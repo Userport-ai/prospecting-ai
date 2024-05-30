@@ -17,21 +17,29 @@ function App() {
           <hr />
           <div className="container ps-4">
             <ul className="navbar-nav">
-              <li className="nav-item d-flex flex-row mt-4">
-                <IoHomeOutline className="nav-icon" />
-                <div className="nav-text">Home</div>
+              <li className="nav-item">
+                <a href="#" className="nav-link">
+                  <IoHomeOutline className="nav-icon" />
+                  <div className="nav-text">Home</div>
+                </a>
               </li>
-              <li className="nav-item d-flex flex-row mt-4">
-                <MdDashboard className="nav-icon" />
-                <div className="nav-text">ICP</div>
+              <li className="nav-item">
+                <a href="#" className="nav-link">
+                  <MdDashboard className="nav-icon" />
+                  <div className="nav-text">ICP</div>
+                </a>
               </li>
-              <li className="nav-item d-flex flex-row mt-4">
-                <MdCampaign className="nav-icon" />
-                <div className="nav-text">Campaigns</div>
+              <li className="nav-item">
+                <a href="#" className="nav-link">
+                  <MdCampaign className="nav-icon" />
+                  <div className="nav-text">Campaigns</div>
+                </a>
               </li>
-              <li className="nav-item d-flex flex-row mt-4">
-                <FaRegBuilding className="nav-icon" />
-                <div className="nav-text">Accounts</div>
+              <li className="nav-item">
+                <a href="#" className="nav-link">
+                  <FaRegBuilding className="nav-icon" />
+                  <div className="nav-text">Accounts</div>
+                </a>
               </li>
             </ul>
           </div>
