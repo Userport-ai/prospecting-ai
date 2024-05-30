@@ -4,7 +4,7 @@ function App() {
   return (
     <>
       <Sidebar />
-      <div id="details" className="container-fluid"></div>
+      <div id="detail"></div>
     </>
   );
 }
