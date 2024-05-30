@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import ErrorPage from "./error-page";
+import IdealCustomerProfile from "./ideal-customer-profile";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";
 import "bootstrap/dist/css/bootstrap.css";
@@ -14,6 +15,12 @@ const router = createBrowserRouter([
     path: "/",
     element: <App />,
     errorElement: <ErrorPage />,
+    children: [
+      {
+        path: "icp/:userId",
+        element: <IdealCustomerProfile />,
+      },
+    ],
   },
 ]);
 

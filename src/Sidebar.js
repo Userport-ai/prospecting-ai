@@ -1,17 +1,18 @@
 import "./App.css";
+import { Link } from "react-router-dom";
 import { GiArchiveResearch } from "react-icons/gi";
 import { IoHomeOutline } from "react-icons/io5";
 import { MdDashboard, MdCampaign } from "react-icons/md";
 import { FaRegBuilding } from "react-icons/fa";
 import { CiLogout } from "react-icons/ci";
 
-function NavItem({ text, children }) {
+function NavItem({ url, text, children }) {
   return (
     <li key={text} className="nav-item">
-      <a href="#" className="nav-link">
+      <Link to={url} className="nav-link">
         {children}
         <div className="nav-text">{text}</div>
-      </a>
+      </Link>
     </li>
   );
 }
@@ -28,16 +29,16 @@ function Sidebar() {
           <hr />
           <div className="container ps-4">
             <ul className="navbar-nav">
-              <NavItem text="Home">
+              <NavItem url="/" text="Home">
                 <IoHomeOutline className="nav-icon" />
               </NavItem>
-              <NavItem text="ICP">
+              <NavItem url="icp/1" text="ICP">
                 <MdDashboard className="nav-icon" />
               </NavItem>
-              <NavItem text="Campaigns">
+              <NavItem url="camp/1" text="Campaigns">
                 <MdCampaign className="nav-icon" />
               </NavItem>
-              <NavItem text="Accounts">
+              <NavItem url="accounts/1" text="Accounts">
                 <FaRegBuilding className="nav-icon" />
               </NavItem>
             </ul>
