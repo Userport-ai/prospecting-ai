@@ -32,13 +32,13 @@ function Sidebar() {
               <NavItem url="/" text="Home">
                 <IoHomeOutline className="nav-icon" />
               </NavItem>
-              <NavItem url="icp/1" text="ICP">
+              <NavItem url="icp" text="ICP">
                 <MdDashboard className="nav-icon" />
               </NavItem>
-              <NavItem url="camp/1" text="Campaigns">
+              <NavItem url="camp" text="Campaigns">
                 <MdCampaign className="nav-icon" />
               </NavItem>
-              <NavItem url="accounts/1" text="Accounts">
+              <NavItem url="accounts" text="Accounts">
                 <FaRegBuilding className="nav-icon" />
               </NavItem>
             </ul>
