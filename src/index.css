@@ -20,6 +20,10 @@ a {
   text-decoration: none;
 }
 
+button {
+  cursor: pointer;
+}
+
 #root {
   display: flex;
   flex-direction: row;
@@ -106,7 +110,28 @@ a {
   width: 100%;
 }
 
-#error-page {
+#icp {
+  height: 100%;
+}
+
+#icp #instructions-div p {
+  color: #333;
+  max-width: 80%;
+  font-size: 1rem;
+  font-weight: 450;
+}
+
+#icp #instructions-div button {
+  font-size: 0.8rem;
+  width: 8rem;
+  height: 2rem;
+  background-color: #1978de;
+  color: white;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+#icp #error-page {
   display: flex;
   flex-direction: column;
   align-items: center;
