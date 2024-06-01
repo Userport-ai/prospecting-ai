@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom";
+
 function IdealCustomerProfile() {
   return (
-    <div id="icp" className="container d-flex justify-content-center">
+    <div id="icp">
       <div
         id="instructions-div"
         className="container d-flex flex-column m-3 p-3"
@@ -16,9 +18,11 @@ function IdealCustomerProfile() {
           </p>
           <p>ICP configurations can also be edited at any time.</p>
         </div>
-        <button type="button" className="mt-2">
-          Create new ICP
-        </button>
+        <Link to="/icp/create">
+          <button type="button" className="mt-2">
+            Create new ICP
+          </button>
+        </Link>
       </div>
     </div>
   );
