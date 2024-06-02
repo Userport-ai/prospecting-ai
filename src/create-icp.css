@@ -6,7 +6,19 @@
 }
 
 #create-icp .create-icp-filter {
-  width: 70%;
+  width: 80%;
+}
+
+#create-icp #account-profile-title {
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: #3b3b3b;
+}
+
+#create-icp .filters-title {
+  font-weight: 600;
+  font-size: 1.2rem;
+  color: #3b3b3b;
 }
 
 #create-icp .accordion-button {
@@ -21,6 +33,13 @@
 
 #create-icp .accordion-button:focus {
   box-shadow: none;
+}
+
+#create-icp #relevance-btn .btn {
+  width: 20%;
+  height: 2rem;
+  font-size: 0.9rem;
+  padding: 0.2rem;
 }
 
 #create-icp select {

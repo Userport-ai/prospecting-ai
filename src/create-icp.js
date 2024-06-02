@@ -1,10 +1,20 @@
-import { Accordion } from "react-bootstrap";
 import "./create-icp.css";
+import { Accordion, Button } from "react-bootstrap";
+
 function CreateICP() {
   return (
-    <div className="d-flex justify-content-center">
-      <div id="create-icp" className="d-flex flex-column mt-5 pb-5">
-        <div className="create-icp-filter container d-flex flex-column mt-4">
+    <div className="d-flex flex-row justify-content-center">
+      <div id="create-icp" className="d-flex flex-column mt-5 pb-3">
+        <div
+          id="account-profile-title"
+          className="create-icp-filter container d-flex justify-content-center mb-2"
+        >
+          <p>Account Profile</p>
+        </div>
+        <div className="create-icp-filter filters-title container mt-2">
+          <p>Standard Filters</p>
+        </div>
+        <div className="create-icp-filter container d-flex flex-column">
           <Accordion alwaysOpen>
             <Accordion.Item eventKey="industry">
               <Accordion.Header>Industry</Accordion.Header>
@@ -74,6 +84,16 @@ function CreateICP() {
               </Accordion.Body>
             </Accordion.Item>
           </Accordion>
+        </div>
+
+        <div className="create-icp-filter filters-title container mt-5">
+          <p>Relevance Filters</p>
+        </div>
+        <div
+          id="relevance-btn"
+          className="create-icp-filter container d-flex flex-column mt-1"
+        >
+          <Button>Add filter</Button>
         </div>
       </div>
     </div>
