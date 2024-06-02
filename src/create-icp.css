@@ -1,0 +1,29 @@
+#create-icp {
+  width: 50%;
+  font-size: 0.8rem;
+  color: #3b3b3b;
+  border: 0.5px solid #ccc;
+}
+
+#create-icp .create-icp-filter {
+  width: 70%;
+}
+
+#create-icp .accordion-button {
+  font-size: 0.9rem;
+  font-weight: 500;
+  height: 2rem;
+}
+
+#create-icp .accordion-button::after {
+  --bs-accordion-btn-icon-width: 0.8rem;
+}
+
+#create-icp .accordion-button:focus {
+  box-shadow: none;
+}
+
+#create-icp select {
+  border: 1px solid #ccc;
+  width: 100%;
+}
