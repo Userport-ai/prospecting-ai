@@ -1,7 +1,16 @@
 import "./create-icp.css";
 import { Accordion, Button, Form, CloseButton, Card } from "react-bootstrap";
+import RelevanceFilterInputs from "./relevance-filter";
+import { useState } from "react";
 
 function RelevanceFilter() {
+  const [filterId, setFilterId] = useState("none");
+
+  function handleValueChange(e) {
+    let gotFilterId = e.target.value;
+    setFilterId(gotFilterId);
+  }
+
   return (
     <Card className="mt-1">
       <Card.Body>
@@ -9,8 +18,8 @@ function RelevanceFilter() {
           id="relevance-fitler-container"
           className="container d-flex flex-row justify-content-between"
         >
-          <Form.Select size="sm" className="w-90">
-            <option selected></option>
+          <Form.Select size="sm" className="w-90" onChange={handleValueChange}>
+            <option value="none" selected></option>
             <option value="raised-funding-recently">
               Have they raised money recently?
             </option>
@@ -45,6 +54,7 @@ function RelevanceFilter() {
           </Form.Select>
           <CloseButton size="sm" />
         </div>
+        <RelevanceFilterInputs filterId={filterId} />
       </Card.Body>
     </Card>
   );
@@ -73,7 +83,9 @@ function CreateICP() {
               <Accordion.Header>Industry</Accordion.Header>
               <Accordion.Body>
                 <Form.Select size="sm">
-                  <option selected>N/A</option>
+                  <option value="none" selected>
+                    N/A
+                  </option>
                   <option value="Saas">SaaS</option>
                   <option value="Real Estate">Real Estate</option>
                   <option value="Banking">Banking</option>
@@ -89,7 +101,9 @@ function CreateICP() {
               <Accordion.Header>Region</Accordion.Header>
               <Accordion.Body>
                 <Form.Select size="sm">
-                  <option selected>N/A</option>
+                  <option value="none" selected>
+                    N/A
+                  </option>
                   <option value="AMER">AMER</option>
                   <option value="EMEA">EMEA</option>
                   <option value="APAC">APAC</option>
@@ -104,7 +118,9 @@ function CreateICP() {
               <Accordion.Header>Company Headcount</Accordion.Header>
               <Accordion.Body>
                 <Form.Select size="sm">
-                  <option selected>N/A</option>
+                  <option value="none" selected>
+                    N/A
+                  </option>
                   <option value="1-10">1-10</option>
                   <option value="10-50">10-50</option>
                   <option value="50-100">50-100</option>
@@ -119,7 +135,9 @@ function CreateICP() {
               <Accordion.Header>Function Headcount</Accordion.Header>
               <Accordion.Body>
                 <Form.Select size="sm">
-                  <option selected>Function Name</option>
+                  <option value="none" selected>
+                    Function Name
+                  </option>
                   <option value="Marketing">Marketing</option>
                   <option value="Sales">Sales</option>
                   <option value="Engineering">Engineering</option>

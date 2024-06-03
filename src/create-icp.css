@@ -47,9 +47,15 @@
   padding: 0.2rem;
 }
 
+#create-icp #relevance-fitler-container {
+  padding: 0;
+}
+
 #create-icp #relevance-fitler-container .form-select {
   width: 90%;
 }
+
 #create-icp #relevance-fitler-container .btn-close {
   width: 0.3rem;
+  margin-top: 0.2rem;
 }
