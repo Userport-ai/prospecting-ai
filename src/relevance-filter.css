@@ -1,9 +1,26 @@
-#raised-funding-container .form-select {
-  height: 1.8rem;
-  width: 20%;
-  font-size: 0.7rem;
+#raised-funding-container {
+  height: 2rem;
 }
 
 #raised-funding-container p {
+  font-size: 0.9rem;
+  margin-top: 0.4rem;
+}
+
+#raised-funding-container .form-select {
+  height: 1.8rem;
+  width: 20%;
+  font-size: 0.8rem;
+}
+
+#is-hiring-container .is-hiring-inputs p {
+  font-size: 0.9rem;
+  margin-top: 0.4rem;
+  width: 10%;
+}
+
+#is-hiring-container .is-hiring-inputs .form-select {
+  height: 2rem;
+  width: 50%;
   font-size: 0.8rem;
 }
