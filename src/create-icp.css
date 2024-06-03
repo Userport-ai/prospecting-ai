@@ -35,6 +35,11 @@
   box-shadow: none;
 }
 
+#create-icp select {
+  border: 1px solid #ccc;
+  width: 100%;
+}
+
 #create-icp #relevance-btn .btn {
   width: 20%;
   height: 2rem;
@@ -42,7 +47,9 @@
   padding: 0.2rem;
 }
 
-#create-icp select {
-  border: 1px solid #ccc;
-  width: 100%;
+#create-icp #relevance-fitler-container .form-select {
+  width: 90%;
+}
+#create-icp #relevance-fitler-container .btn-close {
+  width: 0.3rem;
 }
