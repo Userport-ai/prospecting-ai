@@ -24,3 +24,38 @@
   width: 50%;
   font-size: 0.8rem;
 }
+
+#similar-customers-container {
+  width: 100%;
+}
+
+#similar-customers-container #similar-customers-input .input-group {
+  width: 30%;
+}
+
+#similar-customers-container #similar-customers-input input {
+  height: 1.8rem;
+  font-size: 0.9rem;
+}
+
+#similar-customers-container #similar-customers-input .btn {
+  max-width: 2rem;
+  max-height: 1.8rem;
+}
+
+#similar-customers-display #similar-to-text {
+  font-size: 0.9rem;
+}
+
+.customer-chip {
+  width: fit-content;
+  border: 1px solid lightgray;
+  border-radius: 6px;
+  background-color: darkcyan;
+  color: white;
+  font-weight: 600;
+}
+
+.customer-chip .btn-close {
+  margin-left: 0.4rem;
+}

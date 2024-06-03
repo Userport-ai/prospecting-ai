@@ -27,8 +27,7 @@ function RelevanceFilter() {
               Have they started hiring recently?
             </option>
             <option value="similar-to-customers">
-              Are they similar to some of our current customers in the same
-              vertical?
+              Are they similar to current customers in the same vertical?
             </option>
             <option value="using-competitors">
               Are they using any of our competitors today?

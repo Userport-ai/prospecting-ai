@@ -1,5 +1,6 @@
+import { useState } from "react";
 import "./relevance-filter.css";
-import { Form } from "react-bootstrap";
+import { Button, CloseButton, Form, InputGroup } from "react-bootstrap";
 
 function RaisedFunding() {
   return (
@@ -7,9 +8,7 @@ function RaisedFunding() {
       id="raised-funding-container"
       className="container d-flex flex-row justify-content-start mt-3 p-0"
     >
-      <div class="p-0">
-        <p>In the last </p>
-      </div>
+      <p>In the last </p>
       <Form.Select className="ms-3">
         <option value="none" selected></option>
         <option value="3m">3 months</option>
@@ -55,12 +54,59 @@ function IsHiring() {
   );
 }
 
+function CustomerChip({ customerName }) {
+  return (
+    <div className="customer-chip d-flex flex-row p-2 ms-2">
+      <div id="customer-name">{customerName}</div>
+      <CloseButton />
+    </div>
+  );
+}
+
+function SimilarToCustomers() {
+  const [customers, setCustomers] = useState(["glean.com", "Hubspot"]);
+
+  function handleClick() {}
+
+  return (
+    <div
+      id="similar-customers-container"
+      className="container d-flex flex-column align-items-start p-0"
+    >
+      <div
+        id="similar-customers-input"
+        className="container d-flex flex-row mt-3 p-0"
+      >
+        <InputGroup>
+          <Form.Control type="text" placeholder="Enter company" />
+          <Button variant="primary" onClick={handleClick}>
+            +
+          </Button>
+        </InputGroup>
+      </div>
+      <div
+        id="similar-customers-display"
+        className="container d-flex flex-row mt-2 p-0"
+      >
+        <div id="similar-to-text" className="p-2">
+          Similar to:
+        </div>
+        {customers.map((customerName) => (
+          <CustomerChip customerName={customerName} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RelevanceFilterInputs({ filterId }) {
   switch (filterId) {
     case "raised-funding-recently":
       return <RaisedFunding />;
     case "hiring-recently":
       return <IsHiring />;
+    case "similar-to-customers":
+      return <SimilarToCustomers />;
     default:
       return null;
   }
