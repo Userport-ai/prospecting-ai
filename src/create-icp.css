@@ -44,27 +44,15 @@
   width: 100%;
 }
 
-#create-icp #relevance-filter-id .btn {
-  border-radius: 1.4rem;
-  margin-left: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  height: 2.2rem;
-  width: 2.2rem;
-  background-color: dodgerblue;
-  border: 1px solid gray;
-}
-
-#create-icp #relevance-fitler-container {
+#create-icp #relevance-filter-container {
   padding: 0;
 }
 
-#create-icp #relevance-fitler-container .form-select {
-  width: 90%;
-  height: 1.8rem;
+#create-icp #relevance-filter-container .relevance-filter-text {
+  font-size: 0.9rem;
 }
 
-#create-icp #relevance-fitler-container .btn-close {
+#create-icp #relevance-filter-container .btn-close {
   width: 0.3rem;
   margin-top: 0.2rem;
 }

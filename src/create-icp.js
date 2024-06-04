@@ -1,76 +1,54 @@
 import "./create-icp.css";
-import { Accordion, Button, Form, CloseButton, Card } from "react-bootstrap";
+import { Accordion, Form, CloseButton, Card } from "react-bootstrap";
 import RelevanceFilterInputs from "./relevance-filter";
-import { useState } from "react";
 import {
   industrySelection,
   regionSelection,
   companyHeadcountSelection,
   functionNameSelection,
 } from "./standard-filters-data";
+import { relevanceFilters } from "./relevance-filters-data";
+import { useState } from "react";
 
-function RelevanceFilter() {
-  const [filterId, setFilterId] = useState("none");
+// Global constant describing None Key Id.
+const noneKey = "none";
 
-  function handleValueChange(e) {
-    let gotFilterId = e.target.value;
-    setFilterId(gotFilterId);
+function RelevanceFilter({ filterOption, onClose }) {
+  function handleFilterClose(e) {
+    e.stopPropagation();
+    onClose(filterOption.id);
   }
 
   return (
-    <Card className="mt-3">
-      <Card.Body>
-        <div
-          id="relevance-fitler-container"
-          className="container d-flex flex-row justify-content-between"
-        >
-          <Form.Select size="sm" className="w-90" onChange={handleValueChange}>
-            <option value="none"></option>
-            <option value="raised-funding-recently">
-              Have they raised money recently?
-            </option>
-            <option value="hiring-recently">
-              Have they started hiring recently?
-            </option>
-            <option value="similar-to-customers">
-              Are they similar to current customers in the same vertical?
-            </option>
-            <option value="using-competitors">
-              Are they using any of our competitors today?
-            </option>
-            <option value="using-technologies">
-              Are they using these specific technologies in their stack?
-            </option>
-            <option value="acquired-company-recently">
-              Have they acquired any companies recently?
-            </option>
-            <option value="new-leadership-joined-recently">
-              Has a new leader joined the company recently?
-            </option>
-            <option value="planning-launch-to-new-market">
-              Have they recently announced plans to enter a new market?
-            </option>
-            <option value="product-announcement">
-              Have they announced the launch of a new product?
-            </option>
-            <option value="got-acquired-recently">
-              Have they been acquired recently?
-            </option>
-          </Form.Select>
-          <CloseButton size="sm" />
-        </div>
-        <RelevanceFilterInputs filterId={filterId} />
-      </Card.Body>
-    </Card>
+    <div className="container d-flex flex-column">
+      <Card className="mt-3">
+        <Card.Body>
+          <div
+            id="relevance-filter-container"
+            className="container d-flex flex-row justify-content-between"
+          >
+            <div className="relevance-filter-text">
+              {filterOption.humanReadableString}
+            </div>
+            <CloseButton size="sm" onClick={handleFilterClose} />
+          </div>
+          <RelevanceFilterInputs filterId={filterOption.id} />
+        </Card.Body>
+      </Card>
+    </div>
   );
 }
 
 function FormSelection({ options, defaultHumanReadableValue = "", className }) {
   return (
     <Form.Select size="sm" className={className}>
-      <option value="none">{defaultHumanReadableValue}</option>
+      <option key={noneKey} value={noneKey}>
+        {defaultHumanReadableValue}
+      </option>
       {options.map((option) => (
-        <option value={option.key}>{option.humanReadableString}</option>
+        <option key={option.key} value={option.key}>
+          {option.humanReadableString}
+        </option>
       ))}
     </Form.Select>
   );
@@ -90,6 +68,20 @@ function AccordianSelection({ name, className, children }) {
 }
 
 function CreateICP() {
+  const [filterIdList, setFilterIdList] = useState([]);
+
+  function handleFilterSelection(e) {
+    e.stopPropagation();
+    let newFilterId = e.target.value;
+    if (newFilterId !== noneKey && !filterIdList.includes(newFilterId)) {
+      setFilterIdList([...filterIdList, newFilterId]);
+    }
+  }
+
+  function handleFilterRemoval(filterId) {
+    setFilterIdList(filterIdList.filter((id) => id !== filterId));
+  }
+
   return (
     <div
       id="create-icp-outer-body"
@@ -138,18 +130,40 @@ function CreateICP() {
             ></FormSelection>
           </AccordianSelection>
 
-          <div
-            id="relevance-filter-id"
-            className="filters-title container d-flex mt-5"
-          >
-            <div className="d-flex flex-column justify-content-center">
-              Relevance Filters
-            </div>
-            <Button>+</Button>
+          <div className="filters-title container d-flex mt-5">
+            Relevance Filters
           </div>
-          <div className="container d-flex flex-column">
-            <RelevanceFilter />
+          <div id="relevance-filter-selector" className="container mt-3">
+            <Form.Select
+              size="sm"
+              onChange={handleFilterSelection}
+              value={noneKey}
+            >
+              <option key={noneKey} value={noneKey}>
+                {" "}
+                Add a filter{" "}
+              </option>
+              {relevanceFilters.map((filter) => (
+                <option key={filter.id} value={filter.id}>
+                  {filter.humanReadableString}
+                </option>
+              ))}
+            </Form.Select>
           </div>
+          {filterIdList.map((filterId) => {
+            // Fetch filter option with current filter Id.
+            let filterOption = relevanceFilters.find(
+              (option) => option.id === filterId
+            );
+
+            return (
+              <RelevanceFilter
+                key={filterId}
+                filterOption={filterOption}
+                onClose={handleFilterRemoval}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
