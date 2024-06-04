@@ -123,6 +123,11 @@ function SimilarToCustomers() {
   );
 }
 
+/**
+ * Allows users to manually enter competitors they think are similar.
+ * TODO: Get company list from backend API instead of letting user type
+ * which is more error prone.
+ */
 function UsingCompetitors() {
   const [competitorNames, setCompetitorNames] = useState([]);
   const [currentCompetitorName, setCurrentCompetitorName] = useState("");
@@ -180,6 +185,63 @@ function UsingCompetitors() {
   );
 }
 
+/**
+ * Allows users to manually enter technologies they think are similar.
+ * TODO: Get technology list from backend API instead of letting user type
+ * which is more error prone.
+ */
+function UsingTechnologies() {
+  const [technologies, setTechnologies] = useState([]);
+  const [currentTechnology, setCurrentTechnology] = useState("");
+
+  function handleTechnologyChange(e) {
+    e.stopPropagation();
+    let technology = e.target.value;
+    setCurrentTechnology(technology);
+  }
+
+  function handleTechnologySubmitted(e) {
+    e.stopPropagation();
+    if (currentTechnology !== "" && !technologies.includes(currentTechnology)) {
+      // Add to technology list.
+      setTechnologies([...technologies, currentTechnology]);
+      setCurrentTechnology("");
+    }
+  }
+
+  function handleTechnologyChipRemoval(technology) {
+    setTechnologies(technologies.filter((tech) => tech !== technology));
+  }
+
+  return (
+    <div className="multiple-entries-container container d-flex flex-column align-items-start p-0">
+      <div className="multiple-entries-input container d-flex flex-row mt-3 p-0">
+        <InputGroup>
+          <Form.Control
+            type="text"
+            placeholder="Enter Technology"
+            onChange={handleTechnologyChange}
+            value={currentTechnology}
+          />
+          <Button onClick={handleTechnologySubmitted}>+</Button>
+        </InputGroup>
+      </div>
+      <div className="multiple-entries-display container d-flex flex-row flex-wrap mt-3 p-0">
+        <div id="similar-to-text" className="p-2">
+          Technologies:
+        </div>
+        {technologies.map((customerName) => (
+          <CompanyChip
+            key={customerName}
+            entityName={customerName}
+            onClose={handleTechnologyChipRemoval}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RelevanceFilterInputs({ filterId }) {
   switch (filterId) {
     case "raised-funding-recently":
@@ -190,6 +252,8 @@ function RelevanceFilterInputs({ filterId }) {
       return <SimilarToCustomers />;
     case "using-competitors":
       return <UsingCompetitors />;
+    case "using-technologies":
+      return <UsingTechnologies />;
     default:
       return null;
   }

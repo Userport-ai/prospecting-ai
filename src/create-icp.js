@@ -12,7 +12,7 @@ function RelevanceFilter() {
   }
 
   return (
-    <Card className="mt-1">
+    <Card className="mt-3">
       <Card.Body>
         <div
           id="relevance-fitler-container"
@@ -153,12 +153,10 @@ function CreateICP() {
         </div>
         <div
           id="relevance-btn"
-          className="create-icp-filter container d-flex flex-column mt-1"
+          className="create-icp-filter container d-flex flex-column"
         >
+          <Button onClick={handleAddRevelanceFilter}>Add filter</Button>
           <RelevanceFilter />
-          <Button onClick={handleAddRevelanceFilter} className="mt-2">
-            Add filter
-          </Button>
         </div>
       </div>
     </div>
