@@ -2,6 +2,12 @@ import "./create-icp.css";
 import { Accordion, Button, Form, CloseButton, Card } from "react-bootstrap";
 import RelevanceFilterInputs from "./relevance-filter";
 import { useState } from "react";
+import {
+  industrySelection,
+  regionSelection,
+  companyHeadcountSelection,
+  functionNameSelection,
+} from "./standard-filters-data";
 
 function RelevanceFilter() {
   const [filterId, setFilterId] = useState("none");
@@ -59,6 +65,30 @@ function RelevanceFilter() {
   );
 }
 
+function FormSelection({ options, defaultHumanReadableValue = "", className }) {
+  return (
+    <Form.Select size="sm" className={className}>
+      <option value="none">{defaultHumanReadableValue}</option>
+      {options.map((option) => (
+        <option value={option.key}>{option.humanReadableString}</option>
+      ))}
+    </Form.Select>
+  );
+}
+
+function AccordianSelection({ name, className, children }) {
+  return (
+    <div className={"container d-flex flex-column " + className}>
+      <Accordion alwaysOpen>
+        <Accordion.Item eventKey={name}>
+          <Accordion.Header>{name}</Accordion.Header>
+          <Accordion.Body>{children}</Accordion.Body>
+        </Accordion.Item>
+      </Accordion>
+    </div>
+  );
+}
+
 function CreateICP() {
   return (
     <div
@@ -79,77 +109,34 @@ function CreateICP() {
           <div className="filters-title container mt-2">
             <p>Standard Filters</p>
           </div>
-          <div className="container d-flex flex-column">
-            <Accordion alwaysOpen>
-              <Accordion.Item eventKey="industry">
-                <Accordion.Header>Industry</Accordion.Header>
-                <Accordion.Body>
-                  <Form.Select size="sm">
-                    <option value="none">N/A</option>
-                    <option value="Saas">SaaS</option>
-                    <option value="Real Estate">Real Estate</option>
-                    <option value="Banking">Banking</option>
-                    <option value="Media">Media & Entertainment</option>
-                  </Form.Select>
-                </Accordion.Body>
-              </Accordion.Item>
-            </Accordion>
-          </div>
-          <div className="container d-flex flex-column mt-4">
-            <Accordion alwaysOpen>
-              <Accordion.Item eventKey="region">
-                <Accordion.Header>Region</Accordion.Header>
-                <Accordion.Body>
-                  <Form.Select size="sm">
-                    <option value="none">N/A</option>
-                    <option value="AMER">AMER</option>
-                    <option value="EMEA">EMEA</option>
-                    <option value="APAC">APAC</option>
-                  </Form.Select>
-                </Accordion.Body>
-              </Accordion.Item>
-            </Accordion>
-          </div>
-          <div className="container d-flex flex-column mt-4">
-            <Accordion alwaysOpen>
-              <Accordion.Item eventKey="company-headcount">
-                <Accordion.Header>Company Headcount</Accordion.Header>
-                <Accordion.Body>
-                  <Form.Select size="sm">
-                    <option value="none">N/A</option>
-                    <option value="1-10">1-10</option>
-                    <option value="10-50">10-50</option>
-                    <option value="50-100">50-100</option>
-                  </Form.Select>
-                </Accordion.Body>
-              </Accordion.Item>
-            </Accordion>
-          </div>
-          <div className="container d-flex flex-column mt-4">
-            <Accordion alwaysOpen>
-              <Accordion.Item eventKey="function-headcount">
-                <Accordion.Header>Function Headcount</Accordion.Header>
-                <Accordion.Body>
-                  <Form.Select size="sm">
-                    <option value="none">Function Name</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Sales">Sales</option>
-                    <option value="Engineering">Engineering</option>
-                    <option value="IT">IT</option>
-                    <option value="HR">HR</option>
-                  </Form.Select>
-                  <Form.Select size="sm" className="mt-2">
-                    <option>N/A</option>
-                    <option value="1-5">1-5</option>
-                    <option value="1-10">1-10</option>
-                    <option value="1-20">1-20</option>
-                    <option value="1-30">1-30</option>
-                    <option value="1-40">1-40</option>
-                  </Form.Select>
-                </Accordion.Body>
-              </Accordion.Item>
-            </Accordion>
-          </div>
+          <AccordianSelection name={industrySelection.name}>
+            <FormSelection options={industrySelection.options}></FormSelection>
+          </AccordianSelection>
+          <AccordianSelection name={regionSelection.name} className="mt-4">
+            <FormSelection options={regionSelection.options}></FormSelection>
+          </AccordianSelection>
+          <AccordianSelection
+            name={companyHeadcountSelection.name}
+            className="mt-4"
+          >
+            <FormSelection
+              options={companyHeadcountSelection.options}
+            ></FormSelection>
+          </AccordianSelection>
+          <AccordianSelection
+            name={functionNameSelection.name}
+            className="mt-4"
+          >
+            <FormSelection
+              options={functionNameSelection.nameOptions}
+              defaultHumanReadableValue="Name"
+            ></FormSelection>
+            <FormSelection
+              options={functionNameSelection.headcountOptions}
+              defaultHumanReadableValue="Headcount"
+              className="mt-2"
+            ></FormSelection>
+          </AccordianSelection>
 
           <div
             id="relevance-filter-id"
