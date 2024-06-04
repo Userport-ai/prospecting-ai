@@ -25,30 +25,30 @@
   font-size: 0.8rem;
 }
 
-#similar-customers-container {
+.multiple-entries-container {
   width: 100%;
 }
 
-#similar-customers-container #similar-customers-input .input-group {
+.multiple-entries-container .multiple-entries-input .input-group {
   width: 50%;
 }
 
-#similar-customers-container #similar-customers-input input {
+.multiple-entries-container .multiple-entries-input input {
   height: 1.8rem;
   font-size: 0.9rem;
 }
 
-#similar-customers-container #similar-customers-input .btn {
+.multiple-entries-container .multiple-entries-input .btn {
   max-width: 2rem;
   max-height: 1.8rem;
   background-color: dodgerblue;
 }
 
-#similar-customers-display #similar-to-text {
+.multiple-entries-container .multiple-entries-display #similar-to-text {
   font-size: 0.9rem;
 }
 
-.customer-chip {
+.multiple-entries-container .multiple-entries-display .customer-chip {
   width: fit-content;
   border: 1px solid lightgray;
   border-radius: 6px;
@@ -57,6 +57,9 @@
   font-weight: 600;
 }
 
-.customer-chip .btn-close {
+.multiple-entries-container
+  .multiple-entries-display
+  .customer-chip
+  .btn-close {
   margin-left: 0.4rem;
 }

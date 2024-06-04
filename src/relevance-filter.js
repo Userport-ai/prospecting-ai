@@ -50,14 +50,14 @@ function IsHiring() {
   );
 }
 
-function CustomerChip({ customerName, onClose }) {
+function CompanyChip({ entityName, onClose }) {
   function handleClose(e) {
     e.stopPropagation();
-    onClose(customerName);
+    onClose(entityName);
   }
   return (
     <div className="customer-chip d-flex flex-row flex-wrap p-2 ms-2">
-      <div id="customer-name">{customerName}</div>
+      <div id="customer-name">{entityName}</div>
       <CloseButton onClick={handleClose} />
     </div>
   );
@@ -90,19 +90,13 @@ function SimilarToCustomers() {
     }
   }
 
-  function handleChipRemoval(customerName) {
+  function handleCustomerChipRemoval(customerName) {
     setCustomerNames(customerNames.filter((name) => name !== customerName));
   }
 
   return (
-    <div
-      id="similar-customers-container"
-      className="container d-flex flex-column align-items-start p-0"
-    >
-      <div
-        id="similar-customers-input"
-        className="container d-flex flex-row mt-3 p-0"
-      >
+    <div className="multiple-entries-container container d-flex flex-column align-items-start p-0">
+      <div className="multiple-entries-input container d-flex flex-row mt-3 p-0">
         <InputGroup>
           <Form.Control
             type="text"
@@ -113,18 +107,72 @@ function SimilarToCustomers() {
           <Button onClick={handleCustomerNameSubmitted}>+</Button>
         </InputGroup>
       </div>
-      <div
-        id="similar-customers-display"
-        className="container d-flex flex-row flex-wrap mt-3 p-0"
-      >
+      <div className="multiple-entries-display container d-flex flex-row flex-wrap mt-3 p-0">
         <div id="similar-to-text" className="p-2">
           Similar to:
         </div>
         {customerNames.map((customerName) => (
-          <CustomerChip
+          <CompanyChip
             key={customerName}
-            customerName={customerName}
-            onClose={handleChipRemoval}
+            entityName={customerName}
+            onClose={handleCustomerChipRemoval}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UsingCompetitors() {
+  const [competitorNames, setCompetitorNames] = useState([]);
+  const [currentCompetitorName, setCurrentCompetitorName] = useState("");
+
+  function handleCompetitorNameChange(e) {
+    e.stopPropagation();
+    let competitorName = e.target.value;
+    setCurrentCompetitorName(competitorName);
+  }
+
+  function handleCompetitorNameSubmitted(e) {
+    e.stopPropagation();
+    if (
+      currentCompetitorName !== "" &&
+      !competitorNames.includes(currentCompetitorName)
+    ) {
+      // Add to competitor name list.
+      setCompetitorNames([...competitorNames, currentCompetitorName]);
+      setCurrentCompetitorName("");
+    }
+  }
+
+  function handleCompetitorChipRemoval(competitorName) {
+    setCompetitorNames(
+      competitorNames.filter((name) => name !== competitorName)
+    );
+  }
+
+  return (
+    <div className="multiple-entries-container container d-flex flex-column align-items-start p-0">
+      <div className="multiple-entries-input container d-flex flex-row mt-3 p-0">
+        <InputGroup>
+          <Form.Control
+            type="text"
+            placeholder="Enter company"
+            onChange={handleCompetitorNameChange}
+            value={currentCompetitorName}
+          />
+          <Button onClick={handleCompetitorNameSubmitted}>+</Button>
+        </InputGroup>
+      </div>
+      <div className="multiple-entries-display container d-flex flex-row flex-wrap mt-3 p-0">
+        <div id="similar-to-text" className="p-2">
+          Competitors:
+        </div>
+        {competitorNames.map((competitorName) => (
+          <CompanyChip
+            key={competitorName}
+            entityName={competitorName}
+            onClose={handleCompetitorChipRemoval}
           />
         ))}
       </div>
@@ -140,6 +188,8 @@ function RelevanceFilterInputs({ filterId }) {
       return <IsHiring />;
     case "similar-to-customers":
       return <SimilarToCustomers />;
+    case "using-competitors":
+      return <UsingCompetitors />;
     default:
       return null;
   }
