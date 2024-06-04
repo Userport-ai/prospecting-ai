@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import ErrorPage from "./error-page";
-import IdealCustomerProfile from "./ideal-customer-profile";
+import IdealCustomerProfile from "./icp";
 import CreateICP from "./create-icp";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";

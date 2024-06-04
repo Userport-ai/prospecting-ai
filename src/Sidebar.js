@@ -20,7 +20,7 @@ function NavItem({ url, text, children }) {
 function Sidebar() {
   return (
     <>
-      <div id="sidebar" className="container-fluid">
+      <div id="sidebar" className="container">
         <nav className="navbar d-flex flex-column justify-content-start">
           <a href="#" className="navbar-brand">
             <GiArchiveResearch />
