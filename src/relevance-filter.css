@@ -30,7 +30,7 @@
 }
 
 #similar-customers-container #similar-customers-input .input-group {
-  width: 30%;
+  width: 50%;
 }
 
 #similar-customers-container #similar-customers-input input {
@@ -41,6 +41,7 @@
 #similar-customers-container #similar-customers-input .btn {
   max-width: 2rem;
   max-height: 1.8rem;
+  background-color: dodgerblue;
 }
 
 #similar-customers-display #similar-to-text {
@@ -51,7 +52,7 @@
   width: fit-content;
   border: 1px solid lightgray;
   border-radius: 6px;
-  background-color: darkcyan;
+  background-color: dodgerblue;
   color: white;
   font-weight: 600;
 }

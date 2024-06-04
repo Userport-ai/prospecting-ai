@@ -10,7 +10,7 @@ function RaisedFunding() {
     >
       <p>In the last </p>
       <Form.Select className="ms-3">
-        <option value="none" selected></option>
+        <option value="none"></option>
         <option value="3m">3 months</option>
         <option value="6m">6 months</option>
         <option value="12m">12 months</option>
@@ -28,9 +28,7 @@ function IsHiring() {
       <div className="container d-flex flex-row p-0 is-hiring-inputs">
         <p>Function</p>
         <Form.Select className="ms-3">
-          <option value="any" selected>
-            Any
-          </option>
+          <option value="any">Any</option>
           <option value="sales">Sales</option>
           <option value="marketing">Marketing</option>
           <option value="engineering">Engineering</option>
@@ -42,9 +40,7 @@ function IsHiring() {
       <div className="container d-flex flex-row p-0 is-hiring-inputs">
         <p>Role</p>
         <Form.Select className="ms-3">
-          <option value="any" selected>
-            Any
-          </option>
+          <option value="any">Any</option>
           <option value="sdr">Sales Development Representative</option>
           <option value="ae">Account Executive</option>
           <option value="eng-manager">Engineering Manager</option>
@@ -54,19 +50,49 @@ function IsHiring() {
   );
 }
 
-function CustomerChip({ customerName }) {
+function CustomerChip({ customerName, onClose }) {
+  function handleClose(e) {
+    e.stopPropagation();
+    onClose(customerName);
+  }
   return (
-    <div className="customer-chip d-flex flex-row p-2 ms-2">
+    <div className="customer-chip d-flex flex-row flex-wrap p-2 ms-2">
       <div id="customer-name">{customerName}</div>
-      <CloseButton />
+      <CloseButton onClick={handleClose} />
     </div>
   );
 }
 
+/**
+ * Allows users to manually enter customers they think are similar.
+ * TODO: Get company list from backend API instead of letting user type
+ * which is more error prone.
+ */
 function SimilarToCustomers() {
-  const [customers, setCustomers] = useState(["glean.com", "Hubspot"]);
+  const [customerNames, setCustomerNames] = useState([]);
+  const [currentCustomerName, setCurrentCustomerName] = useState("");
 
-  function handleClick() {}
+  function handleCustomerNameChange(e) {
+    e.stopPropagation();
+    let customerName = e.target.value;
+    setCurrentCustomerName(customerName);
+  }
+
+  function handleCustomerNameSubmitted(e) {
+    e.stopPropagation();
+    if (
+      currentCustomerName !== "" &&
+      !customerNames.includes(currentCustomerName)
+    ) {
+      // Add to customer name list.
+      setCustomerNames([...customerNames, currentCustomerName]);
+      setCurrentCustomerName("");
+    }
+  }
+
+  function handleChipRemoval(customerName) {
+    setCustomerNames(customerNames.filter((name) => name !== customerName));
+  }
 
   return (
     <div
@@ -78,21 +104,28 @@ function SimilarToCustomers() {
         className="container d-flex flex-row mt-3 p-0"
       >
         <InputGroup>
-          <Form.Control type="text" placeholder="Enter company" />
-          <Button variant="primary" onClick={handleClick}>
-            +
-          </Button>
+          <Form.Control
+            type="text"
+            placeholder="Enter company"
+            onChange={handleCustomerNameChange}
+            value={currentCustomerName}
+          />
+          <Button onClick={handleCustomerNameSubmitted}>+</Button>
         </InputGroup>
       </div>
       <div
         id="similar-customers-display"
-        className="container d-flex flex-row mt-2 p-0"
+        className="container d-flex flex-row flex-wrap mt-3 p-0"
       >
         <div id="similar-to-text" className="p-2">
           Similar to:
         </div>
-        {customers.map((customerName) => (
-          <CustomerChip customerName={customerName} />
+        {customerNames.map((customerName) => (
+          <CustomerChip
+            key={customerName}
+            customerName={customerName}
+            onClose={handleChipRemoval}
+          />
         ))}
       </div>
     </div>

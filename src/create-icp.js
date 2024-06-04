@@ -19,7 +19,7 @@ function RelevanceFilter() {
           className="container d-flex flex-row justify-content-between"
         >
           <Form.Select size="sm" className="w-90" onChange={handleValueChange}>
-            <option value="none" selected></option>
+            <option value="none"></option>
             <option value="raised-funding-recently">
               Have they raised money recently?
             </option>
@@ -82,9 +82,7 @@ function CreateICP() {
               <Accordion.Header>Industry</Accordion.Header>
               <Accordion.Body>
                 <Form.Select size="sm">
-                  <option value="none" selected>
-                    N/A
-                  </option>
+                  <option value="none">N/A</option>
                   <option value="Saas">SaaS</option>
                   <option value="Real Estate">Real Estate</option>
                   <option value="Banking">Banking</option>
@@ -100,9 +98,7 @@ function CreateICP() {
               <Accordion.Header>Region</Accordion.Header>
               <Accordion.Body>
                 <Form.Select size="sm">
-                  <option value="none" selected>
-                    N/A
-                  </option>
+                  <option value="none">N/A</option>
                   <option value="AMER">AMER</option>
                   <option value="EMEA">EMEA</option>
                   <option value="APAC">APAC</option>
@@ -117,9 +113,7 @@ function CreateICP() {
               <Accordion.Header>Company Headcount</Accordion.Header>
               <Accordion.Body>
                 <Form.Select size="sm">
-                  <option value="none" selected>
-                    N/A
-                  </option>
+                  <option value="none">N/A</option>
                   <option value="1-10">1-10</option>
                   <option value="10-50">10-50</option>
                   <option value="50-100">50-100</option>
@@ -134,9 +128,7 @@ function CreateICP() {
               <Accordion.Header>Function Headcount</Accordion.Header>
               <Accordion.Body>
                 <Form.Select size="sm">
-                  <option value="none" selected>
-                    Function Name
-                  </option>
+                  <option value="none">Function Name</option>
                   <option value="Marketing">Marketing</option>
                   <option value="Sales">Sales</option>
                   <option value="Engineering">Engineering</option>
@@ -144,7 +136,7 @@ function CreateICP() {
                   <option value="HR">HR</option>
                 </Form.Select>
                 <Form.Select size="sm" className="mt-2">
-                  <option selected>N/A</option>
+                  <option>N/A</option>
                   <option value="1-5">1-5</option>
                   <option value="1-10">1-10</option>
                   <option value="1-20">1-20</option>
