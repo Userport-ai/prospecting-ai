@@ -1,11 +1,15 @@
-#create-icp {
+#create-icp-outer-body {
   width: 50%;
+}
+
+#create-icp {
+  width: 100%;
   font-size: 0.8rem;
   color: #3b3b3b;
   border: 0.5px solid #ccc;
 }
 
-#create-icp .create-icp-filter {
+#create-icp #create-icp-filter {
   width: 80%;
 }
 
@@ -17,7 +21,7 @@
 
 #create-icp .filters-title {
   font-weight: 600;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   color: #3b3b3b;
 }
 
@@ -40,12 +44,15 @@
   width: 100%;
 }
 
-#create-icp #relevance-btn .btn {
-  width: 20%;
-  height: 2rem;
+#create-icp #relevance-filter-id .btn {
+  border-radius: 1.4rem;
+  margin-left: 0.5rem;
   font-size: 0.9rem;
-  padding: 0.2rem;
+  font-weight: 600;
+  height: 2.2rem;
+  width: 2.2rem;
   background-color: dodgerblue;
+  border: 1px solid gray;
 }
 
 #create-icp #relevance-fitler-container {

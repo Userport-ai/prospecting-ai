@@ -16,7 +16,7 @@
 #is-hiring-container .is-hiring-inputs p {
   font-size: 0.9rem;
   margin-top: 0.4rem;
-  width: 10%;
+  width: 15%;
 }
 
 #is-hiring-container .is-hiring-inputs .form-select {
@@ -34,13 +34,15 @@
 }
 
 .multiple-entries-container .multiple-entries-input input {
-  height: 1.8rem;
+  height: 2rem;
   font-size: 0.9rem;
 }
 
 .multiple-entries-container .multiple-entries-input .btn {
-  max-width: 2rem;
-  max-height: 1.8rem;
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
   background-color: dodgerblue;
 }
 
