@@ -1,4 +1,4 @@
-import "./App.css";
+import "./sidebar.css";
 import { Link } from "react-router-dom";
 import { GiArchiveResearch } from "react-icons/gi";
 import { IoHomeOutline } from "react-icons/io5";
