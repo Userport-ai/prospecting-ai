@@ -43,10 +43,7 @@ function Sidebar() {
               </NavItem>
             </ul>
           </div>
-          <div
-            id="logout-container"
-            className="container mt-auto d-flex flex-column"
-          >
+          <div id="logout-container">
             <hr />
             <a href="#" className="mb-3">
               <CiLogout id="icon" />

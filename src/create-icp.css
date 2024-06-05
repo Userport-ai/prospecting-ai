@@ -4,6 +4,8 @@
 
 #create-icp {
   width: 100%;
+  /* This is to ensure the box streches only to current content height */
+  height: fit-content;
   font-size: 0.8rem;
   color: #3b3b3b;
   border: 0.5px solid #ccc;

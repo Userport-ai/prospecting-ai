@@ -1,6 +1,8 @@
 #sidebar {
   width: 18rem;
-  height: 100vh;
+  /* This is to position sidebar */
+  position: relative;
+  min-height: 100%;
   background-color: #f7f7f7;
   border-right: solid 1px #e3e3e3;
 }
@@ -53,6 +55,15 @@
 #sidebar .nav-text {
   font-size: 1.1rem;
   margin-left: 1rem;
+}
+
+#sidebar #logout-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  display: inline-block;
+  margin-bottom: 1rem;
 }
 
 #sidebar #logout-container hr {

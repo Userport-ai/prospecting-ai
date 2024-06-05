@@ -9,7 +9,10 @@ function App() {
       <div className="container-fluid d-flex p-0">
         <Sidebar />
         {/* We need container-fluid class to remaining screen width for the app is fully taken. */}
-        <div className="container-fluid d-flex justify-content-start p-0">
+        <div
+          id="app-div"
+          className="container-fluid d-flex justify-content-start p-0"
+        >
           <Outlet />
         </div>
       </div>
