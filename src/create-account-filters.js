@@ -1,48 +1,35 @@
 import "./create-account-filters.css";
-import { Accordion, Form } from "react-bootstrap";
+import { Form } from "react-bootstrap";
+import StandardFilter from "./standard-filter";
 import RelevanceFilter from "./relevance-filter";
-import {
-  industrySelection,
-  regionSelection,
-  companyHeadcountSelection,
-  functionNameSelection,
-} from "./standard-filters-data";
 import { relevanceFilters } from "./relevance-filters-data";
+import { standardFilters } from "./standard-filters-data";
 import { useState } from "react";
 
 // Global constant describing None Key Id.
 const noneKey = "none";
 
-function FormSelection({ options, defaultHumanReadableValue = "", className }) {
-  return (
-    <Form.Select size="sm" className={className}>
-      <option key={noneKey} value={noneKey}>
-        {defaultHumanReadableValue}
-      </option>
-      {options.map((option) => (
-        <option key={option.key} value={option.key}>
-          {option.humanReadableString}
-        </option>
-      ))}
-    </Form.Select>
-  );
-}
-
-function AccordianSelection({ name, className, children }) {
-  return (
-    <div className={"container d-flex flex-column " + className}>
-      <Accordion alwaysOpen>
-        <Accordion.Item eventKey={name}>
-          <Accordion.Header>{name}</Accordion.Header>
-          <Accordion.Body>{children}</Accordion.Body>
-        </Accordion.Item>
-      </Accordion>
-    </div>
-  );
-}
-
 function CreateAccountFilters() {
+  const [standardFilterIdList, setStandardFilterIdList] = useState([]);
   const [relevanceFilterIdList, setRelevanceFilterIdList] = useState([]);
+
+  function handleStandardFilterSelection(e) {
+    // Do nothing for now.
+    e.stopPropagation();
+    let newFilterId = e.target.value;
+    if (
+      newFilterId !== noneKey &&
+      !standardFilterIdList.includes(newFilterId)
+    ) {
+      setStandardFilterIdList([...standardFilterIdList, newFilterId]);
+    }
+  }
+
+  function handleStandardFilterRemoval(filterId) {
+    setStandardFilterIdList(
+      standardFilterIdList.filter((id) => id !== filterId)
+    );
+  }
 
   function handleRelevanceFilterSelection(e) {
     e.stopPropagation();
@@ -80,34 +67,38 @@ function CreateAccountFilters() {
           <div className="filters-title container mt-2">
             <p>Standard Filters</p>
           </div>
-          <AccordianSelection name={industrySelection.name}>
-            <FormSelection options={industrySelection.options}></FormSelection>
-          </AccordianSelection>
-          <AccordianSelection name={regionSelection.name} className="mt-4">
-            <FormSelection options={regionSelection.options}></FormSelection>
-          </AccordianSelection>
-          <AccordianSelection
-            name={companyHeadcountSelection.name}
-            className="mt-4"
-          >
-            <FormSelection
-              options={companyHeadcountSelection.options}
-            ></FormSelection>
-          </AccordianSelection>
-          <AccordianSelection
-            name={functionNameSelection.name}
-            className="mt-4"
-          >
-            <FormSelection
-              options={functionNameSelection.nameOptions}
-              defaultHumanReadableValue="Name"
-            ></FormSelection>
-            <FormSelection
-              options={functionNameSelection.headcountOptions}
-              defaultHumanReadableValue="Headcount"
-              className="mt-2"
-            ></FormSelection>
-          </AccordianSelection>
+          <div className="container mt-2">
+            <Form.Select
+              size="sm"
+              onChange={handleStandardFilterSelection}
+              value={noneKey}
+            >
+              <option key={noneKey} value={noneKey}>
+                {" "}
+                Add a filter{" "}
+              </option>
+              {standardFilters.map((filter) => (
+                <option key={filter.id} value={filter.id}>
+                  {filter.humanReadableString}
+                </option>
+              ))}
+            </Form.Select>
+          </div>
+
+          {standardFilterIdList.map((filterId) => {
+            // Fetch filter option with current filter Id.
+            let filterOption = standardFilters.find(
+              (option) => option.id === filterId
+            );
+
+            return (
+              <StandardFilter
+                key={filterId}
+                filterOption={filterOption}
+                onClose={handleStandardFilterRemoval}
+              />
+            );
+          })}
 
           <div className="filters-title container d-flex mt-5">
             Relevance Filters

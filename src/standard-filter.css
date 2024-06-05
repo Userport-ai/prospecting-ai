@@ -1,0 +1,9 @@
+.standard-filter-text {
+  font-size: 0.9rem;
+}
+
+.standard-filter-select .form-select {
+  font-size: 0.9rem;
+  height: 2.2rem;
+  margin-top: 0.5rem;
+}
