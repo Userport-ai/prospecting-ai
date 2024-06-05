@@ -1,4 +1,4 @@
-import "./create-icp.css";
+import "./create-account-filters.css";
 import { Accordion, Form, CloseButton, Card } from "react-bootstrap";
 import RelevanceFilterInputs from "./relevance-filter";
 import {
@@ -67,7 +67,7 @@ function AccordianSelection({ name, className, children }) {
   );
 }
 
-function CreateICP() {
+function CreateAccountFilters() {
   const [filterIdList, setFilterIdList] = useState([]);
 
   function handleFilterSelection(e) {
@@ -84,12 +84,12 @@ function CreateICP() {
 
   return (
     <div
-      id="create-icp-outer-body"
+      id="create-account-filters-outer-body"
       className="container d-flex flex-row justify-content-center"
     >
-      <div id="create-icp" className="d-flex flex-column mt-5 pb-3">
+      <div id="create-account-filters" className="d-flex flex-column mt-5 pb-3">
         <div
-          id="create-icp-filter"
+          id="create-account-filters-filter"
           className="container  d-flex flex-column align-items-center"
         >
           <div
@@ -170,4 +170,4 @@ function CreateICP() {
   );
 }
 
-export default CreateICP;
+export default CreateAccountFilters;

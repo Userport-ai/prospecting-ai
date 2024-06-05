@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import ErrorPage from "./error-page";
 import IdealCustomerProfile from "./icp";
-import CreateICP from "./create-icp";
+import CreateAccountFilters from "./create-account-filters";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";
 import "bootstrap/dist/css/bootstrap.css";
@@ -23,7 +23,7 @@ const router = createBrowserRouter([
       },
       {
         path: "icp/create",
-        element: <CreateICP />,
+        element: <CreateAccountFilters />,
       },
     ],
   },

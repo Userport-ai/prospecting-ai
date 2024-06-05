@@ -1,8 +1,8 @@
-#create-icp-outer-body {
+#create-account-filters-outer-body {
   width: 50%;
 }
 
-#create-icp {
+#create-account-filters {
   width: 100%;
   /* This is to ensure the box streches only to current content height */
   height: fit-content;
@@ -11,50 +11,50 @@
   border: 0.5px solid #ccc;
 }
 
-#create-icp #create-icp-filter {
+#create-account-filters #create-account-filters-filter {
   width: 80%;
 }
 
-#create-icp #account-profile-title {
+#create-account-filters #account-profile-title {
   font-weight: 700;
   font-size: 1.4rem;
   color: #3b3b3b;
 }
 
-#create-icp .filters-title {
+#create-account-filters .filters-title {
   font-weight: 600;
   font-size: 1.3rem;
   color: #3b3b3b;
 }
 
-#create-icp .accordion-button {
+#create-account-filters .accordion-button {
   font-size: 0.9rem;
   font-weight: 500;
   height: 2rem;
 }
 
-#create-icp .accordion-button::after {
+#create-account-filters .accordion-button::after {
   --bs-accordion-btn-icon-width: 0.8rem;
 }
 
-#create-icp .accordion-button:focus {
+#create-account-filters .accordion-button:focus {
   box-shadow: none;
 }
 
-#create-icp select {
+#create-account-filters select {
   border: 1px solid #ccc;
   width: 100%;
 }
 
-#create-icp #relevance-filter-container {
+#create-account-filters #relevance-filter-container {
   padding: 0;
 }
 
-#create-icp #relevance-filter-container .relevance-filter-text {
+#create-account-filters #relevance-filter-container .relevance-filter-text {
   font-size: 0.9rem;
 }
 
-#create-icp #relevance-filter-container .btn-close {
+#create-account-filters #relevance-filter-container .btn-close {
   width: 0.3rem;
   margin-top: 0.2rem;
 }
