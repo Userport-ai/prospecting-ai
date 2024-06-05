@@ -1,6 +1,6 @@
 import "./create-account-filters.css";
-import { Accordion, Form, CloseButton, Card } from "react-bootstrap";
-import RelevanceFilterInputs from "./relevance-filter";
+import { Accordion, Form } from "react-bootstrap";
+import RelevanceFilter from "./relevance-filter";
 import {
   industrySelection,
   regionSelection,
@@ -12,32 +12,6 @@ import { useState } from "react";
 
 // Global constant describing None Key Id.
 const noneKey = "none";
-
-function RelevanceFilter({ filterOption, onClose }) {
-  function handleFilterClose(e) {
-    e.stopPropagation();
-    onClose(filterOption.id);
-  }
-
-  return (
-    <div className="container d-flex flex-column">
-      <Card className="mt-3">
-        <Card.Body>
-          <div
-            id="relevance-filter-container"
-            className="container d-flex flex-row justify-content-between"
-          >
-            <div className="relevance-filter-text">
-              {filterOption.humanReadableString}
-            </div>
-            <CloseButton size="sm" onClick={handleFilterClose} />
-          </div>
-          <RelevanceFilterInputs filterId={filterOption.id} />
-        </Card.Body>
-      </Card>
-    </div>
-  );
-}
 
 function FormSelection({ options, defaultHumanReadableValue = "", className }) {
   return (
@@ -68,18 +42,23 @@ function AccordianSelection({ name, className, children }) {
 }
 
 function CreateAccountFilters() {
-  const [filterIdList, setFilterIdList] = useState([]);
+  const [relevanceFilterIdList, setRelevanceFilterIdList] = useState([]);
 
-  function handleFilterSelection(e) {
+  function handleRelevanceFilterSelection(e) {
     e.stopPropagation();
     let newFilterId = e.target.value;
-    if (newFilterId !== noneKey && !filterIdList.includes(newFilterId)) {
-      setFilterIdList([...filterIdList, newFilterId]);
+    if (
+      newFilterId !== noneKey &&
+      !relevanceFilterIdList.includes(newFilterId)
+    ) {
+      setRelevanceFilterIdList([...relevanceFilterIdList, newFilterId]);
     }
   }
 
-  function handleFilterRemoval(filterId) {
-    setFilterIdList(filterIdList.filter((id) => id !== filterId));
+  function handleRelevanceFilterRemoval(filterId) {
+    setRelevanceFilterIdList(
+      relevanceFilterIdList.filter((id) => id !== filterId)
+    );
   }
 
   return (
@@ -136,7 +115,7 @@ function CreateAccountFilters() {
           <div id="relevance-filter-selector" className="container mt-3">
             <Form.Select
               size="sm"
-              onChange={handleFilterSelection}
+              onChange={handleRelevanceFilterSelection}
               value={noneKey}
             >
               <option key={noneKey} value={noneKey}>
@@ -150,7 +129,7 @@ function CreateAccountFilters() {
               ))}
             </Form.Select>
           </div>
-          {filterIdList.map((filterId) => {
+          {relevanceFilterIdList.map((filterId) => {
             // Fetch filter option with current filter Id.
             let filterOption = relevanceFilters.find(
               (option) => option.id === filterId
@@ -160,7 +139,7 @@ function CreateAccountFilters() {
               <RelevanceFilter
                 key={filterId}
                 filterOption={filterOption}
-                onClose={handleFilterRemoval}
+                onClose={handleRelevanceFilterRemoval}
               />
             );
           })}

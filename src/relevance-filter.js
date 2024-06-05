@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "./relevance-filter.css";
-import { Button, CloseButton, Form, InputGroup } from "react-bootstrap";
+import { Button, CloseButton, Form, InputGroup, Card } from "react-bootstrap";
 
 function RaisedFunding() {
   return (
@@ -259,4 +259,30 @@ function RelevanceFilterInputs({ filterId }) {
   }
 }
 
-export default RelevanceFilterInputs;
+function RelevanceFilter({ filterOption, onClose }) {
+  function handleFilterClose(e) {
+    e.stopPropagation();
+    onClose(filterOption.id);
+  }
+
+  return (
+    <div className="container d-flex flex-column">
+      <Card className="mt-3">
+        <Card.Body>
+          <div
+            id="relevance-filter-container"
+            className="container d-flex flex-row justify-content-between"
+          >
+            <div className="relevance-filter-text">
+              {filterOption.humanReadableString}
+            </div>
+            <CloseButton size="sm" onClick={handleFilterClose} />
+          </div>
+          <RelevanceFilterInputs filterId={filterOption.id} />
+        </Card.Body>
+      </Card>
+    </div>
+  );
+}
+
+export default RelevanceFilter;
