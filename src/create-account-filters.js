@@ -9,9 +9,8 @@ import { useState } from "react";
 // Global constant describing None Key Id.
 const noneKey = "none";
 
-function CreateAccountFilters() {
+function StandardAccountFilters() {
   const [standardFilterIdList, setStandardFilterIdList] = useState([]);
-  const [relevanceFilterIdList, setRelevanceFilterIdList] = useState([]);
 
   function handleStandardFilterSelection(e) {
     // Do nothing for now.
@@ -31,6 +30,50 @@ function CreateAccountFilters() {
     );
   }
 
+  return (
+    <>
+      <div className="filters-title container mt-2">
+        <p>Standard Filters</p>
+      </div>
+      <div className="container mt-2">
+        <Form.Select
+          size="sm"
+          onChange={handleStandardFilterSelection}
+          value={noneKey}
+        >
+          <option key={noneKey} value={noneKey}>
+            {" "}
+            Add a filter{" "}
+          </option>
+          {standardFilters.map((filter) => (
+            <option key={filter.id} value={filter.id}>
+              {filter.humanReadableString}
+            </option>
+          ))}
+        </Form.Select>
+      </div>
+
+      {standardFilterIdList.map((filterId) => {
+        // Fetch filter option with current filter Id.
+        let filterOption = standardFilters.find(
+          (option) => option.id === filterId
+        );
+
+        return (
+          <StandardFilter
+            key={filterId}
+            filterOption={filterOption}
+            onClose={handleStandardFilterRemoval}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function RelevanceAccountFilters() {
+  const [relevanceFilterIdList, setRelevanceFilterIdList] = useState([]);
+
   function handleRelevanceFilterSelection(e) {
     e.stopPropagation();
     let newFilterId = e.target.value;
@@ -47,7 +90,47 @@ function CreateAccountFilters() {
       relevanceFilterIdList.filter((id) => id !== filterId)
     );
   }
+  return (
+    <>
+      <div className="filters-title container d-flex mt-5">
+        Relevance Filters
+      </div>
+      <div id="relevance-filter-selector" className="container mt-3">
+        <Form.Select
+          size="sm"
+          onChange={handleRelevanceFilterSelection}
+          value={noneKey}
+        >
+          <option key={noneKey} value={noneKey}>
+            {" "}
+            Add a filter{" "}
+          </option>
+          {relevanceFilters.map((filter) => (
+            <option key={filter.id} value={filter.id}>
+              {filter.humanReadableString}
+            </option>
+          ))}
+        </Form.Select>
+      </div>
+      {relevanceFilterIdList.map((filterId) => {
+        // Fetch filter option with current filter Id.
+        let filterOption = relevanceFilters.find(
+          (option) => option.id === filterId
+        );
 
+        return (
+          <RelevanceFilter
+            key={filterId}
+            filterOption={filterOption}
+            onClose={handleRelevanceFilterRemoval}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function CreateAccountFilters() {
   return (
     <div
       id="create-account-filters-outer-body"
@@ -62,78 +145,10 @@ function CreateAccountFilters() {
             id="account-profile-title"
             className="container d-flex justify-content-center mt-2 mb-2"
           >
-            <p>Account Profile</p>
+            <p>Select Account Filters</p>
           </div>
-          <div className="filters-title container mt-2">
-            <p>Standard Filters</p>
-          </div>
-          <div className="container mt-2">
-            <Form.Select
-              size="sm"
-              onChange={handleStandardFilterSelection}
-              value={noneKey}
-            >
-              <option key={noneKey} value={noneKey}>
-                {" "}
-                Add a filter{" "}
-              </option>
-              {standardFilters.map((filter) => (
-                <option key={filter.id} value={filter.id}>
-                  {filter.humanReadableString}
-                </option>
-              ))}
-            </Form.Select>
-          </div>
-
-          {standardFilterIdList.map((filterId) => {
-            // Fetch filter option with current filter Id.
-            let filterOption = standardFilters.find(
-              (option) => option.id === filterId
-            );
-
-            return (
-              <StandardFilter
-                key={filterId}
-                filterOption={filterOption}
-                onClose={handleStandardFilterRemoval}
-              />
-            );
-          })}
-
-          <div className="filters-title container d-flex mt-5">
-            Relevance Filters
-          </div>
-          <div id="relevance-filter-selector" className="container mt-3">
-            <Form.Select
-              size="sm"
-              onChange={handleRelevanceFilterSelection}
-              value={noneKey}
-            >
-              <option key={noneKey} value={noneKey}>
-                {" "}
-                Add a filter{" "}
-              </option>
-              {relevanceFilters.map((filter) => (
-                <option key={filter.id} value={filter.id}>
-                  {filter.humanReadableString}
-                </option>
-              ))}
-            </Form.Select>
-          </div>
-          {relevanceFilterIdList.map((filterId) => {
-            // Fetch filter option with current filter Id.
-            let filterOption = relevanceFilters.find(
-              (option) => option.id === filterId
-            );
-
-            return (
-              <RelevanceFilter
-                key={filterId}
-                filterOption={filterOption}
-                onClose={handleRelevanceFilterRemoval}
-              />
-            );
-          })}
+          <StandardAccountFilters />
+          <RelevanceAccountFilters />
         </div>
       </div>
     </div>
