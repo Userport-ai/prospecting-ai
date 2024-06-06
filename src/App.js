@@ -11,7 +11,7 @@ function App() {
         {/* We need container-fluid class to remaining screen width for the app is fully taken. */}
         <div
           id="app-div"
-          className="container-fluid d-flex justify-content-start p-0"
+          className="container-fluid d-flex justify-content-center p-0"
         >
           <Outlet />
         </div>

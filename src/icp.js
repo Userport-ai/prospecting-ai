@@ -18,11 +18,13 @@ function IdealCustomerProfile() {
         </p>
         <p>ICP configurations can also be edited at any time.</p>
       </div>
-      <Link to="/icp/create">
-        <button type="button" className="mt-2">
-          Create new ICP
-        </button>
-      </Link>
+      <div className="d-flex justify-content-start">
+        <Link to="/icp/create">
+          <button type="button" className="mt-2">
+            Create new ICP
+          </button>
+        </Link>
+      </div>
     </div>
   );
 }
