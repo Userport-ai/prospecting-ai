@@ -28,11 +28,10 @@
   color: #61dafb;
 }
 
-#app-div {
-  /* We need this to ensure App is always 100% width and height */
-  width: 100%;
+#app-container {
   height: 100%;
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes App-logo-spin {

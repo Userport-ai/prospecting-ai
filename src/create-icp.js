@@ -28,10 +28,20 @@ function CreateICP() {
   switch (currentStep) {
     case 1:
       return (
-        <CreateAccountFilters
-          onAccountFiltersUpdate={handleAccountFiltersUpdate}
-          onNextStepClick={handleNextStepClick}
-        />
+        <>
+          <CreateAccountFilters
+            onAccountFiltersUpdate={handleAccountFiltersUpdate}
+            onNextStepClick={handleNextStepClick}
+          />
+          <CreateAccountFilters
+            onAccountFiltersUpdate={handleAccountFiltersUpdate}
+            onNextStepClick={handleNextStepClick}
+          />
+          <CreateAccountFilters
+            onAccountFiltersUpdate={handleAccountFiltersUpdate}
+            onNextStepClick={handleNextStepClick}
+          />
+        </>
       );
     default:
       return null;

@@ -1,0 +1,51 @@
+#nav-header {
+  background-color: var(--primary);
+  color: var(--on-primary);
+  --logo-width: 20%;
+  padding: 0;
+}
+
+#nav-header #nav-logo-title {
+  background-color: var(--primary);
+  width: var(--logo-width);
+  display: flex;
+  justify-content: start;
+  align-items: center;
+  padding-left: 1rem;
+}
+
+#nav-header #nav-logo-title h2 {
+  margin-left: 1rem;
+}
+
+#nav-header #nav-menu {
+  background-color: var(--primary);
+  width: calc(100% - var(--logo-width));
+}
+
+#nav-header .ant-menu-item {
+  color: var(--outline-variant);
+}
+
+#nav-header .ant-menu-item-icon {
+  font-size: 1.4rem;
+}
+
+#nav-header .ant-menu-item::after {
+  /* Remove hover border bottom color for unselected menu items. */
+  border-bottom: none;
+}
+
+#nav-header .ant-menu-title-content {
+  font-size: 1.6rem;
+}
+
+/* Selected menu item styling */
+
+#nav-header .ant-menu-item-selected {
+  color: var(--on-primary);
+}
+
+#nav-header .ant-menu-item-selected::after {
+  border-bottom: 2px solid var(--on-primary);
+}

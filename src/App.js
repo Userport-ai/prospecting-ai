@@ -1,20 +1,18 @@
 import "./App.css";
-import Sidebar from "./Sidebar";
+import { Layout } from "antd";
+import AppHeader from "./header";
 import { Outlet } from "react-router-dom";
+
+const { Content } = Layout;
 
 function App() {
   return (
     <>
-      {/* We need container-fluid class to ensure full screen width is taken. */}
-      <div className="container-fluid d-flex p-0">
-        <Sidebar />
-        {/* We need container-fluid class to remaining screen width for the app is fully taken. */}
-        <div
-          id="app-div"
-          className="container-fluid d-flex justify-content-center p-0"
-        >
-          <Outlet />
-        </div>
+      <div id="app-container">
+        <AppHeader></AppHeader>
+        <Content>
+          <Outlet></Outlet>
+        </Content>
       </div>
     </>
   );
