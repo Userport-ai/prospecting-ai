@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import FetchedLeads from "./fetched-leads";
 import ErrorPage from "./error-page";
 import IdealCustomerProfile from "./icp";
 import CreateICP from "./create-icp";
@@ -17,6 +18,10 @@ const router = createBrowserRouter([
     element: <App />,
     errorElement: <ErrorPage />,
     children: [
+      {
+        path: "/",
+        element: <FetchedLeads />,
+      },
       {
         path: "icp",
         element: <IdealCustomerProfile />,

@@ -1,6 +1,5 @@
 #nav-header {
   background-color: var(--primary);
-  color: var(--on-primary);
   --logo-width: 20%;
   padding: 0;
 }
@@ -11,11 +10,11 @@
   display: flex;
   justify-content: start;
   align-items: center;
-  padding-left: 1rem;
 }
 
-#nav-header #nav-logo-title h2 {
-  margin-left: 1rem;
+#nav-header #nav-logo-title h3 {
+  margin-left: 2rem;
+  color: var(--on-primary);
 }
 
 #nav-header #nav-menu {

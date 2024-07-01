@@ -3,9 +3,20 @@
 :root {
   --primary: #65558f;
   --on-primary: #ffffff;
+  --primary-container: #eaddff;
+  --on-primary-container: #21005d;
   --secondary: #625b71;
   --on-secondary: #ffffff;
+  --secondary-container: #e8def8;
+  --on-secondary-container: #1d192b;
   --outline-variant: #cac4d0;
+  --surface-container-low: #f7f2fa;
+  --surface-container-bright: #fef7ff;
+  --surface: #fef7ff;
+  --on-surface: #1d1b20;
+  --surface-tint: #6750a4;
+  --inverse-primary: #d0bcff;
+  --hover-color: #9476e0;
 }
 
 html {

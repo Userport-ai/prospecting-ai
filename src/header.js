@@ -1,8 +1,9 @@
 import "./header.css";
-import { Layout, Menu, Flex } from "antd";
+import { Layout, Menu, Flex, Typography } from "antd";
 import { UserOutlined, DashboardOutlined } from "@ant-design/icons";
 
 const { Header } = Layout;
+const { Title } = Typography;
 
 const items = [
   {
@@ -22,7 +23,7 @@ function AppHeader() {
     <Header id="nav-header">
       <Flex id="nav-flex">
         <div id="nav-logo-title">
-          <h2>Prospecting AI</h2>
+          <Title level={3}>Prospecting AI</Title>
         </div>
         <Menu
           id="nav-menu"
