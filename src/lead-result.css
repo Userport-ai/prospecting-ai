@@ -44,3 +44,16 @@
 #lead-result-container #outreach-container {
   margin-top: 5%;
 }
+
+#outreach-container .ant-card {
+  padding: 0;
+  border-radius: 1.7rem;
+  background-color: var(--surface-bright);
+}
+
+#outreach-container .ant-typography {
+  font-family: "Lato";
+  font-size: 1.7rem;
+  color: var(--on-surface);
+  font-weight: 550;
+}

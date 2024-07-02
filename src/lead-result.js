@@ -1,9 +1,25 @@
 import "./lead-result.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { Flex, Typography, Button } from "antd";
+import { Flex, Typography, Button, Card } from "antd";
 import { useNavigate } from "react-router-dom";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
+
+const outreachTextOne =
+  "Hi Zachary, Congrats on Plaid being named #1 for the Finance category of Most Innovative Companies for 2024! \
+  It’s great to see new features via RTP & FedNow while keeping the ecosystem safe at the same time with anti-fraud tools like Signal!";
+
+const outreachTextTwo =
+  "Hi Zachary, Congrats on the recent launch of Plaid Layer! \
+It’s so cool that you can verify a user’s identity just by using their phone number using Layer and also improve user conversion rates by nearly 90%. ";
+
+function InfoCard({ text }) {
+  return (
+    <Card>
+      <Text>{text}</Text>
+    </Card>
+  );
+}
 
 function InfoSection({ sectionTitle }) {
   return (
@@ -32,7 +48,9 @@ function LeadResult() {
           <InfoSection sectionTitle="Product Updates"></InfoSection>
         </Flex>
         <Flex id="outreach-container" vertical={true} gap="large">
-          <Title level={4}>Outreach Messages</Title>
+          <Title level={4}>Sample Outreach Messages</Title>
+          <InfoCard text={outreachTextOne} />
+          <InfoCard text={outreachTextTwo} />
         </Flex>
       </div>
     </div>
