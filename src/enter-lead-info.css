@@ -19,6 +19,7 @@
 #form-container .anticon-arrow-left svg {
   width: 2rem;
   height: 2rem;
+  color: var(--primary);
 }
 
 #form-container h3 {

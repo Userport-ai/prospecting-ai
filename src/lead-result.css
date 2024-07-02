@@ -11,3 +11,36 @@
   display: flex;
   flex-direction: column;
 }
+
+#lead-result-container .anticon-arrow-left svg {
+  width: 2rem;
+  height: 2rem;
+  color: var(--primary);
+}
+
+#lead-result-container h3 {
+  margin-top: 1rem;
+  color: var(--on-surface);
+}
+
+#lead-result-container #info-container {
+  margin-top: 2%;
+}
+
+#info-container .info-section-btn {
+  width: fit-content;
+  background-color: var(--primary-container);
+  color: var(--on-primary-container);
+  border-radius: 1.5rem;
+  font-size: 1.7rem;
+  font-weight: 500;
+  padding: 1.8rem;
+}
+
+#info-container .info-section-btn:hover {
+  background-color: var(--hover-color);
+}
+
+#lead-result-container #outreach-container {
+  margin-top: 5%;
+}
