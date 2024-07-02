@@ -13,6 +13,7 @@
 }
 
 #nav-header #nav-logo-title h3 {
+  margin-top: 1rem;
   margin-left: 2rem;
   color: var(--on-primary);
 }

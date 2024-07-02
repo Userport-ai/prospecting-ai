@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import FetchedLeads from "./fetched-leads";
 import EnterLeadInfo from "./enter-lead-info";
+import LeadResult from "./lead-result";
 import ErrorPage from "./error-page";
 import IdealCustomerProfile from "./icp";
 import CreateICP from "./create-icp";
@@ -26,6 +27,10 @@ const router = createBrowserRouter([
       {
         path: "/enter-lead-info",
         element: <EnterLeadInfo />,
+      },
+      {
+        path: "/lead-result",
+        element: <LeadResult />,
       },
       {
         path: "icp",

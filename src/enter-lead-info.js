@@ -46,7 +46,12 @@ function EnterLeadInfo() {
                 span: 16,
               }}
             >
-              <Button type="primary" htmlType="submit">
+              <Button
+                type="primary"
+                htmlType="submit"
+                // TODO: change to use action and send data to server
+                onClick={() => navigate("/lead-result")}
+              >
                 Submit
               </Button>
             </Form.Item>
