@@ -23,6 +23,19 @@
   color: var(--on-surface);
 }
 
+#lead-result-container .ant-card {
+  padding: 0;
+  border-radius: 1.7rem;
+  background-color: var(--surface-bright);
+}
+
+#lead-result-container .ant-card .ant-typography {
+  font-family: "Lato";
+  font-size: 1.7rem;
+  color: var(--on-surface);
+  font-weight: 550;
+}
+
 #lead-result-container #info-container {
   margin-top: 2%;
 }
@@ -39,21 +52,13 @@
 
 #info-container .info-section-btn:hover {
   background-color: var(--hover-color);
+  color: var(--on-primary);
+}
+
+#lead-result-container .ant-btn-link {
+  padding: 0;
 }
 
 #lead-result-container #outreach-container {
   margin-top: 5%;
-}
-
-#outreach-container .ant-card {
-  padding: 0;
-  border-radius: 1.7rem;
-  background-color: var(--surface-bright);
-}
-
-#outreach-container .ant-typography {
-  font-family: "Lato";
-  font-size: 1.7rem;
-  color: var(--on-surface);
-  font-weight: 550;
 }

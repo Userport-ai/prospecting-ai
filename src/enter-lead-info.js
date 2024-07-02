@@ -37,7 +37,7 @@ function EnterLeadInfo() {
                 },
               ]}
             >
-              <Input />
+              <Input defaultValue="https://www.linkedin.com/in/zperret/" />
             </Form.Item>
 
             <Form.Item
