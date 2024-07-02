@@ -5,8 +5,6 @@ import FetchedLeads from "./fetched-leads";
 import EnterLeadInfo from "./enter-lead-info";
 import LeadResult from "./lead-result";
 import ErrorPage from "./error-page";
-import IdealCustomerProfile from "./icp";
-import CreateICP from "./create-icp";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";
 import "bootstrap/dist/css/bootstrap.css";
@@ -31,14 +29,6 @@ const router = createBrowserRouter([
       {
         path: "/lead-result",
         element: <LeadResult />,
-      },
-      {
-        path: "icp",
-        element: <IdealCustomerProfile />,
-      },
-      {
-        path: "icp/create",
-        element: <CreateICP />,
       },
     ],
   },
