@@ -5,6 +5,7 @@ const columns = [
     title: "Name",
     dataIndex: "name",
     key: "name",
+    // render: (_, record) => <a href={record.url}>{record.name}</a>,
   },
   {
     title: "Role Title",
@@ -30,7 +31,7 @@ const columns = [
     title: "Research results",
     dataIndex: "researchResults",
     key: "researchResults",
-    render: (_, record) => <a href="/icp">View</a>,
+    render: (_, record) => <a href="/">View</a>,
   },
 ];
 
@@ -42,7 +43,7 @@ const data = [
     companyName: "Hubspot",
     industry: "CRM, Marketing tech",
     companyHeadcount: "10,456",
-    researchResultsUrl: "",
+    url: "www.linkedin.com",
   },
   {
     key: "1",
@@ -51,7 +52,7 @@ const data = [
     companyName: "Plaid",
     industry: "Financial Services, Payments",
     companyHeadcount: "1221",
-    researchResultsUrl: "",
+    url: "www.linkedin.com",
   },
   {
     key: "2",
@@ -60,7 +61,7 @@ const data = [
     companyName: "Salesforce",
     industry: "CRM, ERP, Marketing",
     companyHeadcount: "15,200",
-    researchResultsUrl: "",
+    url: "www.linkedin.com",
   },
 ];
 
