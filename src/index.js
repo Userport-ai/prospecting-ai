@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import AllTemplates from "./all-templates";
 import FetchedLeads from "./fetched-leads";
 import EnterLeadInfo from "./enter-lead-info";
 import LeadResult from "./lead-result";
@@ -19,7 +20,16 @@ const router = createBrowserRouter([
     errorElement: <ErrorPage />,
     children: [
       {
+        path: "/templates",
+        element: <AllTemplates />,
+      },
+      {
+        // Navigate home to leads page by default
         path: "/",
+        element: <FetchedLeads />,
+      },
+      {
+        path: "/leads",
         element: <FetchedLeads />,
       },
       {

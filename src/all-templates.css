@@ -1,0 +1,38 @@
+#all-templates-outer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+#all-templates-outer-container {
+  width: 70%;
+  margin-top: 5%;
+  /* display: flex;
+  flex-direction: column; */
+}
+
+#all-templates-outer-container .ant-card {
+  width: 45%;
+  height: fit-content;
+  border: 1px solid var(--outline-variant);
+}
+
+#all-templates-outer-container .ant-typography {
+  font-family: "Lato";
+  color: var(--on-surface);
+}
+
+#all-templates-outer-container .card-key {
+  font-weight: 600;
+}
+
+#all-templates-outer-container .ant-btn {
+  width: fit-content;
+  background-color: var(--primary);
+  border-radius: 1.5rem;
+}
+
+#all-templates-outer-container .ant-btn:hover {
+  background-color: var(--hover-color);
+}

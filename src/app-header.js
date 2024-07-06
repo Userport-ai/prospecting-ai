@@ -1,17 +1,24 @@
-import "./header.css";
+import "./app-header.css";
 import { Layout, Menu, Flex, Typography } from "antd";
 import { UserOutlined, DashboardOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
 const { Header } = Layout;
 const { Title } = Typography;
-const icp_key = "icp";
+const templates_key = "templates";
+const leads_key = "leads";
 const dashboard_key = "dashboard";
 
 const items = [
   {
-    label: "ICP",
-    key: icp_key,
+    label: "Leads",
+    key: leads_key,
+    icon: <UserOutlined />,
+  },
+  {
+    label: "Templates",
+    key: templates_key,
     icon: <UserOutlined />,
   },
   {
@@ -23,6 +30,7 @@ const items = [
 
 function AppHeader() {
   const navigate = useNavigate();
+  const [curMenuKey, setCurMenuKey] = useState(leads_key);
   return (
     <Header id="nav-header">
       <Flex id="nav-flex">
@@ -33,11 +41,14 @@ function AppHeader() {
           id="nav-menu"
           mode="horizontal"
           items={items}
-          selectedKeys={[icp_key]}
+          selectedKeys={[curMenuKey]}
           onClick={(e) => {
-            if (e.key === icp_key) {
-              // Navigate to default page.
-              navigate("/");
+            if (e.key === leads_key) {
+              setCurMenuKey(leads_key);
+              navigate("/leads");
+            } else if (e.key === templates_key) {
+              setCurMenuKey(templates_key);
+              navigate("/templates");
             }
           }}
         ></Menu>
