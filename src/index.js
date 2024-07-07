@@ -4,6 +4,7 @@ import App from "./App";
 import AllTemplates from "./all-templates";
 import { templateMessagesLoader } from "./all-templates";
 import CreateTemplateMessage from "./create-template-message";
+import { createTemplateAction } from "./create-template-message";
 import FetchedLeads from "./fetched-leads";
 import EnterLeadInfo from "./enter-lead-info";
 import LeadResult from "./lead-result";
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
       {
         path: "/create-template",
         element: <CreateTemplateMessage />,
+        action: createTemplateAction,
       },
       {
         // Navigate home to leads page by default

@@ -12,3 +12,9 @@ var createdMessages = [exampleTemplate, exampleTemplate];
 export function getTemplateMessages() {
   return createdMessages;
 }
+
+export function createTemplateMessage() {
+  createdMessages.push(exampleTemplate);
+  console.log("this happened");
+  return createdMessages;
+}

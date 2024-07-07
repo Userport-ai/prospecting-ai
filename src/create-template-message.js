@@ -1,15 +1,22 @@
 import "./create-template-message.css";
-import { exampleTemplate } from "./create-template-message-data";
+import {
+  exampleTemplate,
+  createTemplateMessage,
+} from "./create-template-message-data";
 import { Flex, Typography, Form, Input, Button } from "antd";
 import BackArrow from "./back-arrow";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Form as RouterForm, redirect } from "react-router-dom";
 
 const { Title } = Typography;
 const { TextArea } = Input;
 
+export async function createTemplateAction() {
+  createTemplateMessage();
+  return redirect("/templates");
+}
+
 function CreateTemplateMessage() {
-  const navigate = useNavigate();
   const [currMessage, setCurrMessage] = useState(exampleTemplate.message);
   return (
     <div id="create-template-message-outer">
@@ -60,14 +67,11 @@ function CreateTemplateMessage() {
             </Form.Item>
           </Form>
           <Flex id="btn-container" vertical={false} justify="flex-end">
-            <Button
-              type="primary"
-              htmlType="submit"
-              // TODO: change to use action and send data to server
-              onClick={() => navigate("/templates")}
-            >
-              Create
-            </Button>
+            <RouterForm method="post">
+              <Button type="primary" htmlType="submit">
+                Create
+              </Button>
+            </RouterForm>
           </Flex>
         </Flex>
       </div>
