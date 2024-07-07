@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import AllTemplates from "./all-templates";
+import { templateMessagesLoader } from "./all-templates";
 import CreateTemplateMessage from "./create-template-message";
 import FetchedLeads from "./fetched-leads";
 import EnterLeadInfo from "./enter-lead-info";
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
       {
         path: "/templates",
         element: <AllTemplates />,
+        loader: templateMessagesLoader,
       },
       {
         path: "/create-template",

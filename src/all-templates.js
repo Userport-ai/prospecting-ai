@@ -2,19 +2,28 @@ import "./all-templates.css";
 import { Flex, Typography, Button } from "antd";
 import { useNavigate } from "react-router-dom";
 import TemplateCard from "./template-card";
-import { exampleTemplate } from "./create-template-message-data";
+import { getTemplateMessages } from "./create-template-message-data";
+import { useLoaderData } from "react-router-dom";
 
 const { Title } = Typography;
 
+export async function templateMessagesLoader() {
+  const templateMessages = getTemplateMessages();
+  return { templateMessages };
+}
+
 function AllTemplates() {
   const navigate = useNavigate();
+  const { templateMessages } = useLoaderData();
+
   return (
     <div id="all-templates-outer">
       <Flex id="all-templates-outer-container" vertical={true} gap="large">
         <Title level={3}>Template Messages</Title>
         <Flex vertical={false} wrap gap={100}>
-          <TemplateCard templateDetails={exampleTemplate}></TemplateCard>
-          <TemplateCard templateDetails={exampleTemplate}></TemplateCard>
+          {templateMessages.map((template) => (
+            <TemplateCard templateDetails={template} />
+          ))}
         </Flex>
 
         <Flex vertical={false} justify="flex-start">

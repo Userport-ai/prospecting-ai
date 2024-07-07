@@ -7,3 +7,8 @@ export const exampleTemplate = {
   additionalKeywords: "Performance Marketing",
   message: templateMessage,
 };
+
+var createdMessages = [exampleTemplate, exampleTemplate];
+export function getTemplateMessages() {
+  return createdMessages;
+}
