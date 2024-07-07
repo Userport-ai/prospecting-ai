@@ -1,6 +1,6 @@
 import "./enter-lead-info.css";
-import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Typography, Flex, Form, Input, Button } from "antd";
+import BackArrow from "./back-arrow";
 import { useNavigate } from "react-router-dom";
 
 const { Title } = Typography;
@@ -12,7 +12,7 @@ function EnterLeadInfo() {
       <div id="enter-lead-info-container">
         <div id="form-container">
           <Flex vertical={false} gap="middle">
-            <ArrowLeftOutlined onClick={() => navigate("/")} />
+            <BackArrow />
             <Title level={3}>Enter Lead information</Title>
           </Flex>
           <Form

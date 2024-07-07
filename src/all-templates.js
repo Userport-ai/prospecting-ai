@@ -46,9 +46,9 @@ function AllTemplates() {
             type="primary"
             htmlType="submit"
             // TODO: change to use action and send data to server
-            onClick={() => navigate("/lead-result")}
+            onClick={() => navigate("/create-template")}
           >
-            Add new template
+            Create new template
           </Button>
         </Flex>
       </Flex>

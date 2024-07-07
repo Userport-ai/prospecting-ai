@@ -12,13 +12,13 @@ const dashboard_key = "dashboard";
 
 const items = [
   {
-    label: "Leads",
-    key: leads_key,
+    label: "Templates",
+    key: templates_key,
     icon: <UserOutlined />,
   },
   {
-    label: "Templates",
-    key: templates_key,
+    label: "Leads",
+    key: leads_key,
     icon: <UserOutlined />,
   },
   {
@@ -35,7 +35,7 @@ function AppHeader() {
     <Header id="nav-header">
       <Flex id="nav-flex">
         <div id="nav-logo-title">
-          <Title level={3}>Prospecting AI</Title>
+          <Title level={3}>Userport.ai</Title>
         </div>
         <Menu
           id="nav-menu"

@@ -16,12 +16,6 @@
   margin-left: 18%;
 }
 
-#form-container .anticon-arrow-left svg {
-  width: 2rem;
-  height: 2rem;
-  color: var(--primary);
-}
-
 #form-container h3 {
   margin-top: 1rem;
   color: var(--on-surface);

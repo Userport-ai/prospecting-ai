@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import AllTemplates from "./all-templates";
+import CreateTemplateMessage from "./create-template-message";
 import FetchedLeads from "./fetched-leads";
 import EnterLeadInfo from "./enter-lead-info";
 import LeadResult from "./lead-result";
@@ -22,6 +23,10 @@ const router = createBrowserRouter([
       {
         path: "/templates",
         element: <AllTemplates />,
+      },
+      {
+        path: "/create-template",
+        element: <CreateTemplateMessage />,
       },
       {
         // Navigate home to leads page by default
