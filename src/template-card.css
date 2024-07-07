@@ -1,0 +1,14 @@
+.template-card .ant-card {
+  width: 45%;
+  height: fit-content;
+  border: 1px solid var(--outline-variant);
+}
+
+.template-card .ant-typography {
+  font-family: "Lato";
+  color: var(--on-surface);
+}
+
+.template-card .card-key {
+  font-weight: 600;
+}
