@@ -12,13 +12,13 @@ const dashboard_key = "dashboard";
 
 const items = [
   {
-    label: "Templates",
-    key: templates_key,
+    label: "Leads",
+    key: leads_key,
     icon: <UserOutlined />,
   },
   {
-    label: "Leads",
-    key: leads_key,
+    label: "Templates",
+    key: templates_key,
     icon: <UserOutlined />,
   },
   {
