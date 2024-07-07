@@ -7,10 +7,21 @@ import { personInfoList, outreachMessages } from "./lead-result-data";
 
 const { Title, Text } = Typography;
 
+function addLineBreaks(text) {
+  return text.split("\n").map((substr) => {
+    return (
+      <>
+        {substr}
+        <br />
+      </>
+    );
+  });
+}
+
 function OutreachCard({ text }) {
   return (
     <Card>
-      <Text className="outreach-text">{text}</Text>
+      <Text className="outreach-text">{addLineBreaks(text)}</Text>
     </Card>
   );
 }

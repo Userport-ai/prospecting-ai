@@ -1,6 +1,6 @@
 import "./create-template-message.css";
 import {
-  exampleTemplate,
+  ceoTemplate,
   createTemplateMessage,
 } from "./create-template-message-data";
 import { Flex, Typography, Form, Input, Button } from "antd";
@@ -17,7 +17,7 @@ export async function createTemplateAction() {
 }
 
 function CreateTemplateMessage() {
-  const [currMessage, setCurrMessage] = useState(exampleTemplate.message);
+  const [currMessage, setCurrMessage] = useState(ceoTemplate.message);
   return (
     <div id="create-template-message-outer">
       <div id="create-template-message-area">
@@ -42,7 +42,7 @@ function CreateTemplateMessage() {
                 { required: true, message: "Please enter valid role titles!" },
               ]}
             >
-              <Input defaultValue={exampleTemplate.roleTitles} />
+              <Input defaultValue={ceoTemplate.roleTitles} />
             </Form.Item>
 
             <Form.Item
@@ -50,7 +50,7 @@ function CreateTemplateMessage() {
               name="additional-keywords"
               rules={[{ required: false }]}
             >
-              <Input defaultValue={exampleTemplate.additionalKeywords} />
+              <Input defaultValue={ceoTemplate.additionalKeywords} />
             </Form.Item>
 
             <Form.Item
