@@ -119,7 +119,7 @@ class LinkedInPostScraper:
 
         return LinkedInPost(**data)
 
-    @ staticmethod
+    @staticmethod
     def _get_post_id(post_url: str) -> str:
         """Extracts Post ID from given LinkedIn Post URL."""
         match = re.search("activity-(\d+)-", post_url)
@@ -130,7 +130,7 @@ class LinkedInPostScraper:
         # Access the captured group and convert to integer
         return match.group(1)
 
-    @ staticmethod
+    @staticmethod
     def _is_valid_post(post_url: str) -> bool:
         """Returns true if valid linkedin post and false otherwise."""
         if "linkedin.com/posts" not in post_url or "activity-" not in post_url:
