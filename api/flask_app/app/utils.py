@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import pytz
 
 
 class Utils:
@@ -21,6 +22,21 @@ class Utils:
         """
         return datetime.fromisoformat(post_time.replace('Z', '+00:00')).astimezone(timezone.utc)
 
+    @staticmethod
+    def create_utc_datetime(day: int, month: int, year: int) -> datetime:
+        """Converts given date to dateimte with UTC timezone."""
+
+        # Create a naive datetime object
+        naive_date = datetime(year, month, day)
+
+        # Get the UTC timezone
+        utc_timezone = pytz.UTC
+
+        # Localize the naive datetime to UTC
+        utc_datetime = utc_timezone.localize(naive_date)
+
+        return utc_datetime
+
 
 if __name__ == "__main__":
     # UTC time
@@ -28,5 +44,8 @@ if __name__ == "__main__":
 
     # UTC+05:30 time.
     # post_time: str = "2023-06-20T12:30:45+05:30"
-    dt = Utils.convert_linkedin_post_time_to_utc(post_time)
-    print(dt.tzinfo)
+    # dt = Utils.convert_linkedin_post_time_to_utc(post_time)
+    # print(dt.tzinfo)
+
+    utc_date = Utils.create_utc_datetime(7, 6, 2023)
+    print(utc_date.tzinfo)

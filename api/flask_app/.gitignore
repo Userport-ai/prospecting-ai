@@ -2,7 +2,7 @@
 
 .env
 
-example_linkedin_posts/
+example_linkedin_info/
 
 *.pyc
 __pycache__/
