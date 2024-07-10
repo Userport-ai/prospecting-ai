@@ -37,6 +37,11 @@ class Utils:
 
         return utc_datetime
 
+    @staticmethod
+    def create_utc_time_now() -> datetime:
+        """Returns UTC time now."""
+        return datetime.now(pytz.UTC)
+
 
 if __name__ == "__main__":
     # UTC time

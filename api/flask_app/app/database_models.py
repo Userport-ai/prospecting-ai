@@ -12,15 +12,6 @@ from enum import Enum
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
-class PersonInfo(BaseModel):
-    """Information about a given Person."""
-    id: Optional[PyObjectId] = Field(
-        alias="_id", default=None, description="MongoDB generated unique identifier for the person.")
-    full_name: str = Field(..., description="Full name of the person.")
-    linkedin_profile_url: str = Field(...,
-                                      description="LinkedIn profile URL of the person.")
-
-
 class CompanyInfo(BaseModel):
     """Information about a given Company."""
     id: Optional[PyObjectId] = Field(
@@ -160,9 +151,9 @@ class WebSearchResult(BaseModel):
         alias="_id", default=None, description="MongoDB generated unique identifier for the document.")
     content_url: str = Field(...,
                              description="URL of content from search results on the web.")
-    person_info_id: Optional[PyObjectId] = Field(
-        default=None, description="PersonInfo Identifier used to search for this web result.")
-    company_info_id: Optional[PyObjectId] = Field(
+    person_profile_id: Optional[PyObjectId] = Field(
+        default=None, description="PersonProfile Identifier used to search for this web result.")
+    company_profile_id: Optional[PyObjectId] = Field(
         default=None, description="CompanyInfo Identifier used to search for this web result.")
     search_query: str = Field(...,
                               description="Search query used to fetch this content.")
@@ -182,10 +173,12 @@ class WebSearchResult(BaseModel):
         default=None, description="Why the content is not relevant to person and company.")
 
 
-class LinkedInProfile(BaseModel):
-    """LinkedIn Profile of a person.
+class PersonProfile(BaseModel):
+    """Profile of a person.
 
-    Most of the information is from Proxycurl's API response.
+    Most of the information is from Proxycurl's Person LinkedIn Profile API response.
+
+    Other fields will be enriched manually or using other sources.
     """
 
     class Date(BaseModel):
@@ -219,7 +212,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -247,7 +240,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -269,7 +262,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -293,7 +286,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -315,7 +308,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -343,7 +336,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -367,7 +360,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -389,7 +382,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -413,7 +406,7 @@ class LinkedInProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
-            profile_date = LinkedInProfile.Date(**v)
+            profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
@@ -426,8 +419,8 @@ class LinkedInProfile(BaseModel):
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for the LinkedIn Post.")
-    url: Optional[str] = Field(
-        default=None, description="URL of the profile.")
+    linkedin_url: Optional[str] = Field(
+        default=None, description="URL of the LinkedIn profile.")
     date_synced: Optional[datetime] = Field(
         default=None, description="Date when this profile was synced from LinkedIn in UTC timezone.")
     public_identifier: str = Field(...,

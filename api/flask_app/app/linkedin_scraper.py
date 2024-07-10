@@ -3,7 +3,8 @@ import re
 import requests
 from typing import Optional, Dict
 from dotenv import load_dotenv
-from database_models import LinkedInPost, LinkedInProfile
+from utils import Utils
+from database_models import LinkedInPost, PersonProfile
 
 load_dotenv()
 
@@ -59,7 +60,7 @@ class LinkedInScraper:
 
         return LinkedInPost(**data)
 
-    def fetch_linkedin_profile(profile_url: str) -> Optional[LinkedInProfile]:
+    def fetch_linkedin_profile(profile_url: str) -> Optional[PersonProfile]:
         """Fetches and returns LinkedIn Profile information of a given person from URL.
 
         Proxycurl API documentation: https://nubela.co/proxycurl/docs
@@ -102,7 +103,11 @@ class LinkedInScraper:
             raise ValueError(
                 f"Failed to get JSON response when fetching LinkedIn Profile for url: {profile_url}")
 
-        return LinkedInProfile(**data)
+        # Populate LinkedIn profile URL field in the response.
+        person_profile = PersonProfile(**data)
+        person_profile.linkedin_url = profile_url
+        person_profile.date_synced = Utils.create_utc_time_now()
+        return person_profile
 
     @staticmethod
     def _get_post_id(post_url: str) -> str:
@@ -155,7 +160,7 @@ if __name__ == "__main__":
     with open("../example_linkedin_info/proxycurl_profile_3.json", "r") as f:
         data = f.read()
     profile_data = json.loads(data)
-    lprofile = LinkedInProfile(**profile_data)
+    lprofile = PersonProfile(**profile_data)
     print(lprofile)
 
     # post_url = 'https://www.linkedin.com/posts/a2kapur_macro-activity-7150910641900244992-0B5E'
