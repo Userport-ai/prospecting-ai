@@ -19,7 +19,7 @@ class LinkedInScraper:
     PROXYCURL_PROFILE_ENDPOINT = "https://nubela.co/proxycurl/api/v2/linkedin"
 
     @staticmethod
-    def fetch_linkedin_post(post_url: str) -> Optional[LinkedInPost]:
+    def fetch_linkedin_post(post_url: str) -> LinkedInPost:
         """Fetches and returns LinkedIn post information for given URL.
 
         Piloterr API documentation: https://www.piloterr.com/library/linkedin-post-info.
@@ -28,9 +28,9 @@ class LinkedInScraper:
             post_url [string]: URL of the LinkedIn post.
 
         Returns:
-            Dictionary of LinkedIn Post if found, else None.
+            LinkedInPost object instance.
         """
-        if not LinkedInScraper._is_valid_post(post_url):
+        if not LinkedInScraper.is_valid_post(post_url):
             raise ValueError(f"Invalid LinkedIn post URL format: {post_url}")
 
         headers = LinkedInScraper._get_piloterr_request_headers()
@@ -41,14 +41,10 @@ class LinkedInScraper:
                 LinkedInScraper.PILOTERR_POST_ENDPOINT, headers=headers, params=params)
         except Exception as e:
             raise ValueError(
-                f"Failed to fetch LinkedIn post from Piloterr: {e}")
+                f"Failed to fetch LinkedIn post from Piloterr due to error: {e}")
 
         status_code = response.status_code
         if status_code != 200:
-            if status_code == 404:
-                # Post not found, return None.
-                return None
-
             raise ValueError(
                 f"Got invalid status code: {status_code} when fetching LinkedIn post for url:  {post_url}")
 
@@ -121,13 +117,13 @@ class LinkedInScraper:
         return match.group(1)
 
     @staticmethod
-    def _is_valid_post(post_url: str) -> bool:
+    def is_valid_post(post_url: str) -> bool:
         """Returns true if valid linkedin post and false otherwise.
 
         Post url must be of this format: https://www.linkedin.com/posts/a2kapur_macro-activity-7150910641900244992-0B5E
         """
         if "linkedin.com/posts" not in post_url or "activity-" not in post_url:
-            raise False
+            return False
         return True
 
     @staticmethod

@@ -1,6 +1,7 @@
 
 import os
 import re
+from typing import Optional
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from pymongo.collection import Collection
@@ -33,9 +34,9 @@ class Database:
         """Helper to exclude ID during model_dump call."""
         return ['id']
 
-    def _get_person_profile_collection(self) -> Collection:
-        """Returns Person Profile collection."""
-        return self.db['person_profile']
+    def _get_person_profiles_collection(self) -> Collection:
+        """Returns Person Profiles collection."""
+        return self.db['person_profiles']
 
     def _get_web_search_results_collection(self) -> Collection:
         """Returns Web Search results collection."""
@@ -46,7 +47,7 @@ class Database:
         if person_profile.id:
             raise ValueError(
                 f"PersonProfile instance cannot have an Id before db insertion: {person_profile}")
-        collection = self._get_person_profile_collection()
+        collection = self._get_person_profiles_collection()
         result = collection.insert_one(
             person_profile.model_dump(exclude=Database._exclude_id()))
         return result.inserted_id
@@ -63,13 +64,21 @@ class Database:
 
     def get_current_employment(self, person_profile_id: ObjectId) -> CurrentEmployment:
         """Returns CurrentEmployment value for given person's profile id."""
-        collection = self._get_person_profile_collection()
+        collection = self._get_person_profiles_collection()
         data_dict = collection.find_one({"_id": person_profile_id})
         if not data_dict:
             raise ValueError(
                 f'Person profile not found for Id: {person_profile_id}')
         profile = PersonProfile(**data_dict)
         return Database._to_current_employment(profile=profile)
+
+    def get_web_search_result_by_url(self, url: str) -> Optional[WebSearchResult]:
+        """Returns Websearch result for given url and None if not found."""
+        collection = self._get_web_search_results_collection()
+        data_dict = collection.find_one({"url": url})
+        if not data_dict:
+            return None
+        return WebSearchResult(**data_dict)
 
     @staticmethod
     def _to_current_employment(profile: PersonProfile) -> CurrentEmployment:
@@ -118,11 +127,12 @@ if __name__ == "__main__":
         profile_data = json.loads(data)
         person_profile = PersonProfile(**profile_data)
         person_profile.linkedin_url = "https://in.linkedin.com/in/aniket-bajpai"
+        # person_profile.linkedin_url = "https://www.linkedin.com/in/zperret"
         person_profile.date_synced = Utils.create_utc_time_now()
         return person_profile
 
     db = Database()
-    # db.insert_person_profile(person_profile=read_person_profile())
-    current_employment = db.get_current_employment(
-        ObjectId("668e4eb26870b48c49e60dde"))
-    print(current_employment)
+    db.insert_person_profile(person_profile=read_person_profile())
+    # current_employment = db.get_current_employment(
+    #     ObjectId("668e4eb26870b48c49e60dde"))
+    # print(current_employment)

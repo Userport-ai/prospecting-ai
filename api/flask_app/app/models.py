@@ -1,4 +1,4 @@
-from typing import Optional, Annotated, List
+from typing import Optional, Annotated, List, Literal, Union
 from pydantic.functional_validators import BeforeValidator
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
@@ -151,24 +151,54 @@ class ContentType(Enum):
     OTHER = "content_type_other"
 
 
+class SearchEngineMetadata(BaseModel):
+    """Metdata when using search engine for searching web."""
+    type: Literal["search_engine"]
+    name: str = Field(..., description="Name of the search engine used.")
+    query: str = Field(..., description="Query used for search.")
+
+    @staticmethod
+    def create(name: str, query: str):
+        return SearchEngineMetadata(type="search_engine", name=name, query=query)
+
+
+class CompanyWebsiteMetadata(BaseModel):
+    """Metdata when using company website for scraping information."""
+    type: Literal["company_website"]
+
+    @staticmethod
+    def create():
+        return CompanyWebsiteMetadata(type="company_website")
+
+
+"""Metadata associated with the different workflows to fetch information on the web."""
+WebSearchMetadata = Union[SearchEngineMetadata, CompanyWebsiteMetadata]
+
+
 class WebSearchResult(BaseModel):
     """
     Contains results from scraping the web.
 
     The content from the web can be about a person or a company or both.
+
+    It can be fetched in multiple ways:
+    1. Using search engines.
+    2. Scraping websites.
+    3. Calling specific APIs like Crunchbase, NYSE.
+    4. Asking LLMs directly.
     """
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for web search result.")
     current_employment: CurrentEmployment = Field(
         ..., description="Current employment defails of the person who is being searched for.")
-    search_query: str = Field(...,
-                              description="Search query used to fetch this content.")
-    content_url: str = Field(...,
-                             description="URL of content from search results on the web.")
-    is_scrapable: Optional[bool] = Field(
-        default=None, description="Whether this piece of content is scrapable or not.")
-    date_published: Optional[datetime] = Field(
+    web_search_metadata: WebSearchMetadata = Field(...,
+                                                   description="Metadata associated with web search process to get this result.")
+    url: str = Field(...,
+                     description="URL from searching on the web.")
+    created_on: datetime = Field(
+        ..., description="Date in UTC timezone when this document was inserted in the db.")
+    content_publish_date: Optional[datetime] = Field(
         default=None, description="Date when this content was published in UTC timezone.")
     content_type: Optional[ContentType] = Field(default=None,
                                                 description="Type of content found in this URL.")
@@ -180,6 +210,10 @@ class WebSearchResult(BaseModel):
         default=None, description="Whether content is relevant to given person and company.")
     not_relevant_content_reason: Optional[str] = Field(
         default=None, description="Why the content is not relevant to person and company.")
+
+    # To prevent encoding error, see https://stackoverflow.com/questions/65209934/pydantic-enum-field-does-not-get-converted-to-string.
+    class Config:
+        use_enum_values = True
 
 
 class PersonProfile(BaseModel):
