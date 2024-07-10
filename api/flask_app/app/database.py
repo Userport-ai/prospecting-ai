@@ -1,11 +1,16 @@
 
 import os
+import re
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from pymongo.collection import Collection
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
-from database_models import PersonProfile, CompanyInfo, WebSearchResult
+from database_models import (
+    PersonProfile,
+    CurrentEmployment,
+    WebSearchResult
+)
 from typing import List
 
 load_dotenv()
@@ -32,10 +37,6 @@ class Database:
         """Returns Person Profile collection."""
         return self.db['person_profile']
 
-    def _get_company_info_collection(self) -> Collection:
-        """Returns Company Info collection."""
-        return self.db['company_info']
-
     def _get_web_search_results_collection(self) -> Collection:
         """Returns Web Search results collection."""
         return self.db['web_search_results']
@@ -45,19 +46,9 @@ class Database:
         if person_profile.id:
             raise ValueError(
                 f"PersonProfile instance cannot have an Id before db insertion: {person_profile}")
-        person_profile_collection = self._get_person_profile_collection()
-        result = person_profile_collection.insert_one(
+        collection = self._get_person_profile_collection()
+        result = collection.insert_one(
             person_profile.model_dump(exclude=Database._exclude_id()))
-        return result.inserted_id
-
-    def insert_company_info(self, company_info: CompanyInfo) -> ObjectId:
-        """Inserts Company information as a document in the database and returns the created Id."""
-        if company_info.id:
-            raise ValueError(
-                f"CompanyInfo instance cannot have an Id before db insertion: {company_info}")
-        company_info_collection = self._get_company_info_collection()
-        result = company_info_collection.insert_one(
-            company_info.model_dump(exclude=Database._exclude_id()))
         return result.inserted_id
 
     def insert_web_search_result(self, web_search_result: WebSearchResult) -> ObjectId:
@@ -65,10 +56,48 @@ class Database:
         if web_search_result.id:
             raise ValueError(
                 f"WebSearchresult instance cannot have an Id before db insertion: {web_search_result}")
-        web_search_results_collection = self._get_web_search_results_collection()
-        result = web_search_results_collection.insert_one(
+        collection = self._get_web_search_results_collection()
+        result = collection.insert_one(
             web_search_result.model_dump(exclude=Database._exclude_id()))
         return result.inserted_id
+
+    def get_current_employment(self, person_profile_id: ObjectId) -> CurrentEmployment:
+        """Returns CurrentEmployment value for given person's profile id."""
+        collection = self._get_person_profile_collection()
+        data_dict = collection.find_one({"_id": person_profile_id})
+        if not data_dict:
+            raise ValueError(
+                f'Person profile not found for Id: {person_profile_id}')
+        profile = PersonProfile(**data_dict)
+        return Database._to_current_employment(profile=profile)
+
+    @staticmethod
+    def _to_current_employment(profile: PersonProfile) -> CurrentEmployment:
+        """Returns CurrentEmployment from given Person profile."""
+        match = re.search("(.+) at (.+)", profile.occupation)
+        if not match:
+            raise ValueError(
+                f"Profile occupation not in expected format: {profile}")
+        role_title: str = match.group(1)
+        company_name: str = match.group(2)
+
+        # Find company URL from experiences.
+        experience: PersonProfile.Experience = next(
+            filter(lambda e: e.company == company_name, profile.experiences), None)
+        if not experience:
+            raise ValueError(
+                f"Could not find experience in profile with company: {company_name}. Profile: {profile}")
+        company_linkedin_profile_url: str = experience.company_linkedin_profile_url
+
+        return CurrentEmployment(
+            person_profile_id=profile.id,
+            date_synced=profile.date_synced,
+            full_name=profile.full_name,
+            role_title=role_title,
+            person_profile_url=profile.linkedin_url,
+            company_name=company_name,
+            company_linkedin_profile_url=company_linkedin_profile_url
+        )
 
     def _test_connection(self):
         """Helper method to test successful connection to cluster deployment."""
@@ -93,8 +122,7 @@ if __name__ == "__main__":
         return person_profile
 
     db = Database()
-    db.insert_person_profile(person_profile=read_person_profile())
-
-    # company_info = CompanyInfo(
-    #     full_name="Plaid", linkedin_page_url="https://www.linkedin.com/company/plaid-/")
-    # db.insert_company_info(company_info=company_info)
+    # db.insert_person_profile(person_profile=read_person_profile())
+    current_employment = db.get_current_employment(
+        ObjectId("668e4eb26870b48c49e60dde"))
+    print(current_employment)

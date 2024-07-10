@@ -12,13 +12,23 @@ from enum import Enum
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
-class CompanyInfo(BaseModel):
-    """Information about a given Company."""
-    id: Optional[PyObjectId] = Field(
-        alias="_id", default=None, description="MongoDB generated unique identifier for the company.")
-    full_name: str = Field(..., description="Full name of the company.")
-    linkedin_page_url: str = Field(...,
-                                   description="LinkedIn page URL of the company.")
+class CurrentEmployment(BaseModel):
+    """Details about person's current employment.
+
+    Used when searching for information related to the person on the web.
+    """
+    person_profile_id: PyObjectId = Field(
+        ..., description="PersonProfile identifier of this person.")
+    date_synced: datetime = Field(
+        ..., description="Date when this information was last synced from LinkedIn profile.")
+    full_name: str = Field(..., description="Person's full name.")
+    role_title: str = Field(...,
+                            description="Person's role title at company.")
+    person_profile_url: str = Field(...,
+                                    description="LinkedIn profile URL of the person.")
+    company_name: str = Field(..., description="Company name.")
+    company_linkedin_profile_url: str = Field(
+        ..., description="Company LinkedIn profile URL.")
 
 
 class Product(Enum):
@@ -147,16 +157,15 @@ class WebSearchResult(BaseModel):
 
     The content from the web can be about a person or a company or both.
     """
+
     id: Optional[PyObjectId] = Field(
-        alias="_id", default=None, description="MongoDB generated unique identifier for the document.")
-    content_url: str = Field(...,
-                             description="URL of content from search results on the web.")
-    person_profile_id: Optional[PyObjectId] = Field(
-        default=None, description="PersonProfile Identifier used to search for this web result.")
-    company_profile_id: Optional[PyObjectId] = Field(
-        default=None, description="CompanyInfo Identifier used to search for this web result.")
+        alias="_id", default=None, description="MongoDB generated unique identifier for web search result.")
+    current_employment: CurrentEmployment = Field(
+        ..., description="Current employment defails of the person who is being searched for.")
     search_query: str = Field(...,
                               description="Search query used to fetch this content.")
+    content_url: str = Field(...,
+                             description="URL of content from search results on the web.")
     is_scrapable: Optional[bool] = Field(
         default=None, description="Whether this piece of content is scrapable or not.")
     date_published: Optional[datetime] = Field(
@@ -212,6 +221,12 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
@@ -240,6 +255,13 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
@@ -262,6 +284,12 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
@@ -286,6 +314,12 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
@@ -308,6 +342,12 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
@@ -336,6 +376,12 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
@@ -360,6 +406,12 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
@@ -382,6 +434,12 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
@@ -406,6 +464,12 @@ class PersonProfile(BaseModel):
             if not v:
                 # Date is None, nothing to do here.
                 return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
