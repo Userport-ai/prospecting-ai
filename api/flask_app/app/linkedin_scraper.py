@@ -4,7 +4,7 @@ import requests
 from typing import Optional, Dict
 from dotenv import load_dotenv
 from utils import Utils
-from database_models import LinkedInPost, PersonProfile
+from models import LinkedInPost, PersonProfile
 
 load_dotenv()
 

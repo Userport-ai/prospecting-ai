@@ -6,7 +6,7 @@ from pymongo.server_api import ServerApi
 from pymongo.collection import Collection
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
-from database_models import (
+from models import (
     PersonProfile,
     CurrentEmployment,
     WebSearchResult
