@@ -1,8 +1,11 @@
 
 import os
 import re
+import contextlib
 from typing import Optional
+from collections.abc import Generator
 from pymongo.mongo_client import MongoClient
+from pymongo.client_session import ClientSession
 from pymongo.server_api import ServerApi
 from pymongo.collection import Collection
 from bson.objectid import ObjectId
@@ -10,7 +13,8 @@ from dotenv import load_dotenv
 from models import (
     PersonProfile,
     CurrentEmployment,
-    WebSearchResult
+    WebSearchResult,
+    LinkedInPost
 )
 from typing import List
 
@@ -38,6 +42,10 @@ class Database:
         """Returns Person Profiles collection."""
         return self.db['person_profiles']
 
+    def _get_linkedin_posts_collection(self) -> Collection:
+        """Returns LinkedIn posts collection."""
+        return self.db['linkedin_posts']
+
     def _get_web_search_results_collection(self) -> Collection:
         """Returns Web Search results collection."""
         return self.db['web_search_results']
@@ -52,15 +60,38 @@ class Database:
             person_profile.model_dump(exclude=Database._exclude_id()))
         return result.inserted_id
 
-    def insert_web_search_result(self, web_search_result: WebSearchResult) -> ObjectId:
+    def insert_linkedin_post(self, linkedin_post: LinkedInPost, session: Optional[ClientSession] = None) -> ObjectId:
+        """Inserts LinkedIn post information as document in the database and returns the created Id."""
+        if linkedin_post.id:
+            raise ValueError(
+                f"LinkedInPost instance cannot have an Id before db insertion: {linkedin_post}")
+        collection = self._get_linkedin_posts_collection()
+        result = collection.insert_one(
+            linkedin_post.model_dump(exclude=Database._exclude_id()), session=session)
+        return result.inserted_id
+
+    def insert_web_search_result(self, web_search_result: WebSearchResult, session: Optional[ClientSession] = None) -> ObjectId:
         """Inserts Websearch result as a document in the database and returns the created Id."""
         if web_search_result.id:
             raise ValueError(
                 f"WebSearchresult instance cannot have an Id before db insertion: {web_search_result}")
         collection = self._get_web_search_results_collection()
         result = collection.insert_one(
-            web_search_result.model_dump(exclude=Database._exclude_id()))
+            web_search_result.model_dump(exclude=Database._exclude_id()), session=session)
         return result.inserted_id
+
+    @contextlib.contextmanager
+    def transaction_session(self) -> Generator[ClientSession, None]:
+        """Wrapper Context manager around MongoDB client session to skip creating a new instance method for each new type of transacation.
+
+        Example:
+        with self.database.transaction_session() as session:
+            self.database.insert_linkedin_post(post, session=session)
+            self.database.insert_web_search_resul(result, session=session)
+        """
+        with self.mongo_client.start_session() as session:
+            with session.start_transaction():
+                yield session
 
     def get_current_employment(self, person_profile_id: ObjectId) -> CurrentEmployment:
         """Returns CurrentEmployment value for given person's profile id."""

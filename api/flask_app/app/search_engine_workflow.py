@@ -8,7 +8,8 @@ from models import (
     WebSearchResult,
     SearchEngineMetadata,
     ContentType,
-    ContentCategory
+    ContentCategory,
+    LinkedInPostReference
 )
 
 
@@ -66,9 +67,18 @@ class SearchEngineWorkflow:
                     is_relevant_content=None,
                     not_relevant_content_reason=None
                 )
+
+                # Write LinkedIn post and web search result transactionally.
                 try:
-                    self.database.insert_web_search_result(
-                        web_search_result=web_search_result)
+                    with self.database.transaction_session() as session:
+                        post_id = self.database.insert_linkedin_post(
+                            linkedin_post=linkedin_post, session=session)
+
+                        # Add post storage reference to web search result.
+                        web_search_result.content_extra_reference = LinkedInPostReference.create(
+                            id=post_id)
+                        self.database.insert_web_search_result(
+                            web_search_result=web_search_result, session=session)
                 except Exception as e:
                     # Log error and continue.
                     print(

@@ -175,6 +175,28 @@ class CompanyWebsiteMetadata(BaseModel):
 WebSearchMetadata = Union[SearchEngineMetadata, CompanyWebsiteMetadata]
 
 
+class LinkedInPostReference(BaseModel):
+    """Reference to LinkedIn Post details in Database."""
+    type: Literal["linkedin_post"]
+    id: PyObjectId = Field(...,
+                           description="Identifier for stored LinkedIn post in database.")
+
+    @staticmethod
+    def create(id: PyObjectId):
+        return LinkedInPostReference(type="linkedin_post", id=id)
+
+
+class HTMLPageReference(BaseModel):
+    """Reference to HTML page details in Database."""
+    type: Literal["html_page"]
+    id: PyObjectId = Field(...,
+                           description="Identifier for stored HTML Page in database.")
+
+
+"""Extra information about the content that is stored separately and can be processed independently of fetching the content again."""
+ContentExtraReference = Union[LinkedInPostReference, HTMLPageReference]
+
+
 class WebSearchResult(BaseModel):
     """
     Contains results from scraping the web.
@@ -206,6 +228,8 @@ class WebSearchResult(BaseModel):
         default=None, description="Category of the content found")
     content_short_summary: Optional[str] = Field(
         default=None, description="A short summary of the content")
+    content_extra_reference: Optional[ContentExtraReference] = Field(
+        default=None, description="Reference to extra details regarding content stored in a different collection.")
     is_relevant_content: Optional[bool] = Field(
         default=None, description="Whether content is relevant to given person and company.")
     not_relevant_content_reason: Optional[str] = Field(
@@ -595,12 +619,18 @@ class LinkedInPost(BaseModel):
         image_url: Optional[str] = None
         profile_type: ProfileType = Field(...)
 
+        # To prevent encoding error, see https://stackoverflow.com/questions/65209934/pydantic-enum-field-does-not-get-converted-to-string.
+        class Config:
+            use_enum_values = True
+
         def is_person(self) -> bool:
             """Returns True if person and false otherwise."""
             return self.profile_type == LinkedInPost.PostAuthor.ProfileType.PERSON
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for the LinkedIn Post.")
+    fetch_date: Optional[datetime] = Field(default=None,
+                                           description="Date when post was fetched from API call."),
     post_id: str = Field(..., validation_alias="id",
                          description="Identifier of the post.")
     url: str = Field(..., description="URL of the post.")
@@ -625,10 +655,10 @@ class LinkedInPost(BaseModel):
     @field_validator('date_published', mode='before')
     @classmethod
     def parse_date_published(cls, v):
-        """Convert string to datetime object."""
-        if not isinstance(v, str):
-            raise ValueError(
-                f"Expected string for date_published, got type: {type(v)} with value: {v}")
+        if isinstance(v, datetime):
+            # Already correct type, do nothing.
+            # This happens when reading object from Database.
+            return v
 
-        # Convert to datetime object in UTC timezone.
+        # Convert string to datetime object in UTC timezone.
         return Utils.convert_linkedin_post_time_to_utc(post_time=v)

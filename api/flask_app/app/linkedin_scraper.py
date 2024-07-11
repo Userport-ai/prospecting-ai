@@ -54,7 +54,9 @@ class LinkedInScraper:
             raise ValueError(
                 f"Failed to get JSON response when fetching LinkedIn post for url: {post_url}")
 
-        return LinkedInPost(**data)
+        post = LinkedInPost(**data)
+        post.fetch_date = Utils.create_utc_time_now()
+        return post
 
     def fetch_linkedin_profile(profile_url: str) -> Optional[PersonProfile]:
         """Fetches and returns LinkedIn Profile information of a given person from URL.
