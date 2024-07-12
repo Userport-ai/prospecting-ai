@@ -21,8 +21,11 @@ class ParsedHTMLOutput(BaseModel):
         ..., description="Parsed HTML page divided into chunks and Markdown formatted.")
 
 
-class FetchHTMLGraph:
-    """Uses Scrapegraph AI to construct a graph that fetches HTML page and parses it into Markdown chunks."""
+class ScrapeWebPageGraph:
+    """Uses Scrapegraph AI to construct a graph that fetches HTML page and parses it into Markdown chunks.
+
+    The class can then be queried multiple times for different answers.
+    """
 
     # Constant used to store state in graph execution.
     # If these values are changed, you must change the corresponding field names in ParsedHTMLOuput class.
@@ -38,17 +41,17 @@ class FetchHTMLGraph:
     GPT_40_MAX_CONTEXT_WINDOW_SIZE = 128000
     GPT_3_5_TURBO_MAX_CONTEXT_WINDOW_SIZE = 16000
 
-    def __init__(self, verbose: bool = False, chunk_size: int = 4096) -> None:
+    def __init__(self, url: str, verbose: bool = False, chunk_size: int = 4096) -> None:
         self.chunk_size = chunk_size
         self.verbose = verbose
-        self.html_fetch_and_parse_graph = self._create_html_fetch_and_parse_graph()
+        self.url = url
+        self.parsed_html_output = self._fetch_html_and_parse()
 
-    def _create_html_fetch_and_parse_graph(self) -> BaseGraph:
-        """Define graph to fetch HTML page and parse the document into a list of chunked Langchain documents."""
-
+    def _fetch_html_and_parse(self) -> ParsedHTMLOutput:
+        """Graph that fetches HTML page and parses it and returns the output."""
         fetch_node = FetchNode(
-            input=f"{FetchHTMLGraph.URL} | local_dir",
-            output=[FetchHTMLGraph.DOC],
+            input=f"{ScrapeWebPageGraph.URL} | local_dir",
+            output=[ScrapeWebPageGraph.DOC],
             node_config={
                 "headless": True,
                 "verbose": self.verbose,
@@ -56,15 +59,15 @@ class FetchHTMLGraph:
         )
 
         parse_node = ParseNode(
-            input=FetchHTMLGraph.DOC,
-            output=[FetchHTMLGraph.PARSED_DOC],
+            input=ScrapeWebPageGraph.DOC,
+            output=[ScrapeWebPageGraph.PARSED_DOC],
             node_config={
                 "chunk_size": self.chunk_size,
                 "verbose": self.verbose,
             }
         )
 
-        return BaseGraph(
+        graph = BaseGraph(
             nodes=[
                 fetch_node,
                 parse_node,
@@ -75,17 +78,13 @@ class FetchHTMLGraph:
             entry_point=fetch_node
         )
 
-    def run(self, url: str) -> ParsedHTMLOutput:
-        """Fetches and parses HTML page associated with the given URL."""
-
         # We need to pass in a random key as first parameter due to a bug in the scrapergraphai library
         # that expects the second argument to be the URL: https://github.com/ScrapeGraphAI/Scrapegraph-ai/blob/main/scrapegraphai/graphs/base_graph.py#L117.
-        final_state, _ = self.html_fetch_and_parse_graph.execute({"random": "not needed",
-                                                                  FetchHTMLGraph.URL: url})
+        final_state, _ = graph.execute({"random": "not needed",
+                                        ScrapeWebPageGraph.URL: self.url})
         return ParsedHTMLOutput(**final_state)
 
 
 if __name__ == "__main__":
-    g = FetchHTMLGraph()
-    url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
-    g.run(url=url)
+    graph = ScrapeWebPageGraph(
+        "https://lilianweng.github.io/posts/2023-06-23-agent/")
