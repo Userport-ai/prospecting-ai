@@ -2,7 +2,7 @@
 
 .env
 
-app/cache/
+app/chroma_db/
 
 example_linkedin_info/
 
