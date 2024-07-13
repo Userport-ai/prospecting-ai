@@ -2,6 +2,8 @@
 
 .env
 
+app/cache/
+
 example_linkedin_info/
 
 *.pyc
