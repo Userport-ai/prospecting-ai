@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 import requests
-from typing import List, Dict
+from typing import List
 from markdownify import markdownify
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -50,6 +50,23 @@ class ScrapePageGraph:
         chunks: List[Document] = ScrapePageGraph.split_into_chunks(
             doc=doc, chunk_size=chunk_size)
         self.create_and_store_embeddings(chunks=chunks)
+
+    def retrieve_relevant_docs(self, user_query: str, k: int = 5) -> List[Document]:
+        """Retreive k most relevant docs for give query from Vector store."""
+        # Reference: https://api.python.langchain.com/en/latest/vectorstores/langchain_community.vectorstores.chroma.Chroma.html#langchain_community.vectorstores.chroma.Chroma.as_retriever
+        search_kwargs = {
+            'k': k,
+            'filter': {
+                # Note: You can only filter by one Metadata param, so we will use URL.
+                ScrapePageGraph.URL: self.url,
+            }
+        }
+        try:
+            retriever = self.db.as_retriever(search_kwargs=search_kwargs)
+            return retriever.invoke(user_query)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to fetch relevant docs for user query: {user_query} for url: {self.url} with error: {e}")
 
     @staticmethod
     def fetch_page(url: str) -> Document:
@@ -107,3 +124,7 @@ class ScrapePageGraph:
 if __name__ == "__main__":
     url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
     graph = ScrapePageGraph(url=url)
+
+    user_query = "What is an agent?"
+    docs = graph.retrieve_relevant_docs(user_query=user_query)
+    print("first doc content: ", docs[0].page_content[:1000])
