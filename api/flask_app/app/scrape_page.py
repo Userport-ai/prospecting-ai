@@ -89,6 +89,7 @@ class ScrapePageGraph:
                 f"Invalid Opena AI model name: {openai_model_name}")
 
         # Reference: https://python.langchain.com/v0.2/docs/tutorials/summarization.
+        # Use chain_type: "map_reduce" or "stuff" or "refine".
         llm = ChatOpenAI(temperature=1.0, model_name=openai_model_name)
         chain = load_summarize_chain(llm, chain_type="map_reduce")
 
@@ -166,5 +167,5 @@ if __name__ == "__main__":
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
     # print("first doc content: ", docs[0].page_content[:1000])
 
-    graph.get_page_summary(
-        openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL)
+    print(graph.get_page_summary(
+        openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL))
