@@ -1,19 +1,30 @@
 import os
 from dotenv import load_dotenv
 import requests
-from typing import List, Dict
+from datetime import datetime
+from langchain_core.prompts import PromptTemplate
+from typing import List, Dict, Optional
 from markdownify import markdownify
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnablePassthrough
+from models import ContentType
 from langchain.chains.summarize import load_summarize_chain
+from langchain_core.pydantic_v1 import BaseModel, Field
 
 load_dotenv()
+
+
+class ContentClassification(BaseModel):
+    """Classification of the content."""
+    content_type: ContentType = Field(...,
+                                      description="The type of the content described by the text.")
+    content_category: str = Field(
+        ..., description="Category of the content described by the text.")
+    publish_date: Optional[datetime] = Field(
+        default=None, description="Date in UTC timezone when this content was published.")
 
 
 class ScrapePageGraph:
@@ -82,8 +93,8 @@ class ScrapePageGraph:
             raise ValueError(
                 f"Failed to fetch relevant docs for user query: {user_query} for url: {self.url} with error: {e}")
 
-    def get_page_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL):
-        """Generate a summary of the page contents from chunks."""
+    def get_page_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL) -> str:
+        """Returns a summary of the page contents from chunks."""
         if openai_model_name not in [ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL, ScrapePageGraph.OPENAI_GPT_4O_MODEL]:
             raise ValueError(
                 f"Invalid Opena AI model name: {openai_model_name}")
@@ -95,6 +106,29 @@ class ScrapePageGraph:
 
         result = chain.invoke(self.chunks)
         return result["output_text"]
+
+    def get_content_details(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL):
+        prompt_template = """Extract the desired information from the following text.
+
+            Passage:
+            {text}
+            """
+        tagging_prompt = PromptTemplate.from_template(prompt_template)
+        llm = ChatOpenAI(temperature=1.0, model_name=openai_model_name).with_structured_output(
+            ContentClassification)
+
+        chain = tagging_prompt | llm
+
+        result = chain.invoke(
+            {"text": ScrapePageGraph.format_docs(self.chunks)})
+        print(result)
+
+    @staticmethod
+    def format_docs(docs: List[Document]) -> str:
+        """Helper since StuffDocumentsChain gives some validation error when structued output is
+        specified with LLM model. So using this function as workaround to combines docs to text.
+        """
+        return "\n\n".join(doc.page_content for doc in docs)
 
     @staticmethod
     def fetch_page(url: str) -> Document:
@@ -115,7 +149,7 @@ class ScrapePageGraph:
         md = markdownify(response.text)
         return Document(page_content=md, metadata={ScrapePageGraph.URL: url})
 
-    @staticmethod
+    @ staticmethod
     def split_into_chunks(doc: Document, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[Document]:
         """Split document into chunks of given size and overlap."""
         text_splitter = RecursiveCharacterTextSplitter(
@@ -167,5 +201,7 @@ if __name__ == "__main__":
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
     # print("first doc content: ", docs[0].page_content[:1000])
 
-    print(graph.get_page_summary(
-        openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL))
+    # print(graph.get_page_summary(
+    #     openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL))
+    graph.get_content_details(
+        openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL)

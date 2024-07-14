@@ -31,31 +31,31 @@ class CurrentEmployment(BaseModel):
         ..., description="Company LinkedIn profile URL.")
 
 
-class Product(Enum):
+class Product(str, Enum):
     LAUNCH = "product_launch"
     UPDATE = "product_update"
     SUNSET = "product_sunset"
     OTHER = "product_other"
 
 
-class LeaderAppointment(Enum):
+class LeaderAppointment(str, Enum):
     NEW_HIRE = "leader_new_hire"
     PROMOTION = "leader_promotion"
     OTHER = "leader_other"
 
 
-class FinancialResults(Enum):
+class FinancialResults(str, Enum):
     QUARTER = "financial_results_quarter"
     ANNUAL = "financial_results_annual"
     OTHER = "financial_results_other"
 
 
-class Collaboration(Enum):
+class Collaboration(str, Enum):
     PARTNERSHIP = "collaboration_partnership"
     OTHER = "collaboration_other"
 
 
-class Achievement(Enum):
+class Achievement(str, Enum):
     FUNDING_ANNOUNCEMENT = "achievement_funding_announcement"
     IPO_ANNOUNCEMENT = "achievement_ipo_announcement"
     RECOGNITION = "achievement_recognition"
@@ -66,19 +66,19 @@ class Achievement(Enum):
     OTHER = "achievement_other"
 
 
-class Event(Enum):
+class Event(str, Enum):
     CONFERENCE = "event_conference"
     WEBINAR = "event_webinar"
     TRADE_SHOW = "event_trade_show"
     OTHER = "event_other"
 
 
-class Challenge(Enum):
+class Challenge(str, Enum):
     CRISIS_SITUATION = "challenge_crisis_situation"
     OTHER = "challenge_other"
 
 
-class Rebranding(Enum):
+class Rebranding(str, Enum):
     NAME = "rebrading_name"
     LOGO = "rebranding_logo"
     WEBSITE = "rebranding_website"
@@ -86,13 +86,13 @@ class Rebranding(Enum):
     OTHER = "rebranding_other"
 
 
-class SocialResponsibility(Enum):
+class SocialResponsibility(str, Enum):
     NEW_INITIATIVE = "social_responsibility_new_initiative"
     DONATION = "social_responsibility_donation"
     OTHER = "social_responsibility_other"
 
 
-class BusinessExpansion(Enum):
+class BusinessExpansion(str, Enum):
     NEW_OFFICE = "business_expansion_new_office"
     GROWTH = "business_expansion_growth"
     NEW_MARKET_EXPANSION = "business_expansion_new_market_expansion"
@@ -100,20 +100,20 @@ class BusinessExpansion(Enum):
     OTHER = "business_expansion_other"
 
 
-class Legal(Enum):
+class Legal(str, Enum):
     REGULATION_COMPLIANCE = "legal_regulation_compliance"
     LAWSUIT = "legal_lawsuit"
     SETTLEMENT = "legal_settlement"
 
 
-class InternalEvent(Enum):
+class InternalEvent(str, Enum):
     COMPANY_OFFSITE = "internal_event_company_offsite"
     EMPLOYEE_RECOGNITION = "internal_event_employee_recognition"
     EMPLOYEE_PROMOTION = "internal_event_employee_promotion"
     HIRING = "internal_event_hiring"
 
 
-class PersonalThoughts(Enum):
+class PersonalThoughts(str, Enum):
     """Content that is personal thoughts of a person."""
     ADVICE = "personal_thoughts_advice"
     ANECDOTE = "personal_thoughts_anecdote"
@@ -122,7 +122,7 @@ class PersonalThoughts(Enum):
     OTHER = "personal_thoughts_other"
 
 
-class ContentCategory(Enum):
+class ContentCategory(str, Enum):
     """Categories of different types of content on the web."""
     PRODUCT = Product
     LEADER_APPOINTMENT = LeaderAppointment
@@ -140,7 +140,7 @@ class ContentCategory(Enum):
     OTHER = "content_category_other"
 
 
-class ContentType(Enum):
+class ContentType(str, Enum):
     """Categories of web content in the web result."""
     INTERVIEW_ARTICLE = "content_type_interview_article"
     INTERVIEW_VIDEO = "content_type_interview_video"
