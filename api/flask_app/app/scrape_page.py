@@ -23,8 +23,6 @@ class ContentClassification(BaseModel):
                                       description="The type of the content described by the text.")
     content_category: str = Field(
         ..., description="Category of the content described by the text.")
-    publish_date: Optional[str] = Field(
-        default=None, description="Date when this content was published. If not found in the text, set to None.")
 
 
 class ContentSummary(BaseModel):
@@ -109,23 +107,6 @@ class ScrapePageGraph:
             raise ValueError(
                 f"Failed to fetch relevant docs for user query: {user_query} for url: {self.url} with error: {e}")
 
-    def get_content_details(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL):
-        prompt_template = """Extract the desired information from the following text.
-
-            Passage:
-            {text}
-            """
-        tagging_prompt = PromptTemplate.from_template(prompt_template)
-        llm = ChatOpenAI(temperature=1.0, model_name=openai_model_name).with_structured_output(
-            ContentClassification)
-
-        chain = tagging_prompt | llm
-
-        # TODO: break chunks into relevant chunks before inferrring content details.
-        result = chain.invoke(
-            {"text": ScrapePageGraph.format_docs(self.chunks)})
-        print(result)
-
     def fetch_content_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL) -> Tuple[str, str]:
         """Fetches content details by parsing the document from the top to the bottom.
         Returns concatenations of summaries as well as overall summary of the page.
@@ -204,7 +185,41 @@ class ScrapePageGraph:
         result = chain.invoke("Who wrote the content and on which date?")
 
         # Now using the string response from LLM, parse it for author and date information.
-        return self.parse_llm_output(content=result.content)
+        content_details = self.parse_llm_output(content=result.content)
+        print("\ncontent details about author and publish date: ", content_details)
+        return content_details
+
+    def fetch_content_type(self, content_details: ContentDetails, detailed_summary: str) -> str:
+        """Fetches content type using given detials and summary of text.
+
+        Currenly returning LLM string output without parsing.
+        """
+        # Do not change this prompt before testing, results may get worse.
+        prompt_template = (
+            "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
+            "If you don't know the answer or it's not in the context, just say you don't know.\n"
+            "\n"
+            "Question: {question}\n"
+            "\n"
+            "Context: {context}\n"
+        )
+        # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
+        llm = ChatOpenAI(
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
+        prompt = PromptTemplate.from_template(prompt_template)
+
+        chain = prompt | llm
+        question = "What type of content does this text represent? If you don't know, just say you don't know."
+        context = f'URL: {self.url}\n\nAuthor:{content_details.author}\n\nDate published:{content_details.publish_date}\n\nDetailed Summary: {detailed_summary}'
+        result = chain.invoke(
+            {"question": question, "context": context})
+
+        # Now using the string response from LLM, parse it for author and date information.
+        # return self.parse_llm_output(content=result.content)
+        print("\nContent type:")
+        print(result)
+        # TODO: Parse content type and return enum. Right now it is just a sentence provided by LLM.
+        return result.content
 
     def parse_llm_output(self, content: str) -> ContentDetails:
         """Helper to fetch content details in structured format from unstructured LLM output.
@@ -222,14 +237,14 @@ class ScrapePageGraph:
         chain = prompt | llm
         return chain.invoke(content)
 
-    @ staticmethod
+    @staticmethod
     def format_docs(docs: List[Document]) -> str:
         """Helper since StuffDocumentsChain gives some validation error when structued output is
         specified with LLM model. So using this function as workaround to combines docs to text.
         """
         return "\n\n".join(doc.page_content for doc in docs)
 
-    @ staticmethod
+    @staticmethod
     def fetch_page(url: str) -> Document:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
         try:
@@ -248,7 +263,7 @@ class ScrapePageGraph:
         md = markdownify(response.text)
         return Document(page_content=md, metadata={ScrapePageGraph.URL: url})
 
-    @ staticmethod
+    @staticmethod
     def split_into_chunks(doc: Document, chunk_size: int = 4096, chunk_overlap: int = 200) -> List[Document]:
         """Split document into chunks of given size and overlap."""
         text_splitter = RecursiveCharacterTextSplitter(
@@ -295,15 +310,16 @@ class ScrapePageGraph:
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
     # url = "https://plaid.com/blog/year-in-review-2023/"
-    url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
+    # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
+    # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
+    url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     graph = ScrapePageGraph(url=url)
 
     # user_query = "What is an agent?"
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
     # print("first doc content: ", docs[0].page_content[:1000])
 
-    # graph.get_content_details(
-    #     openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL)
-
-    # graph.fetch_content_summary()
-    print(graph.fetch_content_details())
+    context, _ = graph.fetch_content_summary()
+    content_details = graph.fetch_content_details()
+    graph.fetch_content_type(
+        content_details=content_details, detailed_summary=context)
