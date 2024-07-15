@@ -12,6 +12,7 @@ from langchain_chroma import Chroma
 from models import ContentType
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.runnables import RunnablePassthrough
+from langchain.retrievers.multi_query import MultiQueryRetriever
 
 load_dotenv()
 
@@ -32,20 +33,12 @@ class ContentSummary(BaseModel):
                                   description="Detailed Summary of the text.")
 
 
-class Content(BaseModel):
-    # publish_date: Optional[str] = Field(
-    #     default=None, description="Date when this content was published.  If not found in the text, set to None.")
-    # author: Optional[str] = Field(
-    #     default=None, description="Author of the content. If not found in text, set to None.")
-    # type: str = Field(default=None, description="Type of content from given enum values. If none of them match, set to None.", enum=[
-    #                   'interview', 'blog post', 'article', 'podcast transcript'])
-    pass
-
-
-class ContentPublishDate(BaseModel):
-    """Date when content was published."""
+class ContentDetails(BaseModel):
+    """Content author and publish date."""
+    author: Optional[str] = Field(
+        default=None, description="Full name of author of content. If not found, set to None.")
     publish_date: Optional[str] = Field(
-        default=None, description="Date when this content was published. It should be a valid date format. If not found, set to None.")
+        default=None, description="Date when this content was published. If not found, set to None.")
 
 
 class ScrapePageGraph:
@@ -184,28 +177,50 @@ class ScrapePageGraph:
         print(f"\n\ndetailed summary: {result.detailed_summary}")
         return context, result.detailed_summary
 
-    def fetch_content_publish_date(self) -> Optional[str]:
-        """Fetches publish date of content by using a RAG chain. Returns None if no publish date is found."""
+    def fetch_content_details(self) -> ContentDetails:
+        """Fetches content details like author and publish date."""
 
         # Do not change this prompt before testing, results may get worse.
-        publish_date_prompt_template = (
+        prompt_template = (
             "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
-            "If you don't know the answer or it's not in the context, do not make up an answer.\n"
+            "If you don't know the answer or it's not in the context, just say you don't know.\n"
             "\n"
             "Question: {question}\n"
             "\n"
             "Context: {context}\n"
         )
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
-        llm = ChatOpenAI(temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(
-            ContentPublishDate)
-        prompt = PromptTemplate.from_template(publish_date_prompt_template)
-
+        llm = ChatOpenAI(
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
+        prompt = PromptTemplate.from_template(prompt_template)
         retriever = self.get_retriever(k=5)
 
-        chain = {"context": retriever | ScrapePageGraph.format_docs,
+        # Use multi query retriever: https://python.langchain.com/v0.2/docs/how_to/MultiQueryRetriever/#supplying-your-own-prompt.
+        # to reduce reliance on prompt engineering for user query.
+        multi_retriever = MultiQueryRetriever.from_llm(
+            retriever=retriever, llm=llm)
+        chain = {"context": multi_retriever | ScrapePageGraph.format_docs,
                  "question": RunnablePassthrough()} | prompt | llm
-        return chain.invoke("When was this web page published?")
+        result = chain.invoke("Who wrote the content and on which date?")
+
+        # Now using the string response from LLM, parse it for author and date information.
+        return self.parse_llm_output(content=result.content)
+
+    def parse_llm_output(self, content: str) -> ContentDetails:
+        """Helper to fetch content details in structured format from unstructured LLM output.
+
+        Used to process LLM output into content details class.
+        """
+        prompt_template = (
+            "Extract properties of provided function from given content. If a property is not found, set it to None.\n"
+            "\n"
+            "Content: {content}\n"
+        )
+        prompt = PromptTemplate.from_template(prompt_template)
+        llm = ChatOpenAI(
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentDetails)
+        chain = prompt | llm
+        return chain.invoke(content)
 
     @ staticmethod
     def format_docs(docs: List[Document]) -> str:
@@ -291,4 +306,4 @@ if __name__ == "__main__":
     #     openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL)
 
     # graph.fetch_content_summary()
-    graph.fetch_content_publish_date()
+    print(graph.fetch_content_details())
