@@ -11,8 +11,6 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from models import ContentType
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.runnables import RunnablePassthrough
-from langchain.retrievers.multi_query import MultiQueryRetriever
 
 load_dotenv()
 
@@ -174,15 +172,13 @@ class ScrapePageGraph:
         llm = ChatOpenAI(
             temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
         prompt = PromptTemplate.from_template(prompt_template)
-        retriever = self.get_retriever(k=5)
 
-        # Use multi query retriever: https://python.langchain.com/v0.2/docs/how_to/MultiQueryRetriever/#supplying-your-own-prompt.
-        # to reduce reliance on prompt engineering for user query.
-        multi_retriever = MultiQueryRetriever.from_llm(
-            retriever=retriever, llm=llm)
-        chain = {"context": multi_retriever | ScrapePageGraph.format_docs,
-                 "question": RunnablePassthrough()} | prompt | llm
-        result = chain.invoke("Who wrote the content and on which date?")
+        # We will attempt to fetch content details from top few chunks. Usually its in the beginning of web pages.
+        k = 3
+        context = ScrapePageGraph.format_docs(self.chunks[:k])
+        chain = prompt | llm
+        result = chain.invoke(
+            {"question": "Who wrote the content and on which date?", "context": context})
 
         # Now using the string response from LLM, parse it for author and date information.
         content_details = self.parse_llm_output(content=result.content)
@@ -319,7 +315,9 @@ if __name__ == "__main__":
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
     # print("first doc content: ", docs[0].page_content[:1000])
 
-    context, _ = graph.fetch_content_summary()
-    content_details = graph.fetch_content_details()
-    graph.fetch_content_type(
-        content_details=content_details, detailed_summary=context)
+    # context, _ = graph.fetch_content_summary()
+    # content_details = graph.fetch_content_details()
+    # graph.fetch_content_type(
+    #     content_details=content_details, detailed_summary=context)
+
+    graph.fetch_content_details()
