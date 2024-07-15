@@ -11,6 +11,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from models import ContentType
 from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_core.runnables import RunnablePassthrough
 
 load_dotenv()
 
@@ -39,6 +40,12 @@ class Content(BaseModel):
     # type: str = Field(default=None, description="Type of content from given enum values. If none of them match, set to None.", enum=[
     #                   'interview', 'blog post', 'article', 'podcast transcript'])
     pass
+
+
+class ContentPublishDate(BaseModel):
+    """Date when content was published."""
+    publish_date: Optional[str] = Field(
+        default=None, description="Date when this content was published. It should be a valid date format. If not found, set to None.")
 
 
 class ScrapePageGraph:
@@ -174,7 +181,31 @@ class ScrapePageGraph:
             context = f"{context}\n\n{result.detailed_summary}"
 
         # Return concatenation of summaries and the final detailed summary.
+        print(f"\n\ndetailed summary: {result.detailed_summary}")
         return context, result.detailed_summary
+
+    def fetch_content_publish_date(self) -> Optional[str]:
+        """Fetches publish date of content by using a RAG chain. Returns None if no publish date is found."""
+
+        # Do not change this prompt before testing, results may get worse.
+        publish_date_prompt_template = (
+            "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
+            "If you don't know the answer or it's not in the context, do not make up an answer.\n"
+            "\n"
+            "Question: {question}\n"
+            "\n"
+            "Context: {context}\n"
+        )
+        # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
+        llm = ChatOpenAI(temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(
+            ContentPublishDate)
+        prompt = PromptTemplate.from_template(publish_date_prompt_template)
+
+        retriever = self.get_retriever(k=5)
+
+        chain = {"context": retriever | ScrapePageGraph.format_docs,
+                 "question": RunnablePassthrough()} | prompt | llm
+        return chain.invoke("When was this web page published?")
 
     @ staticmethod
     def format_docs(docs: List[Document]) -> str:
@@ -248,7 +279,8 @@ class ScrapePageGraph:
 
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
-    url = "https://plaid.com/blog/year-in-review-2023/"
+    # url = "https://plaid.com/blog/year-in-review-2023/"
+    url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     graph = ScrapePageGraph(url=url)
 
     # user_query = "What is an agent?"
@@ -258,4 +290,5 @@ if __name__ == "__main__":
     # graph.get_content_details(
     #     openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL)
 
-    graph.fetch_content_summary()
+    # graph.fetch_content_summary()
+    graph.fetch_content_publish_date()
