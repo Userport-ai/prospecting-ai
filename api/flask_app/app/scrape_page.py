@@ -1,9 +1,8 @@
 import os
 from dotenv import load_dotenv
 import requests
-from datetime import datetime
 from langchain_core.prompts import PromptTemplate
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from markdownify import markdownify
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
@@ -11,7 +10,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from models import ContentType
-from langchain.chains.summarize import load_summarize_chain
 from langchain_core.pydantic_v1 import BaseModel, Field
 
 load_dotenv()
@@ -23,14 +21,30 @@ class ContentClassification(BaseModel):
                                       description="The type of the content described by the text.")
     content_category: str = Field(
         ..., description="Category of the content described by the text.")
-    publish_date: Optional[datetime] = Field(
-        default=None, description="Date in UTC timezone when this content was published.")
+    publish_date: Optional[str] = Field(
+        default=None, description="Date when this content was published. If not found in the text, set to None.")
+
+
+class ContentSummary(BaseModel):
+    """Class to parse content summary from page while parsing it top to bottom."""
+    detailed_summary: str = Field(...,
+                                  description="Detailed Summary of the text.")
+
+
+class Content(BaseModel):
+    # publish_date: Optional[str] = Field(
+    #     default=None, description="Date when this content was published.  If not found in the text, set to None.")
+    # author: Optional[str] = Field(
+    #     default=None, description="Author of the content. If not found in text, set to None.")
+    # type: str = Field(default=None, description="Type of content from given enum values. If none of them match, set to None.", enum=[
+    #                   'interview', 'blog post', 'article', 'podcast transcript'])
+    pass
 
 
 class ScrapePageGraph:
     """Uses Langchain to construct a graph that fetches HTML page and parses it into Markdown chunks.
 
-    The class can then be queried multiple times for different answers.
+    The class can then be queried multiple times for different answers by clients.
     """
 
     # Open AI configurations.
@@ -56,9 +70,11 @@ class ScrapePageGraph:
         self.db = Chroma(persist_directory=ScrapePageGraph.CHROMA_DB_PATH,
                          embedding_function=ScrapePageGraph.OPENAI_EMBEDDING_FUNCTION)
         if len(self.get_doc_ids()) == 0:
+            print("Page deos not exist in db, fetching it.")
             # Index page rom URL.
             self.index(url=url, chunk_size=chunk_size)
         else:
+            print("Page already exists in db, fetching it.")
             # Get page chunks from database.
             self.chunks = self.get_doc_chunks()
 
@@ -93,20 +109,6 @@ class ScrapePageGraph:
             raise ValueError(
                 f"Failed to fetch relevant docs for user query: {user_query} for url: {self.url} with error: {e}")
 
-    def get_page_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL) -> str:
-        """Returns a summary of the page contents from chunks."""
-        if openai_model_name not in [ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL, ScrapePageGraph.OPENAI_GPT_4O_MODEL]:
-            raise ValueError(
-                f"Invalid Opena AI model name: {openai_model_name}")
-
-        # Reference: https://python.langchain.com/v0.2/docs/tutorials/summarization.
-        # Use chain_type: "map_reduce" or "stuff" or "refine".
-        llm = ChatOpenAI(temperature=1.0, model_name=openai_model_name)
-        chain = load_summarize_chain(llm, chain_type="map_reduce")
-
-        result = chain.invoke(self.chunks)
-        return result["output_text"]
-
     def get_content_details(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL):
         prompt_template = """Extract the desired information from the following text.
 
@@ -119,18 +121,69 @@ class ScrapePageGraph:
 
         chain = tagging_prompt | llm
 
+        # TODO: break chunks into relevant chunks before inferrring content details.
         result = chain.invoke(
             {"text": ScrapePageGraph.format_docs(self.chunks)})
         print(result)
 
-    @staticmethod
+    def fetch_content_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL) -> Tuple[str, str]:
+        """Fetches content details by parsing the document from the top to the bottom.
+        Returns concatenations of summaries as well as overall summary of the page.
+
+        The contents fetched are updated in the output model as we iterate.
+        Insipired by the refine chain in the langchain docs.
+
+        Size of compressed content:
+        When testing against https://lilianweng.github.io/posts/2023-06-23-agent/
+        which is of size = 15 * 4096 characters  ~ 60KB, the compressed text based on summaries is 3500 chars.
+        Token size of ChatGPT 3.5 Turbo is 16K tokens so we can index up to web page of size:
+        16/3.5 = 4 times the size of 60 KB = 2.4 MB while the compressed doc is still small enough
+        to fit the context window.
+        """
+        # Do not change this prompt before testing, results may get worse.
+        summary_prompt_template = (
+            "You are a smart web page analyzer. Assume that the page is being parsed from top to bottom\n"
+            "with the 'Context' section containing a summary of text so far and the 'Text' section below\n"
+            "containing the new text.\n"
+            "Do not make up values for the properties if not found.\n"
+            "\n"
+            "Context:\n"
+            "{context}\n"
+            "\n"
+            "Text:\n"
+            "{text}\n"
+        )
+        llm = ChatOpenAI(temperature=0, model_name=openai_model_name).with_structured_output(
+            ContentSummary)
+        prompt = PromptTemplate.from_template(summary_prompt_template)
+
+        # Context will be a concatenated string of summaries
+        # computed at each step.
+        context = ""
+        result: ContentSummary
+        for i, chunk in enumerate(self.chunks):
+            text = chunk.page_content
+            chain = prompt | llm
+            result: ContentSummary = chain.invoke(
+                {"context": context, "text": text})
+            print(f"\n\nIteration {i+1}")
+            print("--------------")
+            print(f"Summary so far: {context}")
+
+            # Set context as new summary.
+            context = f"{context}\n\n{result.detailed_summary}"
+
+        # Return concatenation of summaries and the final detailed summary.
+        return context, result.detailed_summary
+
+    @ staticmethod
     def format_docs(docs: List[Document]) -> str:
         """Helper since StuffDocumentsChain gives some validation error when structued output is
         specified with LLM model. So using this function as workaround to combines docs to text.
         """
         return "\n\n".join(doc.page_content for doc in docs)
 
-    @staticmethod
+    @ staticmethod
     def fetch_page(url: str) -> Document:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
         try:
@@ -150,7 +203,7 @@ class ScrapePageGraph:
         return Document(page_content=md, metadata={ScrapePageGraph.URL: url})
 
     @ staticmethod
-    def split_into_chunks(doc: Document, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[Document]:
+    def split_into_chunks(doc: Document, chunk_size: int = 4096, chunk_overlap: int = 200) -> List[Document]:
         """Split document into chunks of given size and overlap."""
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap, add_start_index=True
@@ -194,14 +247,15 @@ class ScrapePageGraph:
 
 
 if __name__ == "__main__":
-    url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
+    # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
+    url = "https://plaid.com/blog/year-in-review-2023/"
     graph = ScrapePageGraph(url=url)
 
     # user_query = "What is an agent?"
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
     # print("first doc content: ", docs[0].page_content[:1000])
 
-    # print(graph.get_page_summary(
-    #     openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL))
-    graph.get_content_details(
-        openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL)
+    # graph.get_content_details(
+    #     openai_model_name=ScrapePageGraph.OPENAI_GPT_3_5_TURBO_MODEL)
+
+    graph.fetch_content_summary()
