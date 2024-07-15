@@ -59,6 +59,9 @@ class ScrapePageGraph:
     # Metadata Constant keys.
     URL = "url"
     CHUNK_SIZE = "chunk_size"
+    START_INDEX = "start_index"
+    COMBINED_SUMMARIES = "combined_summaries"
+    DETAILED_SUMMARY = "detailed_summary"
 
     def __init__(self, url: str, chunk_size: int = 4096) -> None:
         self.url = url
@@ -119,6 +122,11 @@ class ScrapePageGraph:
         16/3.5 = 4 times the size of 60 KB = 2.4 MB while the compressed doc is still small enough
         to fit the context window.
         """
+        summaries = self.get_summaries_from_db()
+        if summaries:
+            print("Found summaries in database")
+            return summaries
+
         # Do not change this prompt before testing, results may get worse.
         summary_prompt_template = (
             "You are a smart web page analyzer. Assume that the page is being parsed from top to bottom\n"
@@ -138,23 +146,29 @@ class ScrapePageGraph:
 
         # Context will be a concatenated string of summaries
         # computed at each step.
-        context = ""
+        combined_summaries = ""
         result: ContentSummary
         for i, chunk in enumerate(self.chunks):
             text = chunk.page_content
             chain = prompt | llm
             result: ContentSummary = chain.invoke(
-                {"context": context, "text": text})
+                {"context": combined_summaries, "text": text})
             print(f"\n\nIteration {i+1}")
             print("--------------")
-            print(f"Summary so far: {context}")
+            print(f"Summary so far: {combined_summaries}")
 
             # Set context as new summary.
-            context = f"{context}\n\n{result.detailed_summary}"
+            combined_summaries = f"{combined_summaries}\n\n{result.detailed_summary}"
+
+        detailed_summary = result.detailed_summary
+        print(f"\n\ndetailed summary: {detailed_summary}")
+
+        # Write summaries to database.
+        self.create_summaries_in_db(
+            combined_summaries=combined_summaries, detailed_summary=detailed_summary)
 
         # Return concatenation of summaries and the final detailed summary.
-        print(f"\n\ndetailed summary: {result.detailed_summary}")
-        return context, result.detailed_summary
+        return combined_summaries, detailed_summary
 
     def fetch_content_details(self) -> ContentDetails:
         """Fetches content details like author and publish date."""
@@ -185,8 +199,8 @@ class ScrapePageGraph:
         print("\ncontent details about author and publish date: ", content_details)
         return content_details
 
-    def fetch_content_type(self, content_details: ContentDetails, detailed_summary: str) -> str:
-        """Fetches content type using given detials and summary of text.
+    def fetch_content_type(self, content_details: ContentDetails, combined_summaries: str) -> str:
+        """Fetches content type using given detials and combined summaries of text.
 
         Currenly returning LLM string output without parsing.
         """
@@ -206,7 +220,7 @@ class ScrapePageGraph:
 
         chain = prompt | llm
         question = "What type of content does this text represent? If you don't know, just say you don't know."
-        context = f'URL: {self.url}\n\nAuthor:{content_details.author}\n\nDate published:{content_details.publish_date}\n\nDetailed Summary: {detailed_summary}'
+        context = f'URL: {self.url}\n\nAuthor:{content_details.author}\n\nDate published:{content_details.publish_date}\n\nDetailed Summary: {combined_summaries}'
         result = chain.invoke(
             {"question": question, "context": context})
 
@@ -290,13 +304,67 @@ class ScrapePageGraph:
 
     def get_doc_chunks(self) -> List[Document]:
         """Return document chunks sorted by index number from the database for given URL."""
-        result: Dict = self.db.get(
-            where={ScrapePageGraph.URL: self.url})
+        result: Dict = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: self.url},
+                {ScrapePageGraph.START_INDEX: {"$gte": 0}},
+            ]
+        })
         sorted_results = sorted(zip(result["metadatas"], result["documents"]),
                                 key=lambda m: m[0]["start_index"])
 
         return [Document(page_content=result[1])
                 for result in sorted_results]
+
+    def create_summaries_in_db(self, combined_summaries: str, detailed_summary: str):
+        """Creates combined summaries and detailed summary doc in the database."""
+        self.db.add_documents(documents=[Document(
+            page_content=combined_summaries, metadata={ScrapePageGraph.URL: url, ScrapePageGraph.COMBINED_SUMMARIES: True})])
+        self.db.add_documents(documents=[Document(
+            page_content=detailed_summary, metadata={ScrapePageGraph.URL: url, ScrapePageGraph.DETAILED_SUMMARY: True})])
+
+    def get_summaries_from_db(self) -> Optional[Tuple[str, str]]:
+        """Return combined summaries and detailed summary for given URL from db, none if it doesn't exist yet."""
+        combined_summaries_result: Dict = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: url},
+                {ScrapePageGraph.COMBINED_SUMMARIES: True}
+            ]
+        })
+        detailed_summary_result: Dict = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: url},
+                {ScrapePageGraph.DETAILED_SUMMARY: True}
+            ]
+        })
+        combined_summaries_content: List[str] = combined_summaries_result['documents']
+        detailed_summary_content: List[str] = detailed_summary_result['documents']
+        if len(combined_summaries_content) == 0 and len(detailed_summary_content) == 0:
+            # Result not in db.
+            return None
+        if len(combined_summaries_content) != 1 or len(detailed_summary_content) != 1:
+            raise ValueError(
+                f"Expected 1 doc per combined summaries and detailed summary result, got combined: {combined_summaries_content}, detailed: {detailed_summary_content}")
+        return combined_summaries_content[0], detailed_summary_content[0]
+
+    def delete_summaries_from_db(self):
+        """Deletes combined_summaries and detailed summary from the database."""
+        combined_summaries_ids: List[str] = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: url},
+                {ScrapePageGraph.COMBINED_SUMMARIES: True}
+            ]
+        })['ids']
+        detailed_summary_ids: List[str] = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: url},
+                {ScrapePageGraph.DETAILED_SUMMARY: True}
+            ]
+        })['ids']
+        ids_to_delete: List[str] = combined_summaries_ids + \
+            detailed_summary_ids
+        self.db.delete(ids=ids_to_delete)
+        print(f"Deleted {len(ids_to_delete)} summaries docs")
 
     def delete_docs(self):
         """Delete docs associated with given url."""
@@ -305,19 +373,23 @@ class ScrapePageGraph:
 
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
-    # url = "https://plaid.com/blog/year-in-review-2023/"
+    url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
-    url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
+    # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
+    # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     graph = ScrapePageGraph(url=url)
+    # print("docs len: ", len(graph.get_doc_chunks()))
+    # print("docs summaries: ", graph.get_summaries_from_db()[0])
+    # graph.delete_summaries_from_db()
 
     # user_query = "What is an agent?"
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
     # print("first doc content: ", docs[0].page_content[:1000])
 
-    # context, _ = graph.fetch_content_summary()
-    # content_details = graph.fetch_content_details()
-    # graph.fetch_content_type(
-    #     content_details=content_details, detailed_summary=context)
+    combined_summaries, _ = graph.fetch_content_summary()
+    content_details = graph.fetch_content_details()
+    graph.fetch_content_type(
+        content_details=content_details, combined_summaries=combined_summaries)
 
-    graph.fetch_content_details()
+    # graph.fetch_content_details()
