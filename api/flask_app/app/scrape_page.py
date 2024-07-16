@@ -37,6 +37,14 @@ class ContentAboutCompanyOrText(BaseModel):
                         description="Reason for why it is integral part of the text.")
 
 
+class ContentCategory(BaseModel):
+    """Category of the content."""
+    enum_value: Optional[str] = Field(
+        default=None, description="Enum value of the category the text falls under. Set to None if it does not fall under any of the categories defined.")
+    reason: Optional[str] = Field(
+        ..., description="Reason for enum value selection.")
+
+
 class OpenAITokenTracker(BaseModel):
     """Token usage tracker when calling chains using Open AI models."""
     url: str = Field(...,
@@ -288,8 +296,8 @@ class ScrapePageGraph:
         print(f"\n{result}")
         return result
 
-    def fetch_content_category(self, company_name: str, person_name: str, combined_summaries: str):
-        """Returns the category of the content, company name and person name."""
+    def fetch_content_category(self, company_name: str, person_name: str, combined_summaries: str) -> ContentCategory:
+        """Returns the category of the content using company name, person name and combined summary."""
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
             "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
@@ -300,50 +308,50 @@ class ScrapePageGraph:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentCategory)
         chain = prompt | llm
 
         question = (
             "Does the text below fall into one of the following categories?\n",
-            f"* Personal thoughts shared by {person_name}.\n"
-            f"* Advice shared by {person_name}.\n"
-            f"* Anecdote shared by {person_name}.\n"
-            f"* Launch of {company_name}'s product.\n"
-            f"* Update to {company_name}'s product.\n"
-            f"* Shutdown of {company_name}'s product.\n"
-            f"* Appointment of leadership hire at {company_name}.\n"
-            f"* Promotion of an employee at {company_name}.\n"
-            f"* Employee leaving {company_name}.\n"
-            f"* Hiring announcement for {company_name}.\n"
-            f"* Financial results of {company_name}.\n"
-            f"* A Story about {company_name}.\n",
-            f"* Trends associated with {company_name}'s industry.\n"
-            f"* Announcement of {company_name}'s recent partnership with another company.\n"
-            f"* A significant achievement by {company_name}.\n"
-            f"* Funding announcement by {company_name}.\n"
-            f"* IPO announcement by {company_name}.\n"
-            f"* Recognition received by {company_name}.\n"
-            f"* Award received by {company_name}.\n"
-            f"* {company_name}'s anniversary announcement.\n"
-            f"* Sales growth or user base growth milestone achieved by {company_name}.\n"
-            f"* An event, conference or trade show hosted or attended by {company_name}.\n"
-            f"* A webinar hosted by {company_name}.\n"
-            f"* Layoffs announced by {company_name}.\n"
-            f"* A challenge facing {company_name}.\n"
-            f"* A rebranding initiative by {company_name}.\n"
-            f"* New market expansion announcement by {company_name}.\n"
-            f"* New office or branch opening announcement by {company_name}.\n"
-            f"* Social responsibility announcement by {company_name}.\n"
-            f"* Legal challenge affecting {company_name}.\n"
-            f"* Regulation relating to {company_name}.\n"
-            f"* Lawsuit settlement relating to {company_name}.\n"
-            f"* Internal event for {company_name} employees only.\n"
-            f"* Internal offsite for {company_name} employees.\n"
+            f"* Personal thoughts shared by {person_name}. [Enum value: personal_thoughts]\n"
+            f"* Advice shared by {person_name}. [Enum value: personal_advice]\n"
+            f"* Anecdote shared by {person_name}. [Enum value: personal_anecdote]\n"
+            f"* Launch of {company_name}'s product. [Enum value: product_launch]\n"
+            f"* Update to {company_name}'s product. [Enum value: product_update]\n"
+            f"* Shutdown of {company_name}'s product. [Enum value: product_shutdown]\n"
+            f"* Appointment of leadership hire at {company_name}. [Enum value: leader_hire]\n"
+            f"* Promotion of an employee at {company_name}. [Enum value: employee_promotion]\n"
+            f"* Employee leaving {company_name}. [Enum value: employee_leaving]\n"
+            f"* Hiring announcement for {company_name}. [Enum value: company_hiring]\n"
+            f"* Financial results announcement of {company_name}. [Enum value: financial_results]\n"
+            f"* A Story about {company_name}. [Enum value: company_story]\n",
+            f"* Trends associated with {company_name}'s industry. [Enum value: industry_trends]\n"
+            f"* Announcement of {company_name}'s recent partnership with another company. [Enum value: company_partnership]\n"
+            f"* A significant achievement by {company_name}. [Enum value: company_achievement]\n"
+            f"* Funding announcement by {company_name}. [Enum value: funding_announcement]\n"
+            f"* IPO announcement by {company_name}. [Enum value: ipo_announcement]\n"
+            f"* Recognition or award received by {company_name}. [Enum value: company_recognition]\n"
+            f"* {company_name}'s anniversary announcement. [Enum value: company_anniversary]\n"
+            f"* Sales growth or user base growth milestone achieved by {company_name}. [Enum value: sales_user_growth_milestone]\n"
+            f"* An event, conference or trade show hosted or attended by {company_name}. [Enum value: event_hosted_attended]\n"
+            f"* A webinar hosted by {company_name}. [Enum value: company_webinar]\n"
+            f"* Layoffs announced by {company_name}. [Enum value: company_layoffs]\n"
+            f"* A challenge facing {company_name}. [Enum value: company_challenge]\n"
+            f"* A rebranding initiative by {company_name}. [Enum value: company_rebrand]\n"
+            f"* New market expansion announcement by {company_name}. [Enum value: company_new_market_expansion]\n"
+            f"* New office or branch opening announcement by {company_name}. [Enum value: company_new_office]\n"
+            f"* Social responsibility announcement by {company_name}. [Enum value: company_social_responsibility]\n"
+            f"* Legal challenge affecting {company_name}. [Enum value: company_legal_challenge]\n"
+            f"* Regulation relating to {company_name}. [Enum value: company_regulation]\n"
+            f"* Lawsuit settlement relating to {company_name}. [Enum value: company_lawsuit]\n"
+            f"* Internal event for {company_name} employees only. [Enum value: company_internal_event]\n"
+            f"* Company offsite for {company_name} employees. [Enum value: company_offsite]\n"
         )
         result = chain.invoke(
             {"question": question, "context": combined_summaries})
 
         print(f"\nCategories result: {result}")
+        return result
 
     def parse_llm_output(self, content: str) -> ContentDetails:
         """Helper to fetch content details in structured format from unstructured LLM output.
@@ -488,35 +496,42 @@ class ScrapePageGraph:
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
     # url = "https://plaid.com/blog/year-in-review-2023/"
-    # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
+    url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     # url = "https://plaid.com/blog/introducing-plaid-layer/"
-    url = "https://plaid.com/team-update/"
+    # url = "https://plaid.com/team-update/"
     # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
     # url = "https://lnkd.in/g4VDfXUf"
     # Able to scrape linkedin pulse as well. Could be useful content in the future.
     # url = "https://www.linkedin.com/pulse/blurred-lines-leadership-anuj-kapur"
-    person_name = "Zach Perret"
-    company_name = "Plaid"
-    # person_name = "Anuj Kapur"
-    # company_name = "Cloudbees"
+    # person_name = "Zach Perret"
+    # company_name = "Plaid"
+    person_name = "Raj Sarkar"
+    company_name = "Cloudbees"
     graph = ScrapePageGraph(url=url)
-    graph.analyze_page(person_name=person_name, company_name=company_name)
+    # graph.analyze_page(person_name=person_name, company_name=company_name)
 
     # combined_summaries, _ = graph.fetch_content_summary()
-    # summary = """
-    # Author: Anuj Kapur
-    # Company: Cloudbees
+    summary = """
+    I wrote an internal post as part of my leadership series:
 
-    # Enjoyed the chat with Adrian Bridgwater on Software delivery, how far we have come and implications for the future. #DevSecOps
+Why Speed is not the same as Velocity?
 
-    # https://lnkd.in/g4VDfXUf
-    # """
-    # graph.fetch_content_category(
-    #     company_name=company_name, person_name=person_name, combined_summaries=summary)
+Speed, in its simplest form, refers to how fast something is moving. It’s a scalar quantity, representing motion without regard to direction. At organizations, speed often manifests itself as tasks are completed or projects are executed. It’s about the sheer pace of activity.  
+
+On the other hand, velocity introduces an additional dimension by incorporating direction into the equation. Velocity is a vector quantity. At organizations, velocity not only means the rate of progress but also moving forward with purpose, navigating towards predetermined goals rather than merely staying busy.  
+
+People often conflate the two. Consider a scenario where you are diligently working on various tasks day in and day out. You are squarely focused on output, demonstrating impressive speed in your activities. However, if it fails to drive any outcome or contribute meaningfully to our company goals, you’re essentially moving in circles.  
+
+We often confuse being busy with being productive. It’s not uncommon for us to equate a flurry of activity with success but if we are not making any progress towards our goals, in terms of velocity, we are just static. 
+
+Don’t fall into this trap. Focus on outcomes over outputs. Before working on every task, ask yourself - what KPI this will influence? Is it contributing to our company goals? If not, ruthlessly prioritize.
+    """
+    graph.fetch_content_category(
+        company_name=company_name, person_name=person_name, combined_summaries=summary)
 
     # user_query = "What is an agent?"
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
