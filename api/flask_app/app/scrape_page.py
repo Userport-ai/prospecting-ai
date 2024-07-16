@@ -69,6 +69,8 @@ class ScrapePageGraph:
     # Reference: https://python.langchain.com/v0.2/docs/integrations/vectorstores/chroma/#basic-example-including-saving-to-disk.
     CHROMA_DB_PATH = "./chroma_db"
 
+    OPERATION_TAG_NAME = "analyze_page_workflow"
+
     # Metadata Constant keys.
     URL = "url"
     CHUNK_SIZE = "chunk_size"
@@ -120,6 +122,26 @@ class ScrapePageGraph:
         except Exception as e:
             raise ValueError(
                 f"Failed to fetch relevant docs for user query: {user_query} for url: {self.url} with error: {e}")
+
+    def analyze_page(self, person_name: str, company_name: str):
+        """Runs analysis of the scraped web page."""
+        with get_openai_callback() as cb:
+            combined_summaries, _ = self.fetch_content_summary()
+
+            content_details = self.fetch_content_details()
+
+            self.fetch_content_type(
+                content_details=content_details, combined_summaries=combined_summaries)
+
+            self.is_content_about_company_or_person(
+                company_or_person_name=company_name, combined_summaries=combined_summaries)
+
+            self.fetch_content_category(
+                company_name=company_name, person_name=person_name, combined_summaries=combined_summaries)
+
+            token_tracker = OpenAITokenTracker(url=self.url, operation_tag=ScrapePageGraph.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
+                                               completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+            print(f"\nTokens used: {token_tracker}")
 
     def fetch_content_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL) -> Tuple[str, str]:
         """Fetches content details by parsing the document from the top to the bottom.
@@ -244,7 +266,7 @@ class ScrapePageGraph:
         # TODO: Parse content type and return enum. Right now it is just a sentence provided by LLM.
         return result.content
 
-    def is_content_about_company_or_person(self, company_name: str, combined_summaries: str):
+    def is_content_about_company_or_person(self, company_or_person_name: str, combined_summaries: str):
         """Tests if company name or person is an important part of the combined summaries content."""
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
@@ -259,12 +281,49 @@ class ScrapePageGraph:
             temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentAboutCompanyOrText)
         chain = prompt | llm
 
-        question = f"Is {company_name} an integral part of the text below?"
+        question = f"Is {company_or_person_name} an integral part of the text below?"
         result = chain.invoke(
             {"question": question, "context": combined_summaries})
 
         print(f"\n{result}")
         return result
+
+    def fetch_content_category(self, company_name: str, person_name: str, combined_summaries: str):
+        """Returns the category of the content, company name and person name."""
+        # Do not change this prompt before testing, results may get worse.
+        prompt_template = (
+            "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
+            "\n"
+            "Question: {question}\n"
+            "\n"
+            "Context: {context}\n"
+        )
+        prompt = PromptTemplate.from_template(prompt_template)
+        llm = ChatOpenAI(
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
+        chain = prompt | llm
+
+        question = (
+            "Does the text below fall into one of the following categories?\n",
+            f"* Personal thoughts of {person_name}.\n"
+            f"* Launch of {company_name}'s product.\n",
+            f"* Appointment of leadership hire at {company_name}.\n"
+            f"* Financial results of {company_name}.\n"
+            f"* A Story about {company_name}.\n",
+            f"* Announcement of {company_name}'s recent partnership.\n"
+            f"* A significant chievement by {company_name}.\n"
+            f"* An Event hosted or attended by {company_name}.\n"
+            f"* A challenge faching {company_name}.\n"
+            f"* A rebranding initiative by {company_name}.\n"
+            f"* New market expansion announcement by {company_name}.\n"
+            f"* Social responsibility announcement by {company_name}.\n"
+            f"* Legal challenge affecting {company_name}.\n"
+            f"* Internal event for {company_name} employees only.\n"
+        )
+        result = chain.invoke(
+            {"question": question, "context": combined_summaries})
+
+        print(f"\nCategories result: {result}")
 
     def parse_llm_output(self, content: str) -> ContentDetails:
         """Helper to fetch content details in structured format from unstructured LLM output.
@@ -409,28 +468,22 @@ class ScrapePageGraph:
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
     # url = "https://plaid.com/blog/year-in-review-2023/"
-    url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
+    # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
+    # url = "https://plaid.com/blog/introducing-plaid-layer/"
+    url = "https://plaid.com/team-update/"
+    person_name = "Zach Perret"
+    company_name = "Plaid"
     graph = ScrapePageGraph(url=url)
-    # print("docs len: ", len(graph.get_doc_chunks()))
-    # print("docs summaries: ", graph.get_summaries_from_db()[0])
-    # graph.delete_summaries_from_db()
+    graph.analyze_page(person_name=person_name, company_name=company_name)
+
+    # combined_summaries, _ = graph.fetch_content_summary()
+    # graph.fetch_content_category(
+    #     company_name=company_name, person_name=person_name, combined_summaries=combined_summaries)
 
     # user_query = "What is an agent?"
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
     # print("first doc content: ", docs[0].page_content[:1000])
-
-    with get_openai_callback() as cb:
-        combined_summaries, _ = graph.fetch_content_summary()
-        content_details = graph.fetch_content_details()
-        graph.fetch_content_type(
-            content_details=content_details, combined_summaries=combined_summaries)
-        # graph.is_content_about_company_or_person(
-        #     company_name="Visa", combined_summaries=combined_summaries)
-
-        token_tracker = OpenAITokenTracker(url=graph.url, operation_tag="analyze_page_workflow", prompt_tokens=cb.prompt_tokens,
-                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-        print(f"\nTokens used: {token_tracker}")
