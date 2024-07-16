@@ -9,18 +9,9 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
-from models import ContentType
 from langchain_core.pydantic_v1 import BaseModel, Field
 
 load_dotenv()
-
-
-class ContentClassification(BaseModel):
-    """Classification of the content."""
-    content_type: ContentType = Field(...,
-                                      description="The type of the content described by the text.")
-    content_category: str = Field(
-        ..., description="Category of the content described by the text.")
 
 
 class ContentSummary(BaseModel):
@@ -35,6 +26,14 @@ class ContentDetails(BaseModel):
         default=None, description="Full name of author of content. If not found, set to None.")
     publish_date: Optional[str] = Field(
         default=None, description="Date when this content was published. If not found, set to None.")
+
+
+class ContentAboutCompanyOrText(BaseModel):
+    """Whether content is about company or text."""
+    is_integral_part_of_text: bool = Field(
+        ..., description="Set to True if integral part of the text and False otherwise.")
+    reason: str = Field(...,
+                        description="Reason for why it is integral part of the text.")
 
 
 class ScrapePageGraph:
@@ -128,6 +127,7 @@ class ScrapePageGraph:
             return summaries
 
         # Do not change this prompt before testing, results may get worse.
+        # TODO: Ask to skip parsing HTML navigation, links and javscript. Only parse HTML Body.
         summary_prompt_template = (
             "You are a smart web page analyzer. Assume that the page is being parsed from top to bottom\n"
             "with the 'Context' section containing a summary of text so far and the 'Text' section below\n"
@@ -230,6 +230,28 @@ class ScrapePageGraph:
         print(result)
         # TODO: Parse content type and return enum. Right now it is just a sentence provided by LLM.
         return result.content
+
+    def is_content_about_company_or_person(self, company_name: str, combined_summaries: str):
+        """Tests if company name or person is an important part of the combined summaries content."""
+        # Do not change this prompt before testing, results may get worse.
+        prompt_template = (
+            "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
+            "\n"
+            "Question: {question}\n"
+            "\n"
+            "Context: {context}\n"
+        )
+        prompt = PromptTemplate.from_template(prompt_template)
+        llm = ChatOpenAI(
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentAboutCompanyOrText)
+        chain = prompt | llm
+
+        question = f"Is {company_name} an integral part of the text below?"
+        result = chain.invoke(
+            {"question": question, "context": combined_summaries})
+
+        print(f"\n{result}")
+        return result
 
     def parse_llm_output(self, content: str) -> ContentDetails:
         """Helper to fetch content details in structured format from unstructured LLM output.
@@ -373,11 +395,12 @@ class ScrapePageGraph:
 
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
-    url = "https://plaid.com/blog/year-in-review-2023/"
+    # url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
-    # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
+    url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
+    # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     graph = ScrapePageGraph(url=url)
     # print("docs len: ", len(graph.get_doc_chunks()))
     # print("docs summaries: ", graph.get_summaries_from_db()[0])
@@ -391,5 +414,5 @@ if __name__ == "__main__":
     content_details = graph.fetch_content_details()
     graph.fetch_content_type(
         content_details=content_details, combined_summaries=combined_summaries)
-
-    # graph.fetch_content_details()
+    graph.is_content_about_company_or_person(
+        company_name="Visa", combined_summaries=combined_summaries)
