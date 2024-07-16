@@ -10,6 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_community.callbacks import get_openai_callback
 
 load_dotenv()
 
@@ -34,6 +35,19 @@ class ContentAboutCompanyOrText(BaseModel):
         ..., description="Set to True if integral part of the text and False otherwise.")
     reason: str = Field(...,
                         description="Reason for why it is integral part of the text.")
+
+
+class OpenAITokenTracker(BaseModel):
+    """Token usage tracker when calling chains using Open AI models."""
+    url: str = Field(...,
+                     description="URL for which tokens are being tracked.")
+    operation_tag: str = Field(
+        ..., description="Tag describing the operation for which cost is computed.")
+    prompt_tokens: int = Field(..., description="Prompt tokens used")
+    completion_tokens: int = Field(..., description="Completion tokens used")
+    total_tokens: int = Field(..., description="Total tokens used")
+    total_cost_in_usd: float = Field(...,
+                                     description="Total cost of tokens used.")
 
 
 class ScrapePageGraph:
@@ -226,8 +240,7 @@ class ScrapePageGraph:
 
         # Now using the string response from LLM, parse it for author and date information.
         # return self.parse_llm_output(content=result.content)
-        print("\nContent type:")
-        print(result)
+        print(f"\nContent type:{result}")
         # TODO: Parse content type and return enum. Right now it is just a sentence provided by LLM.
         return result.content
 
@@ -396,9 +409,9 @@ class ScrapePageGraph:
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
     # url = "https://plaid.com/blog/year-in-review-2023/"
-    # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
+    url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
-    url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
+    # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     graph = ScrapePageGraph(url=url)
@@ -410,9 +423,14 @@ if __name__ == "__main__":
     # docs = graph.retrieve_relevant_docs(user_query=user_query)
     # print("first doc content: ", docs[0].page_content[:1000])
 
-    combined_summaries, _ = graph.fetch_content_summary()
-    content_details = graph.fetch_content_details()
-    graph.fetch_content_type(
-        content_details=content_details, combined_summaries=combined_summaries)
-    graph.is_content_about_company_or_person(
-        company_name="Visa", combined_summaries=combined_summaries)
+    with get_openai_callback() as cb:
+        combined_summaries, _ = graph.fetch_content_summary()
+        content_details = graph.fetch_content_details()
+        graph.fetch_content_type(
+            content_details=content_details, combined_summaries=combined_summaries)
+        # graph.is_content_about_company_or_person(
+        #     company_name="Visa", combined_summaries=combined_summaries)
+
+        token_tracker = OpenAITokenTracker(url=graph.url, operation_tag="analyze_page_workflow", prompt_tokens=cb.prompt_tokens,
+                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+        print(f"\nTokens used: {token_tracker}")
