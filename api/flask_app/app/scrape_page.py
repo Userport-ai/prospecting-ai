@@ -305,20 +305,40 @@ class ScrapePageGraph:
 
         question = (
             "Does the text below fall into one of the following categories?\n",
-            f"* Personal thoughts of {person_name}.\n"
-            f"* Launch of {company_name}'s product.\n",
+            f"* Personal thoughts shared by {person_name}.\n"
+            f"* Advice shared by {person_name}.\n"
+            f"* Anecdote shared by {person_name}.\n"
+            f"* Launch of {company_name}'s product.\n"
+            f"* Update to {company_name}'s product.\n"
+            f"* Shutdown of {company_name}'s product.\n"
             f"* Appointment of leadership hire at {company_name}.\n"
+            f"* Promotion of an employee at {company_name}.\n"
+            f"* Employee leaving {company_name}.\n"
+            f"* Hiring announcement for {company_name}.\n"
             f"* Financial results of {company_name}.\n"
             f"* A Story about {company_name}.\n",
-            f"* Announcement of {company_name}'s recent partnership.\n"
-            f"* A significant chievement by {company_name}.\n"
-            f"* An Event hosted or attended by {company_name}.\n"
-            f"* A challenge faching {company_name}.\n"
+            f"* Trends associated with {company_name}'s industry.\n"
+            f"* Announcement of {company_name}'s recent partnership with another company.\n"
+            f"* A significant achievement by {company_name}.\n"
+            f"* Funding announcement by {company_name}.\n"
+            f"* IPO announcement by {company_name}.\n"
+            f"* Recognition received by {company_name}.\n"
+            f"* Award received by {company_name}.\n"
+            f"* {company_name}'s anniversary announcement.\n"
+            f"* Sales growth or user base growth milestone achieved by {company_name}.\n"
+            f"* An event, conference or trade show hosted or attended by {company_name}.\n"
+            f"* A webinar hosted by {company_name}.\n"
+            f"* Layoffs announced by {company_name}.\n"
+            f"* A challenge facing {company_name}.\n"
             f"* A rebranding initiative by {company_name}.\n"
             f"* New market expansion announcement by {company_name}.\n"
+            f"* New office or branch opening announcement by {company_name}.\n"
             f"* Social responsibility announcement by {company_name}.\n"
             f"* Legal challenge affecting {company_name}.\n"
+            f"* Regulation relating to {company_name}.\n"
+            f"* Lawsuit settlement relating to {company_name}.\n"
             f"* Internal event for {company_name} employees only.\n"
+            f"* Internal offsite for {company_name} employees.\n"
         )
         result = chain.invoke(
             {"question": question, "context": combined_summaries})
@@ -475,14 +495,28 @@ if __name__ == "__main__":
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     # url = "https://plaid.com/blog/introducing-plaid-layer/"
     url = "https://plaid.com/team-update/"
+    # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
+    # url = "https://lnkd.in/g4VDfXUf"
+    # Able to scrape linkedin pulse as well. Could be useful content in the future.
+    # url = "https://www.linkedin.com/pulse/blurred-lines-leadership-anuj-kapur"
     person_name = "Zach Perret"
     company_name = "Plaid"
+    # person_name = "Anuj Kapur"
+    # company_name = "Cloudbees"
     graph = ScrapePageGraph(url=url)
     graph.analyze_page(person_name=person_name, company_name=company_name)
 
     # combined_summaries, _ = graph.fetch_content_summary()
+    # summary = """
+    # Author: Anuj Kapur
+    # Company: Cloudbees
+
+    # Enjoyed the chat with Adrian Bridgwater on Software delivery, how far we have come and implications for the future. #DevSecOps
+
+    # https://lnkd.in/g4VDfXUf
+    # """
     # graph.fetch_content_category(
-    #     company_name=company_name, person_name=person_name, combined_summaries=combined_summaries)
+    #     company_name=company_name, person_name=person_name, combined_summaries=summary)
 
     # user_query = "What is an agent?"
     # docs = graph.retrieve_relevant_docs(user_query=user_query)

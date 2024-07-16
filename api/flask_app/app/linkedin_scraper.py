@@ -153,13 +153,13 @@ class LinkedInScraper:
 
 
 if __name__ == "__main__":
-    import json
-    data = None
-    with open("../example_linkedin_info/proxycurl_profile_3.json", "r") as f:
-        data = f.read()
-    profile_data = json.loads(data)
-    lprofile = PersonProfile(**profile_data)
-    print(lprofile)
+    # import json
+    # data = None
+    # with open("../example_linkedin_info/proxycurl_profile_3.json", "r") as f:
+    #     data = f.read()
+    # profile_data = json.loads(data)
+    # lprofile = PersonProfile(**profile_data)
+    # print(lprofile)
 
     # post_url = 'https://www.linkedin.com/posts/a2kapur_macro-activity-7150910641900244992-0B5E'
     # post_url = 'https://www.linkedin.com/posts/aniket-bajpai_forbes30under30-forbesunder30-growth-activity-7064856579463942144-RptV'
@@ -168,8 +168,16 @@ if __name__ == "__main__":
     # post_url = 'https://www.linkedin.com/posts/plaid-_there-is-still-a-chance-to-catch-up-on-everything-activity-7211762498528555009-vHps/'
 
     # post_url = 'https://www.linkedin.com/posts/a16z_on-this-episode-of-in-the-vault-plaid-ceo-activity-7212156930234941441-6bFX/'
-    # post_data = LinkedInScraper.fetch_linkedin_post(post_url)
-    # print(post_data)
+    # post_url = "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.linkedin.com/posts/jeandenisgreze_growth-engineering-program-reforge-activity-7183823123882946562-wyqe&ved=2ahUKEwiBxqillauHAxW3xDgGHWTvDbAQFnoECBMQAQ&usg=AOvVaw3Cp35kXvI-XKaRDuuU8RtS"
+    # This one gave wrong result from Piloterr.
+    # post_url = "https://www.linkedin.com/posts/jeandenisgreze_thrilled-to-announce-that-ownercom-raised-activity-7158717112633499650-ENK7/"
+    # post_url = "https://www.linkedin.com/posts/zperret_credit-underwriting-in-the-us-is-broken-activity-7203797435322621953-v_Bn"
+    # post_url = "https://www.linkedin.com/posts/jeandenisgreze_distributed-coroutines-a-new-primitive-soon-activity-7173787541630803969-ADdw"
+    # post_url = "https://www.linkedin.com/posts/zperret_2024-fintech-predictions-with-zach-perret-activity-7155603572825427969-ThEB/"
+    # post_url = "https://www.linkedin.com/posts/a2kapur_cloudbees-ceo-software-delivery-is-now-activity-6986004496485158912-vVyd?trk=public_profile_like_view"
+    post_url = "https://www.linkedin.com/posts/a2kapur_security-is-the-new-healthcare-activity-7055957841920086016-Y6Hu"
+    post_data = LinkedInScraper.fetch_linkedin_post(post_url)
+    print(post_data)
 
     # profile_url = "https://www.linkedin.com/in/zperret/"
     # profile_url = "https://www.linkedin.com/in/srinivas-birasal/"
