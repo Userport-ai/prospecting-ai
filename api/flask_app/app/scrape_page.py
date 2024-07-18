@@ -67,9 +67,9 @@ class ContentConciseSummary(BaseModel):
 class ContentDetails(BaseModel):
     """Content author and publish date."""
     author: Optional[str] = Field(
-        default=None, description="Full name of author of content. If not found, set to None.")
+        default=None, description="Full name of author of text. If not found, set to None.")
     publish_date: Optional[str] = Field(
-        default=None, description="Date when this content was published. If not found, set to None.")
+        default=None, description="Date when this text was written. If not found, set to None.")
 
 
 class ContentAboutCompanyOrText(BaseModel):
@@ -199,7 +199,7 @@ class ScrapePageGraph:
         with get_openai_callback() as cb:
             summary = self.fetch_content_summary()
 
-            content_details = self.fetch_content_details()
+            content_details = self.fetch_author_and_date()
 
             self.fetch_content_type(
                 content_details=content_details, combined_summaries=summary)
@@ -265,33 +265,36 @@ class ScrapePageGraph:
 
         return text_summary
 
-    def fetch_content_details(self) -> ContentDetails:
-        """Fetches content details like author and publish date."""
-
+    def fetch_author_and_date(self) -> ContentDetails:
+        """Fetches content details like author and publish date from the web page."""
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
-            "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
-            "If you don't know the answer or it's not in the context, just say you don't know.\n"
+            "You are a smart web page analyzer. A part of the text from a web page is given below.\n"
+            "Determine [1] who wrote the text and [2] the date it was published.\n"
             "\n"
-            "Question: {question}\n"
-            "\n"
-            "Context: {context}\n"
+            "Web Page Text:\n"
+            "{page_text}"
         )
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
             temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
         prompt = PromptTemplate.from_template(prompt_template)
 
-        # We will attempt to fetch content details from top few chunks. Usually its in the beginning of web pages.
-        k = 3
-        context = ScrapePageGraph.format_docs(self.page_body_chunks[:k])
+        # We will fetch author and publish date details from the page header + first page body chunk.
+        # Usually web pages have this information at the top so this algorithm should work well in most cases.
+        page_text = ""
+        if self.page_structure.header:
+            page_text += self.page_structure.header
+        page_text += self.page_body_chunks[0].page_content
+
         chain = prompt | llm
-        result = chain.invoke(
-            {"question": "Who wrote the content and on which date?", "context": context})
+        result = chain.invoke({"page_text": page_text})
 
         # Now using the string response from LLM, parse it for author and date information.
-        content_details = self.parse_llm_output(content=result.content)
-        print("\ncontent details about author and publish date: ", content_details)
+        # For some reason, using structured output in the first LLM call doesn't work. We need to
+        # route the text answer from the first call to extract the structured output.
+        content_details = self.parse_llm_output(text=result.content)
+        print("\ncontent details: ", content_details)
         return content_details
 
     def fetch_content_type(self, content_details: ContentDetails, combined_summaries: str) -> str:
@@ -410,21 +413,22 @@ class ScrapePageGraph:
         print(f"\nCategories result: {result}")
         return result
 
-    def parse_llm_output(self, content: str) -> ContentDetails:
+    def parse_llm_output(self, text: str) -> ContentDetails:
         """Helper to fetch content details in structured format from unstructured LLM output.
 
         Used to process LLM output into content details class.
         """
         prompt_template = (
-            "Extract properties of provided function from given content. If a property is not found, set it to None.\n"
+            "Extract properties of provided function from the given text. If a property is not found, set it to None.\n"
             "\n"
-            "Content: {content}\n"
+            "Text:\n"
+            "{text}"
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
             temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentDetails)
         chain = prompt | llm
-        return chain.invoke(content)
+        return chain.invoke(text)
 
     @staticmethod
     def format_docs(docs: List[Document]) -> str:
@@ -708,11 +712,13 @@ if __name__ == "__main__":
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # Migrated to new struct below.
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
-    url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
+    # Migrated to new struct below.
+    # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     # Migrated to new struct below.
     # url = "https://plaid.com/blog/introducing-plaid-layer/"
+    # Migrated to new struct below.
     # url = "https://plaid.com/team-update/"
     # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
     # url = "https://lnkd.in/g4VDfXUf"
@@ -721,7 +727,7 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
     # Migrated to new struct below.
-    # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
+    url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
     person_name = "Zach Perret"
     company_name = "Plaid"
     # person_name = "Anuj Kapur"
@@ -751,11 +757,12 @@ if __name__ == "__main__":
     # print("summaries exist in db: ", res is not None)
     # graph.analyze_page(person_name=person_name, company_name=company_name)
 
-    summary = graph.fetch_content_summary()
-    graph.fetch_content_category(
-        company_name=company_name, person_name=person_name, summary=summary)
+    # summary = graph.fetch_content_summary()
+    # graph.fetch_content_category(
+    #     company_name=company_name, person_name=person_name, summary=summary)
+    graph.fetch_author_and_date()
 
-    # graph.fetch_content_type(content_details=graph.fetch_content_details())
+    # graph.fetch_content_type(content_details=graph.fetch_author_and_date())
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                            
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                              
