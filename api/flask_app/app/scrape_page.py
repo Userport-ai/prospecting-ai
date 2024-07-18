@@ -57,7 +57,11 @@ class PageFooterResult(BaseModel):
 class ContentConciseSummary(BaseModel):
     """Class to parse content summary from page while parsing it top to bottom."""
     concise_summary: str = Field(...,
-                                  description="Concise Summary of the combined text.")
+                                  description="Concise Summary of the new passage text.")
+    key_persons: List[str] = Field(
+        default=[], description="Extract names of key persons from the new passage text. Set to empty if none found.")
+    key_organizations: List[str] = Field(
+        default=[], description="Extract names of key organizations from the new passage text. Set to empty if none found.")
 
 
 class ContentDetails(BaseModel):
@@ -193,36 +197,37 @@ class ScrapePageGraph:
     def analyze_page(self, person_name: str, company_name: str):
         """Runs analysis of the scraped web page."""
         with get_openai_callback() as cb:
-            combined_summaries, _ = self.fetch_content_summary()
+            summary = self.fetch_content_summary()
 
             content_details = self.fetch_content_details()
 
             self.fetch_content_type(
-                content_details=content_details, combined_summaries=combined_summaries)
+                content_details=content_details, combined_summaries=summary)
 
             self.is_content_about_company_or_person(
-                company_or_person_name=company_name, combined_summaries=combined_summaries)
+                company_or_person_name=company_name, combined_summaries=summary)
 
             self.fetch_content_category(
-                company_name=company_name, person_name=person_name, combined_summaries=combined_summaries)
+                company_name=company_name, person_name=person_name, summary=summary)
 
             token_tracker = OpenAITokenTracker(url=self.url, operation_tag=ScrapePageGraph.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                                completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
             print(f"\nTokens used: {token_tracker}")
 
-    def fetch_content_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL) -> str:
+    def fetch_content_summary(self) -> str:
         """Returns content summary of a web page body using an iterative algorithm."""
         summary: Optional[str] = self.get_summary_from_db()
         if summary:
             print("Found summary in database")
+            print(f"\nSummary: {summary}\n")
             return summary
 
         # Do not change this prompt before testing, results may get worse.
         summary_prompt_template = (
-            "You are a smart web page analyzer. Assume that the input is the body of a web page being parsed from top to bottom.\n"
+            "You are a smart web page analyzer.\n"
             "The 'Summary so far' section below contains a summary of page so far and the 'New Passage' section contains the new information from the page.\n"
-            "Combine information from both sections and write a summary of the page in a concise manner.\n"
-            "Make sure to highlight key numbers, quotes, announcements, persons, and organizations in the summary.\n"
+            "Write a concise summary of only the 'New Passage' section using the 'Summary so far' section as context.\n"
+            "Make sure to highlight key numbers, quotes, announcements, persons and organizations in the summary.\n"
             "\n"
             "Summary so far:\n"
             "{summary_so_far}\n"
@@ -230,10 +235,12 @@ class ScrapePageGraph:
             "New Passage:\n"
             "{new_passage}\n"
         )
-        llm = ChatOpenAI(temperature=0, model_name=openai_model_name).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(
             ContentConciseSummary)
         prompt = PromptTemplate.from_template(summary_prompt_template)
         text_summary: str = ""
+        key_persons: List[str] = []
+        key_organizations: List[str] = []
         result: ContentConciseSummary
         for i, chunk in enumerate(self.page_body_chunks):
             new_passage = chunk.page_content
@@ -242,10 +249,16 @@ class ScrapePageGraph:
                 {"summary_so_far": text_summary, "new_passage": new_passage})
             print(f"\n\nIteration {i+1}")
             print("--------------")
-            print(f"Summary so far: {result.concise_summary}")
-            text_summary = result.concise_summary
+            print(f"Summary of new passage: {result.concise_summary}")
+            print("Key persons: ", result.key_persons)
+            print("Key organizations: ", result.key_organizations)
+            text_summary = f"{text_summary}\n\n{result.concise_summary}"
+            key_persons += result.key_persons
+            key_organizations += result.key_organizations
 
-        print(f"\n\ndetailed summary: {text_summary}")
+        print(f"\n\nsummary: {text_summary}\n")
+        print(f"key persons: {key_persons}\n")
+        print(f"key organizations: {key_organizations}\n")
 
          # Write summary to database.
         self.create_summary_in_db(summary=text_summary)
@@ -340,7 +353,7 @@ class ScrapePageGraph:
         print(f"\n{result}")
         return result
 
-    def fetch_content_category(self, company_name: str, person_name: str, combined_summaries: str) -> ContentCategory:
+    def fetch_content_category(self, company_name: str, person_name: str, summary: str) -> ContentCategory:
         """Returns the category of the content using company name, person name and combined summary."""
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
@@ -392,7 +405,7 @@ class ScrapePageGraph:
             f"* Company offsite for {company_name} employees. [Enum value: company_offsite]\n"
         )
         result = chain.invoke(
-            {"question": question, "context": combined_summaries})
+            {"question": question, "context": summary})
 
         print(f"\nCategories result: {result}")
         return result
@@ -665,7 +678,7 @@ class ScrapePageGraph:
         return summary_content[0]
 
     def delete_summary_from_db(self):
-        """Deletes combined_summaries and detailed summary from the database."""
+        """Deletes summary from the database."""
         summary_ids: List[str] = self.db.get(where={
             "$and": [
                 {ScrapePageGraph.URL: self.url},
@@ -695,22 +708,24 @@ if __name__ == "__main__":
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # Migrated to new struct below.
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
-    # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
+    url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
+    # Migrated to new struct below.
     # url = "https://plaid.com/blog/introducing-plaid-layer/"
     # url = "https://plaid.com/team-update/"
     # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
     # url = "https://lnkd.in/g4VDfXUf"
     # Able to scrape linkedin pulse as well. Could be useful content in the future.
     # url = "https://www.linkedin.com/pulse/blurred-lines-leadership-anuj-kapur"
-    url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
+    # Migrated to new struct below.
+    # url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
     # Migrated to new struct below.
     # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
-    # person_name = "Zach Perret"
-    # company_name = "Plaid"
-    person_name = "Anuj Kapur"
-    company_name = "Cloudbees"
+    person_name = "Zach Perret"
+    company_name = "Plaid"
+    # person_name = "Anuj Kapur"
+    # company_name = "Cloudbees"
     graph = ScrapePageGraph(url=url, start_indexing=True)
     # graph.delete_summary_from_db()
     # graph.delete_all_docs_from_db()
@@ -737,9 +752,10 @@ if __name__ == "__main__":
     # graph.analyze_page(person_name=person_name, company_name=company_name)
 
     summary = graph.fetch_content_summary()
-    # print(summary)
+    graph.fetch_content_category(
+        company_name=company_name, person_name=person_name, summary=summary)
 
-    # graph.fetch_content_type(content_details=graph.fetch_content_details(), combined_summaries=combined_summaries)
+    # graph.fetch_content_type(content_details=graph.fetch_content_details())
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                      
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                            
