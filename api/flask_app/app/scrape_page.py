@@ -431,13 +431,6 @@ class ScrapePageGraph:
         return chain.invoke(text)
 
     @staticmethod
-    def format_docs(docs: List[Document]) -> str:
-        """Helper since StuffDocumentsChain gives some validation error when structued output is
-        specified with LLM model. So using this function as workaround to combines docs to text.
-        """
-        return "\n\n".join(doc.page_content for doc in docs)
-
-    @staticmethod
     def fetch_page(url: str) -> Document:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
         try:
