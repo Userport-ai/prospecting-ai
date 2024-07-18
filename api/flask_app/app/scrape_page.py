@@ -1,5 +1,5 @@
 import os
-from dotenv import load_dotenv
+import random
 import requests
 from langchain_core.prompts import PromptTemplate
 from typing import List, Dict, Optional, Tuple
@@ -7,12 +7,42 @@ from markdownify import markdownify
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
+from utils import Utils
 
+from dotenv import load_dotenv
 load_dotenv()
+
+
+class PageStruture(BaseModel):
+    """Container to store page structure into header, body and footer."""
+    header: Optional[str] = Field(
+        default=None, description="Header of the page, None if no header exists.")
+    body: str = Field(..., description="Body of the page.")
+    footer: Optional[str] = Field(
+        default=None, description="Footer of the page, None if it does not exist.")
+
+    def to_str(self) -> str:
+        """Returns string representation of page structure."""
+        str_repr = ""
+        if self.header:
+            str_repr += f"Header\n=================\n{self.header}\n"
+        str_repr += f"Body\n=================\n{self.body}\n"
+        if self.footer:
+            str_repr += f"Footer\n=================\n{self.footer}\n"
+        return str_repr
+
+
+class PageFooterResult(BaseModel):
+    """Detect footer start string within a web page."""
+    footer_first_sentence: Optional[str] = Field(
+        default=None, description="First sentence from where the footer starts.")
+    reason: str = Field(...,
+                        description="Reason for why this was chosen as footer start point.")
 
 
 class ContentSummary(BaseModel):
@@ -81,6 +111,9 @@ class ScrapePageGraph:
 
     # Metadata Constant keys.
     URL = "url"
+    PAGE_HEADER = "page_header"
+    PAGE_BODY = "page_body"
+    PAGE_FOOTER = "page_footer"
     CHUNK_SIZE = "chunk_size"
     START_INDEX = "start_index"
     COMBINED_SUMMARIES = "combined_summaries"
@@ -250,12 +283,13 @@ class ScrapePageGraph:
         """
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
-            "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
-            "If you don't know the answer or it's not in the context, just say you don't know.\n"
+            "You are an assistant for question-answering tasks. Use the following pieces of retrieved content to answer the question.\n"
+            "If you don't know the answer or it's not in the content, just say you don't know.\n"
             "\n"
             "Question: {question}\n"
             "\n"
-            "Context: {context}\n"
+            "## Content:\n"
+            "{content}"
         )
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
@@ -263,10 +297,15 @@ class ScrapePageGraph:
         prompt = PromptTemplate.from_template(prompt_template)
 
         chain = prompt | llm
-        question = "What type of content does this text represent? If you don't know, just say you don't know."
-        context = f'URL: {self.url}\n\nAuthor:{content_details.author}\n\nDate published:{content_details.publish_date}\n\nDetailed Summary: {combined_summaries}'
+        question = "What type of content does this text represent?"
+        content = (
+            f'URL: {self.url}\n'
+            f'Author:{content_details.author}\n'
+            f'Date published:{content_details.publish_date}\n'
+            f'Detailed Summary: {combined_summaries}'
+        )
         result = chain.invoke(
-            {"question": question, "context": context})
+            {"question": question, "content": content})
 
         # Now using the string response from LLM, parse it for author and date information.
         # return self.parse_llm_output(content=result.content)
@@ -392,12 +431,17 @@ class ScrapePageGraph:
             raise ValueError(
                 f"Invalid response content type: {response.headers}")
 
-        md = markdownify(response.text)
+        # Heading style argument is passed in to ensure we get '#' formatted headings.
+        md = markdownify(response.text, heading_style="ATX")
         return Document(page_content=md, metadata={ScrapePageGraph.URL: url})
 
     @staticmethod
     def split_into_chunks(doc: Document, chunk_size: int = 4096, chunk_overlap: int = 200) -> List[Document]:
         """Split document into chunks of given size and overlap."""
+        # TODO: Problem with this approach is for websites that are marketing pages, the first 2-3 chunks may
+        # just be navigation links that completely destroy the summarization of the page since the algorithm
+        # used right now relies on main content existing in the first 2-3 chunks of summarization.
+        # Workaround is to use Markdown splitter to only start summarizing page once main Header 1 content starts.
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap, add_start_index=True
         )
@@ -410,6 +454,74 @@ class ScrapePageGraph:
             f"Created: {len(chunks)} chunks when splitting: {url} using chunk size: {chunk_size}")
 
         return chunks
+
+    @staticmethod
+    def get_page_structure(doc: Document) -> PageStruture:
+        """Splits given web page document into header, body and footer contents and returns it."""
+        markdown_page = doc.page_content
+
+        # Fetch page header.
+        heading_line: Optional[str] = None
+        for level in range(1, 7):
+            heading_line: Optional[str] = Utils.get_first_heading_in_markdown(
+                markdown_text=markdown_page, level=level)
+            if heading_line:
+                break
+
+        page_header: Optional[str] = None
+        remaining_md_page: str = markdown_page
+        if heading_line:
+            index = markdown_page.find(heading_line)
+            page_header = markdown_page[:index]
+            remaining_md_page = markdown_page[index:]
+
+        # Fetch page footer. Try 3 times max.
+        opeani_temperature: float = 0
+        page_footer: Optional[str] = None
+        page_body: str = remaining_md_page
+        # Try max 5 times to fetch footer.
+        for _ in range(0, 5):
+            footer_result = ScrapePageGraph.fetch_page_footer(
+                page_without_header=remaining_md_page, openai_temperature=opeani_temperature)
+            if footer_result.footer_first_sentence is None:
+                # Use random value between 0 and 1 for new temperature and try again.
+                opeani_temperature = random.random()
+                continue
+
+            index = remaining_md_page.find(footer_result.footer_first_sentence)
+            if index == -1:
+                # Use random value between 0 and 1 for new temperature and try again.
+                opeani_temperature = random.random()
+                continue
+
+            page_footer = remaining_md_page[index:]
+            page_body = remaining_md_page[:index]
+            break
+
+        return PageStruture(header=page_header, body=page_body, footer=page_footer)
+
+    @staticmethod
+    def fetch_page_footer(page_without_header: str, openai_temperature: float = 1.0) -> PageFooterResult:
+        """Use LLM to fetch the footer in given page without header."""
+        prompt_template = (
+            "You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.\n"
+            # "Can you identify if the chunk has a footer containing a bunch of links that are unrelated to the main content?\n"
+            "Can you identify if the chunk can be split into: [1] text with main content and [2] footer text that does not contribute to the main content?\n"
+            "If yes, return the first sentence from where this footer starts. If no, return None.\n"
+            "\n"
+            "Chunk:\n"
+            "{chunk}"
+        )
+        prompt = PromptTemplate.from_template(prompt_template)
+        llm = ChatOpenAI(
+            temperature=openai_temperature, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(PageFooterResult)
+        chain = prompt | llm
+
+        try:
+            # We assume that page without header can fit within the token size of GPT40 which is 128K tokens for most pages.
+            return chain.invoke({"chunk": page_without_header})
+        except Exception as e:
+            raise ValueError(f"Error in fetching page footer: {e}")
 
     def create_and_store_embeddings(self):
         """Create embeddings for document chunks and store into vector db."""
@@ -438,24 +550,106 @@ class ScrapePageGraph:
         return [Document(page_content=result[1])
                 for result in sorted_results]
 
+    def create_page_structure_in_db(self, page_structure: PageStruture):
+        """Creates page structure in database for given URL."""
+        header: Optional[str] = page_structure.header
+        if header:
+            self.db.add_documents(documents=[Document(page_content=header, metadata={
+                                  ScrapePageGraph.URL: url, ScrapePageGraph.PAGE_HEADER: True})])
+
+        body: str = page_structure.body
+        self.db.add_documents(documents=[Document(page_content=body, metadata={
+                              ScrapePageGraph.URL: url, ScrapePageGraph.PAGE_BODY: True})])
+
+        footer: str = page_structure.footer
+        if footer:
+            self.db.add_documents(documents=[Document(page_content=footer, metadata={
+                                  ScrapePageGraph.URL: url, ScrapePageGraph.PAGE_FOOTER: True})])
+
+    def get_page_structure_from_db(self) -> Optional[PageStruture]:
+        """Returns page structure from db for given URL. If not found, returns None."""
+        header_result: Dict = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: self.url},
+                {ScrapePageGraph.PAGE_HEADER: True}
+            ]
+        })
+        body_result: Dict = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: self.url},
+                {ScrapePageGraph.PAGE_BODY: True}
+            ]
+        })
+        footer_result: Dict = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: self.url},
+                {ScrapePageGraph.PAGE_FOOTER: True}
+            ]
+        })
+        header_list: List[str] = header_result['documents']
+        body_list: List[str] = body_result['documents']
+        footer_list: List[str] = footer_result['documents']
+        if len(header_list) == 0 and len(body_list) == 0 and len(footer_list) == 0:
+            # Result not in db.
+            return None
+        if len(body_list) != 1:
+            raise ValueError(
+                f"Expected body for url {self.url} to return 1 result, got: {body_list}")
+        if len(header_list) > 1:
+            raise ValueError(
+                f"Expected header list for url {self.url} to return 1 result, got: {header_list}")
+        if len(footer_list) > 1:
+            raise ValueError(
+                f"Expected footer list for url {self.url} to return 1 result, got: {footer_list}")
+        page_structure = PageStruture(body=body_list[0])
+        if len(header_list) > 0:
+            page_structure.header = header_list[0]
+        if len(footer_list) > 0:
+            page_structure.footer = footer_list[0]
+        return page_structure
+
+    def delete_page_structure_from_db(self):
+        """Delete page structures from database."""
+        header_ids: List[str] = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: self.url},
+                {ScrapePageGraph.PAGE_HEADER: True}
+            ]
+        })['ids']
+        body_ids: List[str] = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: self.url},
+                {ScrapePageGraph.PAGE_BODY: True}
+            ]
+        })['ids']
+        footer_ids: List[str] = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: self.url},
+                {ScrapePageGraph.PAGE_FOOTER: True}
+            ]
+        })['ids']
+        ids_to_delete: List[str] = header_ids + body_ids + footer_ids
+        self.db.delete(ids=ids_to_delete)
+        print(f"Deleted {len(ids_to_delete)} page structure docs")
+
     def create_summaries_in_db(self, combined_summaries: str, detailed_summary: str):
         """Creates combined summaries and detailed summary doc in the database."""
         self.db.add_documents(documents=[Document(
-            page_content=combined_summaries, metadata={ScrapePageGraph.URL: url, ScrapePageGraph.COMBINED_SUMMARIES: True})])
+            page_content=combined_summaries, metadata={ScrapePageGraph.URL: self.url, ScrapePageGraph.COMBINED_SUMMARIES: True})])
         self.db.add_documents(documents=[Document(
-            page_content=detailed_summary, metadata={ScrapePageGraph.URL: url, ScrapePageGraph.DETAILED_SUMMARY: True})])
+            page_content=detailed_summary, metadata={ScrapePageGraph.URL: self.url, ScrapePageGraph.DETAILED_SUMMARY: True})])
 
     def get_summaries_from_db(self) -> Optional[Tuple[str, str]]:
         """Return combined summaries and detailed summary for given URL from db, none if it doesn't exist yet."""
         combined_summaries_result: Dict = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: url},
+                {ScrapePageGraph.URL: self.url},
                 {ScrapePageGraph.COMBINED_SUMMARIES: True}
             ]
         })
         detailed_summary_result: Dict = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: url},
+                {ScrapePageGraph.URL: self.url},
                 {ScrapePageGraph.DETAILED_SUMMARY: True}
             ]
         })
@@ -473,13 +667,13 @@ class ScrapePageGraph:
         """Deletes combined_summaries and detailed summary from the database."""
         combined_summaries_ids: List[str] = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: url},
+                {ScrapePageGraph.URL: self.url},
                 {ScrapePageGraph.COMBINED_SUMMARIES: True}
             ]
         })['ids']
         detailed_summary_ids: List[str] = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: url},
+                {ScrapePageGraph.URL: self.url},
                 {ScrapePageGraph.DETAILED_SUMMARY: True}
             ]
         })['ids']
@@ -489,14 +683,14 @@ class ScrapePageGraph:
         print(f"Deleted {len(ids_to_delete)} summaries docs")
 
     def delete_docs(self):
-        """Delete docs associated with given url."""
+        """Delete all documents associated with given url."""
         self.db.delete(ids=self.get_doc_ids())
 
 
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
-    # url = "https://plaid.com/blog/year-in-review-2023/"
-    url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
+    url = "https://plaid.com/blog/year-in-review-2023/"
+    # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
@@ -507,32 +701,33 @@ if __name__ == "__main__":
     # url = "https://lnkd.in/g4VDfXUf"
     # Able to scrape linkedin pulse as well. Could be useful content in the future.
     # url = "https://www.linkedin.com/pulse/blurred-lines-leadership-anuj-kapur"
+    # url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
+    # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
     # person_name = "Zach Perret"
     # company_name = "Plaid"
-    person_name = "Raj Sarkar"
+    person_name = "Anuj Kapur"
     company_name = "Cloudbees"
     graph = ScrapePageGraph(url=url)
+    # print("got: ", graph.get_page_structure_from_db())
+    # Write page structure into file to test that it works.
+
+    with get_openai_callback() as cb:
+        page_structure = ScrapePageGraph.get_page_structure(
+            doc=ScrapePageGraph.fetch_page(url=url))
+        print(cb)
+        with open("../example_linkedin_info/page_structure.txt", "w") as f:
+            f.write(page_structure.to_str())
+
+    # print("num docs: ", len(graph.get_doc_ids()))
+    # res = graph.get_summaries_from_db()
+    # print("summaries exist in db: ", res is not None)
     # graph.analyze_page(person_name=person_name, company_name=company_name)
 
-    # combined_summaries, _ = graph.fetch_content_summary()
-    summary = """
-    I wrote an internal post as part of my leadership series:
+    # combined_summaries, detailed_summary = graph.fetch_content_summary()
+    # print(detailed_summary)
+    # print(detailed_summary)
 
-Why Speed is not the same as Velocity?
-
-Speed, in its simplest form, refers to how fast something is moving. It’s a scalar quantity, representing motion without regard to direction. At organizations, speed often manifests itself as tasks are completed or projects are executed. It’s about the sheer pace of activity.  
-
-On the other hand, velocity introduces an additional dimension by incorporating direction into the equation. Velocity is a vector quantity. At organizations, velocity not only means the rate of progress but also moving forward with purpose, navigating towards predetermined goals rather than merely staying busy.  
-
-People often conflate the two. Consider a scenario where you are diligently working on various tasks day in and day out. You are squarely focused on output, demonstrating impressive speed in your activities. However, if it fails to drive any outcome or contribute meaningfully to our company goals, you’re essentially moving in circles.  
-
-We often confuse being busy with being productive. It’s not uncommon for us to equate a flurry of activity with success but if we are not making any progress towards our goals, in terms of velocity, we are just static. 
-
-Don’t fall into this trap. Focus on outcomes over outputs. Before working on every task, ask yourself - what KPI this will influence? Is it contributing to our company goals? If not, ruthlessly prioritize.
-    """
-    graph.fetch_content_category(
-        company_name=company_name, person_name=person_name, combined_summaries=summary)
+    # graph.fetch_content_type(content_details=graph.fetch_content_details(), combined_summaries=combined_summaries)
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)
-    # print("first doc content: ", docs[0].page_content[:1000])
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                       

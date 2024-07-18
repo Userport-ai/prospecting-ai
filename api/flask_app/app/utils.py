@@ -1,9 +1,26 @@
+import re
 from datetime import datetime, timezone
 import pytz
+from typing import Optional
 
 
 class Utils:
     """Class with common utility functions."""
+
+    @staticmethod
+    def get_first_heading_in_markdown(markdown_text: str, level: int = 1) -> Optional[str]:
+        """Returns first heading of given level (1 = h1, 2= h2 and so on) from given markdown text.
+
+        If no heading found, returns None.
+        """
+        header = "#" * level
+        # H1 pattern
+        pattern = r'((?<!#)(' + header + r')\s.*)'
+        matches = re.findall(pattern, markdown_text, re.MULTILINE)
+        if len(matches) == 0:
+            return None
+        # First group of first match contains the matched string.
+        return matches[0][0]
 
     @staticmethod
     def convert_linkedin_post_time_to_utc(post_time: str) -> datetime:
