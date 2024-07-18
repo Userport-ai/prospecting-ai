@@ -2,12 +2,11 @@ import os
 import random
 import requests
 from langchain_core.prompts import PromptTemplate
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from markdownify import markdownify
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
@@ -18,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-class PageStruture(BaseModel):
+class PageStructure(BaseModel):
     """Container to store page structure into header, body and footer."""
     header: Optional[str] = Field(
         default=None, description="Header of the page, None if no header exists.")
@@ -36,6 +35,16 @@ class PageStruture(BaseModel):
             str_repr += f"Footer\n=================\n{self.footer}\n"
         return str_repr
 
+    def to_doc(self) -> str:
+        """Returns document string."""
+        doc: str = ""
+        if self.header:
+            doc += self.header
+        doc += self.body
+        if self.footer:
+            doc += self.footer
+        return doc
+
 
 class PageFooterResult(BaseModel):
     """Detect footer start string within a web page."""
@@ -45,10 +54,10 @@ class PageFooterResult(BaseModel):
                         description="Reason for why this was chosen as footer start point.")
 
 
-class ContentSummary(BaseModel):
+class ContentConciseSummary(BaseModel):
     """Class to parse content summary from page while parsing it top to bottom."""
-    detailed_summary: str = Field(...,
-                                  description="Detailed Summary of the text.")
+    concise_summary: str = Field(...,
+                                  description="Concise Summary of the combined text.")
 
 
 class ContentDetails(BaseModel):
@@ -111,37 +120,54 @@ class ScrapePageGraph:
 
     # Metadata Constant keys.
     URL = "url"
+    DOCUMENTS = "documents"
     PAGE_HEADER = "page_header"
     PAGE_BODY = "page_body"
     PAGE_FOOTER = "page_footer"
     CHUNK_SIZE = "chunk_size"
     START_INDEX = "start_index"
-    COMBINED_SUMMARIES = "combined_summaries"
-    DETAILED_SUMMARY = "detailed_summary"
+    SPLIT_INDEX = "split_index"
+    SUMMARY = "summary"
 
-    def __init__(self, url: str, chunk_size: int = 4096) -> None:
+    def __init__(self,  url: str, start_indexing: bool = False, chunk_size: int = 4096, chunk_overlap: int = 200) -> None:
         self.url = url
         self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
         self.db = Chroma(persist_directory=ScrapePageGraph.CHROMA_DB_PATH,
                          embedding_function=ScrapePageGraph.OPENAI_EMBEDDING_FUNCTION)
-        if len(self.get_doc_ids()) == 0:
-            print("Page deos not exist in db, fetching it.")
-            # Index page rom URL.
-            self.index(url=url, chunk_size=chunk_size)
+
+        if start_indexing:
+            self.index()
+
+    def index(self):
+        """Workflow to fetch HTML page, split into page structure, create chunks and then store embeddings in vector database."""
+        page_structure = self.get_page_structure_from_db(
+        )
+        doc: Document = None
+        if page_structure:
+            print("Fetched page structure from database.")
+            self.page_structure: PageStructure = page_structure
+            doc = self.page_structure.to_doc()
         else:
-            print("Page already exists in db, fetching it.")
-            # Get page chunks from database.
-            self.chunks = self.get_doc_chunks()
+            print("Page structure not found in database, fetching it from web.")
+            doc = ScrapePageGraph.fetch_page(url=self.url)
+            self.page_structure: PageStructure = ScrapePageGraph.get_page_structure(
+                doc=doc)
+            self.create_page_structure_in_db(
+                page_structure=self.page_structure)
 
-    def index(self, url: str, chunk_size: int):
-        """Workflow that fetches HTML page, converts it Markdown doc, splits it and then stores embeddings in a vector database.
-
-        Returns the created Vector database instance which can be used for retrieveing and querying.
-        """
-        doc: Document = ScrapePageGraph.fetch_page(url=url)
-        self.chunks: List[Document] = ScrapePageGraph.split_into_chunks(
-            doc=doc, chunk_size=chunk_size)
-        self.create_and_store_embeddings()
+        page_body_chunks: List[Document] = self.get_page_body_chunks_from_db(
+        )
+        if len(page_body_chunks) > 0:
+            print(
+                f"Found {len(page_body_chunks)} page body chunks in database")
+            self.page_body_chunks = page_body_chunks
+        else:
+            print("Page body chunks not found in database, creating it.")
+            page_body_chunks = self.split_into_chunks(
+                doc=Document(page_content=self.page_structure.body))
+            self.page_body_chunks = self.create_page_body_chunks_in_db(
+                chunks=page_body_chunks)
 
     def get_retriever(self,  k: int = 5) -> VectorStoreRetriever:
         """Return retriever from given database for known URL."""
@@ -184,68 +210,47 @@ class ScrapePageGraph:
                                                completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
             print(f"\nTokens used: {token_tracker}")
 
-    def fetch_content_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL) -> Tuple[str, str]:
-        """Fetches content details by parsing the document from the top to the bottom.
-        Returns concatenations of summaries as well as overall summary of the page.
-
-        The contents fetched are updated in the output model as we iterate.
-        Insipired by the refine chain in the langchain docs.
-
-        Size of compressed content:
-        When testing against https://lilianweng.github.io/posts/2023-06-23-agent/
-        which is of size = 15 * 4096 characters  ~ 60KB, the compressed text based on summaries is 3500 chars.
-        Token size of ChatGPT 3.5 Turbo is 16K tokens so we can index up to web page of size:
-        16/3.5 = 4 times the size of 60 KB = 2.4 MB while the compressed doc is still small enough
-        to fit the context window.
-        """
-        summaries = self.get_summaries_from_db()
-        if summaries:
-            print("Found summaries in database")
-            return summaries
+    def fetch_content_summary(self, openai_model_name: str = OPENAI_GPT_3_5_TURBO_MODEL) -> str:
+        """Returns content summary of a web page body using an iterative algorithm."""
+        summary: Optional[str] = self.get_summary_from_db()
+        if summary:
+            print("Found summary in database")
+            return summary
 
         # Do not change this prompt before testing, results may get worse.
-        # TODO: Ask to skip parsing HTML navigation, links and javscript. Only parse HTML Body.
         summary_prompt_template = (
-            "You are a smart web page analyzer. Assume that the page is being parsed from top to bottom\n"
-            "with the 'Context' section containing a summary of text so far and the 'Text' section below\n"
-            "containing the new text.\n"
-            "Do not make up values for the properties if not found.\n"
+            "You are a smart web page analyzer. Assume that the input is the body of a web page being parsed from top to bottom.\n"
+            "The 'Summary so far' section below contains a summary of page so far and the 'New Passage' section contains the new information from the page.\n"
+            "Combine information from both sections and write a summary of the page in a concise manner.\n"
+            "Make sure to highlight key numbers, quotes, announcements, persons, and organizations in the summary.\n"
             "\n"
-            "Context:\n"
-            "{context}\n"
+            "Summary so far:\n"
+            "{summary_so_far}\n"
             "\n"
-            "Text:\n"
-            "{text}\n"
+            "New Passage:\n"
+            "{new_passage}\n"
         )
         llm = ChatOpenAI(temperature=0, model_name=openai_model_name).with_structured_output(
-            ContentSummary)
+            ContentConciseSummary)
         prompt = PromptTemplate.from_template(summary_prompt_template)
-
-        # Context will be a concatenated string of summaries
-        # computed at each step.
-        combined_summaries = ""
-        result: ContentSummary
-        for i, chunk in enumerate(self.chunks):
-            text = chunk.page_content
+        text_summary: str = ""
+        result: ContentConciseSummary
+        for i, chunk in enumerate(self.page_body_chunks):
+            new_passage = chunk.page_content
             chain = prompt | llm
-            result: ContentSummary = chain.invoke(
-                {"context": combined_summaries, "text": text})
+            result: ContentConciseSummary = chain.invoke(
+                {"summary_so_far": text_summary, "new_passage": new_passage})
             print(f"\n\nIteration {i+1}")
             print("--------------")
-            print(f"Summary so far: {combined_summaries}")
+            print(f"Summary so far: {result.concise_summary}")
+            text_summary = result.concise_summary
 
-            # Set context as new summary.
-            combined_summaries = f"{combined_summaries}\n\n{result.detailed_summary}"
+        print(f"\n\ndetailed summary: {text_summary}")
 
-        detailed_summary = result.detailed_summary
-        print(f"\n\ndetailed summary: {detailed_summary}")
+         # Write summary to database.
+        self.create_summary_in_db(summary=text_summary)
 
-        # Write summaries to database.
-        self.create_summaries_in_db(
-            combined_summaries=combined_summaries, detailed_summary=detailed_summary)
-
-        # Return concatenation of summaries and the final detailed summary.
-        return combined_summaries, detailed_summary
+        return text_summary
 
     def fetch_content_details(self) -> ContentDetails:
         """Fetches content details like author and publish date."""
@@ -266,7 +271,7 @@ class ScrapePageGraph:
 
         # We will attempt to fetch content details from top few chunks. Usually its in the beginning of web pages.
         k = 3
-        context = ScrapePageGraph.format_docs(self.chunks[:k])
+        context = ScrapePageGraph.format_docs(self.page_body_chunks[:k])
         chain = prompt | llm
         result = chain.invoke(
             {"question": "Who wrote the content and on which date?", "context": context})
@@ -433,30 +438,20 @@ class ScrapePageGraph:
 
         # Heading style argument is passed in to ensure we get '#' formatted headings.
         md = markdownify(response.text, heading_style="ATX")
-        return Document(page_content=md, metadata={ScrapePageGraph.URL: url})
+        return Document(page_content=md)
 
-    @staticmethod
-    def split_into_chunks(doc: Document, chunk_size: int = 4096, chunk_overlap: int = 200) -> List[Document]:
-        """Split document into chunks of given size and overlap."""
-        # TODO: Problem with this approach is for websites that are marketing pages, the first 2-3 chunks may
-        # just be navigation links that completely destroy the summarization of the page since the algorithm
-        # used right now relies on main content existing in the first 2-3 chunks of summarization.
-        # Workaround is to use Markdown splitter to only start summarizing page once main Header 1 content starts.
+    def split_into_chunks(self, doc: Document) -> List[Document]:
+        """Split document into chunks using character splitter of given maximum chunk size and overlap."""
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size, chunk_overlap=chunk_overlap, add_start_index=True
+            chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap, add_start_index=True
         )
         chunks = text_splitter.split_documents([doc])
-        # Add chunk size metadata.
-        for chunk in chunks:
-            chunk.metadata[ScrapePageGraph.CHUNK_SIZE] = chunk_size
-
         print(
-            f"Created: {len(chunks)} chunks when splitting: {url} using chunk size: {chunk_size}")
-
+            f"Created: {len(chunks)} chunks when splitting: {url} using chunk size: {self.chunk_size}")
         return chunks
 
     @staticmethod
-    def get_page_structure(doc: Document) -> PageStruture:
+    def get_page_structure(doc: Document) -> PageStructure:
         """Splits given web page document into header, body and footer contents and returns it."""
         markdown_page = doc.page_content
 
@@ -498,7 +493,7 @@ class ScrapePageGraph:
             page_body = remaining_md_page[:index]
             break
 
-        return PageStruture(header=page_header, body=page_body, footer=page_footer)
+        return PageStructure(header=page_header, body=page_body, footer=page_footer)
 
     @staticmethod
     def fetch_page_footer(page_without_header: str, openai_temperature: float = 1.0) -> PageFooterResult:
@@ -523,50 +518,65 @@ class ScrapePageGraph:
         except Exception as e:
             raise ValueError(f"Error in fetching page footer: {e}")
 
-    def create_and_store_embeddings(self):
-        """Create embeddings for document chunks and store into vector db."""
-        try:
-            self.db.add_documents(documents=self.chunks)
-        except Exception as e:
-            raise ValueError(
-                f"Failed to create vector embeddings for {len(self.chunks)} docs with url: {self.url} with error: {e}")
+    def create_page_body_chunks_in_db(self, chunks: List[Document]) -> List[Document]:
+        """Create embeddings for page body chunks and store into vector db.
 
-    def get_doc_ids(self) -> List[str]:
-        """Get doc Ids stored in database for given URL."""
-        return self.db.get(
-            where={ScrapePageGraph.URL: self.url})['ids']
+        Returns chunks with metadata populated.
+        """
+        for i, chunk in enumerate(chunks):
+            # Add URL and chunk size metadata to document.
+            chunk.metadata[ScrapePageGraph.URL] = self.url
+            chunk.metadata[ScrapePageGraph.CHUNK_SIZE] = self.chunk_size
+            chunk.metadata[ScrapePageGraph.SPLIT_INDEX] = i
 
-    def get_doc_chunks(self) -> List[Document]:
-        """Return document chunks sorted by index number from the database for given URL."""
+        self.db.add_documents(documents=chunks)
+        return chunks
+
+    def get_page_body_chunks_from_db(self) -> List[Document]:
+        """Return Page body chunks sorted by index number from the database for given URL."""
         result: Dict = self.db.get(where={
             "$and": [
                 {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.START_INDEX: {"$gte": 0}},
+                {ScrapePageGraph.SPLIT_INDEX: {"$gte": 0}},
             ]
         })
-        sorted_results = sorted(zip(result["metadatas"], result["documents"]),
-                                key=lambda m: m[0]["start_index"])
+        sorted_results = sorted(zip(result["metadatas"], result[ScrapePageGraph.DOCUMENTS]),
+                                key=lambda m: m[0][ScrapePageGraph.SPLIT_INDEX])
 
         return [Document(page_content=result[1])
                 for result in sorted_results]
 
-    def create_page_structure_in_db(self, page_structure: PageStruture):
-        """Creates page structure in database for given URL."""
+    def delete_page_body_chunks_from_db(self):
+        """Delete page body chunks from database."""
+        page_body_chunk_ids: List[str] = self.db.get(where={
+            "$and": [
+                {ScrapePageGraph.URL: self.url},
+                {ScrapePageGraph.SPLIT_INDEX: {"$gte": 0}},
+            ]
+        })['ids']
+        self.db.delete(ids=page_body_chunk_ids)
+        print(f"Deleted {len(page_body_chunk_ids)} page body chunk docs")
+
+    def create_page_structure_in_db(self, page_structure: PageStructure):
+        """Creates page structure in database for given URL.
+
+        Each string in the page structure cannot be larger than 8192 tokens per: https://platform.openai.com/docs/api-reference/embeddings/create.
+        """
         header: Optional[str] = page_structure.header
         if header:
             self.db.add_documents(documents=[Document(page_content=header, metadata={
-                                  ScrapePageGraph.URL: url, ScrapePageGraph.PAGE_HEADER: True})])
+                                  ScrapePageGraph.URL: self.url, ScrapePageGraph.PAGE_HEADER: True})])
 
         body: str = page_structure.body
         self.db.add_documents(documents=[Document(page_content=body, metadata={
-                              ScrapePageGraph.URL: url, ScrapePageGraph.PAGE_BODY: True})])
+                              ScrapePageGraph.URL: self.url, ScrapePageGraph.PAGE_BODY: True})])
 
         footer: str = page_structure.footer
         if footer:
             self.db.add_documents(documents=[Document(page_content=footer, metadata={
-                                  ScrapePageGraph.URL: url, ScrapePageGraph.PAGE_FOOTER: True})])
+                                  ScrapePageGraph.URL: self.url, ScrapePageGraph.PAGE_FOOTER: True})])
 
-    def get_page_structure_from_db(self) -> Optional[PageStruture]:
+    def get_page_structure_from_db(self) -> Optional[PageStructure]:
         """Returns page structure from db for given URL. If not found, returns None."""
         header_result: Dict = self.db.get(where={
             "$and": [
@@ -586,9 +596,9 @@ class ScrapePageGraph:
                 {ScrapePageGraph.PAGE_FOOTER: True}
             ]
         })
-        header_list: List[str] = header_result['documents']
-        body_list: List[str] = body_result['documents']
-        footer_list: List[str] = footer_result['documents']
+        header_list: List[str] = header_result[ScrapePageGraph.DOCUMENTS]
+        body_list: List[str] = body_result[ScrapePageGraph.DOCUMENTS]
+        footer_list: List[str] = footer_result[ScrapePageGraph.DOCUMENTS]
         if len(header_list) == 0 and len(body_list) == 0 and len(footer_list) == 0:
             # Result not in db.
             return None
@@ -601,7 +611,7 @@ class ScrapePageGraph:
         if len(footer_list) > 1:
             raise ValueError(
                 f"Expected footer list for url {self.url} to return 1 result, got: {footer_list}")
-        page_structure = PageStruture(body=body_list[0])
+        page_structure = PageStructure(body=body_list[0])
         if len(header_list) > 0:
             page_structure.header = header_list[0]
         if len(footer_list) > 0:
@@ -632,65 +642,58 @@ class ScrapePageGraph:
         self.db.delete(ids=ids_to_delete)
         print(f"Deleted {len(ids_to_delete)} page structure docs")
 
-    def create_summaries_in_db(self, combined_summaries: str, detailed_summary: str):
-        """Creates combined summaries and detailed summary doc in the database."""
+    def create_summary_in_db(self, summary: str):
+        """Creates summary in the database."""
         self.db.add_documents(documents=[Document(
-            page_content=combined_summaries, metadata={ScrapePageGraph.URL: self.url, ScrapePageGraph.COMBINED_SUMMARIES: True})])
-        self.db.add_documents(documents=[Document(
-            page_content=detailed_summary, metadata={ScrapePageGraph.URL: self.url, ScrapePageGraph.DETAILED_SUMMARY: True})])
+            page_content=summary, metadata={ScrapePageGraph.URL: self.url, ScrapePageGraph.SUMMARY: True})])
 
-    def get_summaries_from_db(self) -> Optional[Tuple[str, str]]:
-        """Return combined summaries and detailed summary for given URL from db, none if it doesn't exist yet."""
-        combined_summaries_result: Dict = self.db.get(where={
-            "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.COMBINED_SUMMARIES: True}
-            ]
-        })
+    def get_summary_from_db(self) -> Optional[str]:
+        """Return summary for given URL from db and None if it doesn't exist yet."""
         detailed_summary_result: Dict = self.db.get(where={
             "$and": [
                 {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.DETAILED_SUMMARY: True}
+                {ScrapePageGraph.SUMMARY: True}
             ]
         })
-        combined_summaries_content: List[str] = combined_summaries_result['documents']
-        detailed_summary_content: List[str] = detailed_summary_result['documents']
-        if len(combined_summaries_content) == 0 and len(detailed_summary_content) == 0:
+        summary_content: List[str] = detailed_summary_result[ScrapePageGraph.DOCUMENTS]
+        if len(summary_content) == 0:
             # Result not in db.
             return None
-        if len(combined_summaries_content) != 1 or len(detailed_summary_content) != 1:
+        if len(summary_content) != 1:
             raise ValueError(
-                f"Expected 1 doc per combined summaries and detailed summary result, got combined: {combined_summaries_content}, detailed: {detailed_summary_content}")
-        return combined_summaries_content[0], detailed_summary_content[0]
+                f"Expected 1 doc for summary result, got: {summary_content}")
+        return summary_content[0]
 
-    def delete_summaries_from_db(self):
+    def delete_summary_from_db(self):
         """Deletes combined_summaries and detailed summary from the database."""
-        combined_summaries_ids: List[str] = self.db.get(where={
+        summary_ids: List[str] = self.db.get(where={
             "$and": [
                 {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.COMBINED_SUMMARIES: True}
+                {ScrapePageGraph.SUMMARY: True}
             ]
         })['ids']
-        detailed_summary_ids: List[str] = self.db.get(where={
-            "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.DETAILED_SUMMARY: True}
-            ]
-        })['ids']
-        ids_to_delete: List[str] = combined_summaries_ids + \
-            detailed_summary_ids
-        self.db.delete(ids=ids_to_delete)
-        print(f"Deleted {len(ids_to_delete)} summaries docs")
+        self.db.delete(ids=summary_ids)
+        print(f"Deleted {len(summary_ids)} summaries docs")
 
-    def delete_docs(self):
+    def get_all_doc_ids_from_db(self) -> List[str]:
+        """Get Ids for all documents (header, footer, body, chunks, summmaries etc.) in the database associated with the given URL."""
+        return self.db.get(
+            where={ScrapePageGraph.URL: self.url})['ids']
+
+    def get_all_docs_from_db(self) -> List[Document]:
+        return self.db.get(where={ScrapePageGraph.URL: self.url})[ScrapePageGraph.DOCUMENTS]
+
+    def delete_all_docs_from_db(self):
         """Delete all documents associated with given url."""
-        self.db.delete(ids=self.get_doc_ids())
+        self.db.delete(ids=self.get_all_doc_ids_from_db())
 
 
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
-    url = "https://plaid.com/blog/year-in-review-2023/"
+    # Migrated to new struct below.
+    # url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
+    # Migrated to new struct below.
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
@@ -701,33 +704,42 @@ if __name__ == "__main__":
     # url = "https://lnkd.in/g4VDfXUf"
     # Able to scrape linkedin pulse as well. Could be useful content in the future.
     # url = "https://www.linkedin.com/pulse/blurred-lines-leadership-anuj-kapur"
-    # url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
+    url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
+    # Migrated to new struct below.
     # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
     # person_name = "Zach Perret"
     # company_name = "Plaid"
     person_name = "Anuj Kapur"
     company_name = "Cloudbees"
-    graph = ScrapePageGraph(url=url)
+    graph = ScrapePageGraph(url=url, start_indexing=True)
+    # graph.delete_summary_from_db()
+    # graph.delete_all_docs_from_db()
+    # graph.analyze_page(person_name=person_name, company_name=company_name)
     # print("got: ", graph.get_page_structure_from_db())
     # Write page structure into file to test that it works.
 
-    with get_openai_callback() as cb:
-        page_structure = ScrapePageGraph.get_page_structure(
-            doc=ScrapePageGraph.fetch_page(url=url))
-        print(cb)
-        with open("../example_linkedin_info/page_structure.txt", "w") as f:
-            f.write(page_structure.to_str())
+    # print("page body chunks: ", len(graph.page_body_chunks))
+    # print(len(graph.get_all_docs_from_db()))
+    # print("page structure: ", graph.get_page_structure_from_db())
+
+    # print("delete docs: ", graph.delete_all_docs_from_db())
+
+    # with get_openai_callback() as cb:
+    #     page_structure = ScrapePageGraph.get_page_structure(
+    #         doc=ScrapePageGraph.fetch_page(url=url))
+    #     print(cb)
+    #     with open("../example_linkedin_info/page_structure.txt", "w") as f:
+    #         f.write(page_structure.to_str())
 
     # print("num docs: ", len(graph.get_doc_ids()))
-    # res = graph.get_summaries_from_db()
+    # res = graph.get_summary_from_db()
     # print("summaries exist in db: ", res is not None)
     # graph.analyze_page(person_name=person_name, company_name=company_name)
 
-    # combined_summaries, detailed_summary = graph.fetch_content_summary()
-    # print(detailed_summary)
-    # print(detailed_summary)
+    summary = graph.fetch_content_summary()
+    # print(summary)
 
     # graph.fetch_content_type(content_details=graph.fetch_content_details(), combined_summaries=combined_summaries)
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                       
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                      

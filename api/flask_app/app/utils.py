@@ -9,9 +9,9 @@ class Utils:
 
     @staticmethod
     def get_first_heading_in_markdown(markdown_text: str, level: int = 1) -> Optional[str]:
-        """Returns first heading of given level (1 = h1, 2= h2 and so on) from given markdown text.
+        """Returns first heading of given level (1 = h1, 2= h2 and so on) from given markdown text. If no heading found, returns None.
 
-        If no heading found, returns None.
+        We use our own regex for headings because MarkdownHeaderTextSplitter doesn't detect headings accurately all the time.
         """
         header = "#" * level
         # H1 pattern
