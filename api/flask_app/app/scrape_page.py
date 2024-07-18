@@ -46,6 +46,11 @@ class PageStructure(BaseModel):
             doc += self.footer
         return doc
 
+    def get_size_mb(self) -> float:
+        """Returns size of given page in megabytes."""
+        page_text: str = self.to_doc()
+        return len(page_text.encode("utf-8"))/(1024.0 * 1024.0)
+
 
 class PageFooterResult(BaseModel):
     """Detect footer start string within a web page."""
@@ -742,9 +747,9 @@ if __name__ == "__main__":
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     # Migrated to new struct below.
-    # url = "https://plaid.com/blog/introducing-plaid-layer/"
+    url = "https://plaid.com/blog/introducing-plaid-layer/"
     # Migrated to new struct below.
-    url = "https://plaid.com/team-update/"
+    # url = "https://plaid.com/team-update/"
     # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
     # url = "https://lnkd.in/g4VDfXUf"
     # Able to scrape linkedin pulse as well. Could be useful content in the future.
@@ -758,6 +763,7 @@ if __name__ == "__main__":
     # person_name = "Anuj Kapur"
     # company_name = "Cloudbees"
     graph = ScrapePageGraph(url=url, start_indexing=True)
+    print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
     # graph.delete_summary_from_db()
     # graph.delete_all_docs_from_db()
     # graph.analyze_page(person_name=person_name, company_name=company_name)
@@ -787,9 +793,9 @@ if __name__ == "__main__":
     #     company_name=company_name, person_name=person_name, summary=summary)
     # content_details = graph.fetch_author_and_date()
     # graph.convert_to_datetime(parsed_date=content_details.publish_date)
-    print("date: ", graph.convert_to_datetime(parsed_date="5th April, 2022"))
+    # print("date: ", graph.convert_to_datetime(parsed_date="5th April, 2022"))
 
     # graph.fetch_content_type(content_details=graph.fetch_author_and_date())
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                               
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                
