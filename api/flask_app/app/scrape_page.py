@@ -1,6 +1,7 @@
 import os
 import random
 import requests
+from datetime import datetime
 from langchain_core.prompts import PromptTemplate
 from typing import List, Dict, Optional
 from markdownify import markdownify
@@ -70,6 +71,16 @@ class ContentDetails(BaseModel):
         default=None, description="Full name of author of text. If not found, set to None.")
     publish_date: Optional[str] = Field(
         default=None, description="Date when this text was written. If not found, set to None.")
+
+
+class ContentDate(BaseModel):
+    """Used to parse date components."""
+    day: Optional[int] = Field(
+        default=None, description="Day of the parsed date. If not found, set to None.")
+    month: Optional[int] = Field(
+        default=None, description="Month of the parsed date. If not found, set to None.")
+    year: Optional[int] = Field(
+        default=None, description="Year of the parsed date. If not found, set to None.")
 
 
 class ContentAboutCompanyOrText(BaseModel):
@@ -430,6 +441,27 @@ class ScrapePageGraph:
         chain = prompt | llm
         return chain.invoke(text)
 
+    def convert_to_datetime(self, parsed_date: str) -> datetime:
+        """Converts given parsed date (from web page) to datetime object in UTC timezone."""
+        prompt_template = (
+            "Convert given string representing a date into its its components: [1] Day, [2] Month and [3].\n"
+            "If any of those 3 components is not avaiable in the string, set that component to None."
+            "\n"
+            "Date:{parsed_date}"
+            ""
+        )
+        prompt = PromptTemplate.from_template(prompt_template)
+        llm = ChatOpenAI(
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentDate)
+        chain = prompt | llm
+        result: ContentDate = chain.invoke(parsed_date)
+
+        # Default values.
+        day: int = result.day if result.day else 1
+        month: int = result.month if result.month else 1
+        year: int = result.year if result.year else datetime.now().year
+        return Utils.create_utc_datetime(day=day, month=month, year=year)
+
     @staticmethod
     def fetch_page(url: str) -> Document:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
@@ -712,7 +744,7 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://plaid.com/blog/introducing-plaid-layer/"
     # Migrated to new struct below.
-    # url = "https://plaid.com/team-update/"
+    url = "https://plaid.com/team-update/"
     # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
     # url = "https://lnkd.in/g4VDfXUf"
     # Able to scrape linkedin pulse as well. Could be useful content in the future.
@@ -720,7 +752,7 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
     # Migrated to new struct below.
-    url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
+    # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
     person_name = "Zach Perret"
     company_name = "Plaid"
     # person_name = "Anuj Kapur"
@@ -753,9 +785,11 @@ if __name__ == "__main__":
     # summary = graph.fetch_content_summary()
     # graph.fetch_content_category(
     #     company_name=company_name, person_name=person_name, summary=summary)
-    graph.fetch_author_and_date()
+    # content_details = graph.fetch_author_and_date()
+    # graph.convert_to_datetime(parsed_date=content_details.publish_date)
+    print("date: ", graph.convert_to_datetime(parsed_date="5th April, 2022"))
 
     # graph.fetch_content_type(content_details=graph.fetch_author_and_date())
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                              
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                               
