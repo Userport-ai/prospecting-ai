@@ -107,13 +107,14 @@ class ContentType(BaseModel):
 
 
 class ContentTypeEnum(str, Enum):
-    """Enum values associated with ContentType class."""
-    ARTICLE_PERSON_IS_FOCUS = "article_person_is_focus"
-    ARTICLE_COMPANY_IS_FOCUS = "article_company_is_focus"
-    ARTICLE_COMPANY_AND_PERSON_IS_FOCUS = "article_company_and_person_is_focus"
-    ARTICLE_PERSON_OR_COMPANY_IS_NOT_FOCUS = "article_person_company_not_focus"
-    INTERVIEW_OF_PERSON = "interview_of_person"
-    PODCAST_WITH_PERSON_AS_GUEST = "podcast_with_person_as_guest"
+    """Enum values associated with ContentTypeSource class."""
+    ARTICLE = "article"
+    BLOG_POST = "blog_post"
+    ANNOUCEMENT = "announcement"
+    INTERVIEW = "interview"
+    PODCAST = "podcast"
+    PANEL_DISCUSSION = "panel_discussion"
+    LINKEDIN_POST = "linkedin_post"
 
 
 class ContentCategory(BaseModel):
@@ -190,7 +191,7 @@ class ScrapePageGraph:
     OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
     OPENAI_EMBEDDING_FUNCTION = OpenAIEmbeddings(
         model=OPENAI_EMBEDDING_MODEL, api_key=OPENAI_API_KEY)
-    OPENAI_GPT_4O_MINI_MODEL = os.getenv("OPENAI_GPT_4O_MINI_MODE")
+    OPENAI_GPT_4O_MINI_MODEL = os.getenv("OPENAI_GPT_4O_MINI_MODEL")
     OPENAI_GPT_4O_MODEL = os.getenv("OPENAI_GPT_4O_MODEL")
 
     # Chroma DB path for saving indices locally.
@@ -277,10 +278,9 @@ class ScrapePageGraph:
         with get_openai_callback() as cb:
             summary = self.fetch_content_summary()
 
-            content_details = self.fetch_author_and_date()
+            self.fetch_author_and_date()
 
-            self.fetch_content_type(person_name=person_name, company_name=company_name,
-                                    content_details=content_details, summary=summary)
+            self.fetch_content_type()
 
             self.fetch_content_category(
                 company_name=company_name, person_name=person_name, summary=summary)
@@ -372,32 +372,32 @@ class ScrapePageGraph:
         print("\ncontent details: ", content_details)
         return content_details
 
-    def fetch_content_type(self, person_name: str, company_name: str, content_details: ContentDetails, summary: str) -> str:
-        """Fetches content type (podcast, interview, article, blog post etc.) using given summary."""
-        # Do not change this prompt before testing, results may get worse.
+    def fetch_content_type(self) -> str:
+        """Fetches content type (podcast, interview, article, blog post etc.) using Page body."""
+         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
-            "Does the text below fall into one of the following types?\n"
-            f"* Article where {person_name} is the focus. [Enum value: {ContentTypeEnum.ARTICLE_PERSON_IS_FOCUS.value}].\n"
-            f"* Article where {company_name} is the focus. [Enum value: {ContentTypeEnum.ARTICLE_COMPANY_IS_FOCUS.value}].\n"
-            f"* Article where {company_name} and {person_name} are both the focus. [Enum value: {ContentTypeEnum.ARTICLE_COMPANY_AND_PERSON_IS_FOCUS.value}].\n"
-            f"* Article where {person_name} or {company_name} is mentioned but not the focus. [Enum value: {ContentTypeEnum.ARTICLE_PERSON_OR_COMPANY_IS_NOT_FOCUS.value}]\n"
-            f"* Interview of {person_name}. [Enum value: {ContentTypeEnum.INTERVIEW_OF_PERSON.value}].\n"
-            f"* Podcast with {person_name} as guest. [Enum value: {ContentTypeEnum.PODCAST_WITH_PERSON_AS_GUEST.value}]\n"
+            "Does the text from a web page below fall into one of the following types?\n"
+            f"* Article. [Enum value: {ContentTypeEnum.ARTICLE.value}].\n"
+            f"* Blog post. [Enum value: {ContentTypeEnum.BLOG_POST.value}].\n"
+            f"* Announcement. [Enum value: {ContentTypeEnum.ANNOUCEMENT.value}].\n"
+            f"* Interview. [Enum value: {ContentTypeEnum.INTERVIEW.value}].\n"
+            f"* Podcast. [Enum value: {ContentTypeEnum.PODCAST.value}].\n"
+            f"* Panel Discussion. [Enum value: {ContentTypeEnum.PANEL_DISCUSSION.value}].\n"
             "\n"
-            "Text:\n"
             "{content}"
         )
-        # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
+        # We will use 40 model directly on the entire body as one string. Example podcast transcript was 6K tokens and we have up to 128K.
+        # TODO: Use better way to break entire text into compressed text while maintaing structure and use that as input instead.
+        content: str = "".join(
+            [doc.page_content for doc in self.page_body_chunks])
         llm = ChatOpenAI(
             temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentType)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         content = (
-            f'URL: {self.url}\n'
-            f'Author:{content_details.author}\n'
-            f'Date published:{content_details.publish_date}\n'
-            'Summary of text\n'
-            f'{summary}'
+            f'Page URL: {self.url}\n'
+            f'Page Text:\n'
+            f'{content}'
         )
         result = chain.invoke(content)
 
@@ -804,7 +804,7 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # Migrated to new struct below.
-    url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
+    # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     # Migrated to new struct below.
@@ -819,10 +819,11 @@ if __name__ == "__main__":
     # url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
     # Migrated to new struct below.
     # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
-    person_name = "Zachary Perret"
-    company_name = "Plaid"
-    # person_name = "Anuj Kapur"
-    # company_name = "Cloudbees"
+    url = "https://www.cloudbees.com/newsroom/cloudbees-appoints-raj-sarkar-as-chief-marketing-officer"
+    # person_name = "Zachary Perret"
+    # company_name = "Plaid"
+    person_name = "Anuj Kapur"
+    company_name = "Cloudbees"
     graph = ScrapePageGraph(url=url, start_indexing=True)
     # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
     # graph.delete_summary_from_db()
@@ -850,14 +851,15 @@ if __name__ == "__main__":
     # graph.analyze_page(person_name=person_name, company_name=company_name)
 
     summary = graph.fetch_content_summary()
-    # graph.fetch_content_category(
-    #     company_name=company_name, person_name=person_name, summary=summary)
+    graph.fetch_content_category(
+        company_name=company_name, person_name=person_name, summary=summary)
     content_details = graph.fetch_author_and_date()
     # graph.convert_to_datetime(parsed_date=content_details.publish_date)
     # print("date: ", graph.convert_to_datetime(parsed_date="5th April, 2022"))
 
-    graph.fetch_content_type(person_name=person_name, company_name=company_name,
-                                content_details=content_details, summary=summary)
+    # with get_openai_callback() as cb:
+    #     graph.fetch_content_type_v2()
+    #     print(cb)
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                          
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                                
