@@ -5,7 +5,7 @@ from database import Database
 from utils import Utils
 from models import (
     PersonCurrentEmployment,
-    PageDetails,
+    ContentInfo,
     SearchEngineWorkflowMetadata,
     ContentTypeEnum,
     LinkedInPostReference
@@ -34,7 +34,7 @@ class SearchEngineWorkflow:
             name=SearchEngineWorkflow.GOOGLE_SEARCH_ENGINE, query=search_query)
         for url in search(search_query, stop=self.max_search_results_per_query):
             # Check if URL already exists in database, if so skip it.
-            if self.database.get_page_details_by_url(url=url):
+            if self.database.get_content_info_by_url(url=url):
                 print(
                     f"Web URL: {url} already stored in in database, skipping parsing again.")
                 continue
@@ -54,10 +54,10 @@ class SearchEngineWorkflow:
                 # Convert to websearch result and write to to database.
                 # TODO: Compute content category and summary and mark as None.
                 time_now = Utils.create_utc_time_now()
-                web_search_result = PageDetails(
+                web_search_result = ContentInfo(
                     person_current_employment=current_employment,
                     workflow_metadata=web_search_metadata,
-                    url=url,
+                    content_url=url,
                     creation_date=time_now,
                     content_publish_date=linkedin_post.date_published,
                     content_type=ContentTypeEnum.LINKEDIN_POST,

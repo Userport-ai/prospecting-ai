@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from models import (
     PersonProfile,
     PersonCurrentEmployment,
-    PageDetails,
+    ContentInfo,
     LinkedInPost
 )
 from typing import List
@@ -46,9 +46,9 @@ class Database:
         """Returns LinkedIn posts collection."""
         return self.db['linkedin_posts']
 
-    def _get_page_details_collection(self) -> Collection:
+    def _get_content_info_collection(self) -> Collection:
         """Returns Page details collection."""
-        return self.db['page_details']
+        return self.db['content_info']
 
     def insert_person_profile(self, person_profile: PersonProfile) -> ObjectId:
         """Inserts Person information as a document in the database and returns the created Id."""
@@ -70,12 +70,12 @@ class Database:
             linkedin_post.model_dump(exclude=Database._exclude_id()), session=session)
         return result.inserted_id
 
-    def insert_page_details(self, page_details: PageDetails, session: Optional[ClientSession] = None) -> ObjectId:
+    def insert_page_details(self, page_details: ContentInfo, session: Optional[ClientSession] = None) -> ObjectId:
         """Inserts page details in the database and returns the created Id."""
         if page_details.id:
             raise ValueError(
                 f"WebSearchresult instance cannot have an Id before db insertion: {page_details}")
-        collection = self._get_page_details_collection()
+        collection = self._get_content_info_collection()
         result = collection.insert_one(
             page_details.model_dump(exclude=Database._exclude_id()), session=session)
         return result.inserted_id
@@ -103,13 +103,13 @@ class Database:
         profile = PersonProfile(**data_dict)
         return Database.to_person_current_employement(profile=profile)
 
-    def get_page_details_by_url(self, url: str) -> Optional[PageDetails]:
+    def get_content_info_by_url(self, url: str) -> Optional[ContentInfo]:
         """Returns page details for given url. Returns None if not found."""
-        collection = self._get_page_details_collection()
+        collection = self._get_content_info_collection()
         data_dict = collection.find_one({"url": url})
         if not data_dict:
             return None
-        return PageDetails(**data_dict)
+        return ContentInfo(**data_dict)
 
     @staticmethod
     def to_person_current_employement(profile: PersonProfile) -> PersonCurrentEmployment:

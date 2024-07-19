@@ -12,6 +12,19 @@ from enum import Enum
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
+class OpenAITokenUsage(BaseModel):
+    """Token usage when calling workflows using Open AI models."""
+    url: str = Field(...,
+                     description="URL for which tokens are being tracked.")
+    operation_tag: str = Field(
+        ..., description="Tag describing the operation for which cost is computed.")
+    prompt_tokens: int = Field(..., description="Prompt tokens used")
+    completion_tokens: int = Field(..., description="Completion tokens used")
+    total_tokens: int = Field(..., description="Total tokens used")
+    total_cost_in_usd: float = Field(...,
+                                     description="Total cost of tokens used.")
+
+
 class PersonCurrentEmployment(BaseModel):
     """Details about person's current employment.
 
@@ -126,44 +139,56 @@ class ContentCategoryEnum(str, Enum):
 ContentSource = Union[LinkedInPostReference, HTMLPageReference]
 
 
-class PageDetails(BaseModel):
+class ContentInfo(BaseModel):
     """
-    Content details of a web page found during search for person and company.
+    Contains details of content related to a lead or company (or both) found using various workflow.
 
-    The page can be fetched using one of the following workflows:
+    Example workflows:
     1. Using search engine to find page and then scrape it manually or using an API (e.g. LinkedIn posts).
     2. Scraping company website directly.
     3. Calling specific APIs like Crunchbase, NYSE for information about the company.
+
+    In the future, we can add more workflows.
     """
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for web search result.")
     creation_date: datetime = Field(
         ..., description="Date in UTC timezone when this document was inserted in the database.")
-    url: str = Field(..., description="URL of the parsed web page.")
-    person_current_employment: PersonCurrentEmployment = Field(
-        ..., description="Person's current employment defails.")
-    workflow_metadata: WorkflowMetadata = Field(...,
-                                                description="Metadata associated with workflow to fetch this page..")
-    content_author: Optional[str] = Field(
-        default=None, description="Full name of author of text.")
-    content_publish_date: Optional[datetime] = Field(
-        default=None, description="Date when this content was published in UTC timezone.")
-    content_type: Optional[ContentTypeEnum] = Field(default=None,
-                                                    description="Type of content (Interview, podcast, blog, article, LinkedIn post etc.) found on the page.")
-    content_summary: str = Field(...,
-                                 description="A summary of the content on the page.")
-    content_category: Optional[ContentCategoryEnum] = Field(
-        default=None, description="Category of the content found")
-    content_source: Optional[ContentSource] = Field(
+    source: Optional[ContentSource] = Field(
         default=None, description="Reference to the content source which is stored in a separate collection.")
-    content_key_persons: List[str] = Field(
-        default=[], description="Names of key persons extracted from the page content.")
-    content_key_organizations: List[str] = Field(
-        default=[], description="Names of key organizations extracted from the page content.")
+    url: Optional[str] = Field(
+        default=None, description="URL of the content if any.")
+    workflow_metadata: WorkflowMetadata = Field(...,
+                                                description="Metadata associated with workflow to fetch this content.")
+    person_name: Optional[str] = Field(
+        default=None, description="Full name of person. Populated only when the workflow was explicitly searching for person information and None when searching for only company information.")
+    company_name: Optional[str] = Field(
+        default=None, description="Company name used when searching content. Should mostly be populated, there may be some exceptions that are not known as of now.")
+    person_role_title: Optional[str] = Field(
+        default=None, description="Role title of person at company. Populated only when person_name is populated and None otherwise.")
+    person_profile_id: Optional[PyObjectId] = Field(
+        default=None, description="PersonProfile reference of this person. Populated only when person_name is populated and None otherwise.")
+    # TODO: Add a company profile ID once CompanyProfile is defined.
+
+    # Content related fields below.
+    type: Optional[ContentTypeEnum] = Field(
+        default=None, description="Type of content (Interview, podcast, blog, article, LinkedIn post etc.).")
+    author: Optional[str] = Field(
+        default=None, description="Full name of author of content if any.")
+    publish_date: Optional[datetime] = Field(
+        default=None, description="Date when this content was published in UTC timezone.")
+    summary: Optional[str] = Field(default=None,
+                                   description="A summary of the content.")
+    category: Optional[ContentCategoryEnum] = Field(
+        default=None, description="Category of the content found")
+    key_persons: Optional[List[str]] = Field(
+        default=None, description="Names of key persons extracted from the content.")
+    key_organizations: Optional[List[str]] = Field(
+        default=None, description="Names of key organizations extracted from the content.")
 
     schema_version: int = Field(...,
-                                description="Schema version for this document.")
+                                description="Schema version for this collection.")
 
     # To prevent encoding error, see https://stackoverflow.com/questions/65209934/pydantic-enum-field-does-not-get-converted-to-string.
     class Config:

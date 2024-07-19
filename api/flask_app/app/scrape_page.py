@@ -15,7 +15,7 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 from utils import Utils
 from deprecated import deprecated
-from models import ContentTypeEnum, ContentCategoryEnum
+from models import ContentTypeEnum, ContentCategoryEnum, ContentInfo
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -73,7 +73,7 @@ class ContentConciseSummary(BaseModel):
         default=[], description="Extract names of key organizations from the new passage text. Set to empty if none found.")
 
 
-class ContentDetails(BaseModel):
+class ContentAuthorAndPublishDate(BaseModel):
     """Content author and publish date."""
     author: Optional[str] = Field(
         default=None, description="Full name of author of text. If not found, set to None.")
@@ -111,7 +111,8 @@ class ContentCategory(BaseModel):
     """Category of the content."""
     enum_value: Optional[str] = Field(
         default=None, description="Enum value of the category the text falls under. Set to None if it does not fall under any of the categories defined.")
-    reason: Optional[str] = Field(..., description="Reason for enum value selection.")
+    reason: Optional[str] = Field(...,
+                                  description="Reason for enum value selection.")
 
 
 class OpenAITokenTracker(BaseModel):
@@ -287,7 +288,7 @@ class ScrapePageGraph:
 
         return text_summary
 
-    def fetch_author_and_date(self) -> ContentDetails:
+    def fetch_author_and_date(self) -> ContentAuthorAndPublishDate:
         """Fetches content details like author and publish date from the web page."""
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
@@ -437,7 +438,7 @@ class ScrapePageGraph:
         print(f"\nCategories result: {result}")
         return result
 
-    def parse_llm_output(self, text: str) -> ContentDetails:
+    def parse_llm_output(self, text: str) -> ContentAuthorAndPublishDate:
         """Helper to fetch content details in structured format from unstructured LLM output.
 
         Used to process LLM output into content details class.
@@ -450,7 +451,7 @@ class ScrapePageGraph:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentDetails)
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentAuthorAndPublishDate)
         chain = prompt | llm
         return chain.invoke(text)
 
@@ -810,4 +811,4 @@ if __name__ == "__main__":
     #     print(cb)
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                                  
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                                   
