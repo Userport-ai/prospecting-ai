@@ -99,11 +99,21 @@ class ContentAboutCompanyOrText(BaseModel):
 
 
 class ContentType(BaseModel):
-    """Type of content found on the web page."""
+    """Type of content (Interview, podcast, blog, article etc.) found on the web page."""
     enum_value: Optional[str] = Field(
         default=None, description="Enum value of the type that the text falls under. Set to None if it does not fall under any of the types defined.")
     reason: Optional[str] = Field(
         ..., description="Reason for enum value selection.")
+
+
+class ContentTypeEnum(str, Enum):
+    """Enum values associated with ContentType class."""
+    ARTICLE_PERSON_IS_FOCUS = "article_person_is_focus"
+    ARTICLE_COMPANY_IS_FOCUS = "article_company_is_focus"
+    ARTICLE_COMPANY_AND_PERSON_IS_FOCUS = "article_company_and_person_is_focus"
+    ARTICLE_PERSON_OR_COMPANY_IS_NOT_FOCUS = "article_person_company_not_focus"
+    INTERVIEW_OF_PERSON = "interview_of_person"
+    PODCAST_WITH_PERSON_AS_GUEST = "podcast_with_person_as_guest"
 
 
 class ContentCategory(BaseModel):
@@ -115,7 +125,7 @@ class ContentCategory(BaseModel):
 
 
 class ContentCategoryEnum(str, Enum):
-    """Enum values associated with content category."""
+    """Enum values associated with ContentCategory class."""
     PERSONAL_THOUGHTS = "personal_thoughts"
     PERSONAL_ADVICE = "personal_advice"
     PERSONAL_ANECDOTE = "personal_anecdote"
@@ -367,11 +377,12 @@ class ScrapePageGraph:
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
             "Does the text below fall into one of the following types?\n"
-            f"* Article written about {person_name} or {company_name}. [Enum value: article_about_person_or_company]\n"
-            f"* Blog post about {company_name}. [Enum value: blog_post_about_company]\n"
-            f"* Article or Blog post that mentions {person_name} or {company_name}. [Enum value: article_or_blog_post_mention_person_or_company]\n"
-            f"* Interview of {person_name}. [Enum value: interview_of_person]\n"
-            f"* Podcast with {person_name} as guest. [Enum value: podcast_with_person_as_guest]\n"
+            f"* Article where {person_name} is the focus. [Enum value: {ContentTypeEnum.ARTICLE_PERSON_IS_FOCUS.value}].\n"
+            f"* Article where {company_name} is the focus. [Enum value: {ContentTypeEnum.ARTICLE_COMPANY_IS_FOCUS.value}].\n"
+            f"* Article where {company_name} and {person_name} are both the focus. [Enum value: {ContentTypeEnum.ARTICLE_COMPANY_AND_PERSON_IS_FOCUS.value}].\n"
+            f"* Article where {person_name} or {company_name} is mentioned but not the focus. [Enum value: {ContentTypeEnum.ARTICLE_PERSON_OR_COMPANY_IS_NOT_FOCUS.value}]\n"
+            f"* Interview of {person_name}. [Enum value: {ContentTypeEnum.INTERVIEW_OF_PERSON.value}].\n"
+            f"* Podcast with {person_name} as guest. [Enum value: {ContentTypeEnum.PODCAST_WITH_PERSON_AS_GUEST.value}]\n"
             "\n"
             "Text:\n"
             "{content}"
@@ -793,13 +804,13 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # Migrated to new struct below.
-    # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
+    url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     # Migrated to new struct below.
     # url = "https://plaid.com/blog/introducing-plaid-layer/"
     # Migrated to new struct below.
-    url = "https://plaid.com/team-update/"
+    # url = "https://plaid.com/team-update/"
     # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
     # url = "https://lnkd.in/g4VDfXUf"
     # Able to scrape linkedin pulse as well. Could be useful content in the future.
@@ -839,14 +850,14 @@ if __name__ == "__main__":
     # graph.analyze_page(person_name=person_name, company_name=company_name)
 
     summary = graph.fetch_content_summary()
-    graph.fetch_content_category(
-        company_name=company_name, person_name=person_name, summary=summary)
+    # graph.fetch_content_category(
+    #     company_name=company_name, person_name=person_name, summary=summary)
     content_details = graph.fetch_author_and_date()
     # graph.convert_to_datetime(parsed_date=content_details.publish_date)
     # print("date: ", graph.convert_to_datetime(parsed_date="5th April, 2022"))
 
-    # graph.fetch_content_type(person_name=person_name, company_name=company_name,
-                                # content_details=content_details, summary=summary)
+    graph.fetch_content_type(person_name=person_name, company_name=company_name,
+                                content_details=content_details, summary=summary)
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                         
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                          
