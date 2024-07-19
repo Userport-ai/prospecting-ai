@@ -12,167 +12,43 @@ from enum import Enum
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
-class CurrentEmployment(BaseModel):
+class PersonCurrentEmployment(BaseModel):
     """Details about person's current employment.
 
-    Used when searching for information related to the person on the web.
+    This information is used as input when searching for information related to the person and their company on the web.
     """
-    person_profile_id: PyObjectId = Field(
-        ..., description="PersonProfile identifier of this person.")
-    date_synced: datetime = Field(
-        ..., description="Date when this information was last synced from LinkedIn profile.")
     full_name: str = Field(..., description="Person's full name.")
+    company_name: str = Field(
+        ..., description="Company name where the person is currently employed.")
     role_title: str = Field(...,
-                            description="Person's role title at company.")
-    person_profile_url: str = Field(...,
-                                    description="LinkedIn profile URL of the person.")
-    company_name: str = Field(..., description="Company name.")
-    company_linkedin_profile_url: str = Field(
-        ..., description="Company LinkedIn profile URL.")
+                            description="Role title of person at the company.")
+    person_profile_id: PyObjectId = Field(
+        ..., description="PersonProfile reference of this person.")
 
 
-class Product(str, Enum):
-    LAUNCH = "product_launch"
-    UPDATE = "product_update"
-    SUNSET = "product_sunset"
-    OTHER = "product_other"
-
-
-class LeaderAppointment(str, Enum):
-    NEW_HIRE = "leader_new_hire"
-    PROMOTION = "leader_promotion"
-    OTHER = "leader_other"
-
-
-class FinancialResults(str, Enum):
-    QUARTER = "financial_results_quarter"
-    ANNUAL = "financial_results_annual"
-    OTHER = "financial_results_other"
-
-
-class Collaboration(str, Enum):
-    PARTNERSHIP = "collaboration_partnership"
-    OTHER = "collaboration_other"
-
-
-class Achievement(str, Enum):
-    FUNDING_ANNOUNCEMENT = "achievement_funding_announcement"
-    IPO_ANNOUNCEMENT = "achievement_ipo_announcement"
-    RECOGNITION = "achievement_recognition"
-    AWARD = "achievement_award"
-    ANNIVERSARY = "achievement_anniversary"
-    SALES_MILESTONE = "achievement_sales_milestone"
-    USER_BASE_GROWTH = "achievement_user_base_growth"
-    OTHER = "achievement_other"
-
-
-class Event(str, Enum):
-    CONFERENCE = "event_conference"
-    WEBINAR = "event_webinar"
-    TRADE_SHOW = "event_trade_show"
-    OTHER = "event_other"
-
-
-class Challenge(str, Enum):
-    CRISIS_SITUATION = "challenge_crisis_situation"
-    OTHER = "challenge_other"
-
-
-class Rebranding(str, Enum):
-    NAME = "rebrading_name"
-    LOGO = "rebranding_logo"
-    WEBSITE = "rebranding_website"
-    BRAND_IDENTITY = "rebranding_identity"
-    OTHER = "rebranding_other"
-
-
-class SocialResponsibility(str, Enum):
-    NEW_INITIATIVE = "social_responsibility_new_initiative"
-    DONATION = "social_responsibility_donation"
-    OTHER = "social_responsibility_other"
-
-
-class BusinessExpansion(str, Enum):
-    NEW_OFFICE = "business_expansion_new_office"
-    GROWTH = "business_expansion_growth"
-    NEW_MARKET_EXPANSION = "business_expansion_new_market_expansion"
-    NEW_CUSTOMER_ACQUISITION = "business_expansion_new_customer_acquisition"
-    OTHER = "business_expansion_other"
-
-
-class Legal(str, Enum):
-    REGULATION_COMPLIANCE = "legal_regulation_compliance"
-    LAWSUIT = "legal_lawsuit"
-    SETTLEMENT = "legal_settlement"
-
-
-class InternalEvent(str, Enum):
-    COMPANY_OFFSITE = "internal_event_company_offsite"
-    EMPLOYEE_RECOGNITION = "internal_event_employee_recognition"
-    EMPLOYEE_PROMOTION = "internal_event_employee_promotion"
-    HIRING = "internal_event_hiring"
-
-
-class PersonalThoughts(str, Enum):
-    """Content that is personal thoughts of a person."""
-    ADVICE = "personal_thoughts_advice"
-    ANECDOTE = "personal_thoughts_anecdote"
-    INDUSTRY_TRENDS = "personal_thoughts_industry_trends"
-    OPINIONS = "personal_thoughts_opinions"
-    OTHER = "personal_thoughts_other"
-
-
-class ContentCategory(str, Enum):
-    """Categories of different types of content on the web."""
-    PRODUCT = Product
-    LEADER_APPOINTMENT = LeaderAppointment
-    FINANCIAL_RESULTS = FinancialResults
-    COLLABORATION = Collaboration
-    ACHIEVEMENT = Achievement
-    EVENT = Event
-    CHALLENGE = Challenge
-    REBRANDING = Rebranding
-    SOCIAL_RESPONSIBILITY = SocialResponsibility
-    BUSINESS_EXPANSION = BusinessExpansion
-    LEGAL = Legal
-    INTERNAL_EVENT = InternalEvent
-    PERSONAL_THOUGHTS = PersonalThoughts
-    OTHER = "content_category_other"
-
-
-class ContentType(str, Enum):
-    """Categories of web content in the web result."""
-    INTERVIEW_ARTICLE = "content_type_interview_article"
-    INTERVIEW_VIDEO = "content_type_interview_video"
-    PODCAST = "content_type_podcast"
-    ARTICLE = "content_type_article"
-    BLOG_POST = "content_type_blog_post"
-    LINKEDIN_POST = "content_type_linkedin_post"
-    OTHER = "content_type_other"
-
-
-class SearchEngineMetadata(BaseModel):
-    """Metdata when using search engine for searching web."""
+class SearchEngineWorkflowMetadata(BaseModel):
+    """Metdata when using search engine for fetching web pages."""
     type: Literal["search_engine"]
     name: str = Field(..., description="Name of the search engine used.")
     query: str = Field(..., description="Query used for search.")
 
     @staticmethod
     def create(name: str, query: str):
-        return SearchEngineMetadata(type="search_engine", name=name, query=query)
+        return SearchEngineWorkflowMetadata(type="search_engine", name=name, query=query)
 
 
-class CompanyWebsiteMetadata(BaseModel):
-    """Metdata when using company website for scraping information."""
+class CompanyWebsiteWorkflowMetadata(BaseModel):
+    """Metdata when using company website for scraping web pages."""
     type: Literal["company_website"]
 
     @staticmethod
     def create():
-        return CompanyWebsiteMetadata(type="company_website")
+        return CompanyWebsiteWorkflowMetadata(type="company_website")
 
 
 """Metadata associated with the different workflows to fetch information on the web."""
-WebSearchMetadata = Union[SearchEngineMetadata, CompanyWebsiteMetadata]
+WorkflowMetadata = Union[SearchEngineWorkflowMetadata,
+                         CompanyWebsiteWorkflowMetadata]
 
 
 class LinkedInPostReference(BaseModel):
@@ -193,47 +69,101 @@ class HTMLPageReference(BaseModel):
                            description="Identifier for stored HTML Page in database.")
 
 
+class ContentTypeEnum(str, Enum):
+    """Enum values associated with ContentTypeSource class."""
+    ARTICLE = "article"
+    BLOG_POST = "blog_post"
+    ANNOUCEMENT = "announcement"
+    INTERVIEW = "interview"
+    PODCAST = "podcast"
+    PANEL_DISCUSSION = "panel_discussion"
+    LINKEDIN_POST = "linkedin_post"
+
+
+class ContentCategoryEnum(str, Enum):
+    """Enum values associated with ContentCategory class."""
+    PERSONAL_THOUGHTS = "personal_thoughts"
+    PERSONAL_ADVICE = "personal_advice"
+    PERSONAL_ANECDOTE = "personal_anecdote"
+    PERSONAL_PROMOTION = "personal_promotion"
+    PERSONAL_RECOGITION = "personal_recognition"
+    PERSONAL_JOB_CHANGE = "personal_job_change"
+    PERSONAL_EVENT_ATTENDED = "personal_event_attended"
+    PERSONAL_TALK_AT_EVENT = "personal_talk_at_event"
+    PRODUCT_LAUNCH = "product_launch"
+    PRODUCT_UPDATE = "product_update"
+    PRODUCT_SHUTDOWN = "product_shutdown"
+    LEADERSHIP_HIRE = "leadership_hire"
+    LEADERSHIP_CHANGE = "leadership_change"
+    EMPLOYEE_PROMOTION = "employee_promotion"
+    EMPLOYEE_LEAVING = "employee_leaving"
+    COMPANY_HIRING = "company_hiring"
+    FINANCIAL_RESULTS = "financial_results"
+    COMPANY_STORY = "company_story"
+    INDUSTRY_TRENDS = "industry_trends"
+    COMPANY_PARTNERSHIP = "company_partnership"
+    COMPANY_ACHIEVEMENT = "company_achievement"
+    FUNDING_ANNOUNCEMENT = "funding_announcement"
+    IPO_ANNOUNCEMENT = "ipo_announcement"
+    COMPANY_RECOGNITION = "company_recognition"
+    COMPANY_ANNIVERSARY = "company_anniversary"
+    COMPANY_EVENT_HOSTED_ATTENDED = "company_event_hosted_attended"
+    COMPANY_WEBINAR = "company_webinar"
+    COMPANY_LAYOFFS = "company_layoffs"
+    COMPANY_CHALLENGE = "company_challenge"
+    COMPANY_REBRAND = "company_rebrand"
+    COMPANY_NEW_MARKET_EXPANSION = "company_new_market_expansion"
+    COMPANY_NEW_OFFICE = "company_new_office"
+    COMPANY_SOCIAL_RESPONSIBILITY = "company_social_responsibility"
+    COMPANY_LEGAL_CHALLENGE = "company_legal_challenge"
+    COMPANY_REGULATION = "company_regulation"
+    COMPANY_LAWSUIT = "company_lawsuit"
+    COMPANY_INTERNAL_EVENT = "company_internal_event"
+    COMPANY_OFFSITE = "company_offsite"
+
+
 """Extra information about the content that is stored separately and can be processed independently of fetching the content again."""
-ContentExtraReference = Union[LinkedInPostReference, HTMLPageReference]
+ContentSource = Union[LinkedInPostReference, HTMLPageReference]
 
 
-class WebSearchResult(BaseModel):
+class PageDetails(BaseModel):
     """
-    Contains results from scraping the web.
+    Content details of a web page found during search for person and company.
 
-    The content from the web can be about a person or a company or both.
-
-    It can be fetched in multiple ways:
-    1. Using search engines.
-    2. Scraping websites.
-    3. Calling specific APIs like Crunchbase, NYSE.
-    4. Asking LLMs directly.
+    The page can be fetched using one of the following workflows:
+    1. Using search engine to find page and then scrape it manually or using an API (e.g. LinkedIn posts).
+    2. Scraping company website directly.
+    3. Calling specific APIs like Crunchbase, NYSE for information about the company.
     """
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for web search result.")
-    current_employment: CurrentEmployment = Field(
-        ..., description="Current employment defails of the person who is being searched for.")
-    web_search_metadata: WebSearchMetadata = Field(...,
-                                                   description="Metadata associated with web search process to get this result.")
-    url: str = Field(...,
-                     description="URL from searching on the web.")
-    created_on: datetime = Field(
-        ..., description="Date in UTC timezone when this document was inserted in the db.")
+    creation_date: datetime = Field(
+        ..., description="Date in UTC timezone when this document was inserted in the database.")
+    url: str = Field(..., description="URL of the parsed web page.")
+    person_current_employment: PersonCurrentEmployment = Field(
+        ..., description="Person's current employment defails.")
+    workflow_metadata: WorkflowMetadata = Field(...,
+                                                description="Metadata associated with workflow to fetch this page..")
+    content_author: Optional[str] = Field(
+        default=None, description="Full name of author of text.")
     content_publish_date: Optional[datetime] = Field(
         default=None, description="Date when this content was published in UTC timezone.")
-    content_type: Optional[ContentType] = Field(default=None,
-                                                description="Type of content found in this URL.")
-    content_category: Optional[ContentCategory] = Field(
+    content_type: Optional[ContentTypeEnum] = Field(default=None,
+                                                    description="Type of content (Interview, podcast, blog, article, LinkedIn post etc.) found on the page.")
+    content_summary: str = Field(...,
+                                 description="A summary of the content on the page.")
+    content_category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
-    content_short_summary: Optional[str] = Field(
-        default=None, description="A short summary of the content")
-    content_extra_reference: Optional[ContentExtraReference] = Field(
-        default=None, description="Reference to extra details regarding content stored in a different collection.")
-    is_relevant_content: Optional[bool] = Field(
-        default=None, description="Whether content is relevant to given person and company.")
-    not_relevant_content_reason: Optional[str] = Field(
-        default=None, description="Why the content is not relevant to person and company.")
+    content_source: Optional[ContentSource] = Field(
+        default=None, description="Reference to the content source which is stored in a separate collection.")
+    content_key_persons: List[str] = Field(
+        default=[], description="Names of key persons extracted from the page content.")
+    content_key_organizations: List[str] = Field(
+        default=[], description="Names of key organizations extracted from the page content.")
+
+    schema_version: int = Field(...,
+                                description="Schema version for this document.")
 
     # To prevent encoding error, see https://stackoverflow.com/questions/65209934/pydantic-enum-field-does-not-get-converted-to-string.
     class Config:

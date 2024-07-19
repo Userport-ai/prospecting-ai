@@ -15,6 +15,7 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 from utils import Utils
 from deprecated import deprecated
+from models import ContentTypeEnum, ContentCategoryEnum
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -106,65 +107,11 @@ class ContentType(BaseModel):
         ..., description="Reason for enum value selection.")
 
 
-class ContentTypeEnum(str, Enum):
-    """Enum values associated with ContentTypeSource class."""
-    ARTICLE = "article"
-    BLOG_POST = "blog_post"
-    ANNOUCEMENT = "announcement"
-    INTERVIEW = "interview"
-    PODCAST = "podcast"
-    PANEL_DISCUSSION = "panel_discussion"
-    LINKEDIN_POST = "linkedin_post"
-
-
 class ContentCategory(BaseModel):
     """Category of the content."""
     enum_value: Optional[str] = Field(
         default=None, description="Enum value of the category the text falls under. Set to None if it does not fall under any of the categories defined.")
-    reason: Optional[str] = Field(
-        ..., description="Reason for enum value selection.")
-
-
-class ContentCategoryEnum(str, Enum):
-    """Enum values associated with ContentCategory class."""
-    PERSONAL_THOUGHTS = "personal_thoughts"
-    PERSONAL_ADVICE = "personal_advice"
-    PERSONAL_ANECDOTE = "personal_anecdote"
-    PERSONAL_PROMOTION = "personal_promotion"
-    PERSONAL_RECOGITION = "personal_recognition"
-    PERSONAL_JOB_CHANGE = "personal_job_change"
-    PERSONAL_EVENT_ATTENDED = "personal_event_attended"
-    PERSONAL_TALK_AT_EVENT = "personal_talk_at_event"
-    PRODUCT_LAUNCH = "product_launch"
-    PRODUCT_UPDATE = "product_update"
-    PRODUCT_SHUTDOWN = "product_shutdown"
-    LEADERSHIP_HIRE = "leadership_hire"
-    LEADERSHIP_CHANGE = "leadership_change"
-    EMPLOYEE_PROMOTION = "employee_promotion"
-    EMPLOYEE_LEAVING = "employee_leaving"
-    COMPANY_HIRING = "company_hiring"
-    FINANCIAL_RESULTS = "financial_results"
-    COMPANY_STORY = "company_story"
-    INDUSTRY_TRENDS = "industry_trends"
-    COMPANY_PARTNERSHIP = "company_partnership"
-    COMPANY_ACHIEVEMENT = "company_achievement"
-    FUNDING_ANNOUNCEMENT = "funding_announcement"
-    IPO_ANNOUNCEMENT = "ipo_announcement"
-    COMPANY_RECOGNITION = "company_recognition"
-    COMPANY_ANNIVERSARY = "company_anniversary"
-    COMPANY_EVENT_HOSTED_ATTENDED = "company_event_hosted_attended"
-    COMPANY_WEBINAR = "company_webinar"
-    COMPANY_LAYOFFS = "company_layoffs"
-    COMPANY_CHALLENGE = "company_challenge"
-    COMPANY_REBRAND = "company_rebrand"
-    COMPANY_NEW_MARKET_EXPANSION = "company_new_market_expansion"
-    COMPANY_NEW_OFFICE = "company_new_office"
-    COMPANY_SOCIAL_RESPONSIBILITY = "company_social_responsibility"
-    COMPANY_LEGAL_CHALLENGE = "company_legal_challenge"
-    COMPANY_REGULATION = "company_regulation"
-    COMPANY_LAWSUIT = "company_lawsuit"
-    COMPANY_INTERNAL_EVENT = "company_internal_event"
-    COMPANY_OFFSITE = "company_offsite"
+    reason: Optional[str] = Field(..., description="Reason for enum value selection.")
 
 
 class OpenAITokenTracker(BaseModel):
@@ -853,13 +800,14 @@ if __name__ == "__main__":
     summary = graph.fetch_content_summary()
     graph.fetch_content_category(
         company_name=company_name, person_name=person_name, summary=summary)
-    content_details = graph.fetch_author_and_date()
+
+    # content_details = graph.fetch_author_and_date()
     # graph.convert_to_datetime(parsed_date=content_details.publish_date)
     # print("date: ", graph.convert_to_datetime(parsed_date="5th April, 2022"))
 
     # with get_openai_callback() as cb:
-    #     graph.fetch_content_type_v2()
+    #     graph.fetch_content_type()
     #     print(cb)
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                                
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                                  

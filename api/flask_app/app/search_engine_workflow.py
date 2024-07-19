@@ -4,11 +4,10 @@ from linkedin_scraper import LinkedInScraper, LinkedInPost
 from database import Database
 from utils import Utils
 from models import (
-    CurrentEmployment,
-    WebSearchResult,
-    SearchEngineMetadata,
-    ContentType,
-    ContentCategory,
+    PersonCurrentEmployment,
+    PageDetails,
+    SearchEngineWorkflowMetadata,
+    ContentTypeEnum,
     LinkedInPostReference
 )
 
@@ -24,18 +23,18 @@ class SearchEngineWorkflow:
         self.database = database
         self.max_search_results_per_query = max_search_results_per_query
 
-    def run(self, current_employment: CurrentEmployment) -> List[str]:
+    def run(self, current_employment: PersonCurrentEmployment) -> List[str]:
         """Performs web search for given person in their current employment.
 
         Content for the fetched links are then parsed.
         """
         search_query: str = SearchEngineWorkflow.get_recent_linkedin_posts_query(
             current_employment=current_employment)
-        web_search_metadata = SearchEngineMetadata.create(
+        web_search_metadata = SearchEngineWorkflowMetadata.create(
             name=SearchEngineWorkflow.GOOGLE_SEARCH_ENGINE, query=search_query)
         for url in search(search_query, stop=self.max_search_results_per_query):
             # Check if URL already exists in database, if so skip it.
-            if self.database.get_web_search_result_by_url(url=url):
+            if self.database.get_page_details_by_url(url=url):
                 print(
                     f"Web URL: {url} already stored in in database, skipping parsing again.")
                 continue
@@ -55,13 +54,13 @@ class SearchEngineWorkflow:
                 # Convert to websearch result and write to to database.
                 # TODO: Compute content category and summary and mark as None.
                 time_now = Utils.create_utc_time_now()
-                web_search_result = WebSearchResult(
-                    current_employment=current_employment,
-                    web_search_metadata=web_search_metadata,
+                web_search_result = PageDetails(
+                    person_current_employment=current_employment,
+                    workflow_metadata=web_search_metadata,
                     url=url,
-                    created_on=time_now,
+                    creation_date=time_now,
                     content_publish_date=linkedin_post.date_published,
-                    content_type=ContentType.LINKEDIN_POST,
+                    content_type=ContentTypeEnum.LINKEDIN_POST,
                     content_category=None,
                     content_short_summary=None,
                     is_relevant_content=None,
@@ -75,10 +74,10 @@ class SearchEngineWorkflow:
                             linkedin_post=linkedin_post, session=session)
 
                         # Add post storage reference to web search result.
-                        web_search_result.content_extra_reference = LinkedInPostReference.create(
+                        web_search_result.content_source = LinkedInPostReference.create(
                             id=post_id)
-                        self.database.insert_web_search_result(
-                            web_search_result=web_search_result, session=session)
+                        self.database.insert_page_details(
+                            page_details=web_search_result, session=session)
                 except Exception as e:
                     # Log error and continue.
                     print(
@@ -89,7 +88,7 @@ class SearchEngineWorkflow:
                 break
 
     @staticmethod
-    def get_recent_linkedin_posts_query(current_employment: CurrentEmployment) -> str:
+    def get_recent_linkedin_posts_query(current_employment: PersonCurrentEmployment) -> str:
         """Returns search query for recent linkedin posts for person in given company."""
         return f"{current_employment.full_name} {current_employment.role_title} {current_employment.company_name} recent LinkedIn posts"
 
@@ -101,6 +100,6 @@ if __name__ == "__main__":
     from bson.objectid import ObjectId
     db = database = Database()
     wf = SearchEngineWorkflow(database=db)
-    current_emp = db.get_current_employment(
+    current_emp = db.get_person_current_employment(
         person_profile_id=ObjectId("668eae5d8a5ac202c0215d7a"))
     wf.run(current_employment=current_emp)

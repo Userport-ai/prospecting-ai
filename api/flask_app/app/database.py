@@ -12,8 +12,8 @@ from bson.objectid import ObjectId
 from dotenv import load_dotenv
 from models import (
     PersonProfile,
-    CurrentEmployment,
-    WebSearchResult,
+    PersonCurrentEmployment,
+    PageDetails,
     LinkedInPost
 )
 from typing import List
@@ -46,9 +46,9 @@ class Database:
         """Returns LinkedIn posts collection."""
         return self.db['linkedin_posts']
 
-    def _get_web_search_results_collection(self) -> Collection:
-        """Returns Web Search results collection."""
-        return self.db['web_search_results']
+    def _get_page_details_collection(self) -> Collection:
+        """Returns Page details collection."""
+        return self.db['page_details']
 
     def insert_person_profile(self, person_profile: PersonProfile) -> ObjectId:
         """Inserts Person information as a document in the database and returns the created Id."""
@@ -70,14 +70,14 @@ class Database:
             linkedin_post.model_dump(exclude=Database._exclude_id()), session=session)
         return result.inserted_id
 
-    def insert_web_search_result(self, web_search_result: WebSearchResult, session: Optional[ClientSession] = None) -> ObjectId:
-        """Inserts Websearch result as a document in the database and returns the created Id."""
-        if web_search_result.id:
+    def insert_page_details(self, page_details: PageDetails, session: Optional[ClientSession] = None) -> ObjectId:
+        """Inserts page details in the database and returns the created Id."""
+        if page_details.id:
             raise ValueError(
-                f"WebSearchresult instance cannot have an Id before db insertion: {web_search_result}")
-        collection = self._get_web_search_results_collection()
+                f"WebSearchresult instance cannot have an Id before db insertion: {page_details}")
+        collection = self._get_page_details_collection()
         result = collection.insert_one(
-            web_search_result.model_dump(exclude=Database._exclude_id()), session=session)
+            page_details.model_dump(exclude=Database._exclude_id()), session=session)
         return result.inserted_id
 
     @contextlib.contextmanager
@@ -93,27 +93,27 @@ class Database:
             with session.start_transaction():
                 yield session
 
-    def get_current_employment(self, person_profile_id: ObjectId) -> CurrentEmployment:
-        """Returns CurrentEmployment value for given person's profile id."""
+    def get_person_current_employment(self, person_profile_id: ObjectId) -> PersonCurrentEmployment:
+        """Returns person and company details for given profile Id."""
         collection = self._get_person_profiles_collection()
         data_dict = collection.find_one({"_id": person_profile_id})
         if not data_dict:
             raise ValueError(
                 f'Person profile not found for Id: {person_profile_id}')
         profile = PersonProfile(**data_dict)
-        return Database._to_current_employment(profile=profile)
+        return Database.to_person_current_employement(profile=profile)
 
-    def get_web_search_result_by_url(self, url: str) -> Optional[WebSearchResult]:
-        """Returns Websearch result for given url and None if not found."""
-        collection = self._get_web_search_results_collection()
+    def get_page_details_by_url(self, url: str) -> Optional[PageDetails]:
+        """Returns page details for given url. Returns None if not found."""
+        collection = self._get_page_details_collection()
         data_dict = collection.find_one({"url": url})
         if not data_dict:
             return None
-        return WebSearchResult(**data_dict)
+        return PageDetails(**data_dict)
 
     @staticmethod
-    def _to_current_employment(profile: PersonProfile) -> CurrentEmployment:
-        """Returns CurrentEmployment from given Person profile."""
+    def to_person_current_employement(profile: PersonProfile) -> PersonCurrentEmployment:
+        """Returns PersonCurrentEmployment from given Person profile."""
         match = re.search("(.+) at (.+)", profile.occupation)
         if not match:
             raise ValueError(
@@ -122,19 +122,17 @@ class Database:
         company_name: str = match.group(2)
 
         # Find company URL from experiences.
-        experience: PersonProfile.Experience = next(
+        experience: Optional[PersonProfile.Experience] = next(
             filter(lambda e: e.company == company_name, profile.experiences), None)
         if not experience:
             raise ValueError(
                 f"Could not find experience in profile with company: {company_name}. Profile: {profile}")
         company_linkedin_profile_url: str = experience.company_linkedin_profile_url
 
-        return CurrentEmployment(
+        return PersonCurrentEmployment(
             person_profile_id=profile.id,
-            date_synced=profile.date_synced,
             full_name=profile.full_name,
             role_title=role_title,
-            person_profile_url=profile.linkedin_url,
             company_name=company_name,
             company_linkedin_profile_url=company_linkedin_profile_url
         )
