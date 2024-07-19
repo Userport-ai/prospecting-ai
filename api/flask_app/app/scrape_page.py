@@ -13,6 +13,7 @@ from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 from utils import Utils
+from deprecated import deprecated
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -96,6 +97,14 @@ class ContentAboutCompanyOrText(BaseModel):
                         description="Reason for why it is integral part of the text.")
 
 
+class ContentType(BaseModel):
+    """Type of content found on the web page."""
+    enum_value: Optional[str] = Field(
+        default=None, description="Enum value of the type that the text falls under. Set to None if it does not fall under any of the types defined.")
+    reason: Optional[str] = Field(
+        ..., description="Reason for enum value selection.")
+
+
 class ContentCategory(BaseModel):
     """Category of the content."""
     enum_value: Optional[str] = Field(
@@ -128,7 +137,7 @@ class ScrapePageGraph:
     OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
     OPENAI_EMBEDDING_FUNCTION = OpenAIEmbeddings(
         model=OPENAI_EMBEDDING_MODEL, api_key=OPENAI_API_KEY)
-    OPENAI_GPT_3_5_TURBO_MODEL = os.getenv("OPENAI_GPT_3_5_TURBO_MODEL")
+    OPENAI_GPT_4O_MINI_MODEL = os.getenv("OPENAI_GPT_4O_MINI_MODE")
     OPENAI_GPT_4O_MODEL = os.getenv("OPENAI_GPT_4O_MODEL")
 
     # Chroma DB path for saving indices locally.
@@ -217,11 +226,8 @@ class ScrapePageGraph:
 
             content_details = self.fetch_author_and_date()
 
-            self.fetch_content_type(
-                content_details=content_details, combined_summaries=summary)
-
-            self.is_content_about_company_or_person(
-                company_or_person_name=company_name, combined_summaries=summary)
+            self.fetch_content_type(person_name=person_name, company_name=company_name,
+                                    content_details=content_details, summary=summary)
 
             self.fetch_content_category(
                 company_name=company_name, person_name=person_name, summary=summary)
@@ -313,45 +319,40 @@ class ScrapePageGraph:
         print("\ncontent details: ", content_details)
         return content_details
 
-    def fetch_content_type(self, content_details: ContentDetails, combined_summaries: str) -> str:
-        """Fetches content type using given detials and combined summaries of text.
-
-        Currenly returning LLM string output without parsing.
-        """
+    def fetch_content_type(self, person_name: str, company_name: str, content_details: ContentDetails, summary: str) -> str:
+        """Fetches content type (podcast, interview, article, blog post etc.) using given summary."""
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
-            "You are an assistant for question-answering tasks. Use the following pieces of retrieved content to answer the question.\n"
-            "If you don't know the answer or it's not in the content, just say you don't know.\n"
+            "Does the text below fall into one of the following types?\n"
+            f"* Article written about {person_name} or {company_name}. [Enum value: article_about_person_or_company]\n"
+            f"* Blog post about {company_name}. [Enum value: blog_post_about_company]\n"
+            f"* Article or Blog post that mentions {person_name} or {company_name}. [Enum value: article_or_blog_post_mention_person_or_company]\n"
+            f"* Interview of {person_name}. [Enum value: interview_of_person]\n"
+            f"* Podcast with {person_name} as guest. [Enum value: podcast_with_person_as_guest]\n"
             "\n"
-            "Question: {question}\n"
-            "\n"
-            "## Content:\n"
+            "Text:\n"
             "{content}"
         )
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentType)
         prompt = PromptTemplate.from_template(prompt_template)
-
         chain = prompt | llm
-        question = "What type of content does this text represent?"
         content = (
             f'URL: {self.url}\n'
             f'Author:{content_details.author}\n'
             f'Date published:{content_details.publish_date}\n'
-            f'Detailed Summary: {combined_summaries}'
+            'Summary of text\n'
+            f'{summary}'
         )
-        result = chain.invoke(
-            {"question": question, "content": content})
+        result = chain.invoke(content)
 
-        # Now using the string response from LLM, parse it for author and date information.
-        # return self.parse_llm_output(content=result.content)
         print(f"\nContent type:{result}")
-        # TODO: Parse content type and return enum. Right now it is just a sentence provided by LLM.
-        return result.content
+        return result
 
-    def is_content_about_company_or_person(self, company_or_person_name: str, combined_summaries: str):
-        """Tests if company name or person is an important part of the combined summaries content."""
+    @deprecated(reason="We can use key persosn and organizations from summary instead.")
+    def is_content_about_company_or_person(self, company_or_person_name: str, summary: str):
+        """Tests if company name or person is an important part of the content summary."""
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
             "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\n"
@@ -367,7 +368,7 @@ class ScrapePageGraph:
 
         question = f"Is {company_or_person_name} an integral part of the text below?"
         result = chain.invoke(
-            {"question": question, "context": combined_summaries})
+            {"question": question, "context": summary})
 
         print(f"\n{result}")
         return result
@@ -741,13 +742,13 @@ if __name__ == "__main__":
     # url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # Migrated to new struct below.
-    # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
+    url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # Migrated to new struct below.
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
     # url = "https://podcasts.apple.com/us/podcast/zach-perret-ceo-at-plaid/id1456434985?i=1000623440329"
     # Migrated to new struct below.
-    url = "https://plaid.com/blog/introducing-plaid-layer/"
+    # url = "https://plaid.com/blog/introducing-plaid-layer/"
     # Migrated to new struct below.
     # url = "https://plaid.com/team-update/"
     # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
@@ -758,7 +759,7 @@ if __name__ == "__main__":
     # url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
     # Migrated to new struct below.
     # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
-    person_name = "Zach Perret"
+    person_name = "Zachary Perret"
     company_name = "Plaid"
     # person_name = "Anuj Kapur"
     # company_name = "Cloudbees"
@@ -788,14 +789,15 @@ if __name__ == "__main__":
     # print("summaries exist in db: ", res is not None)
     # graph.analyze_page(person_name=person_name, company_name=company_name)
 
-    # summary = graph.fetch_content_summary()
+    summary = graph.fetch_content_summary()
     # graph.fetch_content_category(
     #     company_name=company_name, person_name=person_name, summary=summary)
-    # content_details = graph.fetch_author_and_date()
+    content_details = graph.fetch_author_and_date()
     # graph.convert_to_datetime(parsed_date=content_details.publish_date)
     # print("date: ", graph.convert_to_datetime(parsed_date="5th April, 2022"))
 
-    # graph.fetch_content_type(content_details=graph.fetch_author_and_date())
+    graph.fetch_content_type(person_name=person_name, company_name=company_name,
+                                content_details=content_details, summary=summary)
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                     
