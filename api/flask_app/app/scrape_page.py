@@ -1,6 +1,7 @@
 import os
 import random
 import requests
+from enum import Enum
 from datetime import datetime
 from langchain_core.prompts import PromptTemplate
 from typing import List, Dict, Optional
@@ -111,6 +112,48 @@ class ContentCategory(BaseModel):
         default=None, description="Enum value of the category the text falls under. Set to None if it does not fall under any of the categories defined.")
     reason: Optional[str] = Field(
         ..., description="Reason for enum value selection.")
+
+
+class ContentCategoryEnum(str, Enum):
+    """Enum values associated with content category."""
+    PERSONAL_THOUGHTS = "personal_thoughts"
+    PERSONAL_ADVICE = "personal_advice"
+    PERSONAL_ANECDOTE = "personal_anecdote"
+    PERSONAL_PROMOTION = "personal_promotion"
+    PERSONAL_RECOGITION = "personal_recognition"
+    PERSONAL_JOB_CHANGE = "personal_job_change"
+    PERSONAL_EVENT_ATTENDED = "personal_event_attended"
+    PERSONAL_TALK_AT_EVENT = "personal_talk_at_event"
+    PRODUCT_LAUNCH = "product_launch"
+    PRODUCT_UPDATE = "product_update"
+    PRODUCT_SHUTDOWN = "product_shutdown"
+    LEADERSHIP_HIRE = "leadership_hire"
+    LEADERSHIP_CHANGE = "leadership_change"
+    EMPLOYEE_PROMOTION = "employee_promotion"
+    EMPLOYEE_LEAVING = "employee_leaving"
+    COMPANY_HIRING = "company_hiring"
+    FINANCIAL_RESULTS = "financial_results"
+    COMPANY_STORY = "company_story"
+    INDUSTRY_TRENDS = "industry_trends"
+    COMPANY_PARTNERSHIP = "company_partnership"
+    COMPANY_ACHIEVEMENT = "company_achievement"
+    FUNDING_ANNOUNCEMENT = "funding_announcement"
+    IPO_ANNOUNCEMENT = "ipo_announcement"
+    COMPANY_RECOGNITION = "company_recognition"
+    COMPANY_ANNIVERSARY = "company_anniversary"
+    COMPANY_EVENT_HOSTED_ATTENDED = "company_event_hosted_attended"
+    COMPANY_WEBINAR = "company_webinar"
+    COMPANY_LAYOFFS = "company_layoffs"
+    COMPANY_CHALLENGE = "company_challenge"
+    COMPANY_REBRAND = "company_rebrand"
+    COMPANY_NEW_MARKET_EXPANSION = "company_new_market_expansion"
+    COMPANY_NEW_OFFICE = "company_new_office"
+    COMPANY_SOCIAL_RESPONSIBILITY = "company_social_responsibility"
+    COMPANY_LEGAL_CHALLENGE = "company_legal_challenge"
+    COMPANY_REGULATION = "company_regulation"
+    COMPANY_LAWSUIT = "company_lawsuit"
+    COMPANY_INTERNAL_EVENT = "company_internal_event"
+    COMPANY_OFFSITE = "company_offsite"
 
 
 class OpenAITokenTracker(BaseModel):
@@ -388,41 +431,47 @@ class ScrapePageGraph:
             temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentCategory)
         chain = prompt | llm
 
+        # Be very careful making changes to this prompt, it may result in worse results.
         question = (
             "Does the text below fall into one of the following categories?\n",
-            f"* Personal thoughts shared by {person_name}. [Enum value: personal_thoughts]\n"
-            f"* Advice shared by {person_name}. [Enum value: personal_advice]\n"
-            f"* Anecdote shared by {person_name}. [Enum value: personal_anecdote]\n"
-            f"* Launch of {company_name}'s product. [Enum value: product_launch]\n"
-            f"* Update to {company_name}'s product. [Enum value: product_update]\n"
-            f"* Shutdown of {company_name}'s product. [Enum value: product_shutdown]\n"
-            f"* Appointment of leadership hire at {company_name}. [Enum value: leader_hire]\n"
-            f"* Promotion of an employee at {company_name}. [Enum value: employee_promotion]\n"
-            f"* Employee leaving {company_name}. [Enum value: employee_leaving]\n"
-            f"* Hiring announcement for {company_name}. [Enum value: company_hiring]\n"
-            f"* Financial results announcement of {company_name}. [Enum value: financial_results]\n"
-            f"* A Story about {company_name}. [Enum value: company_story]\n",
-            f"* Trends associated with {company_name}'s industry. [Enum value: industry_trends]\n"
-            f"* Announcement of {company_name}'s recent partnership with another company. [Enum value: company_partnership]\n"
-            f"* A significant achievement by {company_name}. [Enum value: company_achievement]\n"
-            f"* Funding announcement by {company_name}. [Enum value: funding_announcement]\n"
-            f"* IPO announcement by {company_name}. [Enum value: ipo_announcement]\n"
-            f"* Recognition or award received by {company_name}. [Enum value: company_recognition]\n"
-            f"* {company_name}'s anniversary announcement. [Enum value: company_anniversary]\n"
-            f"* Sales growth or user base growth milestone achieved by {company_name}. [Enum value: sales_user_growth_milestone]\n"
-            f"* An event, conference or trade show hosted or attended by {company_name}. [Enum value: event_hosted_attended]\n"
-            f"* A webinar hosted by {company_name}. [Enum value: company_webinar]\n"
-            f"* Layoffs announced by {company_name}. [Enum value: company_layoffs]\n"
-            f"* A challenge facing {company_name}. [Enum value: company_challenge]\n"
-            f"* A rebranding initiative by {company_name}. [Enum value: company_rebrand]\n"
-            f"* New market expansion announcement by {company_name}. [Enum value: company_new_market_expansion]\n"
-            f"* New office or branch opening announcement by {company_name}. [Enum value: company_new_office]\n"
-            f"* Social responsibility announcement by {company_name}. [Enum value: company_social_responsibility]\n"
-            f"* Legal challenge affecting {company_name}. [Enum value: company_legal_challenge]\n"
-            f"* Regulation relating to {company_name}. [Enum value: company_regulation]\n"
-            f"* Lawsuit settlement relating to {company_name}. [Enum value: company_lawsuit]\n"
-            f"* Internal event for {company_name} employees only. [Enum value: company_internal_event]\n"
-            f"* Company offsite for {company_name} employees. [Enum value: company_offsite]\n"
+            f"* Personal thoughts shared by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_THOUGHTS.value}]\n"
+            f"* Advice shared by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_ADVICE.value}]\n"
+            f"* Anecdote shared by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_ANECDOTE.value}]\n"
+            f"* {person_name} got promoted in their job. [Enum value: {ContentCategoryEnum.PERSONAL_PROMOTION.value}]\n"
+            f"* Recognition or award received by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_RECOGITION.value}]\n"
+            f"* Job change announcement by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_JOB_CHANGE.value}]\n"
+            f"* Event attended by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_EVENT_ATTENDED.value}]\n"
+            f"* Talk given by {person_name} at an event or gathering. [Enum value: {ContentCategoryEnum.PERSONAL_TALK_AT_EVENT.value}]\n"
+            f"* Launch of {company_name}'s product. [Enum value: {ContentCategoryEnum.PRODUCT_LAUNCH.value}]\n"
+            f"* Update to {company_name}'s product. [Enum value: {ContentCategoryEnum.PRODUCT_UPDATE.value}]\n"
+            f"* Shutdown of {company_name}'s product. [Enum value: {ContentCategoryEnum.PRODUCT_SHUTDOWN.value}]\n"
+            f"* Appointment of leadership hire at {company_name}. [Enum value: {ContentCategoryEnum.LEADERSHIP_HIRE.value}]\n"
+            f"* Leadership change at {company_name}. [Enum value: {ContentCategoryEnum.LEADERSHIP_CHANGE.value}]\n"
+            f"* Promotion of an employee at {company_name}. [Enum value: {ContentCategoryEnum.EMPLOYEE_PROMOTION.value}]\n"
+            f"* Employee leaving {company_name}. [Enum value: {ContentCategoryEnum.EMPLOYEE_LEAVING.value}]\n"
+            f"* Hiring announcement for {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_HIRING.value}]\n"
+            f"* {company_name}'s Quarterly or Annual Financial results Announcement. [Enum value: {ContentCategoryEnum.FINANCIAL_RESULTS.value}]\n"
+            f"* A Story about {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_STORY.value}]\n",
+            f"* Trends associated with {company_name}'s industry. [Enum value: {ContentCategoryEnum.INDUSTRY_TRENDS.value}]\n"
+            f"* Announcement of {company_name}'s recent partnership with another company. [Enum value: {ContentCategoryEnum.COMPANY_PARTNERSHIP.value}]\n"
+            f"* A significant achievement by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_ACHIEVEMENT.value}]\n"
+            f"* Funding announcement by {company_name}. [Enum value: {ContentCategoryEnum.FUNDING_ANNOUNCEMENT.value}]\n"
+            f"* IPO announcement by {company_name}. [Enum value: {ContentCategoryEnum.IPO_ANNOUNCEMENT.value}]\n"
+            f"* Recognition or award received by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_RECOGNITION.value}]\n"
+            f"* {company_name}'s anniversary announcement. [Enum value: [Enum value: {ContentCategoryEnum.COMPANY_ANNIVERSARY.value}]\n"
+            f"* An event, conference or trade show hosted or attended by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_EVENT_HOSTED_ATTENDED.value}]\n"
+            f"* A webinar hosted by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_WEBINAR.value}]\n"
+            f"* Layoffs announced by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_LAYOFFS.value}]\n"
+            f"* A challenge facing {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_CHALLENGE.value}]\n"
+            f"* A rebranding initiative by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_REBRAND.value}]\n"
+            f"* New market expansion announcement by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_NEW_MARKET_EXPANSION.value}]\n"
+            f"* New office or branch opening announcement by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_NEW_OFFICE.value}]\n"
+            f"* Social responsibility announcement by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_SOCIAL_RESPONSIBILITY.value}]\n"
+            f"* Legal challenge affecting {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_LEGAL_CHALLENGE.value}]\n"
+            f"* Regulation that affects or will affect {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_REGULATION.value}]\n"
+            f"* Lawsuit settlement relating to {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_LAWSUIT.value}]\n"
+            f"* Internal event for {company_name} employees only. [Enum value: {ContentCategoryEnum.COMPANY_INTERNAL_EVENT.value}]\n"
+            f"* Company offsite for {company_name} employees. [Enum value: {ContentCategoryEnum.COMPANY_OFFSITE.value}]\n"
         )
         result = chain.invoke(
             {"question": question, "context": summary})
@@ -742,7 +791,7 @@ if __name__ == "__main__":
     # url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # Migrated to new struct below.
-    url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
+    # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # Migrated to new struct below.
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
@@ -750,7 +799,7 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://plaid.com/blog/introducing-plaid-layer/"
     # Migrated to new struct below.
-    # url = "https://plaid.com/team-update/"
+    url = "https://plaid.com/team-update/"
     # TODO: This sort of link found on linkedin posts, needs to be scraped one more time.
     # url = "https://lnkd.in/g4VDfXUf"
     # Able to scrape linkedin pulse as well. Could be useful content in the future.
@@ -764,7 +813,7 @@ if __name__ == "__main__":
     # person_name = "Anuj Kapur"
     # company_name = "Cloudbees"
     graph = ScrapePageGraph(url=url, start_indexing=True)
-    print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
+    # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
     # graph.delete_summary_from_db()
     # graph.delete_all_docs_from_db()
     # graph.analyze_page(person_name=person_name, company_name=company_name)
@@ -790,14 +839,14 @@ if __name__ == "__main__":
     # graph.analyze_page(person_name=person_name, company_name=company_name)
 
     summary = graph.fetch_content_summary()
-    # graph.fetch_content_category(
-    #     company_name=company_name, person_name=person_name, summary=summary)
+    graph.fetch_content_category(
+        company_name=company_name, person_name=person_name, summary=summary)
     content_details = graph.fetch_author_and_date()
     # graph.convert_to_datetime(parsed_date=content_details.publish_date)
     # print("date: ", graph.convert_to_datetime(parsed_date="5th April, 2022"))
 
-    graph.fetch_content_type(person_name=person_name, company_name=company_name,
-                                content_details=content_details, summary=summary)
+    # graph.fetch_content_type(person_name=person_name, company_name=company_name,
+                                # content_details=content_details, summary=summary)
 
     # user_query = "What is an agent?"
-    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                     
+    # docs = graph.retrieve_relevant_docs(user_query=user_query)                                                                         
