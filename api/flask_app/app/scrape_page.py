@@ -1,7 +1,6 @@
 import os
 import random
 import requests
-from enum import Enum
 from datetime import datetime
 from langchain_core.prompts import PromptTemplate
 from typing import List, Dict, Optional
@@ -14,7 +13,6 @@ from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 from utils import Utils
-from deprecated import deprecated
 from models import ContentTypeEnum, ContentCategoryEnum, PageContentInfo
 
 from dotenv import load_dotenv
@@ -77,9 +75,10 @@ class PageContentInfo(BaseModel):
     page_structure: Optional[PageStructure] = Field(
         default=None, description="Stores page structure.")
 
-    # TODO: Update to ContentType instead of ContentTypeEnum so we can get reason.
     type: Optional[ContentTypeEnum] = Field(
         default=None, description="Type of content (Interview, podcast, blog, article, LinkedIn post etc.).")
+    type_reason: Optional[str] = Field(
+        default=None, description="Reason for chosen enum value of type.")
     author: Optional[str] = Field(
         default=None, description="Full name of author of content if any.")
     publish_date: Optional[datetime] = Field(
@@ -92,9 +91,10 @@ class PageContentInfo(BaseModel):
         default=None, description="Names of key persons extracted from the content.")
     key_organizations: Optional[List[str]] = Field(
         default=None, description="Names of key organizations extracted from the content.")
-    # TODO: Update to ContentCategory instead of ContentCategoryEnum so we can get reason.
     category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
+    category_reason: Optional[str] = Field(
+        default=None, description="Reason for chosen enum value of category.")
 
     openai_usage: Optional[OpenAIUsage] = Field(
         default=None, description="Total Open AI tokens used in fetching this content info.")
@@ -265,6 +265,7 @@ class ScrapePageGraph:
                 url=self.url,
                 page_structure=page_structure,
                 type=type.enum_value,
+                type_reason=type.reason,
                 author=author_and_publish_date.author,
                 publish_date=publish_date,
                 detailed_summary=final_summary.detailed_summary,
@@ -272,6 +273,7 @@ class ScrapePageGraph:
                 key_persons=final_summary.key_persons,
                 key_organizations=final_summary.key_organizations,
                 category=category.enum_value,
+                category_reason=category.reason,
                 openai_usage=tokens_used
             )
 
