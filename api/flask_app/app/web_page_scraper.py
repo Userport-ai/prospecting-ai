@@ -114,7 +114,7 @@ class ContentConciseSummary(BaseModel):
     This is strictly used only for LLM output parsing. The final summary should be read from ContentFinalSummary below.
     """
     concise_summary: str = Field(...,
-                                  description="Concise Summary of the new passage text.")
+                                 description="Concise Summary of the new passage text.")
     key_persons: List[str] = Field(
         default=[], description="Extract names of key persons from the new passage text. Set to empty if none found.")
     key_organizations: List[str] = Field(
@@ -126,7 +126,7 @@ class ContentFinalSummary(BaseModel):
     detailed_summary: str = Field(...,
                                   description="Detailed Summary of the page content.")
     concise_summary: str = Field(...,
-                                  description="Concise Summary of the page content.")
+                                 description="Concise Summary of the page content.")
     key_persons: List[str] = Field(
         default=[], description="Key persons extracted from page content.")
     key_organizations: List[str] = Field(
@@ -167,10 +167,11 @@ class ContentCategory(BaseModel):
                                   description="Reason for enum value selection.")
 
 
-class ScrapePageGraph:
-    """Uses Langchain to construct a graph that fetches HTML page and parses it into Markdown chunks.
+class WebPageScraper:
+    """
+    Scrapes web page and extracts content from it.
 
-    The class can then be queried multiple times for different answers by clients.
+    Set dev_mode to True only when using in development for testing.
     """
 
     # Open AI configurations.
@@ -204,10 +205,10 @@ class ScrapePageGraph:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.dev_mode = dev_mode
-        self.db = Chroma(persist_directory=ScrapePageGraph.CHROMA_DB_PATH,
-                         embedding_function=ScrapePageGraph.OPENAI_EMBEDDING_FUNCTION)
 
         if dev_mode:
+            self.db = Chroma(persist_directory=WebPageScraper.CHROMA_DB_PATH,
+                             embedding_function=WebPageScraper.OPENAI_EMBEDDING_FUNCTION)
             self.index()
 
     def index(self):
@@ -226,7 +227,7 @@ class ScrapePageGraph:
             self.page_structure: PageStructure = page_structure
         else:
             print("Page structure not found in database, fetching it from web.")
-            doc = ScrapePageGraph.fetch_page(url=self.url)
+            doc = WebPageScraper.fetch_page(url=self.url)
             page_structure = self.get_page_structure(
                 doc=doc)
             self.page_structure = self.create_page_structure_in_db(
@@ -237,7 +238,7 @@ class ScrapePageGraph:
         if self.dev_mode:
             raise ValueError("Cannot fetch content in dev mode")
 
-        doc = ScrapePageGraph.fetch_page(url=self.url)
+        doc = WebPageScraper.fetch_page(url=self.url)
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_page_structure(
                 doc=doc)
@@ -257,8 +258,8 @@ class ScrapePageGraph:
             category: ContentCategory = self.fetch_content_category(
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
-            tokens_used = OpenAIUsage(url=self.url, operation_tag=ScrapePageGraph.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
-                                               completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+            tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
+                                      completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
             print(f"\nTokens used: {tokens_used}")
 
             return PageContentInfo(
@@ -300,7 +301,7 @@ class ScrapePageGraph:
             "New Passage:\n"
             "{new_passage}\n"
         )
-        llm = ChatOpenAI(temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(
             ContentConciseSummary)
         prompt = PromptTemplate.from_template(summary_prompt_template)
         detailed_summary: str = ""
@@ -345,7 +346,7 @@ class ScrapePageGraph:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL)
         chain = prompt | llm
 
         return chain.invoke(detailed_summary).content
@@ -362,7 +363,7 @@ class ScrapePageGraph:
         )
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL)
         prompt = PromptTemplate.from_template(prompt_template)
 
         # We will fetch author and publish date details from the page header + first page body chunk.
@@ -384,7 +385,7 @@ class ScrapePageGraph:
 
     def fetch_content_type(self, page_body_chunks: List[Document]) -> ContentType:
         """Fetches content type (podcast, interview, article, blog post etc.) using Page body."""
-         # Do not change this prompt before testing, results may get worse.
+        # Do not change this prompt before testing, results may get worse.
         prompt_template = (
             "Does the text from a web page below fall into one of the following types?\n"
             f"* Article. [Enum value: {ContentTypeEnum.ARTICLE.value}].\n"
@@ -401,7 +402,7 @@ class ScrapePageGraph:
         content: str = "".join(
             [doc.page_content for doc in page_body_chunks])
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentType)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(ContentType)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         content = (
@@ -428,7 +429,7 @@ class ScrapePageGraph:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentCategory)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(ContentCategory)
         chain = prompt | llm
 
         # Be very careful making changes to this prompt, it may result in worse results.
@@ -492,7 +493,7 @@ class ScrapePageGraph:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentAuthorAndPublishDate)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(ContentAuthorAndPublishDate)
         chain = prompt | llm
         return chain.invoke(text)
 
@@ -510,7 +511,7 @@ class ScrapePageGraph:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(ContentDate)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(ContentDate)
         chain = prompt | llm
         result: ContentDate = chain.invoke(parsed_date)
 
@@ -575,7 +576,7 @@ class ScrapePageGraph:
         page_body: str = remaining_md_page
         # Try max 5 times to fetch footer.
         for _ in range(0, 5):
-            footer_result = ScrapePageGraph.fetch_page_footer(
+            footer_result = WebPageScraper.fetch_page_footer(
                 page_without_header=remaining_md_page, openai_temperature=opeani_temperature)
             if footer_result.footer_first_sentence is None:
                 # Use random value between 0 and 1 for new temperature and try again.
@@ -602,7 +603,6 @@ class ScrapePageGraph:
         """Use LLM to fetch the footer in given page without header."""
         prompt_template = (
             "You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.\n"
-            # "Can you identify if the chunk has a footer containing a bunch of links that are unrelated to the main content?\n"
             "Can you identify if the chunk can be split into: [1] text with main content and [2] footer text that does not contribute to the main content?\n"
             "If yes, return the first sentence from where this footer starts. If no, return None.\n"
             "\n"
@@ -611,7 +611,7 @@ class ScrapePageGraph:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=openai_temperature, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL).with_structured_output(PageFooterResult)
+            temperature=openai_temperature, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(PageFooterResult)
         chain = prompt | llm
 
         try:
@@ -627,7 +627,7 @@ class ScrapePageGraph:
             'k': k,
             'filter': {
                 # Note: You can only filter by one Metadata param, so we will use URL.
-                ScrapePageGraph.URL: self.url,
+                WebPageScraper.URL: self.url,
             }
         }
         return self.db.as_retriever(search_kwargs=search_kwargs)
@@ -649,16 +649,16 @@ class ScrapePageGraph:
         header: Optional[str] = page_structure.header
         if header:
             self.db.add_documents(documents=[Document(page_content=header, metadata={
-                                  ScrapePageGraph.URL: self.url, ScrapePageGraph.PAGE_HEADER: True})])
+                                  WebPageScraper.URL: self.url, WebPageScraper.PAGE_HEADER: True})])
 
         body: str = page_structure.body
         self.db.add_documents(documents=[Document(page_content=body, metadata={
-                              ScrapePageGraph.URL: self.url, ScrapePageGraph.PAGE_BODY: True})])
+                              WebPageScraper.URL: self.url, WebPageScraper.PAGE_BODY: True})])
 
         footer: str = page_structure.footer
         if footer:
             self.db.add_documents(documents=[Document(page_content=footer, metadata={
-                                  ScrapePageGraph.URL: self.url, ScrapePageGraph.PAGE_FOOTER: True})])
+                                  WebPageScraper.URL: self.url, WebPageScraper.PAGE_FOOTER: True})])
 
         # Add page body chunks in database.
         page_structure.body_chunks = self.create_page_body_chunks_in_db(
@@ -669,25 +669,25 @@ class ScrapePageGraph:
         """Returns page structure from db for given URL. If not found, returns None."""
         header_result: Dict = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.PAGE_HEADER: True}
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.PAGE_HEADER: True}
             ]
         })
         body_result: Dict = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.PAGE_BODY: True}
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.PAGE_BODY: True}
             ]
         })
         footer_result: Dict = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.PAGE_FOOTER: True}
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.PAGE_FOOTER: True}
             ]
         })
-        header_list: List[str] = header_result[ScrapePageGraph.DOCUMENTS]
-        body_list: List[str] = body_result[ScrapePageGraph.DOCUMENTS]
-        footer_list: List[str] = footer_result[ScrapePageGraph.DOCUMENTS]
+        header_list: List[str] = header_result[WebPageScraper.DOCUMENTS]
+        body_list: List[str] = body_result[WebPageScraper.DOCUMENTS]
+        footer_list: List[str] = footer_result[WebPageScraper.DOCUMENTS]
         if len(header_list) == 0 and len(body_list) == 0 and len(footer_list) == 0:
             # Result not in db.
             return None
@@ -714,26 +714,26 @@ class ScrapePageGraph:
         """Delete page structures from database."""
         header_ids: List[str] = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.PAGE_HEADER: True}
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.PAGE_HEADER: True}
             ]
         })['ids']
         body_ids: List[str] = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.PAGE_BODY: True}
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.PAGE_BODY: True}
             ]
         })['ids']
         footer_ids: List[str] = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.PAGE_FOOTER: True}
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.PAGE_FOOTER: True}
             ]
         })['ids']
         page_body_chunk_ids: List[str] = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.SPLIT_INDEX: {"$gte": 0}},
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.SPLIT_INDEX: {"$gte": 0}},
             ]
         })['ids']
         ids_to_delete: List[str] = header_ids + \
@@ -748,9 +748,9 @@ class ScrapePageGraph:
         """
         for i, chunk in enumerate(chunks):
             # Add URL and chunk size metadata to document.
-            chunk.metadata[ScrapePageGraph.URL] = self.url
-            chunk.metadata[ScrapePageGraph.CHUNK_SIZE] = self.chunk_size
-            chunk.metadata[ScrapePageGraph.SPLIT_INDEX] = i
+            chunk.metadata[WebPageScraper.URL] = self.url
+            chunk.metadata[WebPageScraper.CHUNK_SIZE] = self.chunk_size
+            chunk.metadata[WebPageScraper.SPLIT_INDEX] = i
 
         self.db.add_documents(documents=chunks)
         return chunks
@@ -759,12 +759,12 @@ class ScrapePageGraph:
         """Return Page body chunks sorted by index number from the database for given URL."""
         result: Dict = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.SPLIT_INDEX: {"$gte": 0}},
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.SPLIT_INDEX: {"$gte": 0}},
             ]
         })
-        sorted_results = sorted(zip(result["metadatas"], result[ScrapePageGraph.DOCUMENTS]),
-                                key=lambda m: m[0][ScrapePageGraph.SPLIT_INDEX])
+        sorted_results = sorted(zip(result["metadatas"], result[WebPageScraper.DOCUMENTS]),
+                                key=lambda m: m[0][WebPageScraper.SPLIT_INDEX])
 
         return [Document(page_content=result[1])
                 for result in sorted_results]
@@ -772,17 +772,17 @@ class ScrapePageGraph:
     def create_detailed_summary_in_db(self, summary: str):
         """Creates detailed summary in the database."""
         self.db.add_documents(documents=[Document(
-            page_content=summary, metadata={ScrapePageGraph.URL: self.url, ScrapePageGraph.SUMMARY: True})])
+            page_content=summary, metadata={WebPageScraper.URL: self.url, WebPageScraper.SUMMARY: True})])
 
     def get_detailed_summary_from_db(self) -> Optional[str]:
         """Return summary for given URL from db and None if it doesn't exist yet."""
         detailed_summary_result: Dict = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.SUMMARY: True}
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.SUMMARY: True}
             ]
         })
-        summary_content: List[str] = detailed_summary_result[ScrapePageGraph.DOCUMENTS]
+        summary_content: List[str] = detailed_summary_result[WebPageScraper.DOCUMENTS]
         if len(summary_content) == 0:
             # Result not in db.
             return None
@@ -795,8 +795,8 @@ class ScrapePageGraph:
         """Deletes summary from the database."""
         summary_ids: List[str] = self.db.get(where={
             "$and": [
-                {ScrapePageGraph.URL: self.url},
-                {ScrapePageGraph.SUMMARY: True}
+                {WebPageScraper.URL: self.url},
+                {WebPageScraper.SUMMARY: True}
             ]
         })['ids']
         self.db.delete(ids=summary_ids)
@@ -805,10 +805,10 @@ class ScrapePageGraph:
     def get_all_doc_ids_from_db(self) -> List[str]:
         """Get Ids for all documents (header, footer, body, chunks, summmaries etc.) in the database associated with the given URL."""
         return self.db.get(
-            where={ScrapePageGraph.URL: self.url})['ids']
+            where={WebPageScraper.URL: self.url})['ids']
 
     def get_all_docs_from_db(self) -> List[Document]:
-        return self.db.get(where={ScrapePageGraph.URL: self.url})[ScrapePageGraph.DOCUMENTS]
+        return self.db.get(where={WebPageScraper.URL: self.url})[WebPageScraper.DOCUMENTS]
 
     def delete_all_docs_from_db(self):
         """Delete all documents associated with given url."""
@@ -844,7 +844,7 @@ if __name__ == "__main__":
     company_name = "Plaid"
     # person_name = "Anuj Kapur"
     # company_name = "Cloudbees"
-    graph = ScrapePageGraph(url=url, dev_mode=True)
+    graph = WebPageScraper(url=url, dev_mode=True)
     # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
     # graph.delete_summary_from_db()
     # graph.delete_all_docs_from_db()
@@ -856,4 +856,4 @@ if __name__ == "__main__":
     # graph.fetch_content_type(page_body_chunks=graph.page_structure.body_chunks)
     # graph.fetch_content_category(
     #     company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
-    # print(graph.fetch_page_content_info(company_name=company_name, person_name=person_name))                                                                                     
+    # print(graph.fetch_page_content_info(company_name=company_name, person_name=person_name))
