@@ -139,7 +139,7 @@ class ContentCategoryEnum(str, Enum):
 ContentSource = Union[LinkedInPostReference, HTMLPageReference]
 
 
-class ContentInfo(BaseModel):
+class PageContentInfo(BaseModel):
     """
     Contains details of content related to a lead or company (or both) found using various workflow.
 
@@ -178,8 +178,10 @@ class ContentInfo(BaseModel):
         default=None, description="Full name of author of content if any.")
     publish_date: Optional[datetime] = Field(
         default=None, description="Date when this content was published in UTC timezone.")
-    summary: Optional[str] = Field(default=None,
-                                   description="A summary of the content.")
+    detailed_summary: Optional[str] = Field(default=None,
+                                            description="A detailed summary of the content.")
+    concise_summary: Optional[str] = Field(default=None,
+                                           description="A concise summary of the content.")
     category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
     key_persons: Optional[List[str]] = Field(
@@ -187,8 +189,10 @@ class ContentInfo(BaseModel):
     key_organizations: Optional[List[str]] = Field(
         default=None, description="Names of key organizations extracted from the content.")
 
-    schema_version: int = Field(...,
-                                description="Schema version for this collection.")
+    openai_tokens_used: Optional[OpenAITokenUsage] = Field(
+        default=None, description="Total Open AI tokens used in fetching this content info.")
+    schema_version: Optional[int] = Field(default=None,
+                                          description="Schema version for this collection.")
 
     # To prevent encoding error, see https://stackoverflow.com/questions/65209934/pydantic-enum-field-does-not-get-converted-to-string.
     class Config:
@@ -543,6 +547,43 @@ class PersonProfile(BaseModel):
         ..., description="List of LinekdIn groups this person is part of.")
     skills: List[str] = Field(...,
                               description="List of skills that this user has.")
+
+
+class WebPageInfo(BaseModel):
+    """Stores web page information."""
+    header: Optional[str] = Field(
+        default=None, description="Header of the page in Markdown formatted text, None if no header exists.")
+    body: str = Field(...,
+                      description="Body of the page in Markdown formatted text.")
+    footer: Optional[str] = Field(
+        default=None, description="Footer of the page in Markdown formatted text, None if it does not exist.")
+    body_chunks: Optional[List[str]] = Field(
+        default=None, description="List of markdown formatted chunks that the page body is divided into.")
+
+    def to_str(self) -> str:
+        """Returns string representation of page structure."""
+        str_repr = ""
+        if self.header:
+            str_repr += f"Header\n=================\n{self.header}\n"
+        str_repr += f"Body\n=================\n{self.body}\n"
+        if self.footer:
+            str_repr += f"Footer\n=================\n{self.footer}\n"
+        return str_repr
+
+    def to_doc(self) -> str:
+        """Returns document string."""
+        doc: str = ""
+        if self.header:
+            doc += self.header
+        doc += self.body
+        if self.footer:
+            doc += self.footer
+        return doc
+
+    def get_size_mb(self) -> float:
+        """Returns size of given page in megabytes."""
+        page_text: str = self.to_doc()
+        return len(page_text.encode("utf-8"))/(1024.0 * 1024.0)
 
 
 class LinkedInPost(BaseModel):

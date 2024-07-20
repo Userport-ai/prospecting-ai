@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from models import (
     PersonProfile,
     PersonCurrentEmployment,
-    ContentInfo,
+    PageContentInfo,
     LinkedInPost
 )
 from typing import List
@@ -70,7 +70,7 @@ class Database:
             linkedin_post.model_dump(exclude=Database._exclude_id()), session=session)
         return result.inserted_id
 
-    def insert_page_details(self, page_details: ContentInfo, session: Optional[ClientSession] = None) -> ObjectId:
+    def insert_page_details(self, page_details: PageContentInfo, session: Optional[ClientSession] = None) -> ObjectId:
         """Inserts page details in the database and returns the created Id."""
         if page_details.id:
             raise ValueError(
@@ -103,13 +103,13 @@ class Database:
         profile = PersonProfile(**data_dict)
         return Database.to_person_current_employement(profile=profile)
 
-    def get_content_info_by_url(self, url: str) -> Optional[ContentInfo]:
+    def get_content_info_by_url(self, url: str) -> Optional[PageContentInfo]:
         """Returns page details for given url. Returns None if not found."""
         collection = self._get_content_info_collection()
         data_dict = collection.find_one({"url": url})
         if not data_dict:
             return None
-        return ContentInfo(**data_dict)
+        return PageContentInfo(**data_dict)
 
     @staticmethod
     def to_person_current_employement(profile: PersonProfile) -> PersonCurrentEmployment:

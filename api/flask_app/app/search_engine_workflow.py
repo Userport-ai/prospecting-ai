@@ -5,7 +5,7 @@ from database import Database
 from utils import Utils
 from models import (
     PersonCurrentEmployment,
-    ContentInfo,
+    PageContentInfo,
     SearchEngineWorkflowMetadata,
     ContentTypeEnum,
     LinkedInPostReference
@@ -54,7 +54,7 @@ class SearchEngineWorkflow:
                 # Convert to websearch result and write to to database.
                 # TODO: Compute content category and summary and mark as None.
                 time_now = Utils.create_utc_time_now()
-                web_search_result = ContentInfo(
+                web_search_result = PageContentInfo(
                     person_current_employment=current_employment,
                     workflow_metadata=web_search_metadata,
                     content_url=url,
