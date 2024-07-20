@@ -325,12 +325,30 @@ class ScrapePageGraph:
         print(f"key persons: {key_persons}\n")
         print(f"key organizations: {key_organizations}\n")
 
+        # Compute concise summary of the detailed summary.
+        concise_summary: str = self.fetch_concise_summary(
+            detailed_summary=detailed_summary)
+
         if self.dev_mode:
             # Write summary to database.
             self.create_detailed_summary_in_db(summary=detailed_summary)
 
-        # TODO: fetch and populate concise summary.
-        return ContentFinalSummary(detailed_summary=detailed_summary, concise_summary="", key_persons=key_persons, key_organizations=key_organizations)
+        return ContentFinalSummary(detailed_summary=detailed_summary, concise_summary=concise_summary, key_persons=key_persons, key_organizations=key_organizations)
+
+    def fetch_concise_summary(self, detailed_summary: str) -> str:
+        """Returns concise summary from given detailed summary."""
+        prompt_template = (
+            "Create a concise summary of the text below.\n"
+            "\n"
+            "Text:\n"
+            "{text}"
+        )
+        prompt = PromptTemplate.from_template(prompt_template)
+        llm = ChatOpenAI(
+            temperature=0, model_name=ScrapePageGraph.OPENAI_GPT_4O_MODEL)
+        chain = prompt | llm
+
+        return chain.invoke(detailed_summary).content
 
     def fetch_author_and_date(self, page_structure: PageStructure) -> ContentAuthorAndPublishDate:
         """Fetches content details like author and publish date from the web page."""
@@ -800,10 +818,10 @@ class ScrapePageGraph:
 if __name__ == "__main__":
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
     # Migrated to new struct below.
-    url = "https://plaid.com/blog/year-in-review-2023/"
+    # url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # Migrated to new struct below.
-    # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
+    url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # Migrated to new struct below.
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
@@ -831,8 +849,10 @@ if __name__ == "__main__":
     # graph.delete_summary_from_db()
     # graph.delete_all_docs_from_db()
 
-    # final_summary = graph.fetch_content_final_summary(
-    #     page_body_chunks=graph.page_structure.body_chunks)
+    final_summary = graph.fetch_content_final_summary(
+        page_body_chunks=graph.page_structure.body_chunks)
+    print("concise summary: ", graph.fetch_concise_summary(
+        detailed_summary=final_summary.detailed_summary))
     # graph.fetch_content_type(page_body_chunks=graph.page_structure.body_chunks)
     # graph.fetch_content_category(
     #     company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
