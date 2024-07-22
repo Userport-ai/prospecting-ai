@@ -3,7 +3,7 @@ import random
 import requests
 from datetime import datetime
 from langchain_core.prompts import PromptTemplate
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from markdownify import markdownify
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
@@ -14,6 +14,7 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 from utils import Utils
 from models import ContentTypeEnum, ContentCategoryEnum, PageContentInfo
+from linkedin_scraper import LinkedInScraper
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -182,12 +183,11 @@ class WebPageScraper:
     OPENAI_GPT_4O_MINI_MODEL = os.getenv("OPENAI_GPT_4O_MINI_MODEL")
     OPENAI_GPT_4O_MODEL = os.getenv("OPENAI_GPT_4O_MODEL")
 
-    # Chroma DB path for saving indices locally.
-    # TODO: Make this path per client (worker) in production so they don't step on each other.
+    # Chroma DB path for saving indices locally during development. Do not use in production.
     # Reference: https://python.langchain.com/v0.2/docs/integrations/vectorstores/chroma/#basic-example-including-saving-to-disk.
     CHROMA_DB_PATH = "./chroma_db"
 
-    OPERATION_TAG_NAME = "analyze_page_workflow"
+    OPERATION_TAG_NAME = "web_page_scrape"
 
     # Metadata Constant keys.
     URL = "url"
@@ -228,13 +228,15 @@ class WebPageScraper:
         else:
             print("Page structure not found in database, fetching it from web.")
             doc = WebPageScraper.fetch_page(url=self.url)
-            page_structure = self.get_page_structure(
-                doc=doc)
+            if self.is_valid_linkedin_post(url=self.url):
+                page_structure = self.get_linkedin_post_structure(doc=doc)
+            else:
+                page_structure = self.get_page_structure(doc=doc)
             self.page_structure = self.create_page_structure_in_db(
                 page_structure=page_structure)
 
     def fetch_page_content_info(self, company_name: str, person_name: str) -> PageContentInfo:
-        """Scrapes web page and returns content from it for given person and company names."""
+        """Scrapes web page and returns content from it for given company and person names."""
         if self.dev_mode:
             raise ValueError("Cannot fetch content in dev mode")
 
@@ -521,6 +523,11 @@ class WebPageScraper:
         year: int = result.year if result.year else datetime.now().year
         return Utils.create_utc_datetime(day=day, month=month, year=year)
 
+    def process_linkedin_post_body(self, page_body: str) -> str:
+        """Takes markdown formatted page body and processes it to return Post information in organized form."""
+        LinkedInScraper.extract_post_details(post_body=page_body)
+        # TODO: Add processing here.
+
     @staticmethod
     def fetch_page(url: str) -> Document:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
@@ -553,24 +560,9 @@ class WebPageScraper:
 
     def get_page_structure(self, doc: Document) -> PageStructure:
         """Splits given web page document into header, body, footer and body chunk contents and returns it."""
-        markdown_page = doc.page_content
+        page_header, remaining_md_page = self.get_page_header(doc=doc)
 
-        # Fetch page header.
-        heading_line: Optional[str] = None
-        for level in range(1, 7):
-            heading_line: Optional[str] = Utils.get_first_heading_in_markdown(
-                markdown_text=markdown_page, level=level)
-            if heading_line:
-                break
-
-        page_header: Optional[str] = None
-        remaining_md_page: str = markdown_page
-        if heading_line:
-            index = markdown_page.find(heading_line)
-            page_header = markdown_page[:index]
-            remaining_md_page = markdown_page[index:]
-
-        # Fetch page footer. Try 3 times max.
+        # Fetch page footer.
         opeani_temperature: float = 0
         page_footer: Optional[str] = None
         page_body: str = remaining_md_page
@@ -597,6 +589,50 @@ class WebPageScraper:
         body_chunks: List[Document] = self.split_into_chunks(
             doc=Document(page_content=page_body))
         return PageStructure(header=page_header, body=page_body, footer=page_footer, body_chunks=body_chunks)
+
+    def get_linkedin_post_structure(self, doc: Document) -> PageStructure:
+        """Splits web page representing a linkedin post into header, body and footer elements."""
+        post_header, remaining_post = self.get_page_header(doc=doc)
+
+        # Look for "## More Relevant Posts" for start of footer.
+        footer_start: str = "## More Relevant Posts"
+        footer_index: int = remaining_post.find(footer_start)
+        if footer_index == -1:
+            raise ValueError(
+                f"Could not find footer start: {footer_start} in LinkedIn post: {remaining_post}")
+        post_body = remaining_post[:footer_index]
+        post_footer = remaining_post[footer_index:]
+
+        # Unlike a regular web page, we can skip splitting the body into chunks since a LinkedIn post is usually small in size.
+        return PageStructure(header=post_header, body=post_body, footer=post_footer)
+
+    def get_page_header(self, doc: Document) -> Tuple[Optional[str], str]:
+        """Splits given markdown page document into header and remaining page."""
+        markdown_page = doc.page_content
+
+        # Fetch page header.
+        heading_line: Optional[str] = None
+        for level in range(1, 7):
+            heading_line: Optional[str] = Utils.get_first_heading_in_markdown(
+                markdown_text=markdown_page, level=level)
+            if heading_line:
+                break
+
+        if not heading_line:
+            raise ValueError(
+                f"Could not find Heading (1-7) in Markdown page: {markdown_page[:1000]}")
+
+        page_header: Optional[str] = None
+        remaining_md_page: str = markdown_page
+        if heading_line:
+            index = markdown_page.find(heading_line)
+            if index == -1:
+                raise ValueError(
+                    f"Could not find heading line: {heading_line} in markdown page: {markdown_page[:1000]}")
+            page_header = markdown_page[:index]
+            remaining_md_page = markdown_page[index:]
+
+        return (page_header, remaining_md_page)
 
     @staticmethod
     def fetch_page_footer(page_without_header: str, openai_temperature: float = 1.0) -> PageFooterResult:
@@ -660,9 +696,10 @@ class WebPageScraper:
             self.db.add_documents(documents=[Document(page_content=footer, metadata={
                                   WebPageScraper.URL: self.url, WebPageScraper.PAGE_FOOTER: True})])
 
-        # Add page body chunks in database.
-        page_structure.body_chunks = self.create_page_body_chunks_in_db(
-            chunks=page_structure.body_chunks)
+        if page_structure.body_chunks:
+            # Add page body chunks in database.
+            page_structure.body_chunks = self.create_page_body_chunks_in_db(
+                chunks=page_structure.body_chunks)
         return page_structure
 
     def get_page_structure_from_db(self) -> Optional[PageStructure]:
@@ -812,7 +849,19 @@ class WebPageScraper:
 
     def delete_all_docs_from_db(self):
         """Delete all documents associated with given url."""
-        self.db.delete(ids=self.get_all_doc_ids_from_db())
+        ids_to_delete: List[str] = self.get_all_doc_ids_from_db()
+        self.db.delete(ids=ids_to_delete)
+        print(f"Deleted {len(ids_to_delete)} docs from db")
+
+    @staticmethod
+    def is_valid_linkedin_post(url: str) -> bool:
+        """Returns true if valid linkedin post and false otherwise.
+
+        Post url must be of this format: https://www.linkedin.com/posts/a2kapur_macro-activity-7150910641900244992-0B5E
+        """
+        if "linkedin.com/posts" not in url or "activity-" not in url:
+            return False
+        return True
 
 
 if __name__ == "__main__":
@@ -821,7 +870,7 @@ if __name__ == "__main__":
     # url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # Migrated to new struct below.
-    url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
+    # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # Migrated to new struct below.
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
@@ -839,20 +888,46 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
     # url = "https://www.cloudbees.com/newsroom/cloudbees-appoints-raj-sarkar-as-chief-marketing-officer"
+    # url = "https://www.linkedin.com/posts/rajsarkar_forrestertei-totaleconomicimpact-teistudy-activity-7181275932207271938-S2lc/"
+    # url = "https://www.linkedin.com/posts/a2kapur_macro-activity-7150910641900244992-0B5E"
+    # Pulse can be scraped the same way as any web page. See below. It should work well.
+    # url = "https://www.linkedin.com/pulse/culture-eats-strategy-breakfast-raj-sarkar"
+    # This is a repost below with no text or comments.
+    # url = "https://www.linkedin.com/posts/jeandenisgreze_distributed-coroutines-a-new-primitive-soon-activity-7173787541630803969-ADdw"
+    # This is a repost with text and comments.
+    # url = "https://www.linkedin.com/posts/jeandenisgreze_growth-engineering-program-reforge-activity-7183823123882946562-wyqe"
+    # url = "https://www.linkedin.com/posts/rajsarkar_fourteen-years-ago-in-2010-i-joined-google-activity-7208830932089225216-re5L/"
+    url = "https://www.linkedin.com/posts/a2kapur_cloudbees-buys-releaseiq-devops-orchestration-activity-6980945693720944641-Ayzi/?utm_source=share&utm_medium=member_desktop"
+    # 3 years old post.
+    # url = "https://www.linkedin.com/posts/a2kapur_christian-klein-the-details-guy-who-has-activity-6728126001274068992-Accy/?utm_source=share&utm_medium=member_desktop"
+    # url = "https://www.linkedin.com/posts/rajsarkar_trust-devsecops-activity-7160709081719033857-aB9k/?utm_source=share&utm_medium=member_desktop"
+    # url = "https://www.linkedin.com/posts/plaid-_were-with-plaids-ceo-zachary-perret-on-activity-7207003883506651136-gnif"
+    # G2 recognition for Cloudbees.
+    # url = "https://lnkd.in/eEyZQE-w"
+
     # person_name = "Zachary Perret"
-    person_name = "Al Cook"
-    company_name = "Plaid"
+    # person_name = "Al Cook"
+    # company_name = "Plaid"
     # person_name = "Anuj Kapur"
     # company_name = "Cloudbees"
     graph = WebPageScraper(url=url, dev_mode=True)
+    graph.process_linkedin_post_body(page_body=graph.page_structure.body)
     # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
+
+    # file_path = "../example_linkedin_info/webpage_markdown.txt"
+    # file_path = "../example_linkedin_info/scraped_linkedin_repost_body.txt"
+    # file_path = "../example_linkedin_info/scraped_linkedin_post_body.txt"
+    # with open(file_path, "w") as f:
+    #     f.write(graph.page_structure.body)
+
+    # print(graph.page_structure.body)
     # graph.delete_summary_from_db()
     # graph.delete_all_docs_from_db()
 
-    final_summary = graph.fetch_content_final_summary(
-        page_body_chunks=graph.page_structure.body_chunks)
-    print("concise summary: ", graph.fetch_concise_summary(
-        detailed_summary=final_summary.detailed_summary))
+    # final_summary = graph.fetch_content_final_summary(
+    #     page_body_chunks=graph.page_structure.body_chunks)
+    # print("concise summary: ", graph.fetch_concise_summary(
+    #     detailed_summary=final_summary.detailed_summary))
     # graph.fetch_content_type(page_body_chunks=graph.page_structure.body_chunks)
     # graph.fetch_content_category(
     #     company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)

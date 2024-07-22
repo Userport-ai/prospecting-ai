@@ -75,11 +75,11 @@ class LinkedInPostReference(BaseModel):
         return LinkedInPostReference(type="linkedin_post", id=id)
 
 
-class HTMLPageReference(BaseModel):
-    """Reference to HTML page details in Database."""
-    type: Literal["html_page"]
+class WebPageReference(BaseModel):
+    """Reference to Web page details in Database."""
+    type: Literal["web_page"]
     id: PyObjectId = Field(...,
-                           description="Identifier for stored HTML Page in database.")
+                           description="Identifier for stored WebPageInfo in database.")
 
 
 class ContentTypeEnum(str, Enum):
@@ -136,7 +136,7 @@ class ContentCategoryEnum(str, Enum):
 
 
 """Extra information about the content that is stored separately and can be processed independently of fetching the content again."""
-ContentSource = Union[LinkedInPostReference, HTMLPageReference]
+ContentSource = Union[LinkedInPostReference, WebPageReference]
 
 
 class PageContentInfo(BaseModel):
@@ -174,6 +174,8 @@ class PageContentInfo(BaseModel):
     # Content related fields below.
     type: Optional[ContentTypeEnum] = Field(
         default=None, description="Type of content (Interview, podcast, blog, article, LinkedIn post etc.).")
+    type_reason: Optional[str] = Field(
+        default=None, description="Reason for chosen enum value of type.")
     author: Optional[str] = Field(
         default=None, description="Full name of author of content if any.")
     publish_date: Optional[datetime] = Field(
@@ -184,6 +186,8 @@ class PageContentInfo(BaseModel):
                                            description="A concise summary of the content.")
     category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
+    category_reason: Optional[str] = Field(
+        default=None, description="Reason for chosen enum value of category.")
     key_persons: Optional[List[str]] = Field(
         default=None, description="Names of key persons extracted from the content.")
     key_organizations: Optional[List[str]] = Field(
@@ -551,6 +555,8 @@ class PersonProfile(BaseModel):
 
 class WebPageInfo(BaseModel):
     """Stores web page information."""
+    id: Optional[PyObjectId] = Field(
+        alias="_id", default=None, description="MongoDB generated unique identifier for Web page Info.")
     header: Optional[str] = Field(
         default=None, description="Header of the page in Markdown formatted text, None if no header exists.")
     body: str = Field(...,
@@ -625,8 +631,8 @@ class LinkedInPost(BaseModel):
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for the LinkedIn Post.")
-    fetch_date: Optional[datetime] = Field(default=None,
-                                           description="Date when post was fetched from API call."),
+    creation_date: Optional[datetime] = Field(default=None,
+                                              description="Date when post was created in the database. We will assume it was fetched from the API call on the same date."),
     post_id: str = Field(..., validation_alias="id",
                          description="Identifier of the post.")
     url: str = Field(..., description="URL of the post.")
@@ -647,6 +653,9 @@ class LinkedInPost(BaseModel):
                                   description="Total engagment with the post."),
     mentioned_profiles: List[str] = Field(
         ..., description="LinkedIn profiles of persons or companies mentioned in the post.")
+
+    schema_version: Optional[int] = Field(default=None,
+                                          description="Schema version for this collection.")
 
     @field_validator('date_published', mode='before')
     @classmethod
