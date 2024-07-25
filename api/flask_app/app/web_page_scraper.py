@@ -14,7 +14,7 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 from utils import Utils
 from models import ContentTypeEnum, ContentCategoryEnum, PageContentInfo
-from linkedin_scraper import LinkedInScraper
+from linkedin_scraper import LinkedInScraper, LinkedInPostDetails
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -42,7 +42,7 @@ class PageStructure(BaseModel):
     footer: Optional[str] = Field(
         default=None, description="Footer of the page in Markdown formatted text. None if it does not exist.")
     body_chunks: Optional[List[Document]] = Field(
-        default=None, description="List of markdown formatted chunks that the page body is divided into.")
+        default=None, description="List of markdown formatted chunks that the page body is divided into. Set to None for LinkedIn post web pages only.")
 
     def to_str(self) -> str:
         """Returns string representation of page structure."""
@@ -54,20 +54,20 @@ class PageStructure(BaseModel):
             str_repr += f"Footer\n=================\n{self.footer}\n"
         return str_repr
 
-    def to_doc(self) -> str:
-        """Returns document string."""
-        doc: str = ""
+    def to_doc(self) -> Document:
+        """Returns document from page structure.."""
+        page_content: str = ""
         if self.header:
-            doc += self.header
-        doc += self.body
+            page_content += self.header
+        page_content += self.body
         if self.footer:
-            doc += self.footer
-        return doc
+            page_content += self.footer
+        return Document(page_content=page_content)
 
     def get_size_mb(self) -> float:
         """Returns size of given page in megabytes."""
-        page_text: str = self.to_doc()
-        return len(page_text.encode("utf-8"))/(1024.0 * 1024.0)
+        page_content: str = self.to_doc().page_content
+        return len(page_content.encode("utf-8"))/(1024.0 * 1024.0)
 
 
 class PageContentInfo(BaseModel):
@@ -75,6 +75,8 @@ class PageContentInfo(BaseModel):
     url: Optional[str] = Field(default=None, description="URL of the page.")
     page_structure: Optional[PageStructure] = Field(
         default=None, description="Stores page structure.")
+    linkedin_post_details: Optional[LinkedInPostDetails] = Field(
+        default=None, description="Linkedin post details, set to None for other web pages.")
 
     type: Optional[ContentTypeEnum] = Field(
         default=None, description="Type of content (Interview, podcast, blog, article, LinkedIn post etc.).")
@@ -96,6 +98,10 @@ class PageContentInfo(BaseModel):
         default=None, description="Category of the content found")
     category_reason: Optional[str] = Field(
         default=None, description="Reason for chosen enum value of category.")
+    num_linkedin_reactions: Optional[int] = Field(
+        default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post web page and None otherwise.")
+    num_linkedin_comments: Optional[int] = Field(
+        default=None, description="Number of LinkedIn comments for a post. Set only for LinkedIn post web page and None otherwise.")
 
     openai_usage: Optional[OpenAIUsage] = Field(
         default=None, description="Total Open AI tokens used in fetching this content info.")
@@ -120,6 +126,19 @@ class ContentConciseSummary(BaseModel):
         default=[], description="Extract names of key persons from the new passage text. Set to empty if none found.")
     key_organizations: List[str] = Field(
         default=[], description="Extract names of key organizations from the new passage text. Set to empty if none found.")
+
+
+class PostSummary(BaseModel):
+    """Class to compute summary of a LinkedIn post.
+
+    This is strictly used only for LLM output parsing. The final summary should be read from ContentFinalSummary below.
+    """
+    detailed_summary: str = Field(...,
+                                  description="Detailed Summary of the text.")
+    key_persons: List[str] = Field(
+        default=[], description="Extract names of key persons from the text. Set to empty if none found.")
+    key_organizations: List[str] = Field(
+        default=[], description="Extract names of key organizations from the text. Set to empty if none found.")
 
 
 class ContentFinalSummary(BaseModel):
@@ -241,6 +260,13 @@ class WebPageScraper:
             raise ValueError("Cannot fetch content in dev mode")
 
         doc = WebPageScraper.fetch_page(url=self.url)
+        if self.is_valid_linkedin_post(url=self.url):
+            return self.fetch_content_info_from_linkedin_post(company_name=company_name, person_name=person_name, doc=doc)
+
+        return self.fetch_content_info_from_general_page(company_name=company_name, person_name=person_name, doc=doc)
+
+    def fetch_content_info_from_general_page(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
+        """Fetches content information from General web page (not a LinkedIn post)."""
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_page_structure(
                 doc=doc)
@@ -267,6 +293,7 @@ class WebPageScraper:
             return PageContentInfo(
                 url=self.url,
                 page_structure=page_structure,
+                linkedin_post_details=None,
                 type=type.enum_value,
                 type_reason=type.reason,
                 author=author_and_publish_date.author,
@@ -277,8 +304,131 @@ class WebPageScraper:
                 key_organizations=final_summary.key_organizations,
                 category=category.enum_value,
                 category_reason=category.reason,
+                num_linkedin_reactions=None,
+                num_linkedin_comments=None,
                 openai_usage=tokens_used
             )
+
+    def fetch_content_info_from_linkedin_post(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
+        """Fetches content information from LinkedIn post web page."""
+        with get_openai_callback() as cb:
+            page_structure: PageStructure = self.get_linkedin_post_structure(
+                doc=doc)
+            post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
+                post_body=page_structure.body)
+
+            final_summary: ContentFinalSummary = self.fetch_post_final_summary(
+                post_details=post_details)
+            category: ContentCategory = self.fetch_content_category(
+                company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
+
+            tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
+                                      completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+            print(f"\nTokens used: {tokens_used}")
+
+            return PageContentInfo(
+                url=self.url,
+                page_structure=page_structure,
+                linkedin_post_details=post_details,
+                type=ContentTypeEnum.LINKEDIN_POST,
+                type_reason=None,
+                author=post_details.author_name,
+                publish_date=post_details.publish_date,
+                detailed_summary=final_summary.detailed_summary,
+                concise_summary=final_summary.concise_summary,
+                key_persons=final_summary.key_persons,
+                key_organizations=final_summary.key_organizations,
+                category=category.enum_value,
+                category_reason=category.reason,
+                num_linkedin_reactions=post_details.num_reactions,
+                num_linkedin_comments=post_details.num_comments,
+                openai_usage=tokens_used
+            )
+
+    def fetch_post_final_summary(self, post_details: LinkedInPostDetails) -> ContentFinalSummary:
+        """Fetches final summary of LinkedIn post."""
+        if self.dev_mode:
+            detailed_summary: Optional[str] = self.get_detailed_summary_from_db(
+            )
+            if detailed_summary:
+                print("Found summary in database")
+                print(f"\nSummary: {detailed_summary}\n")
+                return ContentFinalSummary(detailed_summary=detailed_summary, concise_summary="", key_persons=[], key_organizations=[])
+
+        # Do not change this prompt before testing, results may get worse.
+        post_or_repost_str: str = "Type: post"
+        if post_details.repost:
+            post_or_repost_str = "Type: repost"
+
+        def get_headline_or_follower_count_str(post_details: LinkedInPostDetails) -> str:
+            headline_or_follower_count_str: str = ""
+            if post_details.author_type == LinkedInPostDetails.AuthorType.PERSON:
+                headline_or_follower_count_str = f"Author Headline: {post_details.author_headline}"
+            else:
+                headline_or_follower_count_str = f"Author Follower count: {post_details.author_follower_count}"
+            return headline_or_follower_count_str
+
+        post_template = (
+            "The 'Text' section below contains details about a LinkedIn 'post' or 'repost'.\n"
+            "A 'post' contains a single piece of content while a 'repost' contains content from the 'original post' as well.\n"
+            "The Author of the 'post' or 'repost' can be a 'person' or a 'company'. Similarly, the 'original post' can have the author be a 'person' or 'company'.\n"
+            "Summarize the entire 'Text' section and make sure to highlight key numbers, quotes, announcements, persons and organizations in the summary.\n"
+            "\n"
+            "Text\n"
+            "---------\n"
+            f"{post_or_repost_str}\n"
+            "URL: {post_url}\n"
+            f"Publish Date: {post_details.publish_date}\n"
+            f"Author: {post_details.author_name}\n"
+            f"Author Type: {post_details.author_type.value}\n"
+            f"{get_headline_or_follower_count_str(post_details=post_details)}\n"
+            f"Author Profile URL:  {post_details.author_profile_url}\n\n"
+        )
+
+        if len(post_details.text) > 0:
+            post_template += f"Content: {post_details.text}\n"
+
+        if len(post_details.card_links) > 0:
+            post_template += "Learn more by clicking on the links below:\n"
+        for clink in post_details.card_links:
+            post_template += f"* [{clink[0]}]({clink[1]})\n"
+
+        if post_details.repost:
+            repost_details: LinkedInPostDetails = post_details.repost
+            repost_template = (
+                "\n-----------------------------\n"
+                f"Type: original post\n"
+                f"Publish Date: {repost_details.publish_date}\n"
+                f"Author: {repost_details.author_name}\n"
+                f"Author Type: {repost_details.author_type.value}\n"
+                f"{get_headline_or_follower_count_str(post_details=repost_details)}\n"
+                f"Author Profile URL:  {repost_details.author_profile_url}\n\n"
+            )
+            if len(repost_details.text) > 0:
+                repost_template += f"Content: {repost_details.text}\n"
+
+            if len(repost_details.card_links) > 0:
+                repost_template += "Learn more by clicking on the links below:\n"
+            for clink in repost_details.card_links:
+                repost_template += f"* [{clink[0]}]({clink[1]})"
+
+            # Add repost template to post template.
+            post_template = post_template + repost_template
+
+        llm = ChatOpenAI(temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(
+            PostSummary)
+        prompt = PromptTemplate.from_template(post_template)
+        chain = prompt | llm
+        result: PostSummary = chain.invoke({'post_url': post_details.url})
+
+        print("\n\nPost Summary: ", result.detailed_summary, "\n")
+
+        if self.dev_mode:
+            # Write summary to database.
+            self.create_detailed_summary_in_db(summary=result.detailed_summary)
+
+        # Concise summary is always the same as detailed summary for LinkedIn posts.
+        return ContentFinalSummary(detailed_summary=result.detailed_summary, concise_summary=result.detailed_summary, key_persons=result.key_persons, key_organizations=result.key_organizations)
 
     def fetch_content_final_summary(self, page_body_chunks: List[Document]) -> ContentFinalSummary:
         """Returns final summary of content from page body using an iterative algorithm."""
@@ -522,11 +672,6 @@ class WebPageScraper:
         month: int = result.month if result.month else 1
         year: int = result.year if result.year else datetime.now().year
         return Utils.create_utc_datetime(day=day, month=month, year=year)
-
-    def process_linkedin_post_body(self, page_body: str) -> str:
-        """Takes markdown formatted page body and processes it to return Post information in organized form."""
-        LinkedInScraper.extract_post_details(post_body=page_body)
-        # TODO: Add processing here.
 
     @staticmethod
     def fetch_page(url: str) -> Document:
@@ -897,10 +1042,10 @@ if __name__ == "__main__":
     # This is a repost with text and comments.
     # url = "https://www.linkedin.com/posts/jeandenisgreze_growth-engineering-program-reforge-activity-7183823123882946562-wyqe"
     # url = "https://www.linkedin.com/posts/rajsarkar_fourteen-years-ago-in-2010-i-joined-google-activity-7208830932089225216-re5L/"
-    url = "https://www.linkedin.com/posts/a2kapur_cloudbees-buys-releaseiq-devops-orchestration-activity-6980945693720944641-Ayzi/?utm_source=share&utm_medium=member_desktop"
+    # url = "https://www.linkedin.com/posts/a2kapur_cloudbees-buys-releaseiq-devops-orchestration-activity-6980945693720944641-Ayzi/?utm_source=share&utm_medium=member_desktop"
     # 3 years old post.
     # url = "https://www.linkedin.com/posts/a2kapur_christian-klein-the-details-guy-who-has-activity-6728126001274068992-Accy/?utm_source=share&utm_medium=member_desktop"
-    # url = "https://www.linkedin.com/posts/rajsarkar_trust-devsecops-activity-7160709081719033857-aB9k/?utm_source=share&utm_medium=member_desktop"
+    url = "https://www.linkedin.com/posts/rajsarkar_trust-devsecops-activity-7160709081719033857-aB9k/?utm_source=share&utm_medium=member_desktop"
     # url = "https://www.linkedin.com/posts/plaid-_were-with-plaids-ceo-zachary-perret-on-activity-7207003883506651136-gnif"
     # G2 recognition for Cloudbees.
     # url = "https://lnkd.in/eEyZQE-w"
@@ -909,9 +1054,15 @@ if __name__ == "__main__":
     # person_name = "Al Cook"
     # company_name = "Plaid"
     # person_name = "Anuj Kapur"
-    # company_name = "Cloudbees"
+    person_name = "Raj Sarkar"
+    company_name = "Cloudbees"
     graph = WebPageScraper(url=url, dev_mode=True)
-    graph.process_linkedin_post_body(page_body=graph.page_structure.body)
+    # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
+    #     post_body=graph.page_structure.body)
+    # graph.fetch_post_final_summary(post_details=post_details)
+    doc = graph.page_structure.to_doc()
+    graph.fetch_content_info_from_linkedin_post(
+        company_name=company_name, person_name=person_name, doc=doc)
     # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
 
     # file_path = "../example_linkedin_info/webpage_markdown.txt"

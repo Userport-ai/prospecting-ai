@@ -12,8 +12,9 @@ from langchain_core.documents import Document
 from langchain_chroma import Chroma
 from models import LinkedInPost, PersonProfile
 from langchain_openai import OpenAIEmbeddings
-from pydantic import BaseModel, Field
-from langchain_community.callbacks import get_openai_callback
+# from pydantic import BaseModel, Field
+# Can't use pydantic base model because cant embed this class in model class inherting from langchain base model.
+from langchain_core.pydantic_v1 import BaseModel, Field
 from dotenv import load_dotenv
 load_dotenv()
 
