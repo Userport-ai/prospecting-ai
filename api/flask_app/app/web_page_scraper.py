@@ -474,18 +474,18 @@ class WebPageScraper:
             chain = prompt | llm
             result: ContentConciseSummary = chain.invoke(
                 {"summary_so_far": detailed_summary, "new_passage": new_passage})
-            print(f"\n\nIteration {i+1}")
-            print("--------------")
-            print(f"Summary of new passage: {result.concise_summary}")
-            print("Key persons: ", result.key_persons)
-            print("Key organizations: ", result.key_organizations)
+            # print(f"\n\nIteration {i+1}")
+            # print("--------------")
+            # print(f"Summary of new passage: {result.concise_summary}")
+            # print("Key persons: ", result.key_persons)
+            # print("Key organizations: ", result.key_organizations)
             detailed_summary = f"{detailed_summary}\n\n{result.concise_summary}"
             key_persons += result.key_persons
             key_organizations += result.key_organizations
 
-        print(f"\n\nsummary: {detailed_summary}\n")
-        print(f"key persons: {key_persons}\n")
-        print(f"key organizations: {key_organizations}\n")
+        print(f"\n\nDetailed Summary: {detailed_summary}\n")
+        print(f"Key persons: {key_persons}\n")
+        print(f"Key organizations: {key_organizations}\n")
 
         # Compute concise summary of the detailed summary.
         concise_summary: str = self.fetch_concise_summary(
@@ -541,7 +541,7 @@ class WebPageScraper:
         # For some reason, using structured output in the first LLM call doesn't work. We need to
         # route the text answer from the first call to extract the structured output.
         content_details = self.parse_llm_output(text=result.content)
-        print("\ncontent details: ", content_details)
+        print("\nContent details: ", content_details)
         return content_details
 
     def fetch_content_type(self, page_body_chunks: List[Document]) -> ContentType:
@@ -658,9 +658,13 @@ class WebPageScraper:
         chain = prompt | llm
         return chain.invoke(text)
 
-    def convert_to_datetime(self, parsed_date: Optional[str]) -> datetime:
+    def convert_to_datetime(self, parsed_date: Optional[str]) -> Optional[datetime]:
         """Converts given parsed date (from web page) to datetime object in UTC timezone."""
         if not parsed_date:
+            return None
+
+        # Sometimes the LLM sets parsed_date to 'None' string. Handle that case here.
+        if parsed_date == 'None':
             return None
 
         prompt_template = (
@@ -709,7 +713,7 @@ class WebPageScraper:
         )
         chunks = text_splitter.split_documents([doc])
         print(
-            f"Created: {len(chunks)} chunks when splitting: {url} using chunk size: {self.chunk_size}")
+            f"Created: {len(chunks)} chunks when splitting: {self.url} using chunk size: {self.chunk_size}")
         return chunks
 
     def get_page_structure(self, doc: Document) -> PageStructure:
@@ -1050,7 +1054,7 @@ if __name__ == "__main__":
     # url = "https://www.linkedin.com/posts/jeandenisgreze_distributed-coroutines-a-new-primitive-soon-activity-7173787541630803969-ADdw"
     # This is a repost with text and comments.
     # url = "https://www.linkedin.com/posts/jeandenisgreze_growth-engineering-program-reforge-activity-7183823123882946562-wyqe"
-    url = "https://www.linkedin.com/posts/rajsarkar_fourteen-years-ago-in-2010-i-joined-google-activity-7208830932089225216-re5L/"
+    # url = "https://www.linkedin.com/posts/rajsarkar_fourteen-years-ago-in-2010-i-joined-google-activity-7208830932089225216-re5L/"
     # url = "https://www.linkedin.com/posts/a2kapur_cloudbees-buys-releaseiq-devops-orchestration-activity-6980945693720944641-Ayzi/?utm_source=share&utm_medium=member_desktop"
     # 3 years old post.
     # url = "https://www.linkedin.com/posts/a2kapur_christian-klein-the-details-guy-who-has-activity-6728126001274068992-Accy/?utm_source=share&utm_medium=member_desktop"
@@ -1058,20 +1062,23 @@ if __name__ == "__main__":
     # url = "https://www.linkedin.com/posts/plaid-_were-with-plaids-ceo-zachary-perret-on-activity-7207003883506651136-gnif"
     # G2 recognition for Cloudbees.
     # url = "https://lnkd.in/eEyZQE-w"
+    url = "https://plaid.com/events/2024-fintech-predictions-tech-talk/"
 
-    # person_name = "Zachary Perret"
+    person_name = "Zachary Perret"
     # person_name = "Al Cook"
-    # company_name = "Plaid"
+    company_name = "Plaid"
     # person_name = "Anuj Kapur"
-    person_name = "Raj Sarkar"
-    company_name = "Cloudbees"
-    graph = WebPageScraper(url=url, dev_mode=True)
+    # person_name = "Raj Sarkar"
+    # company_name = "Cloudbees"
+    graph = WebPageScraper(url=url, dev_mode=False)
+    graph.fetch_page_content_info(
+        company_name=company_name, person_name=person_name)
     # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
     #     post_body=graph.page_structure.body)
     # graph.fetch_post_final_summary(post_details=post_details)
-    doc = graph.page_structure.to_doc()
-    graph.fetch_content_info_from_linkedin_post(
-        company_name=company_name, person_name=person_name, doc=doc)
+    # doc = graph.page_structure.to_doc()
+    # graph.fetch_content_info_from_linkedin_post(
+    #     company_name=company_name, person_name=person_name, doc=doc)
     # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
 
     # file_path = "../example_linkedin_info/webpage_markdown.txt"

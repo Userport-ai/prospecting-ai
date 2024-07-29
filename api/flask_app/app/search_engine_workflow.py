@@ -1,6 +1,7 @@
 from googlesearch import search
 from web_page_scraper import WebPageScraper, PageContentInfo
 from database import Database
+from typing import List
 from linkedin_scraper import LinkedInScraper
 from models import (
     PersonProfile,
@@ -36,35 +37,38 @@ class SearchEngineWorkflow:
 
         company_name, role_title = person_profile.get_company_and_role_title()
         person_name: str = person_profile.full_name
-        search_query: str = self.get_linkedin_posts_query(
+        all_search_queries: List[str] = self.get_all_search_queries(
             company_name=company_name, person_name=person_name, role_title=role_title)
 
-        for url in search(search_query, stop=self.max_search_results_per_query):
-            print(f"\nGot URL {url} in search result\n")
+        for search_query in all_search_queries:
+            print(f"\nSearch query: {search_query}")
+            print("-----------------------")
+            for url in search(search_query, stop=self.max_search_results_per_query):
+                print(f"\tGot URL {url} in search result.")
 
-            if LinkedInScraper.is_valid_profile_or_company_url(url=url):
-                # This is a person's profile or Company About page on LinkedIn, skip it.
-                print(
-                    f"URL: {url} is a LinkedIn profile or Company, skip parsing it.")
-                continue
+                if LinkedInScraper.is_valid_profile_or_company_url(url=url):
+                    # This is a person's profile or Company About page on LinkedIn, skip it.
+                    print(
+                        f"\tURL: {url} is a LinkedIn profile or Company, skip parsing it.")
+                    continue
 
-            # If this URL has already been indexed, skip processing.
-            if self.database.get_content_details_by_url(url=url):
-                print(
-                    f"Web URL: {url} already indexed in the database, skip parsing again.")
-                continue
+                # If this URL has already been indexed, skip processing.
+                if self.database.get_content_details_by_url(url=url):
+                    print(
+                        f"\tWeb URL: {url} already indexed in the database, skip parsing again.")
+                    continue
 
-            try:
-                self.process_url(url=url, company_name=company_name, person_name=person_name,
-                                 role_title=role_title, search_query=search_query, person_profile_id=person_profile_id, company_profile_id=company_profile_id)
-            except Exception as e:
-                # Log error and continue.
-                print(
-                    f"Failed to process search result URL: {url} for person: {person_profile_id} and query: {search_query} with error: {e}")
+                try:
+                    self.process_url(url=url, company_name=company_name, person_name=person_name,
+                                     role_title=role_title, search_query=search_query, person_profile_id=person_profile_id, company_profile_id=company_profile_id)
+                except Exception as e:
+                    # Log error and continue.
+                    print(
+                        f"\tFailed to process search result URL: {url} for person: {person_profile_id} and query: {search_query} with error: {e}")
 
-            # TODO: Remove this break once content parsing works.
-            print("Done parsing for now!")
-            break
+                # TODO: Remove this break once content parsing works.
+                print("Done parsing for now!")
+                break
 
     def process_url(self, url: str, company_name: str, person_name: str, role_title: str, search_query: str, person_profile_id: str, company_profile_id: str):
         """Process given URL from the web and stores the result in the database."""
@@ -139,9 +143,17 @@ class SearchEngineWorkflow:
             self.database.insert_content_details(
                 content_details=content_details, session=session)
 
-    def get_linkedin_posts_query(self, company_name: str, person_name: str, role_title: str) -> str:
-        """Returns search query string for recent linkedin posts for person in given company."""
-        return f"{company_name} {person_name} {role_title} recent LinkedIn posts"
+    def get_all_search_queries(self, company_name: str, person_name: str, role_title: str) -> List[str]:
+        """Returns list of all search queries for given person employed in given company."""
+        search_prefix = f"{company_name} {person_name} {role_title} "
+        queries = ["recent LinkedIn posts", "recent thoughts on the industry",
+                   "recent articles or blogs", "recent interviews or podcasts",
+                   "recent conferences or events attended", "recent announcements made"]
+
+        final_queries = []
+        for q in queries:
+            final_queries.append(search_prefix + q)
+        return final_queries
 
 
 if __name__ == "__main__":
