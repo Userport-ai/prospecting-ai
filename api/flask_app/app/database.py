@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from utils import Utils
 from models import (
     PersonProfile,
+    CompanyProfile,
     ContentDetails,
     LinkedInPost,
     WebPage
@@ -42,6 +43,10 @@ class Database:
         """Returns Person Profiles collection."""
         return self.db['person_profiles']
 
+    def _get_company_profiles_collection(self) -> Collection:
+        """Returns Company Profiles collection."""
+        return self.db['company_profiles']
+
     def _get_linkedin_posts_collection(self) -> Collection:
         """Returns LinkedIn posts collection."""
         return self.db['linkedin_posts']
@@ -64,6 +69,18 @@ class Database:
         collection = self._get_person_profiles_collection()
         result = collection.insert_one(
             person_profile.model_dump(exclude=Database._exclude_id()))
+        return str(result.inserted_id)
+
+    def insert_company_profile(self, company_profile: CompanyProfile) -> str:
+        """Inserts Company information as a document in the database and returns the created Id."""
+        if company_profile.id:
+            raise ValueError(
+                f"CompanyProfile instance cannot have an Id before db insertion: {company_profile}")
+        company_profile.creation_date = Utils.create_utc_time_now()
+
+        collection = self._get_company_profiles_collection()
+        result = collection.insert_one(
+            company_profile.model_dump(exclude=Database._exclude_id()))
         return str(result.inserted_id)
 
     def insert_linkedin_post(self, linkedin_post: LinkedInPost, session: Optional[ClientSession] = None) -> str:
@@ -123,6 +140,22 @@ class Database:
             raise ValueError(
                 f'Person profile not found for Id: {person_profile_id}')
         return PersonProfile(**data_dict)
+
+    def get_person_profile_by_url(self, person_linkedin_url: str) -> Optional[PersonProfile]:
+        """Returns person profile for given person's LinkedIn URL. Returns None if no profile exists for given URL."""
+        collection = self._get_person_profiles_collection()
+        data_dict = collection.find_one({"linkedin_url": person_linkedin_url})
+        if not data_dict:
+            return None
+        return PersonProfile(**data_dict)
+
+    def get_company_profile_by_url(self, company_linkedin_url: str) -> Optional[CompanyProfile]:
+        """Returns company profile for given company's LinkedIn URL. Returns None if no company profile exists for given URL."""
+        collection = self._get_company_profiles_collection()
+        data_dict = collection.find_one({"linkedin_url": company_linkedin_url})
+        if not data_dict:
+            return None
+        return CompanyProfile(**data_dict)
 
     def get_content_details_by_url(self, url: str) -> Optional[ContentDetails]:
         """Returns Content details for given url. Returns None if not found."""

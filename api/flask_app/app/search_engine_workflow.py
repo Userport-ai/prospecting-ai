@@ -23,7 +23,7 @@ class SearchEngineWorkflow:
         self.database = database
         self.max_search_results_per_query = max_search_results_per_query
 
-    def run(self, person_profile_id: str):
+    def run(self, person_profile_id: str, company_profile_id: str):
         """Runs search queries, analyzes content for given person profile ID.
 
         The analyzed content is then saved to the database.
@@ -36,14 +36,13 @@ class SearchEngineWorkflow:
             raise ValueError(
                 f"Failed to fetch Person Profile in search workflow with id: {person_profile_id} with error: {e}")
 
-        company_name, role_title = self.get_company_and_role_title(
-            person_profile=person_profile)
+        company_name, role_title = person_profile.get_company_and_role_title()
         person_name: str = person_profile.full_name
         search_query: str = self.get_linkedin_posts_query(
             company_name=company_name, person_name=person_name, role_title=role_title)
 
         for url in search(search_query, stop=self.max_search_results_per_query):
-            print(f"Got URL {url} in search result")
+            print(f"\nGot URL {url} in search result\n")
 
             if LinkedInScraper.is_valid_profile_or_company_url(url=url):
                 # This is a person's profile or Company About page on LinkedIn, skip it.
@@ -59,7 +58,7 @@ class SearchEngineWorkflow:
 
             try:
                 self.process_url(url=url, company_name=company_name, person_name=person_name,
-                                 role_title=role_title, search_query=search_query, person_profile_id=person_profile_id)
+                                 role_title=role_title, search_query=search_query, person_profile_id=person_profile_id, company_profile_id=company_profile_id)
             except Exception as e:
                 # Log error and continue.
                 print(
@@ -69,7 +68,7 @@ class SearchEngineWorkflow:
             print("Done parsing for now!")
             break
 
-    def process_url(self, url: str, company_name: str, person_name: str, role_title: str, search_query: str, person_profile_id: str):
+    def process_url(self, url: str, company_name: str, person_name: str, role_title: str, search_query: str, person_profile_id: str, company_profile_id: str):
         """Process given URL from the web and stores the result in the database."""
         # Get page content.
         page_scraper = WebPageScraper(url=url)
@@ -110,6 +109,7 @@ class SearchEngineWorkflow:
             company_name=company_name,
             person_role_title=role_title,
             person_profile_id=person_profile_id,
+            company_profile_id=company_profile_id,
             type=page_content_info.type,
             type_reason=page_content_info.type_reason,
             author=page_content_info.author,
@@ -141,25 +141,6 @@ class SearchEngineWorkflow:
             self.database.insert_content_details(
                 content_details=content_details, session=session)
 
-    def get_company_and_role_title(self, person_profile: PersonProfile) -> Tuple[str, str]:
-        """Returns current company and role title (at company) for given person."""
-        match = re.search("(.+) at (.+)", person_profile.occupation)
-        if not match:
-            raise ValueError(
-                f"Person Profile occupation not in expected forma in search workflow: {person_profile}")
-        role_title: str = match.group(1)
-        company_name: str = match.group(2)
-        return (company_name, role_title)
-
-    def get_company_linkedin_url(self, company_name: str, person_profile: PersonProfile) -> str:
-        """Returns company LinkedIn URL from person's experiences."""
-        experience: Optional[PersonProfile.Experience] = next(
-            filter(lambda e: e.company == company_name, person_profile.experiences), None)
-        if not experience:
-            raise ValueError(
-                f"Could not find experience in profile with company: {company_name}. Profile: {person_profile}")
-        return experience.company_linkedin_profile_url
-
     def get_linkedin_posts_query(self, company_name: str, person_name: str, role_title: str) -> str:
         """Returns search query string for recent linkedin posts for person in given company."""
         return f"{company_name} {person_name} {role_title} recent LinkedIn posts"
@@ -170,20 +151,13 @@ if __name__ == "__main__":
     # query = "Zachary Perret Plaid CEO recent LinkedIn posts"
     # query = "Anuj Kapur CEO Cloudbees recent articles or blogs"
 
-    db = Database()
-
-    def write_profile_to_db(db: Database, profile_url: str):
-        from linkedin_scraper import LinkedInScraper
-        profile = LinkedInScraper.fetch_linkedin_profile(
-            profile_url=profile_url)
-        db.insert_person_profile(person_profile=profile)
-        print("Written profile")
-
     # profile_url = "https://www.linkedin.com/in/zperret"
     # write_profile_to_db(db, profile_url)\
 
     # Zach perret Profile ID.
-    profile_id = '66a70cc8ff3944ed08fe4f1c'
+    person_profile_id = '66a70cc8ff3944ed08fe4f1c'
+    company_profile_id = '66a7a6b5066fac22c378bd75'
 
-    wf = SearchEngineWorkflow(database=db)
-    wf.run(person_profile_id=profile_id)
+    wf = SearchEngineWorkflow(database=Database())
+    wf.run(person_profile_id=person_profile_id,
+           company_profile_id=company_profile_id)

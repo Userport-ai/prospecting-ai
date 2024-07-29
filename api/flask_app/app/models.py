@@ -1,4 +1,3 @@
-from bson.objectid import ObjectId
 from typing import Optional, Annotated, List, Tuple
 from deprecated import deprecated
 from pydantic.functional_validators import BeforeValidator
@@ -6,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from utils import Utils
 from enum import Enum
+import re
 
 # Represents an ObjectId field in the database.
 # It will be represented as a `str` on the model so that it can be serialized to JSON.
@@ -130,7 +130,8 @@ class ContentDetails(BaseModel):
         default=None, description="Reference ID to the parent web page that is stored in the database.")
     linkedin_post_ref_id: Optional[str] = Field(
         default=None, description="Reference ID to the parent LinkedIn post that is stored in the database.")
-    # TODO: Add a company profile ID once CompanyProfile is defined.
+    company_profile_id: Optional[str] = Field(
+        default=None, description="Reference ID to the Company Profile that is stored in the database.")
 
     # Content related fields below.
     type: Optional[ContentTypeEnum] = Field(
@@ -467,7 +468,7 @@ class PersonProfile(BaseModel):
             default=None, description="URL to the LinkedIn group.")
 
     id: Optional[PyObjectId] = Field(
-        alias="_id", default=None, description="MongoDB generated unique identifier for the LinkedIn Post.")
+        alias="_id", default=None, description="MongoDB generated unique identifier for the Person profile.")
     linkedin_url: Optional[str] = Field(
         default=None, description="URL of the LinkedIn profile.")
     creation_date: Optional[datetime] = Field(
@@ -516,6 +517,155 @@ class PersonProfile(BaseModel):
         ..., description="List of LinekdIn groups this person is part of.")
     skills: List[str] = Field(...,
                               description="List of skills that this user has.")
+
+    def get_company_and_role_title(self) -> Tuple[str, str]:
+        """Returns current company and role title (at company) in that order for given person."""
+        match = re.search("(.+) at (.+)", self.occupation)
+        if not match:
+            raise ValueError(
+                f"Person Profile occupation not in expected formar: {self}")
+        role_title: str = match.group(1)
+        company_name: str = match.group(2)
+        return (company_name, role_title)
+
+    def get_company_linkedin_url(self, company_name: str) -> str:
+        """Returns company LinkedIn URL from person's experiences for given company name."""
+        experience: Optional[PersonProfile.Experience] = next(
+            filter(lambda e: e.company == company_name, self.experiences), None)
+        if not experience:
+            raise ValueError(
+                f"Could not find experience in profile with company: {company_name}. Profile: {self}")
+        return experience.company_linkedin_profile_url
+
+
+class CompanyProfile(BaseModel):
+    """Company Profile.
+
+    Most of the information is from Proxycurl's Company Profile API response.
+
+    Other fields will be enriched manually or using other sources.
+    """
+    class Date(BaseModel):
+        """Representation of date in Proxycurl's API response."""
+        day: int = Field(...)
+        month: int = Field(...)
+        year: int = Field(...)
+
+    class CompanyLocation(BaseModel):
+        """Location of company."""
+        country: Optional[str] = Field(
+            default=None, description="Name of the country")
+        city: Optional[str] = Field(
+            default=None, description="Name of the city")
+        postal_code: Optional[str] = Field(
+            default=None, description="Postal code of address")
+        line_1: Optional[str] = Field(
+            default=None, description="First line of address")
+        is_hq: Optional[bool] = Field(
+            default=None, description="Whether the location is HQ or not.")
+        state: Optional[str] = Field(
+            default=None, description="State where location exists.")
+
+    class CompanyType(str, Enum):
+        """Types of Companies as defined in https://nubela.co/proxycurl/docs#company-api-company-profile-endpoint."""
+        EDUCATIONAL = "EDUCATIONAL"
+        GOVERNMENT_AGENCY = "GOVERNMENT_AGENCY"
+        NON_PROFIT = "NON_PROFIT"
+        PARTNERSHIP = "PARTNERSHIP"
+        PRIVATELY_HELD = "PRIVATELY_HELD"
+        PUBLIC_COMPANY = "PUBLIC_COMPANY"
+        SELF_EMPLOYED = "SELF_EMPLOYED"
+        SELF_OWNED = "SELF_OWNED"
+
+    class Funding(BaseModel):
+        """Funding information associated with given company."""
+
+        class Investor(BaseModel):
+            """Investor details."""
+            class InvestorType(str, Enum):
+                PERSON = "person"
+                ORGANIZATION = "organization"
+
+            linkedin_profile_url: Optional[str] = Field(
+                default=None, description="LinkedIn URL of investor.")
+            name: Optional[str] = Field(
+                default=None, description="Name of the investor.")
+            type: Optional[InvestorType] = Field(
+                default=None, description="Type of the investor.")
+
+        funding_type: Optional[str] = Field(
+            default=None, description="Type of funding")
+        money_raised: Optional[int] = Field(
+            default=None, description="USD Amount raised in funding")
+        announced_date: Optional[datetime] = Field(
+            default=None, description="Date of announcement of funding.")
+        number_of_investor: Optional[int] = Field(
+            default=None, description="Number of investors in this round.")
+        investor_list: List[Investor] = Field(
+            default=[], description="List of investors in this round.")
+
+        @field_validator('announced_date', mode='before')
+        @classmethod
+        def parse_date_published(cls, v):
+            """Convert date object to datetime object."""
+            if not v:
+                # Date is None, nothing to do here.
+                return None
+            if isinstance(v, datetime):
+                # Already correct type, do nothing.
+                # This happens when reading object from Database.
+                return v
+
+            # Field has Date format. Happens when reading object from Proxycurl API response.
+            company_profile_date = CompanyProfile.Date(**v)
+            # Convert Date object to datetime object in UTC timezone.
+            return Utils.create_utc_datetime(day=company_profile_date.day, month=company_profile_date.month, year=company_profile_date.year)
+
+    id: Optional[PyObjectId] = Field(
+        alias="_id", default=None, description="MongoDB generated unique identifier for the Company profile.")
+    linkedin_url: Optional[str] = Field(
+        default=None, description="URL of the Company LinkedIn profile.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date when this profile was created in the database in UTC timezone. Assume we synced this from Proxycurl on the same date.")
+
+    linkedin_internal_id: Optional[str] = Field(
+        default=None, description="LinkedIn's Internal and immutable ID of this Company profile.")
+    name: Optional[str] = Field(
+        default=None, description="Name of the company.")
+    tagline: Optional[str] = Field(
+        default=None, description="Short catchy phrase representing company brand.")
+    universal_name_id: Optional[str] = Field(
+        default=None, description="A unique numerical identifier for the company used in the LinkedIn platform.")
+    profile_pic_url: Optional[str] = Field(
+        default=None, description="URL of the company's profile picture.")
+    search_id: Optional[str] = Field(
+        default=None, description="Usable with Job listing endpoint to search for jobs posted in this company.")
+    description: Optional[str] = Field(
+        default=None, description="Textual description of the company.")
+    website: Optional[str] = Field(
+        default=None, description="Website of the company.")
+    industry: Optional[str] = Field(
+        default=None, description="Industry that the company operates under. Exhaustive list can be found in https://drive.google.com/file/d/12yvYLuru7CRv3wKOIkHs5Ldocz31gJSS/view.")
+    company_size: Optional[List[int]] = Field(
+        default=None, description="Sequenced range of headcount (min count, max count)", min_length=2, max_length=2)
+    company_size_on_linkedin: Optional[int] = Field(
+        default=None, description="Size of the company as indicated on LinkedIn.")
+    hq: Optional[CompanyLocation] = Field(
+        default=None, description="Headquarters of company.")
+    company_type: Optional[CompanyType] = Field(
+        default=None, description="Type of Company.")
+    founded_year: Optional[int] = Field(
+        default=None, description="Year when this company was founded.")
+    specialities: List[str] = Field(
+        default=[], description="List of specialities. Example: search, ads, finance etc.")
+    locations: List[CompanyLocation] = Field(
+        default=[], description="List of company locations.")
+    follower_count: Optional[int] = Field(
+        default=None, description="Number of followers of LinkedIn profile.")
+    funding_data: Optional[List[Funding]] = Field(
+        default=None, description="Funding data for given company.")
+    categories: Optional[List[str]] = Field(
+        default=None, description="This attribute is fetched from the company's Crunchbase profile. Values for this attribute are free-form text, and there is no exhaustive list of categories. Consider the categories attribute as \"hints\" regarding the products or services offered by the company.")
 
 
 class WebPageInfo(BaseModel):
