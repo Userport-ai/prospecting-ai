@@ -1,6 +1,4 @@
-import re
 from googlesearch import search
-from typing import Optional, Tuple
 from web_page_scraper import WebPageScraper, PageContentInfo
 from database import Database
 from linkedin_scraper import LinkedInScraper
