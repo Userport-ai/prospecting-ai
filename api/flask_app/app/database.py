@@ -1,6 +1,5 @@
 
 import os
-import re
 import contextlib
 from typing import Optional
 from collections.abc import Generator
@@ -10,11 +9,12 @@ from pymongo.server_api import ServerApi
 from pymongo.collection import Collection
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
+from utils import Utils
 from models import (
     PersonProfile,
-    PersonCurrentEmployment,
-    PageContentInfo,
-    LinkedInPost
+    ContentDetails,
+    LinkedInPost,
+    WebPage
 )
 from typing import List
 
@@ -46,39 +46,61 @@ class Database:
         """Returns LinkedIn posts collection."""
         return self.db['linkedin_posts']
 
-    def _get_content_info_collection(self) -> Collection:
-        """Returns Page details collection."""
-        return self.db['content_info']
+    def _get_web_pages_collection(self) -> Collection:
+        """Returns Web Page collection."""
+        return self.db['web_pages']
 
-    def insert_person_profile(self, person_profile: PersonProfile) -> ObjectId:
+    def _get_content_details_collection(self) -> Collection:
+        """Returns content details collection."""
+        return self.db['content_details']
+
+    def insert_person_profile(self, person_profile: PersonProfile) -> str:
         """Inserts Person information as a document in the database and returns the created Id."""
         if person_profile.id:
             raise ValueError(
                 f"PersonProfile instance cannot have an Id before db insertion: {person_profile}")
+        person_profile.creation_date = Utils.create_utc_time_now()
+
         collection = self._get_person_profiles_collection()
         result = collection.insert_one(
             person_profile.model_dump(exclude=Database._exclude_id()))
-        return result.inserted_id
+        return str(result.inserted_id)
 
-    def insert_linkedin_post(self, linkedin_post: LinkedInPost, session: Optional[ClientSession] = None) -> ObjectId:
+    def insert_linkedin_post(self, linkedin_post: LinkedInPost, session: Optional[ClientSession] = None) -> str:
         """Inserts LinkedIn post information as document in the database and returns the created Id."""
         if linkedin_post.id:
             raise ValueError(
                 f"LinkedInPost instance cannot have an Id before db insertion: {linkedin_post}")
+        linkedin_post.creation_date = Utils.create_utc_time_now()
+
         collection = self._get_linkedin_posts_collection()
         result = collection.insert_one(
             linkedin_post.model_dump(exclude=Database._exclude_id()), session=session)
-        return result.inserted_id
+        return str(result.inserted_id)
 
-    def insert_page_details(self, page_details: PageContentInfo, session: Optional[ClientSession] = None) -> ObjectId:
-        """Inserts page details in the database and returns the created Id."""
-        if page_details.id:
+    def insert_web_page(self, web_page: WebPage, session: Optional[ClientSession] = None) -> str:
+        """Inserts web page as document in the database and returns the created Id."""
+        if web_page.id:
             raise ValueError(
-                f"WebSearchresult instance cannot have an Id before db insertion: {page_details}")
-        collection = self._get_content_info_collection()
+                f"WebPage instance cannot have an Id before db insertion: {web_page}")
+        web_page.creation_date = Utils.create_utc_time_now()
+
+        collection = self._get_web_pages_collection()
         result = collection.insert_one(
-            page_details.model_dump(exclude=Database._exclude_id()), session=session)
-        return result.inserted_id
+            web_page.model_dump(exclude=Database._exclude_id()), session=session)
+        return str(result.inserted_id)
+
+    def insert_content_details(self, content_details: ContentDetails, session: Optional[ClientSession] = None) -> str:
+        """Inserts ContentInfo in the database and returns the created Id."""
+        if content_details.id:
+            raise ValueError(
+                f"Content Details instance cannot have an Id before db insertion: {content_details}")
+        content_details.creation_date = Utils.create_utc_time_now()
+
+        collection = self._get_content_details_collection()
+        result = collection.insert_one(
+            content_details.model_dump(exclude=Database._exclude_id()), session=session)
+        return str(result.inserted_id)
 
     @contextlib.contextmanager
     def transaction_session(self) -> Generator[ClientSession, None]:
@@ -93,49 +115,31 @@ class Database:
             with session.start_transaction():
                 yield session
 
-    def get_person_current_employment(self, person_profile_id: ObjectId) -> PersonCurrentEmployment:
-        """Returns person and company details for given profile Id."""
+    def get_person_profile(self, person_profile_id: str) -> PersonProfile:
+        """Returns person profile for given ID."""
         collection = self._get_person_profiles_collection()
-        data_dict = collection.find_one({"_id": person_profile_id})
+        data_dict = collection.find_one({"_id": ObjectId(person_profile_id)})
         if not data_dict:
             raise ValueError(
                 f'Person profile not found for Id: {person_profile_id}')
-        profile = PersonProfile(**data_dict)
-        return Database.to_person_current_employement(profile=profile)
+        return PersonProfile(**data_dict)
 
-    def get_content_info_by_url(self, url: str) -> Optional[PageContentInfo]:
-        """Returns page details for given url. Returns None if not found."""
-        collection = self._get_content_info_collection()
+    def get_content_details_by_url(self, url: str) -> Optional[ContentDetails]:
+        """Returns Content details for given url. Returns None if not found."""
+        collection = self._get_content_details_collection()
         data_dict = collection.find_one({"url": url})
         if not data_dict:
             return None
-        return PageContentInfo(**data_dict)
+        return ContentDetails(**data_dict)
 
-    @staticmethod
-    def to_person_current_employement(profile: PersonProfile) -> PersonCurrentEmployment:
-        """Returns PersonCurrentEmployment from given Person profile."""
-        match = re.search("(.+) at (.+)", profile.occupation)
-        if not match:
+    def get_content_details(self, content_details_id: str) -> Optional[ContentDetails]:
+        """Returns Content details for given ID."""
+        collection = self._get_content_details_collection()
+        data_dict = collection.find_one({"_id": ObjectId(content_details_id)})
+        if not data_dict:
             raise ValueError(
-                f"Profile occupation not in expected format: {profile}")
-        role_title: str = match.group(1)
-        company_name: str = match.group(2)
-
-        # Find company URL from experiences.
-        experience: Optional[PersonProfile.Experience] = next(
-            filter(lambda e: e.company == company_name, profile.experiences), None)
-        if not experience:
-            raise ValueError(
-                f"Could not find experience in profile with company: {company_name}. Profile: {profile}")
-        company_linkedin_profile_url: str = experience.company_linkedin_profile_url
-
-        return PersonCurrentEmployment(
-            person_profile_id=profile.id,
-            full_name=profile.full_name,
-            role_title=role_title,
-            company_name=company_name,
-            company_linkedin_profile_url=company_linkedin_profile_url
-        )
+                f'Content Details not found for Id: {content_details_id}')
+        return ContentDetails(**data_dict)
 
     def _test_connection(self):
         """Helper method to test successful connection to cluster deployment."""
@@ -147,21 +151,15 @@ class Database:
 
 
 if __name__ == "__main__":
-    def read_person_profile():
-        import json
-        from utils import Utils
-        data = None
-        with open("../example_linkedin_info/proxycurl_profile_3.json", "r") as f:
-            data = f.read()
-        profile_data = json.loads(data)
-        person_profile = PersonProfile(**profile_data)
-        person_profile.linkedin_url = "https://in.linkedin.com/in/aniket-bajpai"
-        # person_profile.linkedin_url = "https://www.linkedin.com/in/zperret"
-        person_profile.date_synced = Utils.create_utc_time_now()
-        return person_profile
 
     db = Database()
-    db.insert_person_profile(person_profile=read_person_profile())
-    # current_employment = db.get_current_employment(
-    #     ObjectId("668e4eb26870b48c49e60dde"))
-    # print(current_employment)
+    content_details_id = '66a72585e3aa5e1d1f9afc79'
+    details = db.get_content_details(content_details_id=content_details_id)
+    print("details person profile: ", details.person_profile_id,
+          type(details.person_profile_id))
+    print("details web page ref: ", details.web_page_ref_id,
+          type(details.web_page_ref_id))
+    print("details linkedin post ref : ", details.linkedin_post_ref_id,
+          type(details.linkedin_post_ref_id))
+    print("details id : ", details.id,
+          type(details.id))

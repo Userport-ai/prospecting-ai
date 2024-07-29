@@ -13,7 +13,7 @@ from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 from utils import Utils
-from models import ContentTypeEnum, ContentCategoryEnum, PageContentInfo
+from models import ContentTypeEnum, ContentCategoryEnum, OpenAITokenUsage
 from linkedin_scraper import LinkedInScraper, LinkedInPostDetails
 
 from dotenv import load_dotenv
@@ -31,6 +31,13 @@ class OpenAIUsage(BaseModel):
     total_tokens: int = Field(..., description="Total tokens used")
     total_cost_in_usd: float = Field(...,
                                      description="Total cost of tokens used.")
+
+    def convert_to_model(self) -> OpenAITokenUsage:
+        """Converts to Token usage as defined by different pydantic model."""
+        return OpenAITokenUsage(
+            url=self.url, operation_tag=self.operation_tag, prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens, total_tokens=self.total_tokens, total_cost_in_usd=self.total_cost_in_usd
+        )
 
 
 class PageStructure(BaseModel):
@@ -267,6 +274,7 @@ class WebPageScraper:
 
     def fetch_content_info_from_general_page(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
         """Fetches content information from General web page (not a LinkedIn post)."""
+        print(f"Fetching content from general page: {self.url}")
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_page_structure(
                 doc=doc)
@@ -311,6 +319,7 @@ class WebPageScraper:
 
     def fetch_content_info_from_linkedin_post(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
         """Fetches content information from LinkedIn post web page."""
+        print(f"Fetching content from LinkedIn post: {self.url}")
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_linkedin_post_structure(
                 doc=doc)
@@ -1041,11 +1050,11 @@ if __name__ == "__main__":
     # url = "https://www.linkedin.com/posts/jeandenisgreze_distributed-coroutines-a-new-primitive-soon-activity-7173787541630803969-ADdw"
     # This is a repost with text and comments.
     # url = "https://www.linkedin.com/posts/jeandenisgreze_growth-engineering-program-reforge-activity-7183823123882946562-wyqe"
-    # url = "https://www.linkedin.com/posts/rajsarkar_fourteen-years-ago-in-2010-i-joined-google-activity-7208830932089225216-re5L/"
+    url = "https://www.linkedin.com/posts/rajsarkar_fourteen-years-ago-in-2010-i-joined-google-activity-7208830932089225216-re5L/"
     # url = "https://www.linkedin.com/posts/a2kapur_cloudbees-buys-releaseiq-devops-orchestration-activity-6980945693720944641-Ayzi/?utm_source=share&utm_medium=member_desktop"
     # 3 years old post.
     # url = "https://www.linkedin.com/posts/a2kapur_christian-klein-the-details-guy-who-has-activity-6728126001274068992-Accy/?utm_source=share&utm_medium=member_desktop"
-    url = "https://www.linkedin.com/posts/rajsarkar_trust-devsecops-activity-7160709081719033857-aB9k/?utm_source=share&utm_medium=member_desktop"
+    # url = "https://www.linkedin.com/posts/rajsarkar_trust-devsecops-activity-7160709081719033857-aB9k/?utm_source=share&utm_medium=member_desktop"
     # url = "https://www.linkedin.com/posts/plaid-_were-with-plaids-ceo-zachary-perret-on-activity-7207003883506651136-gnif"
     # G2 recognition for Cloudbees.
     # url = "https://lnkd.in/eEyZQE-w"

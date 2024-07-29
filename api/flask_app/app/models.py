@@ -1,4 +1,6 @@
-from typing import Optional, Annotated, List, Literal, Union
+from bson.objectid import ObjectId
+from typing import Optional, Annotated, List, Tuple
+from deprecated import deprecated
 from pydantic.functional_validators import BeforeValidator
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
@@ -25,61 +27,20 @@ class OpenAITokenUsage(BaseModel):
                                      description="Total cost of tokens used.")
 
 
-class PersonCurrentEmployment(BaseModel):
-    """Details about person's current employment.
+class WebPage(BaseModel):
+    """Model representing web page broken into header, body and footer elements."""
+    id: Optional[PyObjectId] = Field(
+        alias="_id", default=None, description="MongoDB generated unique identifier for web page.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date when this page was created in the database in UTC timezone.")
 
-    This information is used as input when searching for information related to the person and their company on the web.
-    """
-    full_name: str = Field(..., description="Person's full name.")
-    company_name: str = Field(
-        ..., description="Company name where the person is currently employed.")
-    role_title: str = Field(...,
-                            description="Role title of person at the company.")
-    person_profile_id: PyObjectId = Field(
-        ..., description="PersonProfile reference of this person.")
-
-
-class SearchEngineWorkflowMetadata(BaseModel):
-    """Metdata when using search engine for fetching web pages."""
-    type: Literal["search_engine"]
-    name: str = Field(..., description="Name of the search engine used.")
-    query: str = Field(..., description="Query used for search.")
-
-    @staticmethod
-    def create(name: str, query: str):
-        return SearchEngineWorkflowMetadata(type="search_engine", name=name, query=query)
-
-
-class CompanyWebsiteWorkflowMetadata(BaseModel):
-    """Metdata when using company website for scraping web pages."""
-    type: Literal["company_website"]
-
-    @staticmethod
-    def create():
-        return CompanyWebsiteWorkflowMetadata(type="company_website")
-
-
-"""Metadata associated with the different workflows to fetch information on the web."""
-WorkflowMetadata = Union[SearchEngineWorkflowMetadata,
-                         CompanyWebsiteWorkflowMetadata]
-
-
-class LinkedInPostReference(BaseModel):
-    """Reference to LinkedIn Post details in Database."""
-    type: Literal["linkedin_post"]
-    id: PyObjectId = Field(...,
-                           description="Identifier for stored LinkedIn post in database.")
-
-    @staticmethod
-    def create(id: PyObjectId):
-        return LinkedInPostReference(type="linkedin_post", id=id)
-
-
-class WebPageReference(BaseModel):
-    """Reference to Web page details in Database."""
-    type: Literal["web_page"]
-    id: PyObjectId = Field(...,
-                           description="Identifier for stored WebPageInfo in database.")
+    url: str = Field(..., description="URL of the web page.")
+    header: Optional[str] = Field(
+        default=None, description="Header of the page in Markdown formatted text. None if no header exists.")
+    body: Optional[str] = Field(
+        default=None, description="Body of the page in Markdown formatted text.")
+    footer: Optional[str] = Field(
+        default=None, description="Footer of the page in Markdown formatted text. None if it does not exist.")
 
 
 class ContentTypeEnum(str, Enum):
@@ -135,40 +96,40 @@ class ContentCategoryEnum(str, Enum):
     COMPANY_OFFSITE = "company_offsite"
 
 
-"""Extra information about the content that is stored separately and can be processed independently of fetching the content again."""
-ContentSource = Union[LinkedInPostReference, WebPageReference]
-
-
-class PageContentInfo(BaseModel):
+class ContentDetails(BaseModel):
     """
-    Contains details of content related to a lead or company (or both) found using various workflow.
+    Contains details related to a lead or company (or both) found using various workflows.
 
     Example workflows:
     1. Using search engine to find page and then scrape it manually or using an API (e.g. LinkedIn posts).
     2. Scraping company website directly.
     3. Calling specific APIs like Crunchbase, NYSE for information about the company.
 
-    In the future, we can add more workflows.
+    In the future, we can add more workflows if needed.
     """
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for web search result.")
-    creation_date: datetime = Field(
-        ..., description="Date in UTC timezone when this document was inserted in the database.")
-    source: Optional[ContentSource] = Field(
-        default=None, description="Reference to the content source which is stored in a separate collection.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date in UTC timezone when this document was inserted in the database.")
     url: Optional[str] = Field(
         default=None, description="URL of the content if any.")
-    workflow_metadata: WorkflowMetadata = Field(...,
-                                                description="Metadata associated with workflow to fetch this content.")
+
+    # Metadata associated with the content.
+    search_engine_query: Optional[str] = Field(
+        ..., description="Search engine query that resulted in this URL.")
     person_name: Optional[str] = Field(
         default=None, description="Full name of person. Populated only when the workflow was explicitly searching for person information and None when searching for only company information.")
     company_name: Optional[str] = Field(
         default=None, description="Company name used when searching content. Should mostly be populated, there may be some exceptions that are not known as of now.")
     person_role_title: Optional[str] = Field(
         default=None, description="Role title of person at company. Populated only when person_name is populated and None otherwise.")
-    person_profile_id: Optional[PyObjectId] = Field(
+    person_profile_id: Optional[str] = Field(
         default=None, description="PersonProfile reference of this person. Populated only when person_name is populated and None otherwise.")
+    web_page_ref_id: Optional[str] = Field(
+        default=None, description="Reference ID to the parent web page that is stored in the database.")
+    linkedin_post_ref_id: Optional[str] = Field(
+        default=None, description="Reference ID to the parent LinkedIn post that is stored in the database.")
     # TODO: Add a company profile ID once CompanyProfile is defined.
 
     # Content related fields below.
@@ -192,13 +153,16 @@ class PageContentInfo(BaseModel):
         default=None, description="Names of key persons extracted from the content.")
     key_organizations: Optional[List[str]] = Field(
         default=None, description="Names of key organizations extracted from the content.")
+    num_linkedin_reactions: Optional[int] = Field(
+        default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post content and None otherwise.")
+    num_linkedin_comments: Optional[int] = Field(
+        default=None, description="Number of LinkedIn comments for a post. Set only for LinkedIn post content and None otherwise.")
 
     openai_tokens_used: Optional[OpenAITokenUsage] = Field(
         default=None, description="Total Open AI tokens used in fetching this content info.")
-    schema_version: Optional[int] = Field(default=None,
-                                          description="Schema version for this collection.")
 
     # To prevent encoding error, see https://stackoverflow.com/questions/65209934/pydantic-enum-field-does-not-get-converted-to-string.
+
     class Config:
         use_enum_values = True
 
@@ -506,8 +470,9 @@ class PersonProfile(BaseModel):
         alias="_id", default=None, description="MongoDB generated unique identifier for the LinkedIn Post.")
     linkedin_url: Optional[str] = Field(
         default=None, description="URL of the LinkedIn profile.")
-    date_synced: Optional[datetime] = Field(
-        default=None, description="Date when this profile was synced from LinkedIn in UTC timezone.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date when this profile was created in the database in UTC timezone. Assume we synced this from Proxycurl on the same date.")
+
     public_identifier: str = Field(...,
                                    description="LinkedIn public Identifier of profile.")
     first_name: str = Field(..., description="First name of person.")
@@ -593,6 +558,47 @@ class WebPageInfo(BaseModel):
 
 
 class LinkedInPost(BaseModel):
+    """Stores LinkedIn Post information in the database."""
+    class AuthorType(str, Enum):
+        PERSON = "person"
+        COMPANY = "company"
+
+    id: Optional[PyObjectId] = Field(
+        alias="_id", default=None, description="MongoDB generated unique identifier for LinkedIn Post.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date (in UTC timezone) when this profile was created in the database.")
+
+    author_name: Optional[str] = Field(
+        default=None, description="Name of the author of the LinkedIn Post.")
+    author_type: Optional[AuthorType] = Field(
+        default=None, description="Type of author.")
+    author_profile_url: Optional[str] = Field(
+        default=None, description="LinkedIn profile URL of author. Can be person or company profile.")
+    author_headline: Optional[str] = Field(
+        default=None, description="Headline string associated with Author's profile. Only set for 'person' author type.")
+    author_follower_count: Optional[str] = Field(
+        default=None, description="Follower count string (not integer) of the author. Only set for 'company' author type.")
+    publish_date: Optional[datetime] = Field(
+        default=None, description="Date when this post was published.")
+    url: Optional[str] = Field(
+        default=None, description="URL of the LinkedIn Post. Only set for Post, for repost it is None.")
+    text: str = Field(
+        default="", description="Text associacted with the post. Set to empty when it is a pure repost.")
+    text_links: List[Tuple[str, str]] = Field(
+        default=[], description="List of tuples of links shared in the text of the post. Example: https://lnkd.in/eEyZQE-w (linkedin link) or even external links like https://cloudbees.io.")
+    card_links: List[Tuple[str, str]] = Field(
+        default=[], description="List of tuples of heading + URLs shared as part of the post's card section at the end.")
+    num_reactions: Optional[int] = Field(
+        default=None, description="Number of reactions on the post. Only set for Post, None for repost.")
+    num_comments: Optional[int] = Field(
+        default=None, description="Number of comments on the post.  Only set for Post, None for repost.")
+
+    repost: Optional["LinkedInPost"] = Field(
+        default=None, description="Reference to the original post if this a repost else None.")
+
+
+@deprecated(reason="This class is based on Piloterr's API response which we don't use.")
+class LinkedInPostOld(BaseModel):
     """LinkedIn Post information.
 
     Most of the information is from Piloterr's API response.
@@ -627,7 +633,7 @@ class LinkedInPost(BaseModel):
 
         def is_person(self) -> bool:
             """Returns True if person and false otherwise."""
-            return self.profile_type == LinkedInPost.PostAuthor.ProfileType.PERSON
+            return self.profile_type == LinkedInPostOld.PostAuthor.ProfileType.PERSON
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for the LinkedIn Post.")
@@ -653,9 +659,6 @@ class LinkedInPost(BaseModel):
                                   description="Total engagment with the post."),
     mentioned_profiles: List[str] = Field(
         ..., description="LinkedIn profiles of persons or companies mentioned in the post.")
-
-    schema_version: Optional[int] = Field(default=None,
-                                          description="Schema version for this collection.")
 
     @field_validator('date_published', mode='before')
     @classmethod

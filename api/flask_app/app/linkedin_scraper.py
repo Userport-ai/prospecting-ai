@@ -10,7 +10,7 @@ from typing import Optional, Dict, List, Tuple
 from utils import Utils
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
-from models import LinkedInPost, PersonProfile
+from models import LinkedInPostOld, PersonProfile
 from langchain_openai import OpenAIEmbeddings
 # from pydantic import BaseModel, Field
 # Can't use pydantic base model because cant embed this class in model class inherting from langchain base model.
@@ -92,7 +92,7 @@ class LinkedInScraper:
         if not self.dev_mode:
             raise ValueError("Method should not be called in production.")
 
-        post: Optional[LinkedInPost] = self.get_linkedin_post_from_db()
+        post: Optional[LinkedInPostOld] = self.get_linkedin_post_from_db()
         if post:
             print("LinkedIn Post found in Db")
             self.post = post
@@ -102,7 +102,7 @@ class LinkedInScraper:
             self.create_linkedin_post_in_db(post=self.post)
 
     @staticmethod
-    def fetch_linkedin_post(post_url: str) -> LinkedInPost:
+    def fetch_linkedin_post(post_url: str) -> LinkedInPostOld:
         """Fetches and returns LinkedIn post information for given URL.
 
         Piloterr API documentation: https://www.piloterr.com/library/linkedin-post-info.
@@ -137,7 +137,7 @@ class LinkedInScraper:
             raise ValueError(
                 f"Failed to get JSON response when fetching LinkedIn post for url: {post_url}")
 
-        return LinkedInPost(**data)
+        return LinkedInPostOld(**data)
 
     @staticmethod
     def extract_post_details(post_body: str) -> LinkedInPostDetails:
@@ -406,6 +406,7 @@ class LinkedInScraper:
             stack.append(c)
         return stack
 
+    @staticmethod
     def fetch_linkedin_profile(profile_url: str) -> Optional[PersonProfile]:
         """Fetches and returns LinkedIn Profile information of a given person from URL.
 
@@ -450,10 +451,9 @@ class LinkedInScraper:
                 f"Failed to get JSON response when fetching LinkedIn Profile for url: {profile_url}")
 
         # Populate LinkedIn profile URL field in the response.
-        person_profile = PersonProfile(**data)
-        person_profile.linkedin_url = profile_url
-        person_profile.date_synced = Utils.create_utc_time_now()
-        return person_profile
+        profile = PersonProfile(**data)
+        profile.linkedin_url = profile_url
+        return profile
 
     @staticmethod
     def _get_post_id(post_url: str) -> str:
@@ -484,6 +484,10 @@ class LinkedInScraper:
         """
         return "linkedin.com/in/" in profile_url
 
+    def is_valid_profile_or_company_url(url: str) -> bool:
+        """Returns true if valid Profile or Company URL."""
+        return "linkedin.com/in/" in url or "linkedin.com/company/" in url
+
     @staticmethod
     def _get_piloterr_query_params(query: str) -> Dict:
         """Returns standard params for given query string for Piloterr's APIs."""
@@ -499,13 +503,13 @@ class LinkedInScraper:
             'x-api-key': LinkedInScraper.PILOTERR_API_KEY
         }
 
-    def create_linkedin_post_in_db(self, post_url: str, post: LinkedInPost):
+    def create_linkedin_post_in_db(self, post_url: str, post: LinkedInPostOld):
         """Creates LinkedIn post in database for given URL."""
         post_json: str = post.model_dump_json()
         self.db.add_documents(documents=[Document(page_content=post_json, metadata={
                               LinkedInScraper.URL: post_url, LinkedInScraper.POST: True})])
 
-    def get_linkedin_post_from_db(self, post_url: str) -> Optional[LinkedInPost]:
+    def get_linkedin_post_from_db(self, post_url: str) -> Optional[LinkedInPostOld]:
         post_docs: List[str] = self.db.get(where={
             "$and": [
                 {LinkedInScraper.URL: post_url},
@@ -519,7 +523,7 @@ class LinkedInScraper:
                 f"Expected 1 doc for LinkedIn post URL: {post_url}, got: {post_docs}")
         post_json = post_docs[0]
         post_dict: Dict = json.loads(post_json)
-        return LinkedInPost(**post_dict)
+        return LinkedInPostOld(**post_dict)
 
     def delete_linkedin_post_from_db(self):
         """Delete LinkedIn post from database."""
