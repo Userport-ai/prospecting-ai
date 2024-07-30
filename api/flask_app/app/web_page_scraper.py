@@ -910,17 +910,9 @@ class WebPageScraper:
     @staticmethod
     def fetch_page_footer(page_without_header: str, openai_temperature: float = 1.0) -> PageFooterResult:
         """Use LLM to fetch the footer in given page without header."""
-        # prompt_template = (
-        #     "You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.\n"
-        #     "Can you identify if the chunk can be split into: [1] text with main content and [2] footer text that does not contribute to the main content?\n"
-        #     "If yes, return the first sentence from where this footer starts. If no, return None.\n"
-        #     "\n"
-        #     "Chunk:\n"
-        #     "{chunk}"
-        # )
         prompt_template = (
             "You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.\n"
-            "Can you identify if the chunk can be split into: [1] text with main content and [2] Text that majorly contains navigation links and does not contribute to the main content?\n"
+            "Can you identify if the chunk can be split into: [1] text with main content and [2] text that majorly contains navigation links and does not contribute to the main content?\n"
             "If yes, return the first sentence from where this footer starts. If no, return None.\n"
             "\n"
             "Chunk:\n"
