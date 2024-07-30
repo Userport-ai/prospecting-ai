@@ -343,7 +343,7 @@ class WebPageScraper:
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_linkedin_post_structure(
                 doc=doc)
-            post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
+            post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
                 post_body=page_structure.body)
 
             final_summary: ContentFinalSummary = self.fetch_post_final_summary(
@@ -666,6 +666,7 @@ class WebPageScraper:
             f"* Lawsuit settlement relating to {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_LAWSUIT.value}]\n"
             f"* Internal event for {company_name} employees only. [Enum value: {ContentCategoryEnum.COMPANY_INTERNAL_EVENT.value}]\n"
             f"* Company offsite for {company_name} employees. [Enum value: {ContentCategoryEnum.COMPANY_OFFSITE.value}]\n"
+            f"* None of the above categories. [Enum value: {ContentCategoryEnum.NONE_OF_THE_ABOVE.value}]\n"
         )
         result = chain.invoke(
             {"question": question, "context": detailed_summary})
@@ -1143,7 +1144,7 @@ if __name__ == "__main__":
     # url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # Migrated to new struct below.
-    url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
+    # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # Migrated to new struct below.
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
@@ -1172,7 +1173,7 @@ if __name__ == "__main__":
     # url = "https://www.linkedin.com/posts/rajsarkar_fourteen-years-ago-in-2010-i-joined-google-activity-7208830932089225216-re5L/"
     # url = "https://www.linkedin.com/posts/a2kapur_cloudbees-buys-releaseiq-devops-orchestration-activity-6980945693720944641-Ayzi/?utm_source=share&utm_medium=member_desktop"
     # 3 years old post.
-    url = "https://www.linkedin.com/posts/a2kapur_christian-klein-the-details-guy-who-has-activity-6728126001274068992-Accy/?utm_source=share&utm_medium=member_desktop"
+    # url = "https://www.linkedin.com/posts/a2kapur_christian-klein-the-details-guy-who-has-activity-6728126001274068992-Accy/?utm_source=share&utm_medium=member_desktop"
     # url = "https://www.linkedin.com/posts/rajsarkar_trust-devsecops-activity-7160709081719033857-aB9k/?utm_source=share&utm_medium=member_desktop"
     # url = "https://www.linkedin.com/posts/plaid-_were-with-plaids-ceo-zachary-perret-on-activity-7207003883506651136-gnif"
     # G2 recognition for Cloudbees.
@@ -1183,23 +1184,43 @@ if __name__ == "__main__":
 
     # SITES that don't allow scraping without Proxy.
     # url = "https://www.saastr.com/the-plaid-journey-with-co-founder-and-ceo-zach-perret-pod-561-video/"
-    url = "https://www.crunchbase.com/person/zach-perret"
+    # url = "https://www.crunchbase.com/person/zach-perret"
 
-    # person_name = "Zachary Perret"
+    # These two LinkedIn reposts have a little different structures so our strict state based extraction algoirthm breaks. We have since fixed it.
+    # url = "https://www.linkedin.com/posts/zperret_introducing-beacon-plaid-activity-7077729712181018624-MsBN?trk=public_profile_share_view"
+    url = "https://www.linkedin.com/posts/zperret_the-history-and-future-of-id-verification-activity-7072714551724539906-UvBU"
+    # url = "https://www.linkedin.com/posts/callmehaaa_vietnamstartups-entrepreneurship-ecosystem-activity-7216638281201987584-OJ-F?utm_source=share&utm_medium=member_desktop"
+
+    # The URLs that didn't do well.
+    # url = "https://www.cfodive.com/news/plaid-appoints-first-cfo-amid-potential-run-up-to-public-listing/697059/"
+    # This one saw that repost should be a valid repost.
+    url = "https://www.linkedin.com/posts/hodamehr_fireside-chat-w-plaid-founder-ceo-zach-activity-7161131715170603008-X6Ln"
+    # url = "https://www.linkedin.com/posts/jonlear_this-is-going-to-be-a-terrific-session-with-activity-7153774426881163264-Saig"
+    # url = "https://www.linkedin.com/posts/zperret_the-history-and-future-of-id-verification-activity-7072714551724539906-UvBU"
+    # url = "https://www.linkedin.com/posts/zperret_introducing-beacon-plaid-activity-7077729712181018624-MsBN?trk=public_profile_share_view"
+    # url = "https://www.linkedin.com/posts/zperret_plaids-commitment-to-the-european-open-finance-activity-7132782321518219265-CO9i?trk=public_profile_share_view"
+    # This one ran into 403.
+    # url = "https://www.linkedin.com/posts/zperret_credit-underwriting-in-the-us-is-broken-activity-7203797435322621953-v_Bn"
+
+    person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
     # person_name = "Al Cook"
-    # company_name = "Plaid"
-    person_name = "Anuj Kapur"
+    company_name = "Plaid"
+    # person_name = "Anuj Kapur"
     # person_name = "Raj Sarkar"
-    company_name = "Cloudbees"
+    # company_name = "Cloudbees"
     graph = WebPageScraper(url=url, dev_mode=True)
     # graph.is_page_requesting_user_contact(graph.page_structure)
-    final_summary = graph.fetch_content_final_summary(
-        page_body_chunks=graph.page_structure.body_chunks)
+    # final_summary = graph.fetch_content_final_summary(
+    #     page_body_chunks=graph.page_structure.body_chunks)
 
-    # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
-    #     post_body=graph.page_structure.body)
+    post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
+        post_body=graph.page_structure.body)
+    # print(post_details)
     # final_summary = graph.fetch_post_final_summary(post_details=post_details)
+
+    # graph.fetch_content_category(
+    #     company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
     # print("focus on company: ", graph.is_page_focused_on_company(
     #     company_name=company_name, detailed_summary=final_summary.detailed_summary))
@@ -1221,10 +1242,10 @@ if __name__ == "__main__":
     # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
 
     # file_path = "../example_linkedin_info/webpage_markdown.txt"
-    # file_path = "../example_linkedin_info/scraped_linkedin_repost_body.txt"
+    file_path = "../example_linkedin_info/scraped_linkedin_repost_body.txt"
     # file_path = "../example_linkedin_info/scraped_linkedin_post_body.txt"
-    # with open(file_path, "w") as f:
-    #     f.write(graph.page_structure.body)
+    with open(file_path, "w") as f:
+        f.write(graph.page_structure.body)
 
     # print(graph.page_structure.body)
     # graph.delete_summary_from_db()

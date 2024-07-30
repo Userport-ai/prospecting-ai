@@ -186,22 +186,7 @@ class LinkedInScraper:
                     current_post_obj.author_follower_count = line.strip()
                 state = ParseState.POST_HEADLINE_OR_FOLLOWERS_DETECTED
             elif state == ParseState.POST_HEADLINE_OR_FOLLOWERS_DETECTED:
-                time_now = Utils.create_utc_time_now()
-                publish_date = None
-                if line.endswith("mo"):
-                    # Subtract months.
-                    idx = line.find("mo")
-                    months = int(line[:idx])
-                    publish_date = time_now - relativedelta(months=months)
-                elif line.endswith("y"):
-                    # Subtract years.
-                    idx = line.find("y")
-                    years = int(line[:idx])
-                    publish_date = time_now - relativedelta(years=years)
-                else:
-                    raise ValueError(
-                        f"Invalid value of publish date line: {line}")
-
+                publish_date = LinkedInScraper.fetch_publish_date(line)
                 current_post_obj.publish_date = publish_date
                 if not repost:
                     state = ParseState.POST_PUBLISH_DATE_DETECTED
@@ -252,7 +237,110 @@ class LinkedInScraper:
         # Uncomment for debugging
         # print("\n\n\n")
         # import pprint
-        # pprint.pprint(post.model_dump())
+        # pprint.pprint(post.dict())
+        return post
+
+    @staticmethod
+    def extract_post_details_v2(post_body: str) -> LinkedInPostDetails:
+        """V2 version of Extracts and returns Post details from given Post Body Markdown formatted string."""
+        post_lines: List[str] = LinkedInScraper.preprocess_post(
+            post_body=post_body)
+
+        class ParseState(Enum):
+            NONE = 1
+            POST_AUTHOR_DETECTED = 2
+            POST_URL_DETECTED = 3
+            POST_REACTIONS_AND_COMMENTS = 4
+
+        post = LinkedInPostDetails()
+        repost = None
+        state: ParseState = ParseState.NONE
+        # We choose between post and repost object.
+        current_post_obj: LinkedInPostDetails = post
+        for line in post_lines:
+            if LinkedInScraper.is_like_button(line):
+                # Done parsing post.
+                break
+
+            current_post_obj = post if repost is None else repost
+            if state == ParseState.NONE:
+
+                if LinkedInScraper.fetch_author_and_url(line):
+                    # Found Author and URL, start of post.
+                    # Set author name, profile URL and author type.
+                    current_post_obj.author_name, current_post_obj.author_profile_url = LinkedInScraper.fetch_author_and_url(
+                        line)
+                    current_post_obj.author_type = LinkedInScraper.get_author_type_v2(
+                        current_post_obj.author_profile_url)
+                    state = ParseState.POST_AUTHOR_DETECTED
+            elif state == ParseState.POST_AUTHOR_DETECTED:
+                # Expect headline and publish date followed by post URL.
+                line = line.strip()
+                if LinkedInScraper.fetch_publish_date(line):
+                    # Date when post or repost was published.
+                    current_post_obj.publish_date = LinkedInScraper.fetch_publish_date(
+                        line)
+                    if repost:
+                        # If this is repost, this is the final line before text begins, so update state.
+                        state = ParseState.POST_URL_DETECTED
+                elif LinkedInScraper.fetch_post_url(line):
+                    # URL associated with post. Only for post, doesn't show for repost.
+                    current_post_obj.url = LinkedInScraper.fetch_post_url(line)
+                    state = ParseState.POST_URL_DETECTED
+                else:
+                    # Edited is a hardcoded line that can come up which is not the headline.
+                    if line != 'Edited':
+                        # This is headline or follower count.
+                        if current_post_obj.author_type == LinkedInPostDetails.AuthorType.PERSON:
+                            current_post_obj.author_headline = line
+                        else:
+                            current_post_obj.author_follower_count = line
+            elif state == ParseState.POST_URL_DETECTED:
+                if repost is None and LinkedInScraper.fetch_author_and_url(line):
+                    # Start of repost.
+                    # Set author name, profile URL and author type of repost.
+                    repost = LinkedInPostDetails()
+                    repost.author_name, repost.author_profile_url = LinkedInScraper.fetch_author_and_url(
+                        line)
+                    repost.author_type = LinkedInScraper.get_author_type_v2(
+                        repost.author_profile_url)
+                    state = ParseState.POST_AUTHOR_DETECTED
+
+                elif LinkedInScraper.fetch_num_reactions(line):
+                    # Only post can have reactions, not repost.
+                    post.num_reactions = LinkedInScraper.fetch_num_reactions(
+                        line)
+                    state = ParseState.POST_REACTIONS_AND_COMMENTS
+
+                else:
+                    card_link_tuple = LinkedInScraper.fetch_card_heading_and_url(
+                        line)
+                    if not card_link_tuple:
+                        # Regular text. Extract links from line.
+                        current_post_obj.text_links += LinkedInScraper.fetch_md_links(
+                            line)
+                        current_post_obj.text += "\n" + line
+                    else:
+                        # Add to card links list dictionary.
+                        current_post_obj.card_links.append(card_link_tuple)
+
+            elif state == ParseState.POST_REACTIONS_AND_COMMENTS:
+                if LinkedInScraper.fetch_num_comments(line):
+                    # post can have comments.
+                    post.num_comments = LinkedInScraper.fetch_num_comments(
+                        line)
+
+            # Uncomment for debugging
+            # print("--------")
+            # print(line)
+
+        if repost:
+            post.repost = repost
+
+        # Uncomment for debugging
+        # print("\n\n\n")
+        # import pprint
+        # pprint.pprint(post.dict())
         return post
 
     @staticmethod
@@ -280,12 +368,30 @@ class LinkedInScraper:
         Example post: [Jean-Denis Greze](https://www.linkedin.com/in/jeandenisgreze?trk=public_post_feed-actor-name)
         Example repost: [Anuj Kapur](https://www.linkedin.com/in/a2kapur?trk=public_post_reshare_feed-actor-name)
         """
-        pattern = r"\[(.*)\]\((.*)\?trk=public_post_.*feed-actor-name\)"
+        # pattern = r"\[(.*)\]\((.*)\?trk=public_post_.*feed-actor-name\)"
+        pattern = r"\[(.*)\]\((.*)\?trk=public_post_.*feed.*\)"
         match_result = re.match(pattern, line)
         if not match_result:
-            raise ValueError(
-                f"Expected line: {line} to have post author and URL.")
+            return None
+            # raise ValueError(
+            #     f"Expected line: {line} to have post author and URL.")
+        if "/in/" not in match_result[2] and "/company/" not in match_result[2]:
+            return None
+        if "graphic" in match_result[1]:
+            # This is just the icon image, not the name of the author.
+            return None
         return (match_result[1], match_result[2])
+
+    @staticmethod
+    def get_author_type_v2(author_profile_url: str) -> LinkedInPostDetails.AuthorType:
+        """Returns if author is person or company from their profile URL."""
+        if "/in/" in author_profile_url:
+            return LinkedInPostDetails.AuthorType.PERSON
+
+        elif "/company/" in author_profile_url:
+            return LinkedInPostDetails.AuthorType.COMPANY
+
+        raise ValueError(f"Invalid authortype in line: {author_profile_url}")
 
     @staticmethod
     def fetch_post_url(line: str) -> Optional[str]:
@@ -298,6 +404,37 @@ class LinkedInScraper:
         if not match_result:
             return None
         return urllib.parse.unquote(match_result[1])
+
+    @staticmethod
+    def fetch_publish_date(line: str) -> Optional[datetime]:
+        """Returns datetime object of when post was published."""
+        line = line.strip()
+        week_pattern = r'(\d+)w'
+        month_pattern = r'(\d+)mo'
+        year_pattern = r'(\d+)y'
+
+        week_result = re.match(week_pattern, line)
+        month_result = re.match(month_pattern, line)
+        year_result = re.match(year_pattern, line)
+        if not week_result and not month_result and not year_result:
+            return None
+
+        time_now = Utils.create_utc_time_now()
+        publish_date = None
+        if week_result:
+            # Subtract weeks.
+            weeks = int(week_result[1])
+            publish_date = time_now - relativedelta(weeks=weeks)
+        elif month_result:
+            # Subtract months.
+            months = int(month_result[1])
+            publish_date = time_now - relativedelta(months=months)
+        else:
+            # Subtract years.
+            years = int(year_result[1])
+            publish_date = time_now - relativedelta(years=years)
+
+        return publish_date
 
     @staticmethod
     def fetch_card_heading_and_url(line: str) -> Optional[Tuple[str, str]]:
@@ -396,7 +533,10 @@ class LinkedInScraper:
                 continue
 
             if len(stack) == 0:
-                stack.append(c)
+                # You should not append closing brackets or parenthesis, they are likely not parathesis character then.
+                # For example: :) is a smiley not a close of parenthesis. What a bug sigh.
+                if c == '(' or c == '[':
+                    stack.append(c)
                 continue
 
             last_c = stack[-1]

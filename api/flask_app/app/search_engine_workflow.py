@@ -72,8 +72,8 @@ class SearchEngineWorkflow:
                         f"\tFailed to process search result URL: {url} for person: {person_profile_id} and query: {search_query} with error: {e}")
 
                 # TODO: Remove this break once content parsing works.
-                print("Done parsing for now!")
-                break
+                # print("Done parsing for now!")
+                # break
 
     def process_url(self, url: str, company_name: str, person_name: str, role_title: str, search_query: str, person_profile_id: str, company_profile_id: str):
         """Process given URL from the web and stores the result in the database."""
@@ -106,7 +106,20 @@ class SearchEngineWorkflow:
                 card_links=post_details.card_links,
                 num_reactions=post_details.num_reactions,
                 num_comments=post_details.num_comments,
-                repost=post_details.repost
+                repost=LinkedInPost(
+                    url=post_details.repost.url,
+                    author_name=post_details.repost.author_name,
+                    author_type=post_details.repost.author_type,
+                    author_profile_url=post_details.repost.author_profile_url,
+                    author_headline=post_details.repost.author_headline,
+                    author_follower_count=post_details.repost.author_follower_count,
+                    publish_date=post_details.repost.publish_date,
+                    text=post_details.repost.text,
+                    text_links=post_details.repost.text_links,
+                    card_links=post_details.repost.card_links,
+                    num_reactions=post_details.repost.num_reactions,
+                    num_comments=post_details.repost.num_comments,
+                )
             )
 
         content_details = ContentDetails(
@@ -154,9 +167,11 @@ class SearchEngineWorkflow:
     def get_all_search_queries(self, company_name: str, person_name: str, role_title: str) -> List[str]:
         """Returns list of all search queries for given person employed in given company."""
         search_prefix = f"{company_name} {person_name} {role_title} "
-        queries = ["recent LinkedIn posts", "recent thoughts on the industry",
-                   "recent articles or blogs", "recent interviews or podcasts",
-                   "recent conferences or events attended", "recent announcements made"]
+        # queries = ["recent LinkedIn posts", "recent thoughts on the industry",
+        #            "recent articles or blogs", "recent interviews or podcasts",
+        #            "recent conferences or events attended", "recent announcements made"]
+
+        queries = ["recent LinkedIn posts"]
 
         final_queries = []
         for q in queries:

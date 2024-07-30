@@ -33,8 +33,10 @@ def find_all_md_links(text):
 author_state = "[![View profile for Anuj Kapur, graphic]()](https://www.linkedin.com/in/a2kapur?trk=public_post_feed-actor-image)"
 author_state_pattern = r"\[!\[.*\]\(\)\]\(.*\)"
 
-author_name = "[Jean-Denis Greze](https://www.linkedin.com/in/jeandenisgreze?trk=public_post_feed-actor-name)"
-name_pattern = r"\[(.*)\]\((.*)\?trk=public_post_feed-actor-name\)"
+# author_name = "[Jean-Denis Greze](https://www.linkedin.com/in/jeandenisgreze?trk=public_post_feed-actor-name)"
+# author_name = "[![View profile for Ha Phan, graphic]()](https://vn.linkedin.com/in/callmehaaa?trk=public_post_feed-actor-image)"
+author_name = "[Anuj Kapur](https://www.linkedin.com/in/a2kapur?trk=public_post_reshare_feed-actor-name) "
+name_pattern = r"\[(.*)\]\((.*)\?trk=public_post_.*feed.*\)"
 
 post_url = "* [Report this post](/uas/login?session_redirect=https%3A%2F%2Fwww.linkedin.com%2Fposts%2Frajsarkar_starting-2024-with-a-bang-g2-just-announced-activity-7160709081719033857-AkiZ&trk=public_post_ellipsis-menu-semaphore-sign-in-redirect&guestReportContentType=POST&_f=guest-reporting)"
 post_url_pattern = r"\* \[Report this post\]\(.*session_redirect=(.*)\&trk=public_post.*\)"
@@ -56,7 +58,14 @@ card_links_pattern = r"\[\!\[(.*)\]\(\).*\]\(.*redirect\?url=(.*)\&urlhash.*\)"
 # markdown_links = "Join us at [https://cloudbees.io](https://cloudbees.io?trk=public_post-text) for many more [https://lnkd.in/gmC2q4J7](https://lnkd.in/gmC2q4J7?trk=public_post_reshare-text)."
 markdown_links = "[CloudBees](https://www.linkedin.com/company/cloudbees?trk=public_post_reshare-text) closed FY24 with a bang! Meeting and exceeding all targets. I want to thank our customers for the [#trust](https://www.linkedin.com/signup/cold-join?session_redirect=https%3A%2F%2Fwww.linkedin.com%2Ffeed%2Fhashtag%2Ftrust&trk=public_post_reshare-text) and all 🐝 for the hard work. And we celebrate being a [G2](https://www.linkedin.com/company/g2dotcom?trk=public_post_reshare-text) Top 3 Development Product ranking. Excited to be alongside [Microsoft](https://www.linkedin.com/company/microsoft?trk=public_post_reshare-text) [GitLab](https://www.linkedin.com/company/gitlab-com?trk=public_post_reshare-text). And we're hiring! [#DevSecOps](https://www.linkedin.com/signup/cold-join?session_redirect=https%3A%2F%2Fwww.linkedin.com%2Ffeed%2Fhashtag%2Fdevsecops&trk=public_post_reshare-text)"
 
+
+publish_date_line = "mo"
+publish_date_pattern = r'(\d+)mo'
+
 # match = detect_match(post_reactions, reaction_pattern)
 # print(int(match[1].replace(",", "")))
 # print(match[1], urllib.parse.unquote(match[2]))
-find_all_md_links(markdown_links)
+# find_all_md_links(markdown_links)
+
+result = detect_match(author_name, name_pattern)
+print("result: ", result[2])

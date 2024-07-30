@@ -97,6 +97,7 @@ class ContentCategoryEnum(str, Enum):
     COMPANY_LAWSUIT = "company_lawsuit"
     COMPANY_INTERNAL_EVENT = "company_internal_event"
     COMPANY_OFFSITE = "company_offsite"
+    NONE_OF_THE_ABOVE = "none_of_the_above"
 
 
 class ContentDetails(BaseModel):
