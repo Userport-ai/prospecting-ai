@@ -21,6 +21,7 @@ class SearchEngineWorkflow:
     def __init__(self, database: Database, max_search_results_per_query: int = 20) -> None:
         self.database = database
         self.max_search_results_per_query = max_search_results_per_query
+        self.skip_sites = ["crunchbase.com"]
 
     def run(self, person_profile_id: str, company_profile_id: str):
         """Runs search queries, analyzes content for given person profile ID.
@@ -45,6 +46,10 @@ class SearchEngineWorkflow:
             print("-----------------------")
             for url in search(search_query, stop=self.max_search_results_per_query):
                 print(f"\tGot URL {url} in search result.")
+
+                if url in self.skip_sites:
+                    print(f"\tURL: {url} is in skip list, so skip it.")
+                    continue
 
                 if LinkedInScraper.is_valid_profile_or_company_url(url=url):
                     # This is a person's profile or Company About page on LinkedIn, skip it.
@@ -122,6 +127,9 @@ class SearchEngineWorkflow:
             category_reason=page_content_info.category_reason,
             key_persons=page_content_info.key_persons,
             key_organizations=page_content_info.key_organizations,
+            requesting_user_contact=page_content_info.requesting_user_contact,
+            focus_on_company=page_content_info.focus_on_company,
+            focus_on_person=page_content_info.focus_on_person,
             num_linkedin_reactions=page_content_info.num_linkedin_reactions,
             num_linkedin_comments=page_content_info.num_linkedin_comments,
             openai_tokens_used=page_content_info.openai_usage.convert_to_model()

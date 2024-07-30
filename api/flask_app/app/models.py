@@ -47,6 +47,9 @@ class ContentTypeEnum(str, Enum):
     """Enum values associated with ContentTypeSource class."""
     ARTICLE = "article"
     BLOG_POST = "blog_post"
+    WHITE_PAPER = "white_paper"
+    WEBINAR = "webinar"
+    CASE_STUDY = "case_study"
     ANNOUCEMENT = "announcement"
     INTERVIEW = "interview"
     PODCAST = "podcast"
@@ -154,6 +157,12 @@ class ContentDetails(BaseModel):
         default=None, description="Names of key persons extracted from the content.")
     key_organizations: Optional[List[str]] = Field(
         default=None, description="Names of key organizations extracted from the content.")
+    requesting_user_contact: bool = Field(
+        default=False, description="Whether the page is requesting user contact information in exchange for access to white paper, case study, webinar etc. Always False for LinkedIn posts.")
+    focus_on_company: bool = Field(
+        default=False, description="Whether the content is focused on Company.")
+    focus_on_person: bool = Field(
+        default=False, description="Whether the content is focused on Person.")
     num_linkedin_reactions: Optional[int] = Field(
         default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post content and None otherwise.")
     num_linkedin_comments: Optional[int] = Field(

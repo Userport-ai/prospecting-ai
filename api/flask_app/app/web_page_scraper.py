@@ -1,5 +1,6 @@
 import os
 import random
+import gzip
 import requests
 from datetime import datetime
 from langchain_core.prompts import PromptTemplate
@@ -101,6 +102,12 @@ class PageContentInfo(BaseModel):
         default=None, description="Names of key persons extracted from the content.")
     key_organizations: Optional[List[str]] = Field(
         default=None, description="Names of key organizations extracted from the content.")
+    requesting_user_contact: bool = Field(
+        default=False, description="Whether page is requesting user contact information in exchange for access to talk, webinar, white paper or case study.")
+    focus_on_company: bool = Field(
+        default=False, description="Whether the content is focused on Company.")
+    focus_on_person: bool = Field(
+        default=False, description="Whether the content is focused on Person.")
     category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
     category_reason: Optional[str] = Field(
@@ -231,6 +238,7 @@ class WebPageScraper:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.dev_mode = dev_mode
+        self.all_user_agents = self.load_all_user_agents()
 
         if dev_mode:
             self.db = Chroma(persist_directory=WebPageScraper.CHROMA_DB_PATH,
@@ -253,7 +261,7 @@ class WebPageScraper:
             self.page_structure: PageStructure = page_structure
         else:
             print("Page structure not found in database, fetching it from web.")
-            doc = WebPageScraper.fetch_page(url=self.url)
+            doc = self.fetch_page()
             if self.is_valid_linkedin_post(url=self.url):
                 page_structure = self.get_linkedin_post_structure(doc=doc)
             else:
@@ -266,7 +274,7 @@ class WebPageScraper:
         if self.dev_mode:
             raise ValueError("Cannot fetch content in dev mode")
 
-        doc = WebPageScraper.fetch_page(url=self.url)
+        doc = self.fetch_page()
         if self.is_valid_linkedin_post(url=self.url):
             return self.fetch_content_info_from_linkedin_post(company_name=company_name, person_name=person_name, doc=doc)
 
@@ -294,6 +302,15 @@ class WebPageScraper:
             category: ContentCategory = self.fetch_content_category(
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
+            requesting_user_contact: bool = self.is_page_requesting_user_contact(
+                page_structure=page_structure)
+
+            focus_on_company: bool = self.is_page_focused_on_company(
+                company_name=company_name, detailed_summary=final_summary.detailed_summary)
+
+            focus_on_person: bool = self.is_page_focused_on_person(
+                person_name=person_name, detailed_summary=final_summary.detailed_summary)
+
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
             print(f"\nTokens used: {tokens_used}")
@@ -310,6 +327,9 @@ class WebPageScraper:
                 concise_summary=final_summary.concise_summary,
                 key_persons=final_summary.key_persons,
                 key_organizations=final_summary.key_organizations,
+                requesting_user_contact=requesting_user_contact,
+                focus_on_company=focus_on_company,
+                focus_on_person=focus_on_person,
                 category=category.enum_value,
                 category_reason=category.reason,
                 num_linkedin_reactions=None,
@@ -331,6 +351,12 @@ class WebPageScraper:
             category: ContentCategory = self.fetch_content_category(
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
+            focus_on_company: bool = self.is_page_focused_on_company(
+                company_name=company_name, detailed_summary=final_summary.detailed_summary)
+
+            focus_on_person: bool = self.is_page_focused_on_person(
+                person_name=person_name, detailed_summary=final_summary.detailed_summary)
+
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
             print(f"\nTokens used: {tokens_used}")
@@ -347,6 +373,9 @@ class WebPageScraper:
                 concise_summary=final_summary.concise_summary,
                 key_persons=final_summary.key_persons,
                 key_organizations=final_summary.key_organizations,
+                requesting_user_contact=False,
+                focus_on_company=focus_on_company,
+                focus_on_person=focus_on_person,
                 category=category.enum_value,
                 category_reason=category.reason,
                 num_linkedin_reactions=post_details.num_reactions,
@@ -517,7 +546,7 @@ class WebPageScraper:
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
             "You are a smart web page analyzer. A part of the text from a web page is given below.\n"
-            "Determine [1] who wrote the text and [2] the date it was published.\n"
+            "Determine [1] who wrote the text and [2] the date it was published (If only year published is known, return that).\n"
             "\n"
             "Web Page Text:\n"
             "{page_text}"
@@ -551,6 +580,9 @@ class WebPageScraper:
             "Does the text from a web page below fall into one of the following types?\n"
             f"* Article. [Enum value: {ContentTypeEnum.ARTICLE.value}].\n"
             f"* Blog post. [Enum value: {ContentTypeEnum.BLOG_POST.value}].\n"
+            f"* White Paper. [Enum value: {ContentTypeEnum.WHITE_PAPER.value}].\n"
+            f"* Case Study. [Enum value: {ContentTypeEnum.CASE_STUDY.value}].\n"
+            f"* Webinar. [Enum value: {ContentTypeEnum.WEBINAR.value}].\n"
             f"* Announcement. [Enum value: {ContentTypeEnum.ANNOUCEMENT.value}].\n"
             f"* Interview. [Enum value: {ContentTypeEnum.INTERVIEW.value}].\n"
             f"* Podcast. [Enum value: {ContentTypeEnum.PODCAST.value}].\n"
@@ -686,18 +718,93 @@ class WebPageScraper:
         year: int = result.year if result.year else datetime.now().year
         return Utils.create_utc_datetime(day=day, month=month, year=year)
 
-    @staticmethod
-    def fetch_page(url: str) -> Document:
+    def is_page_requesting_user_contact(self, page_structure: PageStructure) -> bool:
+        """Checks whether the page is asking for user contact in exchange for disclosing talk or whitepaper or case study.
+
+        Returns true if so and false otherwise.
+        """
+
+        prompt_template = (
+            "Is this page below asking for user's contact information in exchange for access to a whitepaper, webinar, case study or talk?.\n"
+            "Text\n"
+            "{page_text}"
+        )
+
+        class IsRequestingUserContact(BaseModel):
+            is_requesting_user_contact: bool = Field(
+                ..., description="Set to true if asking for user contact information and false otherwise.")
+
+        # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
+        llm = ChatOpenAI(
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(IsRequestingUserContact)
+        prompt = PromptTemplate.from_template(prompt_template)
+        if len(page_structure.body_chunks) == 0:
+            raise ValueError(
+                f"Expected non zero body chunks, got: {page_structure}")
+        page_text = page_structure.body_chunks[0].page_content
+
+        chain = prompt | llm
+        result: IsRequestingUserContact = chain.invoke(
+            {"page_text": page_text})
+
+        return result.is_requesting_user_contact
+
+    def is_page_focused_on_company(self, company_name: str, detailed_summary: str):
+        """Returns whether the page's summary is focus is about company name or person."""
+
+        prompt_template = (
+            f"Is the main focus of the text below the Company {company_name}?\n"
+            "Text:\n"
+            "{page_text}"
+        )
+
+        class FocusOnCompany(BaseModel):
+            company_main_focus: bool = Field(
+                ..., description="Set to true if content's main focus is the Company and false otherwise.")
+
+         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
+        llm = ChatOpenAI(
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(FocusOnCompany)
+        prompt = PromptTemplate.from_template(prompt_template)
+        chain = prompt | llm
+        result: FocusOnCompany = chain.invoke(
+            {"page_text": detailed_summary})
+        return result.company_main_focus
+
+    def is_page_focused_on_person(self, person_name: str, detailed_summary: str) -> bool:
+        """Returns whether the page's summary is focused about person."""
+
+        prompt_template = (
+            f"Is the main focus of the text below the Person {person_name}?\n"
+            "Text:\n"
+            "{page_text}"
+        )
+
+        class FocusOnPerson(BaseModel):
+            person_main_focus: bool = Field(
+                ..., description="Set to true if content's main focus is the Person and false otherwise.")
+
+         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
+        llm = ChatOpenAI(
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(FocusOnPerson)
+        prompt = PromptTemplate.from_template(prompt_template)
+        chain = prompt | llm
+        result: FocusOnPerson = chain.invoke(
+            {"page_text": detailed_summary})
+        return result.person_main_focus
+
+    def fetch_page(self) -> Document:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
         try:
-            response = requests.get(url=url)
+            headers = {"User-Agent": random.choice(self.all_user_agents)}
+            response = requests.get(url=self.url, headers=headers)
         except Exception as e:
             raise ValueError(
-                f"ScrapePageGraph: HTTP error when fetching url: {url}, details: {e}")
+                f"ScrapePageGraph: HTTP error when fetching url: {self.url}, details: {e}")
 
         if response.status_code != 200:
             raise ValueError(
-                f"Got non 200 response when fetching: {url}, code: {response.status_code}, text: {response.text}")
+                f"Got non 200 response when fetching: {self.url}, code: {response.status_code}, text: {response.text}")
         if "text/html" not in response.headers["Content-Type"]:
             raise ValueError(
                 f"Invalid response content type: {response.headers}")
@@ -705,6 +812,14 @@ class WebPageScraper:
         # Heading style argument is passed in to ensure we get '#' formatted headings.
         md = markdownify(response.text, heading_style="ATX")
         return Document(page_content=md)
+
+    def load_all_user_agents(self) -> List[str]:
+        """Loads all user agents."""
+        all_agents = []
+        with gzip.open("user_agents.txt.gz", 'rt') as f:
+            for line in f.readlines():
+                all_agents.append(line.strip())
+        return all_agents
 
     def split_into_chunks(self, doc: Document) -> List[Document]:
         """Split document into chunks using character splitter of given maximum chunk size and overlap."""
@@ -795,9 +910,17 @@ class WebPageScraper:
     @staticmethod
     def fetch_page_footer(page_without_header: str, openai_temperature: float = 1.0) -> PageFooterResult:
         """Use LLM to fetch the footer in given page without header."""
+        # prompt_template = (
+        #     "You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.\n"
+        #     "Can you identify if the chunk can be split into: [1] text with main content and [2] footer text that does not contribute to the main content?\n"
+        #     "If yes, return the first sentence from where this footer starts. If no, return None.\n"
+        #     "\n"
+        #     "Chunk:\n"
+        #     "{chunk}"
+        # )
         prompt_template = (
             "You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.\n"
-            "Can you identify if the chunk can be split into: [1] text with main content and [2] footer text that does not contribute to the main content?\n"
+            "Can you identify if the chunk can be split into: [1] text with main content and [2] Text that majorly contains navigation links and does not contribute to the main content?\n"
             "If yes, return the first sentence from where this footer starts. If no, return None.\n"
             "\n"
             "Chunk:\n"
@@ -1028,7 +1151,7 @@ if __name__ == "__main__":
     # url = "https://plaid.com/blog/year-in-review-2023/"
     # url = "https://python.langchain.com/v0.2/docs/tutorials/classification/"
     # Migrated to new struct below.
-    # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
+    url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # Migrated to new struct below.
     # url = "https://techcrunch.com/2023/09/19/plaids-zack-perret-on-visa-valuations-and-privacy/"
     # url = "https://lattice.com/library/plaids-zach-perret-on-building-a-people-first-organization"
@@ -1057,22 +1180,46 @@ if __name__ == "__main__":
     # url = "https://www.linkedin.com/posts/rajsarkar_fourteen-years-ago-in-2010-i-joined-google-activity-7208830932089225216-re5L/"
     # url = "https://www.linkedin.com/posts/a2kapur_cloudbees-buys-releaseiq-devops-orchestration-activity-6980945693720944641-Ayzi/?utm_source=share&utm_medium=member_desktop"
     # 3 years old post.
-    # url = "https://www.linkedin.com/posts/a2kapur_christian-klein-the-details-guy-who-has-activity-6728126001274068992-Accy/?utm_source=share&utm_medium=member_desktop"
+    url = "https://www.linkedin.com/posts/a2kapur_christian-klein-the-details-guy-who-has-activity-6728126001274068992-Accy/?utm_source=share&utm_medium=member_desktop"
     # url = "https://www.linkedin.com/posts/rajsarkar_trust-devsecops-activity-7160709081719033857-aB9k/?utm_source=share&utm_medium=member_desktop"
     # url = "https://www.linkedin.com/posts/plaid-_were-with-plaids-ceo-zachary-perret-on-activity-7207003883506651136-gnif"
     # G2 recognition for Cloudbees.
     # url = "https://lnkd.in/eEyZQE-w"
-    url = "https://plaid.com/events/2024-fintech-predictions-tech-talk/"
 
-    person_name = "Zachary Perret"
+    # url = "https://plaid.com/events/2024-fintech-predictions-tech-talk/"
+    # url = "https://plaid.com/2023-fintech-predictions-whitepaper/"
+
+    # SITES that don't allow scraping without Proxy.
+    # url = "https://www.saastr.com/the-plaid-journey-with-co-founder-and-ceo-zach-perret-pod-561-video/"
+    url = "https://www.crunchbase.com/person/zach-perret"
+
+    # person_name = "Zachary Perret"
+    # person_name = "Jean-Denis Graze"
     # person_name = "Al Cook"
-    company_name = "Plaid"
-    # person_name = "Anuj Kapur"
+    # company_name = "Plaid"
+    person_name = "Anuj Kapur"
     # person_name = "Raj Sarkar"
-    # company_name = "Cloudbees"
-    graph = WebPageScraper(url=url, dev_mode=False)
-    graph.fetch_page_content_info(
-        company_name=company_name, person_name=person_name)
+    company_name = "Cloudbees"
+    graph = WebPageScraper(url=url, dev_mode=True)
+    # graph.is_page_requesting_user_contact(graph.page_structure)
+    final_summary = graph.fetch_content_final_summary(
+        page_body_chunks=graph.page_structure.body_chunks)
+
+    # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
+    #     post_body=graph.page_structure.body)
+    # final_summary = graph.fetch_post_final_summary(post_details=post_details)
+
+    # print("focus on company: ", graph.is_page_focused_on_company(
+    #     company_name=company_name, detailed_summary=final_summary.detailed_summary))
+    # print("focus on person: ", graph.is_page_focused_on_person(
+    #     person_name=person_name, detailed_summary=final_summary.detailed_summary))
+
+    # graph.delete_page_structure_from_db()
+    # graph.fetch_author_and_date(page_structure=graph.page_structure)
+    # print("footer: ", graph.page_structure.footer[:100])
+    # print(graph.convert_to_datetime(parsed_date='2023'))
+    # graph.fetch_page_content_info(
+    #     company_name=company_name, person_name=person_name)
     # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
     #     post_body=graph.page_structure.body)
     # graph.fetch_post_final_summary(post_details=post_details)

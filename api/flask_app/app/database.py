@@ -174,6 +174,29 @@ class Database:
                 f'Content Details not found for Id: {content_details_id}')
         return ContentDetails(**data_dict)
 
+    def delete_all_content_details(self):
+        """Deletes all content details and associated web pages and LinkedIn posts."""
+        content_collection = self._get_content_details_collection()
+
+        content_ids = []
+        linkedin_ids = []
+        web_page_ids = []
+        cursor = content_collection.find({})
+        for content_detail in cursor:
+            content_ids.append(content_detail['_id'])
+            linkedin_ids.append(content_detail['linkedin_post_ref_id'])
+            web_page_ids.append(content_detail['web_page_ref_id'])
+
+        post_collection = self._get_linkedin_posts_collection()
+        post_collection.delete_many(
+            {'_id': {'$in': [ObjectId(lid) for lid in linkedin_ids]}})
+
+        web_pages_collection = self._get_web_pages_collection()
+        web_pages_collection.delete_many(
+            {'_id': {'$in': [ObjectId(lid) for lid in web_page_ids]}})
+
+        content_collection.delete_many({'_id': {'$in': content_ids}})
+
     def _test_connection(self):
         """Helper method to test successful connection to cluster deployment."""
         try:
@@ -186,13 +209,7 @@ class Database:
 if __name__ == "__main__":
 
     db = Database()
-    content_details_id = '66a72585e3aa5e1d1f9afc79'
-    details = db.get_content_details(content_details_id=content_details_id)
-    print("details person profile: ", details.person_profile_id,
-          type(details.person_profile_id))
-    print("details web page ref: ", details.web_page_ref_id,
-          type(details.web_page_ref_id))
-    print("details linkedin post ref : ", details.linkedin_post_ref_id,
-          type(details.linkedin_post_ref_id))
-    print("details id : ", details.id,
-          type(details.id))
+    # content_details_id = '66a72585e3aa5e1d1f9afc79'
+    # details = db.get_content_details(content_details_id=content_details_id)
+
+    # db.delete_all_content_details()
