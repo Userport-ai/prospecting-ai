@@ -210,6 +210,8 @@ class LeadResearchReport(BaseModel):
                                    description="PersonProfile reference of this lead.")
     company_profile_id: str = Field(
         ..., description="Reference ID to the Company Profile that is stored in the database.")
+    cutoff_publish_date: datetime = Field(
+        ..., description="Publish Date cutoff beyond which report is created. This can be 3 months, 6 months, 12 months etc. before date of report creation.")
     # TODO: Add user and organization information.
 
     details: List[ReportDetail] = Field(

@@ -80,7 +80,7 @@ class ResearchReport:
 
         results = self.database.get_content_details_collection().aggregate(pipeline=pipeline)
 
-        research_report = LeadResearchReport(person_profile_id=person_profile_id,
+        research_report = LeadResearchReport(cutoff_publish_date=latest_publish_date, person_profile_id=person_profile_id,
                                              company_profile_id=company_profile_id, details=[])
 
         for detail in results:
@@ -95,6 +95,7 @@ class ResearchReport:
             print("---------------------")
             print("\n")
 
+        print("cutoff publish date: ", research_report.cutoff_publish_date)
         return research_report
 
 
