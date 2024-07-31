@@ -15,7 +15,8 @@ from models import (
     CompanyProfile,
     ContentDetails,
     LinkedInPost,
-    WebPage
+    WebPage,
+    LeadResearchReport
 )
 from typing import List
 
@@ -58,6 +59,10 @@ class Database:
     def get_content_details_collection(self) -> Collection:
         """Returns content details collection."""
         return self.db['content_details']
+
+    def _get_lead_report_collection(self) -> Collection:
+        """Returns Lead Research Report collection."""
+        return self.db['lead_research_reports']
 
     def insert_person_profile(self, person_profile: PersonProfile) -> str:
         """Inserts Person information as a document in the database and returns the created Id."""
@@ -117,6 +122,18 @@ class Database:
         collection = self.get_content_details_collection()
         result = collection.insert_one(
             content_details.model_dump(exclude=Database._exclude_id()), session=session)
+        return str(result.inserted_id)
+
+    def insert_lead_research_report(self, research_report: LeadResearchReport, session: Optional[ClientSession] = None) -> str:
+        """Inserts Lead Research Report in the database and returns the created Id."""
+        if research_report.id:
+            raise ValueError(
+                f"Lead Research report instance cannot have an Id before db insertion: {research_report}")
+        research_report.creation_date = Utils.create_utc_time_now()
+
+        collection = self._get_lead_report_collection()
+        result = collection.insert_one(
+            research_report.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
 
     @contextlib.contextmanager

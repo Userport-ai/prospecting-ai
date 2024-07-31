@@ -12,7 +12,7 @@ class ResearchReport:
         self.database = database
 
     def create(self, person_profile_id: str, company_profile_id: str) -> LeadResearchReport:
-        """Creates and returns Research report for given Person and Company."""
+        """Creates and inserts Research report for given Person and Company in the database."""
         time_now: datetime = Utils.create_utc_time_now()
 
         # Only filter documents from recent months.
@@ -95,7 +95,10 @@ class ResearchReport:
             print("---------------------")
             print("\n")
 
-        print("cutoff publish date: ", research_report.cutoff_publish_date)
+        # Write to database.
+        self.database.insert_lead_research_report(
+            research_report=research_report)
+
         return research_report
 
 
