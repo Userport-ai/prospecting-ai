@@ -3,7 +3,7 @@ from deprecated import deprecated
 from pydantic.functional_validators import BeforeValidator
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
-from utils import Utils
+from app.utils import Utils
 from enum import Enum
 import re
 

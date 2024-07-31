@@ -9,8 +9,8 @@ from pymongo.server_api import ServerApi
 from pymongo.collection import Collection
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
-from utils import Utils
-from models import (
+from app.utils import Utils
+from app.models import (
     PersonProfile,
     CompanyProfile,
     ContentDetails,
@@ -60,7 +60,7 @@ class Database:
         """Returns content details collection."""
         return self.db['content_details']
 
-    def _get_lead_report_collection(self) -> Collection:
+    def _get_lead_research_report_collection(self) -> Collection:
         """Returns Lead Research Report collection."""
         return self.db['lead_research_reports']
 
@@ -131,7 +131,7 @@ class Database:
                 f"Lead Research report instance cannot have an Id before db insertion: {research_report}")
         research_report.creation_date = Utils.create_utc_time_now()
 
-        collection = self._get_lead_report_collection()
+        collection = self._get_lead_research_report_collection()
         result = collection.insert_one(
             research_report.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
@@ -191,6 +191,16 @@ class Database:
                 f'Content Details not found for Id: {content_details_id}')
         return ContentDetails(**data_dict)
 
+    def get_lead_research_report(self, lead_research_report_id: str) -> Optional[LeadResearchReport]:
+        """Returns Lead Research report for given ID."""
+        collection = self._get_lead_research_report_collection()
+        data_dict = collection.find_one(
+            {"_id": ObjectId(lead_research_report_id)})
+        if not data_dict:
+            raise ValueError(
+                f'Lead Research report not found for Id: {lead_research_report_id}')
+        return LeadResearchReport(**data_dict)
+
     def delete_all_content_details(self):
         """Deletes all content details and associated web pages and LinkedIn posts."""
         content_collection = self.get_content_details_collection()
@@ -226,7 +236,7 @@ class Database:
 if __name__ == "__main__":
 
     db = Database()
-    # content_details_id = '66a72585e3aa5e1d1f9afc79'
-    # details = db.get_content_details(content_details_id=content_details_id)
+    content_details_id = '66a88a0fa052ee77579340a0'
+    details = db.get_content_details(content_details_id=content_details_id)
 
     # db.delete_all_content_details()
