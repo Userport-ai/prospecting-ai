@@ -55,6 +55,7 @@ class ContentTypeEnum(str, Enum):
     PODCAST = "podcast"
     PANEL_DISCUSSION = "panel_discussion"
     LINKEDIN_POST = "linkedin_post"
+    NONE_OF_THE_ABOVE = "none_of_the_above"
 
 
 class ContentCategoryEnum(str, Enum):
@@ -176,6 +177,43 @@ class ContentDetails(BaseModel):
 
     class Config:
         use_enum_values = True
+
+
+class LeadResearchReport(BaseModel):
+    """Report for lead research."""
+
+    class ReportDetail(BaseModel):
+        """Details associated with the report."""
+        class Highlight(BaseModel):
+            """Highhlight associated with report."""
+            id: Optional[PyObjectId] = Field(
+                alias="_id", default=None, description="MongoDB generated unique identifier for each Content details.")
+            category: ContentCategoryEnum = Field(...,
+                                                  description="Category of the content. Field is repeated at outer level too.")
+            concise_summary: str = Field(...,
+                                         description="Concise summary of the content.")
+            publish_date: datetime = Field(...,
+                                           description="Publish date of the content.")
+            url: str = Field(..., description="URL of the content.")
+
+        category: ContentCategoryEnum = Field(...,
+                                              description="Category of the highlights.")
+        highlights: List[Highlight] = Field(
+            ..., description="List of Highlights associated with given category.")
+
+    """Research report associated with a lead."""
+    id: Optional[PyObjectId] = Field(
+        alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date in UTC timezone when this document was inserted in the database.")
+    person_profile_id: str = Field(...,
+                                   description="PersonProfile reference of this lead.")
+    company_profile_id: str = Field(
+        ..., description="Reference ID to the Company Profile that is stored in the database.")
+    # TODO: Add user and organization information.
+
+    details: List[ReportDetail] = Field(
+        ..., description="Report details associated with the lead.")
 
 
 class PersonProfile(BaseModel):

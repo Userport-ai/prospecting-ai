@@ -588,6 +588,7 @@ class WebPageScraper:
             f"* Interview. [Enum value: {ContentTypeEnum.INTERVIEW.value}].\n"
             f"* Podcast. [Enum value: {ContentTypeEnum.PODCAST.value}].\n"
             f"* Panel Discussion. [Enum value: {ContentTypeEnum.PANEL_DISCUSSION.value}].\n"
+            f"* None of the above types. [Enum value: {ContentTypeEnum.NONE_OF_THE_ABOVE.value}]\n"
             "\n"
             "{content}"
         )
@@ -910,7 +911,7 @@ class WebPageScraper:
         return (page_header, remaining_md_page)
 
     @staticmethod
-    def fetch_page_footer(page_without_header: str, openai_temperature: float = 1.0) -> PageFooterResult:
+    def fetch_page_footer(page_without_header: str, openai_temperature: float = 0) -> PageFooterResult:
         """Use LLM to fetch the footer in given page without header."""
         prompt_template = (
             "You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.\n"
@@ -1195,13 +1196,22 @@ if __name__ == "__main__":
     # The URLs that didn't do well.
     # url = "https://www.cfodive.com/news/plaid-appoints-first-cfo-amid-potential-run-up-to-public-listing/697059/"
     # This one saw that repost should be a valid repost.
-    url = "https://www.linkedin.com/posts/hodamehr_fireside-chat-w-plaid-founder-ceo-zach-activity-7161131715170603008-X6Ln"
+    # url = "https://www.linkedin.com/posts/hodamehr_fireside-chat-w-plaid-founder-ceo-zach-activity-7161131715170603008-X6Ln"
     # url = "https://www.linkedin.com/posts/jonlear_this-is-going-to-be-a-terrific-session-with-activity-7153774426881163264-Saig"
     # url = "https://www.linkedin.com/posts/zperret_the-history-and-future-of-id-verification-activity-7072714551724539906-UvBU"
     # url = "https://www.linkedin.com/posts/zperret_introducing-beacon-plaid-activity-7077729712181018624-MsBN?trk=public_profile_share_view"
     # url = "https://www.linkedin.com/posts/zperret_plaids-commitment-to-the-european-open-finance-activity-7132782321518219265-CO9i?trk=public_profile_share_view"
     # This one ran into 403.
     # url = "https://www.linkedin.com/posts/zperret_credit-underwriting-in-the-us-is-broken-activity-7203797435322621953-v_Bn"
+    # Fintech futures block scrapers.
+    # url = "https://www.fintechfutures.com/2024/02/jennifer-taylor-joins-plaid-as-the-companys-first-president/"
+
+    # This article has a H1 heading that is not the right one so it wrongly computes body start. As a result, the body contains mostly navigation links
+    # so the whole algorithm is messed up. We may need a better header detection algorithm in the future. First H1 does not always work.
+    url = "https://www.bankingdive.com/news/plaid-president-jen-taylor-zach-perret-ipo-cloudflare-facebook-fintech-visa/707520/"
+
+    # HUGE article that can be broken into 28 chunks of size 4096. Let's see if the algorithm continues to work.
+    url = "https://www.generalist.com/briefing/plaid-finances-next-great-network"
 
     person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
@@ -1211,12 +1221,13 @@ if __name__ == "__main__":
     # person_name = "Raj Sarkar"
     # company_name = "Cloudbees"
     graph = WebPageScraper(url=url, dev_mode=True)
+    print(graph.page_structure.body)
     # graph.is_page_requesting_user_contact(graph.page_structure)
     # final_summary = graph.fetch_content_final_summary(
     #     page_body_chunks=graph.page_structure.body_chunks)
 
-    post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
-        post_body=graph.page_structure.body)
+    # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
+    #     post_body=graph.page_structure.body)
     # print(post_details)
     # final_summary = graph.fetch_post_final_summary(post_details=post_details)
 
@@ -1242,11 +1253,11 @@ if __name__ == "__main__":
     #     company_name=company_name, person_name=person_name, doc=doc)
     # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
 
-    # file_path = "../example_linkedin_info/webpage_markdown.txt"
-    file_path = "../example_linkedin_info/scraped_linkedin_repost_body.txt"
+    file_path = "../example_linkedin_info/webpage_markdown.txt"
+    # file_path = "../example_linkedin_info/scraped_linkedin_repost_body.txt"
     # file_path = "../example_linkedin_info/scraped_linkedin_post_body.txt"
     with open(file_path, "w") as f:
-        f.write(graph.page_structure.body)
+        f.write(graph.page_structure.to_str())
 
     # print(graph.page_structure.body)
     # graph.delete_summary_from_db()

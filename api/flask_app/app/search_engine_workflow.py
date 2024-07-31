@@ -19,11 +19,11 @@ class SearchEngineWorkflow:
     """
     GOOGLE_SEARCH_ENGINE = "google"
 
-    def __init__(self, database: Database, max_search_results_per_query: int = 10) -> None:
+    def __init__(self, database: Database, max_search_results_per_query: int = 20) -> None:
         self.database = database
         self.max_search_results_per_query = max_search_results_per_query
         self.blocklist_domains = set(
-            ["crunchbase.com", "youtube.com", "twitter.com", "x.com"])
+            ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com", "bloomberg.com"])
         self.failed_urls = []
 
     def run(self, person_profile_id: str, company_profile_id: str):
@@ -177,9 +177,9 @@ class SearchEngineWorkflow:
         # queries = ["recent LinkedIn posts", "recent thoughts on the industry",
         #            "recent articles or blogs", "recent interviews or podcasts",
         #            "recent conferences or events attended", "recent announcements made",
-        #            "recent funding announcements", "recent product announcements", "recent leadership changes"]
+        #            "recent funding announcements", "recent product launches", "recent leadership changes"]
 
-        queries = ["recent product announcements"]
+        queries = ["recent product launches"]
 
         final_queries = []
         for q in queries:

@@ -55,7 +55,7 @@ class Database:
         """Returns Web Page collection."""
         return self.db['web_pages']
 
-    def _get_content_details_collection(self) -> Collection:
+    def get_content_details_collection(self) -> Collection:
         """Returns content details collection."""
         return self.db['content_details']
 
@@ -114,7 +114,7 @@ class Database:
                 f"Content Details instance cannot have an Id before db insertion: {content_details}")
         content_details.creation_date = Utils.create_utc_time_now()
 
-        collection = self._get_content_details_collection()
+        collection = self.get_content_details_collection()
         result = collection.insert_one(
             content_details.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
@@ -159,7 +159,7 @@ class Database:
 
     def get_content_details_by_url(self, url: str) -> Optional[ContentDetails]:
         """Returns Content details for given url. Returns None if not found."""
-        collection = self._get_content_details_collection()
+        collection = self.get_content_details_collection()
         data_dict = collection.find_one({"url": url})
         if not data_dict:
             return None
@@ -167,7 +167,7 @@ class Database:
 
     def get_content_details(self, content_details_id: str) -> Optional[ContentDetails]:
         """Returns Content details for given ID."""
-        collection = self._get_content_details_collection()
+        collection = self.get_content_details_collection()
         data_dict = collection.find_one({"_id": ObjectId(content_details_id)})
         if not data_dict:
             raise ValueError(
@@ -176,7 +176,7 @@ class Database:
 
     def delete_all_content_details(self):
         """Deletes all content details and associated web pages and LinkedIn posts."""
-        content_collection = self._get_content_details_collection()
+        content_collection = self.get_content_details_collection()
 
         content_ids = []
         linkedin_ids = []
