@@ -209,7 +209,8 @@ class WebPageScraper:
     """
 
     # Open AI configurations.
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    # OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_API_KEY = os.getenv("OPENAI_USERPORT_API_KEY")
     OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
     OPENAI_EMBEDDING_FUNCTION = OpenAIEmbeddings(
         model=OPENAI_EMBEDDING_MODEL, api_key=OPENAI_API_KEY)
@@ -453,7 +454,7 @@ class WebPageScraper:
             # Add repost template to post template.
             post_template = post_template + repost_template
 
-        llm = ChatOpenAI(temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(
             PostSummary)
         prompt = PromptTemplate.from_template(post_template)
         chain = prompt | llm
@@ -491,7 +492,7 @@ class WebPageScraper:
             "New Passage:\n"
             "{new_passage}\n"
         )
-        llm = ChatOpenAI(temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(
             ContentConciseSummary)
         prompt = PromptTemplate.from_template(summary_prompt_template)
         detailed_summary: str = ""
@@ -536,7 +537,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY)
         chain = prompt | llm
 
         return chain.invoke(detailed_summary).content
@@ -553,7 +554,7 @@ class WebPageScraper:
         )
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY)
         prompt = PromptTemplate.from_template(prompt_template)
 
         # We will fetch author and publish date details from the page header + first page body chunk.
@@ -595,7 +596,7 @@ class WebPageScraper:
         content: str = "".join(
             [doc.page_content for doc in page_body_chunks])
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(ContentType)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(ContentType)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         content = (
@@ -622,7 +623,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(ContentCategory)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(ContentCategory)
         chain = prompt | llm
 
         # Be very careful making changes to this prompt, it may result in worse results.
@@ -687,7 +688,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(ContentAuthorAndPublishDate)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(ContentAuthorAndPublishDate)
         chain = prompt | llm
         return chain.invoke(text)
 
@@ -709,7 +710,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(ContentDate)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(ContentDate)
         chain = prompt | llm
         result: ContentDate = chain.invoke(parsed_date)
 
@@ -737,7 +738,7 @@ class WebPageScraper:
 
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(IsRequestingUserContact)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(IsRequestingUserContact)
         prompt = PromptTemplate.from_template(prompt_template)
         if len(page_structure.body_chunks) == 0:
             raise ValueError(
@@ -765,7 +766,7 @@ class WebPageScraper:
 
          # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(FocusOnCompany)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(FocusOnCompany)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         result: FocusOnCompany = chain.invoke(
@@ -787,7 +788,7 @@ class WebPageScraper:
 
          # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(FocusOnPerson)
+            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(FocusOnPerson)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         result: FocusOnPerson = chain.invoke(
@@ -921,7 +922,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=openai_temperature, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL).with_structured_output(PageFooterResult)
+            temperature=openai_temperature, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(PageFooterResult)
         chain = prompt | llm
 
         try:
@@ -1188,7 +1189,7 @@ if __name__ == "__main__":
 
     # These two LinkedIn reposts have a little different structures so our strict state based extraction algoirthm breaks. We have since fixed it.
     # url = "https://www.linkedin.com/posts/zperret_introducing-beacon-plaid-activity-7077729712181018624-MsBN?trk=public_profile_share_view"
-    url = "https://www.linkedin.com/posts/zperret_the-history-and-future-of-id-verification-activity-7072714551724539906-UvBU"
+    # url = "https://www.linkedin.com/posts/zperret_the-history-and-future-of-id-verification-activity-7072714551724539906-UvBU"
     # url = "https://www.linkedin.com/posts/callmehaaa_vietnamstartups-entrepreneurship-ecosystem-activity-7216638281201987584-OJ-F?utm_source=share&utm_medium=member_desktop"
 
     # The URLs that didn't do well.

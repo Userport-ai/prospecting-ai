@@ -70,7 +70,8 @@ class LinkedInScraper:
     OPERATION_TAG_NAME = "linkedin_post_scrape"
 
     # OpenAI configurations.
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    # OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_API_KEY = os.getenv("OPENAI_USERPORT_API_KEY")
     OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
     OPENAI_EMBEDDING_FUNCTION = OpenAIEmbeddings(
         model=OPENAI_EMBEDDING_MODEL, api_key=OPENAI_API_KEY)

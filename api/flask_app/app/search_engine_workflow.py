@@ -1,4 +1,5 @@
 from googlesearch import search
+import tldextract
 from web_page_scraper import WebPageScraper, PageContentInfo
 from database import Database
 from typing import List
@@ -18,10 +19,12 @@ class SearchEngineWorkflow:
     """
     GOOGLE_SEARCH_ENGINE = "google"
 
-    def __init__(self, database: Database, max_search_results_per_query: int = 20) -> None:
+    def __init__(self, database: Database, max_search_results_per_query: int = 10) -> None:
         self.database = database
         self.max_search_results_per_query = max_search_results_per_query
-        self.skip_sites = ["crunchbase.com"]
+        self.blocklist_domains = set(
+            ["crunchbase.com", "youtube.com", "twitter.com", "x.com"])
+        self.failed_urls = []
 
     def run(self, person_profile_id: str, company_profile_id: str):
         """Runs search queries, analyzes content for given person profile ID.
@@ -45,22 +48,22 @@ class SearchEngineWorkflow:
             print(f"\nSearch query: {search_query}")
             print("-----------------------")
             for url in search(search_query, stop=self.max_search_results_per_query):
-                print(f"\tGot URL {url} in search result.")
+                print(f"Got URL {url} in search result.")
 
-                if url in self.skip_sites:
-                    print(f"\tURL: {url} is in skip list, so skip it.")
+                if self.is_blocklist_domain(url=url):
+                    print(f"URL: {url} is in block list, so skip it.")
                     continue
 
                 if LinkedInScraper.is_valid_profile_or_company_url(url=url):
                     # This is a person's profile or Company About page on LinkedIn, skip it.
                     print(
-                        f"\tURL: {url} is a LinkedIn profile or Company, skip parsing it.")
+                        f"URL: {url} is a LinkedIn profile or Company, skip parsing it.")
                     continue
 
                 # If this URL has already been indexed, skip processing.
                 if self.database.get_content_details_by_url(url=url):
                     print(
-                        f"\tWeb URL: {url} already indexed in the database, skip parsing again.")
+                        f"Web URL: {url} already indexed in the database, skip parsing again.")
                     continue
 
                 try:
@@ -69,11 +72,14 @@ class SearchEngineWorkflow:
                 except Exception as e:
                     # Log error and continue.
                     print(
-                        f"\tFailed to process search result URL: {url} for person: {person_profile_id} and query: {search_query} with error: {e}")
+                        f"Failed to process search result URL: {url} for person: {person_profile_id} and query: {search_query} with error: {e}")
+                    self.failed_urls.append((url, e))
 
                 # TODO: Remove this break once content parsing works.
                 # print("Done parsing for now!")
                 # break
+
+        self.print_errors()
 
     def process_url(self, url: str, company_name: str, person_name: str, role_title: str, search_query: str, person_profile_id: str, company_profile_id: str):
         """Process given URL from the web and stores the result in the database."""
@@ -106,7 +112,9 @@ class SearchEngineWorkflow:
                 card_links=post_details.card_links,
                 num_reactions=post_details.num_reactions,
                 num_comments=post_details.num_comments,
-                repost=LinkedInPost(
+            )
+            if post_details.repost:
+                linkedin_post.repost = LinkedInPost(
                     url=post_details.repost.url,
                     author_name=post_details.repost.author_name,
                     author_type=post_details.repost.author_type,
@@ -120,7 +128,6 @@ class SearchEngineWorkflow:
                     num_reactions=post_details.repost.num_reactions,
                     num_comments=post_details.repost.num_comments,
                 )
-            )
 
         content_details = ContentDetails(
             url=page_content_info.url,
@@ -169,14 +176,29 @@ class SearchEngineWorkflow:
         search_prefix = f"{company_name} {person_name} {role_title} "
         # queries = ["recent LinkedIn posts", "recent thoughts on the industry",
         #            "recent articles or blogs", "recent interviews or podcasts",
-        #            "recent conferences or events attended", "recent announcements made"]
+        #            "recent conferences or events attended", "recent announcements made",
+        #            "recent funding announcements", "recent product announcements", "recent leadership changes"]
 
-        queries = ["recent LinkedIn posts"]
+        queries = ["recent product announcements"]
 
         final_queries = []
         for q in queries:
             final_queries.append(search_prefix + q)
         return final_queries
+
+    def is_blocklist_domain(self, url: str) -> bool:
+        """Returns true if given URL is part of blocklist domains that should not be scraped and false otherwise."""
+        ext = tldextract.extract(url)
+        return ext.registered_domain in self.blocklist_domains
+
+    def print_errors(self):
+        for failed_url in self.failed_urls:
+            url, e = failed_url
+            print("\n")
+            print(f"URL: {url}")
+            print("-------------------------------------")
+            print(f"Error: {e}")
+            print("\n\n")
 
 
 if __name__ == "__main__":
