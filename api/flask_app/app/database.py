@@ -1,12 +1,13 @@
 
 import os
 import contextlib
-from typing import Optional
+from typing import Optional, Dict
 from collections.abc import Generator
 from pymongo.mongo_client import MongoClient
 from pymongo.client_session import ClientSession
 from pymongo.server_api import ServerApi
 from pymongo.collection import Collection
+from pymongo.results import UpdateResult
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
 from app.utils import Utils
@@ -124,16 +125,16 @@ class Database:
             content_details.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
 
-    def insert_lead_research_report(self, research_report: LeadResearchReport, session: Optional[ClientSession] = None) -> str:
+    def insert_lead_research_report(self, lead_research_report: LeadResearchReport, session: Optional[ClientSession] = None) -> str:
         """Inserts Lead Research Report in the database and returns the created Id."""
-        if research_report.id:
+        if lead_research_report.id:
             raise ValueError(
-                f"Lead Research report instance cannot have an Id before db insertion: {research_report}")
-        research_report.creation_date = Utils.create_utc_time_now()
+                f"Lead Research report instance cannot have an Id before db insertion: {lead_research_report}")
+        lead_research_report.creation_date = Utils.create_utc_time_now()
 
         collection = self._get_lead_research_report_collection()
         result = collection.insert_one(
-            research_report.model_dump(exclude=Database._exclude_id()), session=session)
+            lead_research_report.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
 
     @contextlib.contextmanager
@@ -200,6 +201,15 @@ class Database:
             raise ValueError(
                 f'Lead Research report not found for Id: {lead_research_report_id}')
         return LeadResearchReport(**data_dict)
+
+    def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
+        """Sets fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
+        collection = self._get_lead_research_report_collection()
+        res: UpdateResult = collection.update_one(
+            {"_id": ObjectId(lead_research_report_id)}, setFields)
+        if res.matched_count == 0:
+            raise ValueError(
+                f"Could not update research report with ID: {lead_research_report_id}")
 
     def delete_all_content_details(self):
         """Deletes all content details and associated web pages and LinkedIn posts."""

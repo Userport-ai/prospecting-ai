@@ -180,7 +180,11 @@ class ContentDetails(BaseModel):
 
 
 class LeadResearchReport(BaseModel):
-    """Report for lead research."""
+    """Report containing lead research."""
+
+    class Status(str, Enum):
+        IN_PROGRESS = "in_progress"
+        COMPLETE = "complete"
 
     class ReportDetail(BaseModel):
         """Details associated with the report."""
@@ -206,16 +210,20 @@ class LeadResearchReport(BaseModel):
         alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
     creation_date: Optional[datetime] = Field(
         default=None, description="Date in UTC timezone when this document was inserted in the database.")
-    person_profile_id: str = Field(...,
-                                   description="PersonProfile reference of this lead.")
-    company_profile_id: str = Field(
-        ..., description="Reference ID to the Company Profile that is stored in the database.")
-    cutoff_publish_date: datetime = Field(
-        ..., description="Publish Date cutoff beyond which report is created. This can be 3 months, 6 months, 12 months etc. before date of report creation.")
+    person_linkedin_url: Optional[str] = Field(
+        default=None, description="LinkedIn URL of the person's profile.")
+    person_profile_id: Optional[str] = Field(
+        default=None, description="PersonProfile reference of this lead.")
+    company_profile_id: Optional[str] = Field(
+        default=None, description="Reference ID to the Company Profile that is stored in the database.")
+    status: Optional[Status] = Field(
+        default=None, description="Status of the report at given point in time.")
+    cutoff_publish_date: Optional[datetime] = Field(
+        default=None, description="Publish Date cutoff beyond which report is created. This can be 3 months, 6 months, 12 months etc. before date of report creation.")
     # TODO: Add user and organization information.
 
     details: List[ReportDetail] = Field(
-        ..., description="Report details associated with the lead.")
+        default=[], description="Report details associated with the lead.")
 
 
 class PersonProfile(BaseModel):

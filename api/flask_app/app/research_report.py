@@ -1,8 +1,10 @@
-from database import Database
-from utils import Utils
+from typing import Optional, List
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from models import LeadResearchReport
+from app.utils import Utils
+from app.models import LeadResearchReport, PersonProfile, CompanyProfile
+from app.database import Database
+from app.linkedin_scraper import LinkedInScraper
 
 
 class ResearchReport:
@@ -11,8 +13,51 @@ class ResearchReport:
     def __init__(self, database: Database) -> None:
         self.database = database
 
-    def create(self, person_profile_id: str, company_profile_id: str) -> LeadResearchReport:
-        """Creates and inserts Research report for given Person and Company in the database."""
+    def create(self, person_linkedin_url: str) -> str:
+        """Creates Research report in the database for given lead's LinkedIn URL and returns the created ID."""
+        lead_research_report = LeadResearchReport()
+
+        # Compute person profile ID.
+        person_profile: Optional[PersonProfile] = self.database.get_person_profile_by_url(
+            person_linkedin_url=person_linkedin_url)
+        if not person_profile:
+            print(
+                f"Person LinkedIn profile: {person_linkedin_url} NOT found in database.")
+            person_profile = LinkedInScraper.fetch_person_profile(
+                profile_url=person_linkedin_url)
+            lead_research_report.person_profile_id = self.database.insert_person_profile(
+                person_profile=person_profile)
+        else:
+            print(
+                f"Person LinkedIn profile: {person_linkedin_url} profile found in database.")
+            lead_research_report.person_profile_id = person_profile.id
+
+        # Compute company profile ID.
+        company_name, _ = person_profile.get_company_and_role_title()
+        company_linkedin_url = person_profile.get_company_linkedin_url(
+            company_name=company_name)
+        company_profile: Optional[CompanyProfile] = self.database.get_company_profile_by_url(
+            company_linkedin_url=company_linkedin_url)
+        if not company_profile:
+            print(
+                f"Company {company_linkedin_url} profile NOT found in database.")
+            company_profile = LinkedInScraper.fetch_company_profile(
+                profile_url=company_linkedin_url)
+            lead_research_report.company_profile_id = self.database.insert_company_profile(
+                company_profile=company_profile)
+        else:
+            print(
+                f"Company {company_linkedin_url} profile found in database.")
+            lead_research_report.company_profile_id = company_profile.id
+
+        # Add to database.
+        lead_research_report.person_linkedin_url = person_linkedin_url
+        lead_research_report.status = LeadResearchReport.Status.IN_PROGRESS
+        return self.database.insert_lead_research_report(
+            lead_research_report=lead_research_report)
+
+    def update_details(self, lead_research_report_id: str):
+        """Fetches Details of research report for given Person and Company and updates them in the database."""
         time_now: datetime = Utils.create_utc_time_now()
 
         # Only filter documents from recent months.
@@ -78,16 +123,13 @@ class ResearchReport:
             stage_final_projection
         ]
 
+        report_details: List[LeadResearchReport.ReportDetail] = []
         results = self.database.get_content_details_collection().aggregate(pipeline=pipeline)
-
-        research_report = LeadResearchReport(cutoff_publish_date=latest_publish_date, person_profile_id=person_profile_id,
-                                             company_profile_id=company_profile_id, details=[])
-
         for detail in results:
-            report_detail = LeadResearchReport.ReportDetail(**detail)
-            research_report.details.append(report_detail)
+            rep_detail = LeadResearchReport.ReportDetail(**detail)
+            report_details.append(rep_detail)
 
-        for detail in research_report.details:
+        for detail in report_details:
             print("Category: ", detail.category)
             print("Num highlights: ", len(detail.highlights))
             import pprint
@@ -95,18 +137,21 @@ class ResearchReport:
             print("---------------------")
             print("\n")
 
-        # Write to database.
-        self.database.insert_lead_research_report(
-            research_report=research_report)
-
-        return research_report
+        setFields = {
+            "status": LeadResearchReport.Status.COMPLETE,
+            "cutoff_publish_date": latest_publish_date,
+            "details": report_details,
+        }
+        self.database.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
 
 
 if __name__ == "__main__":
     # Zach perret Profile ID.
+    person_url = "https://www.linkedin.com/in/zperret"
     person_profile_id = '66a70cc8ff3944ed08fe4f1c'
     company_profile_id = '66a7a6b5066fac22c378bd75'
 
     rp = ResearchReport(database=Database())
-    rp.create(person_profile_id=person_profile_id,
-              company_profile_id=company_profile_id)
+    rp.fetch(person_profile_id=person_profile_id,
+             company_profile_id=company_profile_id)

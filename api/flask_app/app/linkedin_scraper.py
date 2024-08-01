@@ -7,10 +7,10 @@ from enum import Enum
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from typing import Optional, Dict, List, Tuple
-from utils import Utils
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
-from models import LinkedInPostOld, PersonProfile, CompanyProfile
+from app.models import LinkedInPostOld, PersonProfile, CompanyProfile
+from app.utils import Utils
 from langchain_openai import OpenAIEmbeddings
 # from pydantic import BaseModel, Field
 # Can't use pydantic base model because cant embed this class in model class inherting from langchain base model.
