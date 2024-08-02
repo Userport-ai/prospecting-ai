@@ -1,4 +1,4 @@
-from typing import Optional, Annotated, List, Tuple
+from typing import Optional, Annotated, List, Tuple, Dict
 from deprecated import deprecated
 from pydantic.functional_validators import BeforeValidator
 from pydantic import BaseModel, Field, field_validator
@@ -53,6 +53,7 @@ class ContentTypeEnum(str, Enum):
     ANNOUCEMENT = "announcement"
     INTERVIEW = "interview"
     PODCAST = "podcast"
+    DOCUMENTATION = "documentation"
     PANEL_DISCUSSION = "panel_discussion"
     LINKEDIN_POST = "linkedin_post"
     NONE_OF_THE_ABOVE = "none_of_the_above"
@@ -98,6 +99,7 @@ class ContentCategoryEnum(str, Enum):
     COMPANY_LAWSUIT = "company_lawsuit"
     COMPANY_INTERNAL_EVENT = "company_internal_event"
     COMPANY_OFFSITE = "company_offsite"
+    UNRELATED_TO_COMPANY = "unrelated_to_company"
     NONE_OF_THE_ABOVE = "none_of_the_above"
 
 
@@ -162,7 +164,8 @@ class ContentDetails(BaseModel):
     requesting_user_contact: bool = Field(
         default=False, description="Whether the page is requesting user contact information in exchange for access to white paper, case study, webinar etc. Always False for LinkedIn posts.")
     focus_on_company: bool = Field(
-        default=False, description="Whether the content is focused on Company.")
+        default=False, description="Whether the content is related to the Company.")
+    # Deprecated since it's not a super useful field.
     focus_on_person: bool = Field(
         default=False, description="Whether the content is focused on Person.")
     num_linkedin_reactions: Optional[int] = Field(
@@ -183,8 +186,12 @@ class LeadResearchReport(BaseModel):
     """Report containing lead research."""
 
     class Status(str, Enum):
-        IN_PROGRESS = "in_progress"
+        # Fetched basic details about the person and company.
+        FETCHED_BASIC_DETAILS = "fetched_basic_details"
+        FETCHED_SEARCH_RESULTS = "fetched_search_results"
+        PROCESSED_CONTENTS_IN_URLS = "processed_contents_in_urls"
         COMPLETE = "complete"
+        FAILED_WITH_ERRORS = "failed_with_errors"
 
     class ReportDetail(BaseModel):
         """Details associated with the report."""
@@ -210,17 +217,29 @@ class LeadResearchReport(BaseModel):
         alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
     creation_date: Optional[datetime] = Field(
         default=None, description="Date in UTC timezone when this document was inserted in the database.")
+    last_updated_date: Optional[datetime] = Field(
+        default=None, description="Date in UTC timezone when this document was last updated in the database.")
     person_linkedin_url: Optional[str] = Field(
         default=None, description="LinkedIn URL of the person's profile.")
     person_profile_id: Optional[str] = Field(
         default=None, description="PersonProfile reference of this lead.")
     company_profile_id: Optional[str] = Field(
         default=None, description="Reference ID to the Company Profile that is stored in the database.")
+    person_name: Optional[str] = Field(
+        default=None, description="Full name of person being researched.")
+    company_name: Optional[str] = Field(
+        default=None, description="Company name of the person being researched.")
+    person_role_title: Optional[str] = Field(
+        default=None, description="Role title of person at company.")
     status: Optional[Status] = Field(
         default=None, description="Status of the report at given point in time.")
     cutoff_publish_date: Optional[datetime] = Field(
         default=None, description="Publish Date cutoff beyond which report is created. This can be 3 months, 6 months, 12 months etc. before date of report creation.")
     # TODO: Add user and organization information.
+
+    # Store search results.
+    search_results_map: Optional[Dict[str, List[str]]] = Field(
+        default=None, description="Search result links grouped by search query.")
 
     details: List[ReportDetail] = Field(
         default=[], description="Report details associated with the lead.")

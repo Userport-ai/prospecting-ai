@@ -1,5 +1,7 @@
 .venv/
 
+userport.log
+
 .env
 
 app/chroma_db/

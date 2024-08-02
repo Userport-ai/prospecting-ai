@@ -1,4 +1,5 @@
 import os
+import logging
 import random
 import gzip
 import requests
@@ -13,12 +14,14 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
-from utils import Utils
-from models import ContentTypeEnum, ContentCategoryEnum, OpenAITokenUsage
-from linkedin_scraper import LinkedInScraper, LinkedInPostDetails
+from app.utils import Utils
+from app.models import ContentTypeEnum, ContentCategoryEnum, OpenAITokenUsage
+from app.linkedin_scraper import LinkedInScraper, LinkedInPostDetails
 
 from dotenv import load_dotenv
 load_dotenv()
+
+logger = logging.getLogger()
 
 
 class OpenAIUsage(BaseModel):
@@ -219,7 +222,7 @@ class WebPageScraper:
 
     # Chroma DB path for saving indices locally during development. Do not use in production.
     # Reference: https://python.langchain.com/v0.2/docs/integrations/vectorstores/chroma/#basic-example-including-saving-to-disk.
-    CHROMA_DB_PATH = "./chroma_db"
+    CHROMA_DB_PATH = "./app/chroma_db"
 
     OPERATION_TAG_NAME = "web_page_scrape"
 
@@ -257,11 +260,13 @@ class WebPageScraper:
         page_structure: Optional[PageStructure] = self.get_page_structure_from_db(
         )
         if page_structure:
-            print("Fetched page structure from database.")
-            print(f"Got {len(page_structure.body_chunks)} chunks in page.")
+            logger.info("Fetched page structure from database.")
+            logger.info(
+                f"Got {len(page_structure.body_chunks)} chunks in page.")
             self.page_structure: PageStructure = page_structure
         else:
-            print("Page structure not found in database, fetching it from web.")
+            logger.info(
+                "Page structure not found in database, fetching it from web.")
             doc = self.fetch_page()
             if self.is_valid_linkedin_post(url=self.url):
                 page_structure = self.get_linkedin_post_structure(doc=doc)
@@ -270,12 +275,11 @@ class WebPageScraper:
             self.page_structure = self.create_page_structure_in_db(
                 page_structure=page_structure)
 
-    def fetch_page_content_info(self, company_name: str, person_name: str) -> PageContentInfo:
+    def fetch_page_content_info(self, doc: Document, company_name: str, person_name: str) -> PageContentInfo:
         """Scrapes web page and returns content from it for given company and person names."""
         if self.dev_mode:
             raise ValueError("Cannot fetch content in dev mode")
 
-        doc = self.fetch_page()
         if self.is_valid_linkedin_post(url=self.url):
             return self.fetch_content_info_from_linkedin_post(company_name=company_name, person_name=person_name, doc=doc)
 
@@ -283,7 +287,7 @@ class WebPageScraper:
 
     def fetch_content_info_from_general_page(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
         """Fetches content information from General web page (not a LinkedIn post)."""
-        print(f"Fetching content from general page: {self.url}")
+        logger.info(f"Fetching content from general page: {self.url}")
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_page_structure(
                 doc=doc)
@@ -306,15 +310,12 @@ class WebPageScraper:
             requesting_user_contact: bool = self.is_page_requesting_user_contact(
                 page_structure=page_structure)
 
-            focus_on_company: bool = self.is_page_focused_on_company(
+            related_to_company: bool = self.is_page_related_to_company(
                 company_name=company_name, detailed_summary=final_summary.detailed_summary)
-
-            focus_on_person: bool = self.is_page_focused_on_person(
-                person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-            print(f"\nTokens used: {tokens_used}")
+            logger.info(f"Tokens used: {tokens_used}")
 
             return PageContentInfo(
                 url=self.url,
@@ -329,8 +330,8 @@ class WebPageScraper:
                 key_persons=final_summary.key_persons,
                 key_organizations=final_summary.key_organizations,
                 requesting_user_contact=requesting_user_contact,
-                focus_on_company=focus_on_company,
-                focus_on_person=focus_on_person,
+                focus_on_company=related_to_company,
+                focus_on_person=False,
                 category=category.enum_value,
                 category_reason=category.reason,
                 num_linkedin_reactions=None,
@@ -340,7 +341,7 @@ class WebPageScraper:
 
     def fetch_content_info_from_linkedin_post(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
         """Fetches content information from LinkedIn post web page."""
-        print(f"Fetching content from LinkedIn post: {self.url}")
+        logger.info(f"Fetching content from LinkedIn post: {self.url}")
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_linkedin_post_structure(
                 doc=doc)
@@ -352,15 +353,12 @@ class WebPageScraper:
             category: ContentCategory = self.fetch_content_category(
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
-            focus_on_company: bool = self.is_page_focused_on_company(
+            related_to_company: bool = self.is_page_related_to_company(
                 company_name=company_name, detailed_summary=final_summary.detailed_summary)
-
-            focus_on_person: bool = self.is_page_focused_on_person(
-                person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-            print(f"\nTokens used: {tokens_used}")
+            logger.info(f"Tokens used: {tokens_used}")
 
             return PageContentInfo(
                 url=self.url,
@@ -375,8 +373,8 @@ class WebPageScraper:
                 key_persons=final_summary.key_persons,
                 key_organizations=final_summary.key_organizations,
                 requesting_user_contact=False,
-                focus_on_company=focus_on_company,
-                focus_on_person=focus_on_person,
+                focus_on_company=related_to_company,
+                focus_on_person=False,
                 category=category.enum_value,
                 category_reason=category.reason,
                 num_linkedin_reactions=post_details.num_reactions,
@@ -390,8 +388,8 @@ class WebPageScraper:
             detailed_summary: Optional[str] = self.get_detailed_summary_from_db(
             )
             if detailed_summary:
-                print("Found summary in database")
-                print(f"\nSummary: {detailed_summary}\n")
+                logger.info("Found summary in database")
+                logger.info(f"Summary: {detailed_summary}\n")
                 return ContentFinalSummary(detailed_summary=detailed_summary, concise_summary="", key_persons=[], key_organizations=[])
 
         # Do not change this prompt before testing, results may get worse.
@@ -460,7 +458,7 @@ class WebPageScraper:
         chain = prompt | llm
         result: PostSummary = chain.invoke({'post_url': post_details.url})
 
-        print("\n\nPost Summary: ", result.detailed_summary, "\n")
+        logger.info(f"LinkedIn Post Summary: {result.detailed_summary}\n")
 
         if self.dev_mode:
             # Write summary to database.
@@ -475,8 +473,8 @@ class WebPageScraper:
             detailed_summary: Optional[str] = self.get_detailed_summary_from_db(
             )
             if detailed_summary:
-                print("Found summary in database")
-                print(f"\nSummary: {detailed_summary}\n")
+                logger.info("Found summary in database")
+                logger.info(f"\nSummary: {detailed_summary}\n")
                 return ContentFinalSummary(detailed_summary=detailed_summary, concise_summary="", key_persons=[], key_organizations=[])
 
         # Do not change this prompt before testing, results may get worse.
@@ -504,18 +502,13 @@ class WebPageScraper:
             chain = prompt | llm
             result: ContentConciseSummary = chain.invoke(
                 {"summary_so_far": detailed_summary, "new_passage": new_passage})
-            # print(f"\n\nIteration {i+1}")
-            # print("--------------")
-            # print(f"Summary of new passage: {result.concise_summary}")
-            # print("Key persons: ", result.key_persons)
-            # print("Key organizations: ", result.key_organizations)
             detailed_summary = f"{detailed_summary}\n\n{result.concise_summary}"
             key_persons += result.key_persons
             key_organizations += result.key_organizations
 
-        print(f"\n\nDetailed Summary: {detailed_summary}\n")
-        print(f"Key persons: {key_persons}\n")
-        print(f"Key organizations: {key_organizations}\n")
+        logger.info(f"Detailed Summary of content: {detailed_summary}\n")
+        logger.info(f"Key persons: {key_persons}\n")
+        logger.info(f"Key organizations: {key_organizations}\n")
 
         # Compute concise summary of the detailed summary.
         concise_summary: str = self.fetch_concise_summary(
@@ -571,7 +564,7 @@ class WebPageScraper:
         # For some reason, using structured output in the first LLM call doesn't work. We need to
         # route the text answer from the first call to extract the structured output.
         content_details = self.parse_llm_output(text=result.content)
-        print("\nContent details: ", content_details)
+        logger.info(f"Content Author and Publish date: {content_details}")
         return content_details
 
     def fetch_content_type(self, page_body_chunks: List[Document]) -> ContentType:
@@ -584,6 +577,7 @@ class WebPageScraper:
             f"* White Paper. [Enum value: {ContentTypeEnum.WHITE_PAPER.value}].\n"
             f"* Case Study. [Enum value: {ContentTypeEnum.CASE_STUDY.value}].\n"
             f"* Webinar. [Enum value: {ContentTypeEnum.WEBINAR.value}].\n"
+            f"* Documentation. [Enum value: {ContentTypeEnum.WEBINAR.value}].\n"
             f"* Announcement. [Enum value: {ContentTypeEnum.ANNOUCEMENT.value}].\n"
             f"* Interview. [Enum value: {ContentTypeEnum.INTERVIEW.value}].\n"
             f"* Podcast. [Enum value: {ContentTypeEnum.PODCAST.value}].\n"
@@ -607,7 +601,7 @@ class WebPageScraper:
         )
         result = chain.invoke(content)
 
-        print(f"\nContent type:{result}")
+        logger.info(f"Content type: {result}")
         return result
 
     def fetch_content_category(self, company_name: str, person_name: str, detailed_summary: str) -> ContentCategory:
@@ -673,7 +667,7 @@ class WebPageScraper:
         result = chain.invoke(
             {"question": question, "context": detailed_summary})
 
-        print(f"\nCategories result: {result}")
+        logger.info(f"Content Category result: {result}")
         return result
 
     def parse_llm_output(self, text: str) -> ContentAuthorAndPublishDate:
@@ -752,18 +746,20 @@ class WebPageScraper:
 
         return result.is_requesting_user_contact
 
-    def is_page_focused_on_company(self, company_name: str, detailed_summary: str):
-        """Returns whether the page's summary is focus is about company name or person."""
+    def is_page_related_to_company(self, company_name: str, detailed_summary: str) -> bool:
+        """Returns whether the page's summary is focus is related to company name or not."""
 
         prompt_template = (
-            f"Is the main focus of the text below the Company {company_name}?\n"
+            f"Is the text below talking about something that is related to Company {company_name}? Any of the author's being affiliated to {company_name} does not count.\n"
             "Text:\n"
             "{page_text}"
         )
 
         class FocusOnCompany(BaseModel):
-            company_main_focus: bool = Field(
-                ..., description="Set to true if content's main focus is the Company and false otherwise.")
+            about_company: bool = Field(
+                ..., description="Set to true if the text is talking about something related to the Company and false otherwise.")
+            reason: str = Field(
+                ..., description="Reason for why the text is talking about or not talking about the Company.")
 
          # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
@@ -772,10 +768,12 @@ class WebPageScraper:
         chain = prompt | llm
         result: FocusOnCompany = chain.invoke(
             {"page_text": detailed_summary})
-        return result.company_main_focus
+
+        logger.info(f"result of relation: {result}")
+        return result.about_company
 
     def is_page_focused_on_person(self, person_name: str, detailed_summary: str) -> bool:
-        """Returns whether the page's summary is focused about person."""
+        """[DEPRECATED] Returns whether the page's summary is focused about person."""
 
         prompt_template = (
             f"Is the main focus of the text below the Person {person_name}?\n"
@@ -819,7 +817,7 @@ class WebPageScraper:
     def load_all_user_agents(self) -> List[str]:
         """Loads all user agents."""
         all_agents = []
-        with gzip.open("user_agents.txt.gz", 'rt') as f:
+        with gzip.open("app/user_agents.txt.gz", 'rt') as f:
             for line in f.readlines():
                 all_agents.append(line.strip())
         return all_agents
@@ -830,7 +828,7 @@ class WebPageScraper:
             chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap, add_start_index=True
         )
         chunks = text_splitter.split_documents([doc])
-        print(
+        logger.info(
             f"Created: {len(chunks)} chunks when splitting: {self.url} using chunk size: {self.chunk_size}")
         return chunks
 
@@ -1052,7 +1050,7 @@ class WebPageScraper:
         ids_to_delete: List[str] = header_ids + \
             body_ids + footer_ids + page_body_chunk_ids
         self.db.delete(ids=ids_to_delete)
-        print(f"Deleted {len(ids_to_delete)} page structure docs")
+        logger.info(f"Deleted {len(ids_to_delete)} page structure docs")
 
     def create_page_body_chunks_in_db(self, chunks: List[Document]) -> List[Document]:
         """Create embeddings for page body chunks and store into vector db.
@@ -1113,7 +1111,7 @@ class WebPageScraper:
             ]
         })['ids']
         self.db.delete(ids=summary_ids)
-        print(f"Deleted {len(summary_ids)} summaries docs")
+        logger.info(f"Deleted {len(summary_ids)} summaries docs")
 
     def get_all_doc_ids_from_db(self) -> List[str]:
         """Get Ids for all documents (header, footer, body, chunks, summmaries etc.) in the database associated with the given URL."""
@@ -1127,7 +1125,7 @@ class WebPageScraper:
         """Delete all documents associated with given url."""
         ids_to_delete: List[str] = self.get_all_doc_ids_from_db()
         self.db.delete(ids=ids_to_delete)
-        print(f"Deleted {len(ids_to_delete)} docs from db")
+        logger.info(f"Deleted {len(ids_to_delete)} docs from db")
 
     @staticmethod
     def is_valid_linkedin_post(url: str) -> bool:
@@ -1164,7 +1162,7 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
     # url = "https://www.cloudbees.com/newsroom/cloudbees-appoints-raj-sarkar-as-chief-marketing-officer"
-    # url = "https://www.linkedin.com/posts/rajsarkar_forrestertei-totaleconomicimpact-teistudy-activity-7181275932207271938-S2lc/"
+    url = "https://www.linkedin.com/posts/rajsarkar_forrestertei-totaleconomicimpact-teistudy-activity-7181275932207271938-S2lc/"
     # url = "https://www.linkedin.com/posts/a2kapur_macro-activity-7150910641900244992-0B5E"
     # Pulse can be scraped the same way as any web page. See below. It should work well.
     # url = "https://www.linkedin.com/pulse/culture-eats-strategy-breakfast-raj-sarkar"
@@ -1208,41 +1206,45 @@ if __name__ == "__main__":
 
     # This article has a H1 heading that is not the right one so it wrongly computes body start. As a result, the body contains mostly navigation links
     # so the whole algorithm is messed up. We may need a better header detection algorithm in the future. First H1 does not always work.
-    url = "https://www.bankingdive.com/news/plaid-president-jen-taylor-zach-perret-ipo-cloudflare-facebook-fintech-visa/707520/"
+    # url = "https://www.bankingdive.com/news/plaid-president-jen-taylor-zach-perret-ipo-cloudflare-facebook-fintech-visa/707520/"
 
-    # HUGE article that can be broken into 28 chunks of size 4096. Let's see if the algorithm continues to work.
-    url = "https://www.generalist.com/briefing/plaid-finances-next-great-network"
+    # HUGE article that can be broken into 28 chunks of size 4096. The algorithm continues to work.
+    # url = "https://www.generalist.com/briefing/plaid-finances-next-great-network"
 
-    person_name = "Zachary Perret"
+    # Business insider works.
+    # url = "https://www.businessinsider.com/plaids-ceo-discusses-building-controls-around-customer-data-2020-2"
+    # url = "https://www.linkedin.com/posts/zperret_2024-fintech-predictions-with-zach-perret-activity-7155603572825427969-ThEB"
+
+    # person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
     # person_name = "Al Cook"
-    company_name = "Plaid"
+    # company_name = "Plaid"
     # person_name = "Anuj Kapur"
-    # person_name = "Raj Sarkar"
-    # company_name = "Cloudbees"
+    person_name = "Raj Sarkar"
+    company_name = "Cloudbees"
     graph = WebPageScraper(url=url, dev_mode=True)
-    print(graph.page_structure.body)
+    # graph.delete_detailed_summary_from_db()
+    # logger.info(graph.page_structure.body)
     # graph.is_page_requesting_user_contact(graph.page_structure)
     # final_summary = graph.fetch_content_final_summary(
     #     page_body_chunks=graph.page_structure.body_chunks)
 
-    # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
-    #     post_body=graph.page_structure.body)
-    # print(post_details)
-    # final_summary = graph.fetch_post_final_summary(post_details=post_details)
+    post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
+        post_body=graph.page_structure.body)
+    final_summary = graph.fetch_post_final_summary(post_details=post_details)
 
-    # graph.fetch_content_category(
-    #     company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
+    graph.fetch_content_category(
+        company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
-    # print("focus on company: ", graph.is_page_focused_on_company(
-    #     company_name=company_name, detailed_summary=final_summary.detailed_summary))
+    print("related to company: ", graph.is_page_related_to_company(
+        company_name=company_name, detailed_summary=final_summary.detailed_summary))
     # print("focus on person: ", graph.is_page_focused_on_person(
     #     person_name=person_name, detailed_summary=final_summary.detailed_summary))
 
     # graph.delete_page_structure_from_db()
     # graph.fetch_author_and_date(page_structure=graph.page_structure)
-    # print("footer: ", graph.page_structure.footer[:100])
-    # print(graph.convert_to_datetime(parsed_date='2023'))
+    # logger.info("footer: ", graph.page_structure.footer[:100])
+    # logger.info(graph.convert_to_datetime(parsed_date='2023'))
     # graph.fetch_page_content_info(
     #     company_name=company_name, person_name=person_name)
     # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
@@ -1253,11 +1255,11 @@ if __name__ == "__main__":
     #     company_name=company_name, person_name=person_name, doc=doc)
     # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
 
-    file_path = "../example_linkedin_info/webpage_markdown.txt"
-    # file_path = "../example_linkedin_info/scraped_linkedin_repost_body.txt"
-    # file_path = "../example_linkedin_info/scraped_linkedin_post_body.txt"
-    with open(file_path, "w") as f:
-        f.write(graph.page_structure.to_str())
+    # file_path = "example_linkedin_info/webpage_markdown.txt"
+    # file_path = "example_linkedin_info/scraped_linkedin_repost_body.txt"
+    # file_path = "example_linkedin_info/scraped_linkedin_post_body.txt"
+    # with open(file_path, "w") as f:
+    # f.write(graph.page_structure.to_str())
 
     # print(graph.page_structure.body)
     # graph.delete_summary_from_db()

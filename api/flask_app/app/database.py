@@ -206,7 +206,7 @@ class Database:
         """Sets fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
         collection = self._get_lead_research_report_collection()
         res: UpdateResult = collection.update_one(
-            {"_id": ObjectId(lead_research_report_id)}, setFields)
+            {"_id": ObjectId(lead_research_report_id)}, {"$set": setFields})
         if res.matched_count == 0:
             raise ValueError(
                 f"Could not update research report with ID: {lead_research_report_id}")

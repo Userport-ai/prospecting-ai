@@ -68,3 +68,23 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+## Other Commands
+
+### Run Flask, Celery and Redis locally.
+
+We need to run Flask App with Celery worker using Redis as backend.
+
+These commands should be run from `flask_app` directory not the `app` directory.
+
+Flask: `flask --app app run --debug`
+
+In a shell with virtual env activated and Redis installed (`pip install Redis`):
+
+Start Celery worker: `celery -A app.make_celery worker --loglevel INFO`
+
+Start Local redis server: `redis-server`
+
+Purge unacked tasks in Celery Task queue: `celery -A app.make_celery purge`
+
+Retry management in Celery Task example: https://stackoverflow.com/questions/67968018/how-to-execute-some-code-at-last-retry-of-a-celery-task
