@@ -67,6 +67,11 @@ class LeadResearchReportResponse(BaseModel):
 
     linkedin_url: str = Field(...,
                               description="LinkedIn URL of the lead.")
+    person_name: str = Field(..., description="Full Name of the lead.")
+    company_name: str = Field(...,
+                              description="Company name of the person being researched.")
+    person_role_title: str = Field(...,
+                                   description="Role title of person at company.")
 
     @field_validator('status')
     @classmethod
@@ -89,14 +94,17 @@ def lead_reports_post():
     try:
         logger.info(
             f"Got request to start report for URL: {person_linkedin_url}")
-        research_report: Optional[LeadResearchReport] = db.get_lead_research_report_by_url(
+        lead_research_report: Optional[LeadResearchReport] = db.get_lead_research_report_by_url(
             person_linkedin_url=person_linkedin_url)
-        if research_report:
+        if lead_research_report:
             logger.info(
                 f"Research report already exists for LinkedIn URL: {person_linkedin_url}, returning it.")
-            return LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=research_report.id, lead_research_report_status=research_report.status.value, linkedin_url=person_linkedin_url).model_dump()
 
-        lead_research_report: LeadResearchReport = rp.create(
+            response = LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=lead_research_report.id, lead_research_report_status=lead_research_report.status.value,
+                                                  linkedin_url=person_linkedin_url, person_name=lead_research_report.person_name, company_name=lead_research_report.company_name, person_role_title=lead_research_report.person_role_title)
+            return response.model_dump()
+
+        lead_research_report = rp.create(
             person_linkedin_url=person_linkedin_url)
         fetch_search_results_in_background.delay(
             lead_research_report_id=lead_research_report.id)
@@ -104,7 +112,9 @@ def lead_reports_post():
         logger.info(
             f"Created a new lead research report: {lead_research_report.id} for URL: {person_linkedin_url}")
 
-        return LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=lead_research_report.status, lead_research_report_status=research_report.status.value, linkedin_url=person_linkedin_url).model_dump()
+        response = LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=lead_research_report.status, lead_research_report_status=lead_research_report.status.value,
+                                              linkedin_url=person_linkedin_url, person_name=lead_research_report.person_name, company_name=lead_research_report.company_name, person_role_title=lead_research_report.person_role_title)
+        return response.model_dump()
     except Exception as e:
         logger.exception(
             f"Failed to create report for LinkedIn URL: {person_linkedin_url} with error: {e}")
@@ -123,8 +133,9 @@ def lead_reports_get(lead_research_report_id: str):
             lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Found research report for ID: {lead_research_report_id}")
-        logger.info(f"DETAIL: {lead_research_report.details[0].highlights[0]}")
-        return LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=lead_research_report.id, lead_research_report_status=lead_research_report.status, details=lead_research_report.details, linkedin_url=lead_research_report.person_linkedin_url).model_dump()
+        response = LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=lead_research_report.id, lead_research_report_status=lead_research_report.status, details=lead_research_report.details,
+                                              linkedin_url=lead_research_report.person_linkedin_url, person_name=lead_research_report.person_name, company_name=lead_research_report.company_name, person_role_title=lead_research_report.person_role_title)
+        return response.model_dump()
     except Exception as e:
         logger.exception(
             f"Failed to read report from database with error: {e}")

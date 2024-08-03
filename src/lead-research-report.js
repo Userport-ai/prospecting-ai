@@ -3,7 +3,7 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Flex, Typography, Button, Card } from "antd";
 import { useNavigate, useLoaderData } from "react-router-dom";
 import { useState } from "react";
-import { outreachMessages } from "./lead-result-data";
+import { sampleReport, outreachMessages } from "./lead-result-data";
 
 const { Title, Text } = Typography;
 
@@ -61,8 +61,9 @@ function DetailSection({ detail }) {
 
 // Loader to fetch research report for given lead.
 export async function leadResearchReportLoader({ params }) {
-  const response = await fetch("/api/v1/lead-research-reports/" + params.id);
-  const result = await response.json();
+  // const response = await fetch("/api/v1/lead-research-reports/" + params.id);
+  // const result = await response.json();
+  const result = await sampleReport;
   if (result.status === "error") {
     console.log("Error getting lead report: ", result);
     throw result;
@@ -74,15 +75,20 @@ function LeadResearchReport() {
   const navigate = useNavigate();
   const report = useLoaderData();
 
-  console.log("report: ", report);
-
   return (
     <div id="lead-result-outer">
       <div id="lead-result-container">
-        <Flex vertical={false} gap="middle">
-          <ArrowLeftOutlined onClick={() => navigate("/")} />
-          <Title level={3}>Zach Perret, CEO, Plaid</Title>
+        <ArrowLeftOutlined onClick={() => navigate("/")} />
+        <Flex vertical={true} align="flex-start">
+          <Title level={3}>
+            {report.person_name}, {report.person_role_title},{" "}
+            {report.company_name}
+          </Title>
+          <Button type="link" href={report.linkedin_url}>
+            {report.linkedin_url}
+          </Button>
         </Flex>
+
         <Flex id="info-container" vertical={true} gap="large">
           {report.details.map((detail) => (
             <DetailSection key={detail.category} detail={detail} />
