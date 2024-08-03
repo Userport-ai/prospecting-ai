@@ -285,6 +285,9 @@ class Researcher:
             }
         }
 
+        # TODO: Add filter to focus on company. Existing docs for Perret have bad values for the doc
+        # but we can try with new docs that we will index on.
+
         stage_project_fields = {
             "$project": {
                 "_id": 1,

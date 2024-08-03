@@ -202,6 +202,15 @@ class Database:
                 f'Lead Research report not found for Id: {lead_research_report_id}')
         return LeadResearchReport(**data_dict)
 
+    def get_lead_research_report_by_url(self, person_linkedin_url: str) -> Optional[LeadResearchReport]:
+        """Returns Lead Research report for given person's LinkedIn URL. If it doesn't exist, returns None."""
+        collection = self._get_lead_research_report_collection()
+        data_dict = collection.find_one(
+            {"person_linkedin_url": person_linkedin_url})
+        if not data_dict:
+            return None
+        return LeadResearchReport(**data_dict)
+
     def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
         """Sets fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
         collection = self._get_lead_research_report_collection()

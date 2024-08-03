@@ -556,7 +556,7 @@ class LinkedInScraper:
 
         Piloterr also has an API but is inferiror to Proxycurl's APIs.
         """
-        if not LinkedInScraper._is_valid_profile_url(profile_url):
+        if not LinkedInScraper.is_valid_profile_url(profile_url):
             raise ValueError(
                 f"Invalid URL format for LinkedIn profile: {profile_url}")
 
@@ -668,12 +668,12 @@ class LinkedInScraper:
         return True
 
     @staticmethod
-    def _is_valid_profile_url(profile_url: str) -> bool:
+    def is_valid_profile_url(profile_url: str) -> bool:
         """Returns true if valid Person profile URL format and false otherwise.
 
         Profile URL must be in this format: https://www.linkedin.com/in/srinivas-birasal/
         """
-        return "linkedin.com/in/" in profile_url
+        return profile_url.startswith("https://") and "linkedin.com/in/" in profile_url
 
     @staticmethod
     def is_valid_company_url(url: str) -> bool:

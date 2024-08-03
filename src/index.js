@@ -7,6 +7,7 @@ import CreateTemplateMessage from "./create-template-message";
 import { createTemplateAction } from "./create-template-message";
 import FetchedLeads from "./fetched-leads";
 import EnterLeadInfo from "./enter-lead-info";
+import { enterLeadAction } from "./enter-lead-info";
 import LeadResult from "./lead-result";
 import ErrorPage from "./error-page";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
@@ -44,6 +45,8 @@ const router = createBrowserRouter([
       {
         path: "/enter-lead-info",
         element: <EnterLeadInfo />,
+        action: enterLeadAction,
+        errorElement: <EnterLeadInfo />,
       },
       {
         path: "/lead-result",

@@ -21,8 +21,10 @@
   color: var(--on-surface);
 }
 
-#form-container .ant-form-item {
-  margin-top: 3%;
+#form-container #error-message {
+  margin-top: 1%;
+  font-size: 1.2rem;
+  color: var(--error-color);
 }
 
 #form-container label,
@@ -38,4 +40,8 @@ input {
 
 #form-container .ant-btn:hover {
   background-color: var(--hover-color);
+}
+
+#form-container #enter-lead-form {
+  width: 80%;
 }
