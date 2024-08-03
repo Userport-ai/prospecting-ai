@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 from celery import shared_task
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
@@ -55,10 +55,16 @@ def api_exception(e):
 
 
 class LeadResearchReportResponse(BaseModel):
+    """Response of lead research report."""
     status: str = Field(...,
                         description="Status (success) of the response.")
     lead_research_report_id: str = Field(...,
                                          description="Identifier of Lead Research report.")
+    lead_research_report_status: str = Field(...,
+                                             description="Current report status.")
+    details: List[LeadResearchReport.ReportDetail] = Field(
+        default=[], description="Report details associated with the lead.")
+
     linkedin_url: str = Field(...,
                               description="LinkedIn URL of the lead.")
 
@@ -70,55 +76,60 @@ class LeadResearchReportResponse(BaseModel):
         return v
 
 
-@bp.route('/v1/lead_report', methods=['GET', 'POST'])
-def lead_report():
+@bp.post('/v1/lead-research-reports')
+def lead_reports_post():
     db = Database()
 
-    if request.method == "POST":
-        # Create research report.
-        rp = Researcher(database=db)
-        person_linkedin_url: str = request.json.get('linkedin_url').strip()
-        if not LinkedInScraper.is_valid_profile_url(profile_url=person_linkedin_url):
-            raise APIException(
-                status_code=404, message=f"Invalid URL: {person_linkedin_url}")
-        try:
+    # Create research report.
+    rp = Researcher(database=db)
+    person_linkedin_url: str = request.json.get('linkedin_url').strip()
+    if not LinkedInScraper.is_valid_profile_url(profile_url=person_linkedin_url):
+        raise APIException(
+            status_code=404, message=f"Invalid URL: {person_linkedin_url}")
+    try:
+        logger.info(
+            f"Got request to start report for URL: {person_linkedin_url}")
+        research_report: Optional[LeadResearchReport] = db.get_lead_research_report_by_url(
+            person_linkedin_url=person_linkedin_url)
+        if research_report:
             logger.info(
-                f"Got request to start report for URL: {person_linkedin_url}")
-            research_report: Optional[LeadResearchReport] = db.get_lead_research_report_by_url(
-                person_linkedin_url=person_linkedin_url)
-            if research_report:
-                logger.info(
-                    f"Research report already exists for LinkedIn URL: {person_linkedin_url}, returning it.")
-                return LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=research_report.id, linkedin_url=person_linkedin_url).model_dump()
+                f"Research report already exists for LinkedIn URL: {person_linkedin_url}, returning it.")
+            return LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=research_report.id, lead_research_report_status=research_report.status.value, linkedin_url=person_linkedin_url).model_dump()
 
-            lead_research_report_id: str = rp.create(
-                person_linkedin_url=person_linkedin_url)
-            fetch_search_results_in_background.delay(
-                lead_research_report_id=lead_research_report_id)
+        lead_research_report: LeadResearchReport = rp.create(
+            person_linkedin_url=person_linkedin_url)
+        fetch_search_results_in_background.delay(
+            lead_research_report_id=lead_research_report.id)
 
-            logger.info(
-                f"Created a new lead research report: {lead_research_report_id} for URL: {person_linkedin_url}")
+        logger.info(
+            f"Created a new lead research report: {lead_research_report.id} for URL: {person_linkedin_url}")
 
-            return LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=lead_research_report_id, linkedin_url=person_linkedin_url).model_dump()
-        except Exception as e:
-            logger.exception(
-                f"Failed to create report for LinkedIn URL: {person_linkedin_url} with error: {e}")
-            raise APIException(
-                status_code=500, message=f"Failed to create report for LinkedIn URL: {person_linkedin_url}")
+        return LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=lead_research_report.status, lead_research_report_status=research_report.status.value, linkedin_url=person_linkedin_url).model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to create report for LinkedIn URL: {person_linkedin_url} with error: {e}")
+        raise APIException(
+            status_code=500, message=f"Failed to create report for LinkedIn URL: {person_linkedin_url}")
 
-    elif request.method == "GET":
-        # Fetch existing report.
-        try:
-            report: LeadResearchReport = db.get_lead_research_report(
-                lead_research_report_id="66aa17d158f79392393414a6")
-            return report.model_dump()
-        except Exception as e:
-            logger.exception("Failed to read report from database.")
-            raise APIException(
-                status_code=500, message="Failed to read report from database")
 
-    raise APIException(
-        status_code=400, message=f"Invalid request method: {request.method}")
+@bp.get('/v1/lead-research-reports/<string:lead_research_report_id>')
+def lead_reports_get(lead_research_report_id: str):
+    # Fetch existing report.
+    db = Database()
+    try:
+        logger.info(
+            f"Got lead research report ID: {lead_research_report_id}")
+        lead_research_report: LeadResearchReport = db.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id)
+        logger.info(
+            f"Found research report for ID: {lead_research_report_id}")
+        logger.info(f"DETAIL: {lead_research_report.details[0].highlights[0]}")
+        return LeadResearchReportResponse(status=ResponseStatus.SUCCESS.value, lead_research_report_id=lead_research_report.id, lead_research_report_status=lead_research_report.status, details=lead_research_report.details, linkedin_url=lead_research_report.person_linkedin_url).model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to read report from database with error: {e}")
+        raise APIException(
+            status_code=500, message="Failed to read research report")
 
 
 @bp.route('/v1/debug', methods=['GET'])

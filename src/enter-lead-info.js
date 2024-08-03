@@ -1,7 +1,12 @@
 import "./enter-lead-info.css";
-import { Typography, Flex, Form, Input, Button } from "antd";
+import { Typography, Flex, Form, Input, Button, Spin } from "antd";
 import BackArrow from "./back-arrow";
-import { Form as RouterForm, useRouteError } from "react-router-dom";
+import {
+  Form as RouterForm,
+  useRouteError,
+  useNavigation,
+  redirect,
+} from "react-router-dom";
 import { useState } from "react";
 
 const { Title } = Typography;
@@ -11,7 +16,7 @@ export async function enterLeadAction({ request, params }) {
   const inputValueMap = Object.fromEntries(formData);
   const linkedin_url = inputValueMap["linkedin_url"];
 
-  const response = await fetch("/api/v1/lead_report", {
+  const response = await fetch("/api/v1/lead-research-reports", {
     method: "POST",
     body: JSON.stringify({ linkedin_url: linkedin_url }),
     headers: {
@@ -21,11 +26,16 @@ export async function enterLeadAction({ request, params }) {
   const result = await response.json();
   if (result.status === "error") {
     // Throw error so it can be caught by component.
+    console.log("Got error when calling /api/v1/lead_report: ", result);
     throw result;
   }
 
-  // TODO: Handle success case.
-  return null;
+  if (result.lead_research_report_status === "complete") {
+    // Research complete for lead, route to the research report page.
+    return redirect(`/lead-research-reports/${result.lead_research_report_id}`);
+  }
+
+  // TODO: Handle state where it research report is still in progress.
 }
 
 function DisplayError({ error }) {
@@ -35,10 +45,22 @@ function DisplayError({ error }) {
   return null;
 }
 
+function DisplaySpinState({ loading_or_submitting }) {
+  return (
+    <Flex id="spinner-container" vertical={false} justify="center">
+      <Spin spinning={loading_or_submitting} />
+    </Flex>
+  );
+}
+
 function EnterLeadInfo() {
   const [inputURL, setInputURL] = useState("");
 
   const error = useRouteError();
+
+  const navigation = useNavigation();
+
+  const loading_or_submitting = navigation.state != "idle";
 
   return (
     <div id="enter-lead-info-outer">
@@ -59,11 +81,16 @@ function EnterLeadInfo() {
               />
             </Form.Item>
             <Flex vertical={false} justify="flex-end">
-              <Button type="primary" htmlType="submit">
+              <Button
+                type="primary"
+                htmlType="submit"
+                disabled={loading_or_submitting}
+              >
                 Submit
               </Button>
             </Flex>
           </RouterForm>
+          <DisplaySpinState loading_or_submitting={loading_or_submitting} />
         </div>
       </div>
     </div>

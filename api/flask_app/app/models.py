@@ -99,8 +99,89 @@ class ContentCategoryEnum(str, Enum):
     COMPANY_LAWSUIT = "company_lawsuit"
     COMPANY_INTERNAL_EVENT = "company_internal_event"
     COMPANY_OFFSITE = "company_offsite"
-    UNRELATED_TO_COMPANY = "unrelated_to_company"
     NONE_OF_THE_ABOVE = "none_of_the_above"
+
+
+def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str:
+    """Returns human readable string for given content category enum. Update this method whenever Enum class changes."""
+    if category == ContentCategoryEnum.PERSONAL_THOUGHTS:
+        return "Personal Thoughts"
+    elif category == ContentCategoryEnum.PERSONAL_ADVICE:
+        return "Personal Advice"
+    elif category == ContentCategoryEnum.PERSONAL_ANECDOTE:
+        return "Personal Anecdotes"
+    elif category == ContentCategoryEnum.PERSONAL_PROMOTION:
+        return "Personal Promotion"
+    elif category == ContentCategoryEnum.PERSONAL_RECOGITION:
+        return "Personal Recognition"
+    elif category == ContentCategoryEnum.PERSONAL_JOB_CHANGE:
+        return "Personal Job Change"
+    elif category == ContentCategoryEnum.PERSONAL_EVENT_ATTENDED:
+        return "Personal Events Attended"
+    elif category == ContentCategoryEnum.PERSONAL_TALK_AT_EVENT:
+        return "Personal Talks"
+    elif category == ContentCategoryEnum.PRODUCT_LAUNCH:
+        return "Product Launches"
+    elif category == ContentCategoryEnum.PRODUCT_UPDATE:
+        return "Product Updates"
+    elif category == ContentCategoryEnum.PRODUCT_SHUTDOWN:
+        return "Product Shutdowns"
+    elif category == ContentCategoryEnum.LEADERSHIP_HIRE:
+        return "Leadership Hires"
+    elif category == ContentCategoryEnum.LEADERSHIP_CHANGE:
+        return "Leadership Changes"
+    elif category == ContentCategoryEnum.EMPLOYEE_PROMOTION:
+        return "Employee Promotions"
+    elif category == ContentCategoryEnum.EMPLOYEE_LEAVING:
+        return "Employee Leaving"
+    elif category == ContentCategoryEnum.COMPANY_HIRING:
+        return "Company Hiring"
+    elif category == ContentCategoryEnum.FINANCIAL_RESULTS:
+        return "Company Financial Results"
+    elif category == ContentCategoryEnum.COMPANY_STORY:
+        return "Company Stories"
+    elif category == ContentCategoryEnum.INDUSTRY_TRENDS:
+        return "Industry Trends"
+    elif category == ContentCategoryEnum.COMPANY_PARTNERSHIP:
+        return "Company Patnerships"
+    elif category == ContentCategoryEnum.COMPANY_ACHIEVEMENT:
+        return "Company Achievements"
+    elif category == ContentCategoryEnum.FUNDING_ANNOUNCEMENT:
+        return "Funding Announcements"
+    elif category == ContentCategoryEnum.IPO_ANNOUNCEMENT:
+        return "IPO Announcement"
+    elif category == ContentCategoryEnum.COMPANY_RECOGNITION:
+        return "Company Recognition"
+    elif category == ContentCategoryEnum.COMPANY_ANNIVERSARY:
+        return "Company Anniversary"
+    elif category == ContentCategoryEnum.COMPANY_EVENT_HOSTED_ATTENDED:
+        return "Company Events or Conferences"
+    elif category == ContentCategoryEnum.COMPANY_WEBINAR:
+        return "Company Webinars"
+    elif category == ContentCategoryEnum.COMPANY_LAYOFFS:
+        return "Company Layoffs"
+    elif category == ContentCategoryEnum.COMPANY_CHALLENGE:
+        return "Company Challenges"
+    elif category == ContentCategoryEnum.COMPANY_REBRAND:
+        return "Company Rebrand"
+    elif category == ContentCategoryEnum.COMPANY_NEW_MARKET_EXPANSION:
+        return "Company New Market Expansion News"
+    elif category == ContentCategoryEnum.COMPANY_NEW_OFFICE:
+        return "Company New Office Openings"
+    elif category == ContentCategoryEnum.COMPANY_SOCIAL_RESPONSIBILITY:
+        return "Company Social Initiatives"
+    elif category == ContentCategoryEnum.COMPANY_LEGAL_CHALLENGE:
+        return "Company Legal Challenges"
+    elif category == ContentCategoryEnum.COMPANY_REGULATION:
+        return "Company Regulation Challenges"
+    elif category == ContentCategoryEnum.COMPANY_LAWSUIT:
+        return "Company Lawsuits"
+    elif category == ContentCategoryEnum.COMPANY_INTERNAL_EVENT:
+        return "Company Internal Events"
+    elif category == ContentCategoryEnum.COMPANY_OFFSITE:
+        return "Company Offsites"
+    elif category == ContentCategoryEnum.NONE_OF_THE_ABOVE:
+        return "None of the Above"
 
 
 class ContentDetails(BaseModel):
@@ -197,18 +278,22 @@ class LeadResearchReport(BaseModel):
         """Details associated with the report."""
         class Highlight(BaseModel):
             """Highhlight associated with report."""
-            id: Optional[PyObjectId] = Field(
-                alias="_id", default=None, description="MongoDB generated unique identifier for each Content details.")
+            id: PyObjectId = Field(...,
+                                   description="MongoDB generated unique identifier for each Content details.")
             category: ContentCategoryEnum = Field(...,
                                                   description="Category of the content. Field is repeated at outer level too.")
             concise_summary: str = Field(...,
                                          description="Concise summary of the content.")
             publish_date: datetime = Field(...,
                                            description="Publish date of the content.")
+            publish_date_readable_str: str = Field(default="",
+                                                   description="Human readable publish date string.")
             url: str = Field(..., description="URL of the content.")
 
         category: ContentCategoryEnum = Field(...,
                                               description="Category of the highlights.")
+        category_readable_str: str = Field(
+            default="", description="Human readable Category string.")
         highlights: List[Highlight] = Field(
             ..., description="List of Highlights associated with given category.")
 

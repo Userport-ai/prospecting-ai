@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Set, Tuple
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from app.utils import Utils
-from app.models import LeadResearchReport, PersonProfile, CompanyProfile
+from app.models import LeadResearchReport, PersonProfile, CompanyProfile, content_category_to_human_readable_str
 from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
 from app.search_engine_workflow import SearchEngineWorkflow
@@ -29,8 +29,8 @@ class Researcher:
         # List of URLs that have failed to process.
         self.failed_urls: List[Tuple[str, str]] = []
 
-    def create(self, person_linkedin_url: str) -> str:
-        """Creates Research report in the database for given lead's LinkedIn URL and returns the created ID."""
+    def create(self, person_linkedin_url: str) -> LeadResearchReport:
+        """Creates Research report in the database for given lead's LinkedIn URL and returns the report."""
         lead_research_report = LeadResearchReport()
 
         # Compute person profile ID.
@@ -72,8 +72,12 @@ class Researcher:
         lead_research_report.person_name = person_profile.full_name
         lead_research_report.person_role_title = role_title
         lead_research_report.status = LeadResearchReport.Status.FETCHED_BASIC_DETAILS
-        return self.database.insert_lead_research_report(
+
+        # Insert to database.
+        id: str = self.database.insert_lead_research_report(
             lead_research_report=lead_research_report)
+        lead_research_report.id = id
+        return lead_research_report
 
     def fetch_search_results(self, lead_research_report_id: str):
         """Fetch and store search results for given lead."""
@@ -290,7 +294,9 @@ class Researcher:
 
         stage_project_fields = {
             "$project": {
-                "_id": 1,
+                # These next 2 lines will remove _id MongoDB ID and replace with id in our storage.
+                "_id": 0,
+                "id": "$_id",
                 "url": 1,
                 "publish_date": 1,
                 "concise_summary": 1,
@@ -328,6 +334,17 @@ class Researcher:
         results = self.database.get_content_details_collection().aggregate(pipeline=pipeline)
         for detail in results:
             rep_detail = LeadResearchReport.ReportDetail(**detail)
+
+            # Update publish date readable string manually.
+            for highlight in rep_detail.highlights:
+                # Convert to 02 August, 2024 format.
+                highlight.publish_date_readable_str = highlight.publish_date.strftime(
+                    "%d %B, %Y")
+
+            # Update category human readable string manually.
+            rep_detail.category_readable_str = content_category_to_human_readable_str(
+                category=rep_detail.category)
+
             report_details.append(rep_detail)
 
         for detail in report_details:

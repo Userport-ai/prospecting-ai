@@ -8,7 +8,8 @@ import { createTemplateAction } from "./create-template-message";
 import FetchedLeads from "./fetched-leads";
 import EnterLeadInfo from "./enter-lead-info";
 import { enterLeadAction } from "./enter-lead-info";
-import LeadResult from "./lead-result";
+import LeadResearchReport from "./lead-research-report";
+import { leadResearchReportLoader } from "./lead-research-report";
 import ErrorPage from "./error-page";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";
@@ -49,8 +50,9 @@ const router = createBrowserRouter([
         errorElement: <EnterLeadInfo />,
       },
       {
-        path: "/lead-result",
-        element: <LeadResult />,
+        path: "/lead-research-reports/:id",
+        element: <LeadResearchReport />,
+        loader: leadResearchReportLoader,
       },
     ],
   },
