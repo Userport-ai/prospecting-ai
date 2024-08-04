@@ -3,7 +3,7 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Flex, Typography, Button, Card } from "antd";
 import { useNavigate, useLoaderData } from "react-router-dom";
 import { useState } from "react";
-import { sampleReport, outreachMessages } from "./lead-result-data";
+import { sampleReport, outreachMessages } from "./lead-research-report-data";
 
 const { Title, Text } = Typography;
 
@@ -87,6 +87,12 @@ function LeadResearchReport() {
           <Button type="link" href={report.linkedin_url}>
             {report.linkedin_url}
           </Button>
+          <Text>
+            Report Created On: {report.report_creation_date_readable_str}
+          </Text>
+          <Text>
+            Earliest News Date: {report.report_publish_cutoff_date_readable_str}
+          </Text>
         </Flex>
 
         <Flex id="info-container" vertical={true} gap="large">

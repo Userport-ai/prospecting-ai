@@ -59,6 +59,11 @@ class Utils:
         """Returns UTC time now."""
         return datetime.now(pytz.UTC)
 
+    @staticmethod
+    def to_human_readable_date_str(dt: datetime) -> str:
+        """Returns human readable date string."""
+        return dt.strftime("%d %B, %Y")
+
 
 if __name__ == "__main__":
     # UTC time

@@ -317,15 +317,20 @@ class LeadResearchReport(BaseModel):
     person_role_title: Optional[str] = Field(
         default=None, description="Role title of person at company.")
     status: Optional[Status] = Field(
-        default=None, description="Status of the report at given point in time.")
-    cutoff_publish_date: Optional[datetime] = Field(
-        default=None, description="Publish Date cutoff beyond which report is created. This can be 3 months, 6 months, 12 months etc. before date of report creation.")
+        default=None, description="Status of the report creation at given point in time.")
     # TODO: Add user and organization information.
 
     # Store search results.
     search_results_map: Optional[Dict[str, List[str]]] = Field(
         default=None, description="Search result links grouped by search query.")
 
+    # Report Details fields.
+    report_creation_date_readable_str: Optional[str] = Field(
+        default=None, description="Date string when report was created. Note that report is only created after status is complete.")
+    report_publish_cutoff_date: Optional[datetime] = Field(
+        None, description="Publish Date cutoff beyond which report is created. This can be 3 months, 6 months, 12 months etc. before report creation date.")
+    report_publish_cutoff_date_readable_str: Optional[str] = Field(
+        default=None, description="Report Publish Date human readable string value.")
     details: List[ReportDetail] = Field(
         default=[], description="Report details associated with the lead.")
 

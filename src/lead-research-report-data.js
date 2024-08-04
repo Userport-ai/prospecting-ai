@@ -4,127 +4,13 @@ export const sampleReport = {
   status: "success",
   lead_research_report_id: "66ab9633a3bb9048bc1a0be5",
   lead_research_report_status: "complete",
+  linkedin_url: "https://www.linkedin.com/in/zperret",
+  person_name: "Zachary Perret",
+  company_name: "Plaid",
+  person_role_title: "Co-Founder / CEO",
+  report_creation_date_readable_str: "04 August, 2024",
+  report_publish_cutoff_date_readable_str: "04 August, 2023",
   details: [
-    {
-      category: "leadership_hire",
-      category_readable_str: "Leadership Hires",
-      highlights: [
-        {
-          id: "66a88a0fa052ee77579340a0",
-          category: "leadership_hire",
-          concise_summary:
-            "Zachary Perret, Co-Founder and CEO of Plaid, announced in a LinkedIn post that Eric Hart has joined Plaid as their first Chief Financial Officer (CFO). Zachary expressed his excitement and admiration for Eric's leadership and extensive experience, particularly highlighting his role in building Expedia into a major global platform. Zachary is enthusiastic about Eric's contribution to Plaid's future growth.",
-          publish_date: "2023-10-30T06:36:56.107000",
-          publish_date_readable_str: "30 October, 2023",
-          url: "https://www.linkedin.com/posts/zperret_im-thrilled-to-welcomeeric-hartto-plaid-activity-7120418931659481090-iJ_M?trk=public_profile_post_view",
-        },
-        {
-          id: "66a8e6c2bc8a1e4270c9b2a5",
-          category: "leadership_hire",
-          concise_summary:
-            "Zachary Perret, Co-Founder and CEO of Plaid, announced on LinkedIn that Jennifer Taylor is joining the Plaid team. He expressed his excitement about this new addition to the company.",
-          publish_date: "2024-02-29T13:12:29.065000",
-          publish_date_readable_str: "29 February, 2024",
-          url: "https://www.linkedin.com/posts/zperret_incredibly-excited-to-welcome-jennifer-taylor-activity-7161391372699111424-nvBk",
-        },
-        {
-          id: "66a906070960a262558af23e",
-          category: "leadership_hire",
-          concise_summary:
-            "Zachary Perret, Co-Founder and CEO of Plaid, reposted an announcement welcoming Brian Dammeir to the Plaid team. The original post by Brian Dammeir, GM and Head of Payments at Plaid, highlights Europe's leadership in open finance, driven by regulations like PSD2/3, PSRs, and FIDAR. Dammeir emphasizes the role of technology, particularly Plaid's, in leveraging these regulatory opportunities for consumers. He invites those interested in open banking, finance, or account-to-account payments in Europe, the US, and Canada to get in touch with Plaid. Dammeir also thanks Eric Sager and Zachary Perret for the opportunity and provides a link to learn more about Plaid's commitment to European open finance.",
-          publish_date: "2023-11-30T15:25:51.364000",
-          publish_date_readable_str: "30 November, 2023",
-          url: "https://www.linkedin.com/posts/zperret_plaids-commitment-to-the-european-open-finance-activity-7132782321518219265-CO9i?trk=public_profile_share_view",
-        },
-        {
-          id: "66ac59fe9136a6104bd5a597",
-          category: "leadership_hire",
-          concise_summary:
-            "Zachary Perret, Co-Founder and CEO at Plaid, reposted an announcement welcoming Brian Dammeir to the Plaid team. The original post by Brian Dammeir, GM and Head of Payments at Plaid, highlights Europe's leadership in open finance, driven by regulations such as PSD2/3, PSRs, and FIDAR. Dammeir emphasizes the role of technology, particularly Plaid's, in leveraging these regulatory opportunities for consumers. He invites those interested in open banking, finance, or account-to-account payments in Europe, the US, and Canada to get in touch with Plaid. Dammeir also thanks Eric Sager and Zachary Perret for the opportunity and provides a link to learn more about Plaid's commitment to European open finance.",
-          publish_date: "2023-12-02T04:00:54.420000",
-          publish_date_readable_str: "02 December, 2023",
-          url: "https://www.linkedin.com/posts/zperret_plaids-commitment-to-the-european-open-finance-activity-7132782321518219265-CO9i",
-        },
-      ],
-    },
-    {
-      category: "company_recognition",
-      category_readable_str: "Company Recognition",
-      highlights: [
-        {
-          id: "66a90a3941f864592833bfd7",
-          category: "company_recognition",
-          concise_summary:
-            "Zach Perret, co-founder and CEO of Plaid, has been recognized for tackling financial exclusion. Over 11 years, Plaid has connected to 12,000 financial institutions across North America and Europe, despite challenges like a failed $5 billion deal with Visa. Originating from Clemmons, North Carolina, Perret co-founded Plaid in 2013 with William Hockey to address financial injustice. Initially met with resistance, Plaid's API gained traction with fintechs like Venmo, leading to mainstream success. Although a $5.3 billion acquisition by Visa was blocked in 2020, Plaid raised $425 million in Series D funding in 2021, reaching a $13.4 billion valuation. Today, Plaid collaborates with numerous Fortune 500 companies, and Perret remains dedicated to its mission.",
-          publish_date: "2024-04-04T00:00:00",
-          publish_date_readable_str: "04 April, 2024",
-          url: "https://fintechmagazine.com/articles/lifetime-of-achievement-zach-perret",
-        },
-      ],
-    },
-    {
-      category: "company_event_hosted_attended",
-      category_readable_str: "Company Events or Conferences",
-      highlights: [
-        {
-          id: "66a8a3ed138ae12922c61c81",
-          category: "company_event_hosted_attended",
-          concise_summary:
-            "Zachary Perret, Co-Founder and CEO of Plaid, announced the return of Plaid's annual customer conference, Plaid Effects. The event is scheduled for June 18, 2024, and will be held virtually. The conference will cover recent product developments in areas such as onboarding, underwriting, and bank payments. Perret encourages interested individuals to sign up and learn more through the provided links.",
-          publish_date: "2024-05-30T08:27:17.993000",
-          publish_date_readable_str: "30 May, 2024",
-          url: "https://www.linkedin.com/posts/zperret_effects-2024-a-fintech-event-on-the-future-activity-7191480835223482368-RS_8",
-        },
-        {
-          id: "66ac5b199136a6104bd5a5b7",
-          category: "company_event_hosted_attended",
-          concise_summary:
-            "Plaid, a company with 176,979 followers on LinkedIn, has posted an announcement about their upcoming event, Plaid Effects. The event is scheduled to stream on June 18, and Plaid is encouraging followers to sign up and get their playlists ready. The post features a quote from Plaid’s CEO, Zachary Perret, expressing excitement for the event.",
-          publish_date: "2024-07-02T04:05:39.489000",
-          publish_date_readable_str: "02 July, 2024",
-          url: "https://www.linkedin.com/posts/plaid-_were-with-plaids-ceo-zachary-perret-on-activity-7207003883506651136-gnif",
-        },
-      ],
-    },
-    {
-      category: "personal_recognition",
-      category_readable_str: "Personal Recognition",
-      highlights: [
-        {
-          id: "66a8e6b7bc8a1e4270c9b2a2",
-          category: "personal_recognition",
-          concise_summary:
-            "The post, authored by the company PIN (Power in Numbers), highlights the achievements of Zachary Perret, co-founder and CEO of Plaid, a company valued at $13.4 billion. The post also emphasizes Perret's role as a prolific angel investor, showcasing his impressive startup investment portfolio. The investments include Ascend ($285.5M in funding), Ocrolus ($127M in funding), Reprise ($82.2M in funding), Metronome ($78M in funding), Starbank ($61.5M in funding), and withco ($32M in funding).",
-          publish_date: "2024-05-30T13:12:15.901000",
-          publish_date_readable_str: "30 May, 2024",
-          url: "https://www.linkedin.com/posts/pinxyz_zachary-perret-is-the-co-founder-and-ceo-activity-7198691533359853568-heIf",
-        },
-      ],
-    },
-    {
-      category: "industry_trends",
-      category_readable_str: "Industry Trends",
-      highlights: [
-        {
-          id: "66a9c51ab4e8a6e3cb2d9fab",
-          category: "industry_trends",
-          concise_summary:
-            "Zachary Perret, Co-Founder and CEO of Plaid, shares his 2024 fintech predictions in a LinkedIn post. He forecasts significant developments in various areas of fintech, including real-time bank payments, personal financial management (PFM), open banking rules, fintech advertising, and investment activities. Perret predicts that at least one major retailer will test FedNow and RTP for real-time payments. The shutdown of Mint is expected to drive innovation in PFM, with a surge in signups for other PFM products. Open banking rules are anticipated to finally come to the US. After a period of reduced marketing budgets, fintech companies are expected to reinvest in growth, though not to the extent of 2022's Superbowl ads. Series A and B funding rounds for fintech startups are predicted to increase, while late-stage financing remains challenging. Perret also speculates on the resurgence of Bitcoin and the emergence of a mainstream stablecoin use case. Digital identity is expected to gain traction with efforts from device manufacturers, governments, and startups, although consumer adoption may be slow. The rise of deepfakes poses a significant threat, particularly in the financial services industry. Loan volumes are expected to recover as interest rates stabilize, with personal loans rebounding faster than mortgages. AI-driven financial assistants, or chatbots, are predicted to make a comeback, though they may not meet the hype initially. Perret invites readers to join him for a discussion on these predictions and provides links for further information.",
-          publish_date: "2024-01-31T05:01:03.785000",
-          publish_date_readable_str: "31 January, 2024",
-          url: "https://www.linkedin.com/posts/zperret_2024-fintech-predictions-with-zach-perret-activity-7155603572825427969-ThEB",
-        },
-        {
-          id: "66a9f114cb92d2f9b69415a5",
-          category: "industry_trends",
-          concise_summary:
-            "Adi Levanon, a Solo GP at Selah Ventures, reposted Zachary Perret's 2024 fintech predictions. Zachary Perret, Co-Founder and CEO of Plaid, shared ten key predictions for the fintech industry in 2024. These include the first major use case for real-time bank payments, new innovations in personal financial management following Mint's shutdown, the introduction of open banking rules in the US, a resurgence in fintech advertising, an increase in Series A and B funding rounds, a potential rise in Bitcoin value, efforts to mainstream digital identity, challenges posed by deepfakes, a rebound in loan volumes, and the return of AI-driven financial chatbots. Adi Levanon added her insights, agreeing with several of Perret's points and emphasizing the need for better financial management tools, consumer control over data, and improved global identity management. She also highlighted the potential for mergers and acquisitions in the fintech space and the importance of targeting financial institutions and fintechs to combat deepfakes.",
-          publish_date: "2024-01-31T08:08:44.623000",
-          publish_date_readable_str: "31 January, 2024",
-          url: "https://www.linkedin.com/posts/levanonadi_2024-fintech-predictions-with-zach-perret-activity-7155872413451272193-mI4t",
-        },
-      ],
-    },
     {
       category: "company_story",
       category_readable_str: "Company Stories",
@@ -335,11 +221,127 @@ export const sampleReport = {
         },
       ],
     },
+    {
+      category: "leadership_hire",
+      category_readable_str: "Leadership Hires",
+      highlights: [
+        {
+          id: "66a88a0fa052ee77579340a0",
+          category: "leadership_hire",
+          concise_summary:
+            "Zachary Perret, Co-Founder and CEO of Plaid, announced in a LinkedIn post that Eric Hart has joined Plaid as their first Chief Financial Officer (CFO). Zachary expressed his excitement and admiration for Eric's leadership and extensive experience, particularly highlighting his role in building Expedia into a major global platform. Zachary is enthusiastic about Eric's contribution to Plaid's future growth.",
+          publish_date: "2023-10-30T06:36:56.107000",
+          publish_date_readable_str: "30 October, 2023",
+          url: "https://www.linkedin.com/posts/zperret_im-thrilled-to-welcomeeric-hartto-plaid-activity-7120418931659481090-iJ_M?trk=public_profile_post_view",
+        },
+        {
+          id: "66a8e6c2bc8a1e4270c9b2a5",
+          category: "leadership_hire",
+          concise_summary:
+            "Zachary Perret, Co-Founder and CEO of Plaid, announced on LinkedIn that Jennifer Taylor is joining the Plaid team. He expressed his excitement about this new addition to the company.",
+          publish_date: "2024-02-29T13:12:29.065000",
+          publish_date_readable_str: "29 February, 2024",
+          url: "https://www.linkedin.com/posts/zperret_incredibly-excited-to-welcome-jennifer-taylor-activity-7161391372699111424-nvBk",
+        },
+        {
+          id: "66a906070960a262558af23e",
+          category: "leadership_hire",
+          concise_summary:
+            "Zachary Perret, Co-Founder and CEO of Plaid, reposted an announcement welcoming Brian Dammeir to the Plaid team. The original post by Brian Dammeir, GM and Head of Payments at Plaid, highlights Europe's leadership in open finance, driven by regulations like PSD2/3, PSRs, and FIDAR. Dammeir emphasizes the role of technology, particularly Plaid's, in leveraging these regulatory opportunities for consumers. He invites those interested in open banking, finance, or account-to-account payments in Europe, the US, and Canada to get in touch with Plaid. Dammeir also thanks Eric Sager and Zachary Perret for the opportunity and provides a link to learn more about Plaid's commitment to European open finance.",
+          publish_date: "2023-11-30T15:25:51.364000",
+          publish_date_readable_str: "30 November, 2023",
+          url: "https://www.linkedin.com/posts/zperret_plaids-commitment-to-the-european-open-finance-activity-7132782321518219265-CO9i?trk=public_profile_share_view",
+        },
+        {
+          id: "66ac59fe9136a6104bd5a597",
+          category: "leadership_hire",
+          concise_summary:
+            "Zachary Perret, Co-Founder and CEO at Plaid, reposted an announcement welcoming Brian Dammeir to the Plaid team. The original post by Brian Dammeir, GM and Head of Payments at Plaid, highlights Europe's leadership in open finance, driven by regulations such as PSD2/3, PSRs, and FIDAR. Dammeir emphasizes the role of technology, particularly Plaid's, in leveraging these regulatory opportunities for consumers. He invites those interested in open banking, finance, or account-to-account payments in Europe, the US, and Canada to get in touch with Plaid. Dammeir also thanks Eric Sager and Zachary Perret for the opportunity and provides a link to learn more about Plaid's commitment to European open finance.",
+          publish_date: "2023-12-02T04:00:54.420000",
+          publish_date_readable_str: "02 December, 2023",
+          url: "https://www.linkedin.com/posts/zperret_plaids-commitment-to-the-european-open-finance-activity-7132782321518219265-CO9i",
+        },
+      ],
+    },
+    {
+      category: "company_recognition",
+      category_readable_str: "Company Recognition",
+      highlights: [
+        {
+          id: "66a90a3941f864592833bfd7",
+          category: "company_recognition",
+          concise_summary:
+            "Zach Perret, co-founder and CEO of Plaid, has been recognized for tackling financial exclusion. Over 11 years, Plaid has connected to 12,000 financial institutions across North America and Europe, despite challenges like a failed $5 billion deal with Visa. Originating from Clemmons, North Carolina, Perret co-founded Plaid in 2013 with William Hockey to address financial injustice. Initially met with resistance, Plaid's API gained traction with fintechs like Venmo, leading to mainstream success. Although a $5.3 billion acquisition by Visa was blocked in 2020, Plaid raised $425 million in Series D funding in 2021, reaching a $13.4 billion valuation. Today, Plaid collaborates with numerous Fortune 500 companies, and Perret remains dedicated to its mission.",
+          publish_date: "2024-04-04T00:00:00",
+          publish_date_readable_str: "04 April, 2024",
+          url: "https://fintechmagazine.com/articles/lifetime-of-achievement-zach-perret",
+        },
+      ],
+    },
+    {
+      category: "company_event_hosted_attended",
+      category_readable_str: "Company Events or Conferences",
+      highlights: [
+        {
+          id: "66a8a3ed138ae12922c61c81",
+          category: "company_event_hosted_attended",
+          concise_summary:
+            "Zachary Perret, Co-Founder and CEO of Plaid, announced the return of Plaid's annual customer conference, Plaid Effects. The event is scheduled for June 18, 2024, and will be held virtually. The conference will cover recent product developments in areas such as onboarding, underwriting, and bank payments. Perret encourages interested individuals to sign up and learn more through the provided links.",
+          publish_date: "2024-05-30T08:27:17.993000",
+          publish_date_readable_str: "30 May, 2024",
+          url: "https://www.linkedin.com/posts/zperret_effects-2024-a-fintech-event-on-the-future-activity-7191480835223482368-RS_8",
+        },
+        {
+          id: "66ac5b199136a6104bd5a5b7",
+          category: "company_event_hosted_attended",
+          concise_summary:
+            "Plaid, a company with 176,979 followers on LinkedIn, has posted an announcement about their upcoming event, Plaid Effects. The event is scheduled to stream on June 18, and Plaid is encouraging followers to sign up and get their playlists ready. The post features a quote from Plaid’s CEO, Zachary Perret, expressing excitement for the event.",
+          publish_date: "2024-07-02T04:05:39.489000",
+          publish_date_readable_str: "02 July, 2024",
+          url: "https://www.linkedin.com/posts/plaid-_were-with-plaids-ceo-zachary-perret-on-activity-7207003883506651136-gnif",
+        },
+      ],
+    },
+    {
+      category: "personal_recognition",
+      category_readable_str: "Personal Recognition",
+      highlights: [
+        {
+          id: "66a8e6b7bc8a1e4270c9b2a2",
+          category: "personal_recognition",
+          concise_summary:
+            "The post, authored by the company PIN (Power in Numbers), highlights the achievements of Zachary Perret, co-founder and CEO of Plaid, a company valued at $13.4 billion. The post also emphasizes Perret's role as a prolific angel investor, showcasing his impressive startup investment portfolio. The investments include Ascend ($285.5M in funding), Ocrolus ($127M in funding), Reprise ($82.2M in funding), Metronome ($78M in funding), Starbank ($61.5M in funding), and withco ($32M in funding).",
+          publish_date: "2024-05-30T13:12:15.901000",
+          publish_date_readable_str: "30 May, 2024",
+          url: "https://www.linkedin.com/posts/pinxyz_zachary-perret-is-the-co-founder-and-ceo-activity-7198691533359853568-heIf",
+        },
+      ],
+    },
+    {
+      category: "industry_trends",
+      category_readable_str: "Industry Trends",
+      highlights: [
+        {
+          id: "66a9c51ab4e8a6e3cb2d9fab",
+          category: "industry_trends",
+          concise_summary:
+            "Zachary Perret, Co-Founder and CEO of Plaid, shares his 2024 fintech predictions in a LinkedIn post. He forecasts significant developments in various areas of fintech, including real-time bank payments, personal financial management (PFM), open banking rules, fintech advertising, and investment activities. Perret predicts that at least one major retailer will test FedNow and RTP for real-time payments. The shutdown of Mint is expected to drive innovation in PFM, with a surge in signups for other PFM products. Open banking rules are anticipated to finally come to the US. After a period of reduced marketing budgets, fintech companies are expected to reinvest in growth, though not to the extent of 2022's Superbowl ads. Series A and B funding rounds for fintech startups are predicted to increase, while late-stage financing remains challenging. Perret also speculates on the resurgence of Bitcoin and the emergence of a mainstream stablecoin use case. Digital identity is expected to gain traction with efforts from device manufacturers, governments, and startups, although consumer adoption may be slow. The rise of deepfakes poses a significant threat, particularly in the financial services industry. Loan volumes are expected to recover as interest rates stabilize, with personal loans rebounding faster than mortgages. AI-driven financial assistants, or chatbots, are predicted to make a comeback, though they may not meet the hype initially. Perret invites readers to join him for a discussion on these predictions and provides links for further information.",
+          publish_date: "2024-01-31T05:01:03.785000",
+          publish_date_readable_str: "31 January, 2024",
+          url: "https://www.linkedin.com/posts/zperret_2024-fintech-predictions-with-zach-perret-activity-7155603572825427969-ThEB",
+        },
+        {
+          id: "66a9f114cb92d2f9b69415a5",
+          category: "industry_trends",
+          concise_summary:
+            "Adi Levanon, a Solo GP at Selah Ventures, reposted Zachary Perret's 2024 fintech predictions. Zachary Perret, Co-Founder and CEO of Plaid, shared ten key predictions for the fintech industry in 2024. These include the first major use case for real-time bank payments, new innovations in personal financial management following Mint's shutdown, the introduction of open banking rules in the US, a resurgence in fintech advertising, an increase in Series A and B funding rounds, a potential rise in Bitcoin value, efforts to mainstream digital identity, challenges posed by deepfakes, a rebound in loan volumes, and the return of AI-driven financial chatbots. Adi Levanon added her insights, agreeing with several of Perret's points and emphasizing the need for better financial management tools, consumer control over data, and improved global identity management. She also highlighted the potential for mergers and acquisitions in the fintech space and the importance of targeting financial institutions and fintechs to combat deepfakes.",
+          publish_date: "2024-01-31T08:08:44.623000",
+          publish_date_readable_str: "31 January, 2024",
+          url: "https://www.linkedin.com/posts/levanonadi_2024-fintech-predictions-with-zach-perret-activity-7155872413451272193-mI4t",
+        },
+      ],
+    },
   ],
-  linkedin_url: "https://www.linkedin.com/in/zperret",
-  person_name: "Zachary Perret",
-  company_name: "Plaid",
-  person_role_title: "Co-Founder / CEO",
 };
 
 const outreachMesageOne =

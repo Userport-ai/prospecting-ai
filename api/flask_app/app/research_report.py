@@ -255,7 +255,7 @@ class Researcher:
         time_now: datetime = Utils.create_utc_time_now()
 
         # Only filter documents from recent months.
-        latest_publish_date = time_now - relativedelta(months=12)
+        report_publish_cutoff_date = time_now - relativedelta(months=12)
 
         stage_match_person_and_company = {
             "$match": {
@@ -266,7 +266,7 @@ class Researcher:
 
         stage_match_publish_date = {
             "$match": {
-                "publish_date": {"$gt": latest_publish_date}
+                "publish_date": {"$gt": report_publish_cutoff_date}
             }
         }
 
@@ -353,8 +353,10 @@ class Researcher:
 
         setFields = {
             "status": LeadResearchReport.Status.COMPLETE,
-            "cutoff_publish_date": latest_publish_date,
             "last_updated_date": Utils.create_utc_time_now(),
+            "report_creation_date_readable_str": Utils.to_human_readable_date_str(time_now),
+            "report_publish_cutoff_date": report_publish_cutoff_date,
+            "report_publish_cutoff_date_readable_str": Utils.to_human_readable_date_str(report_publish_cutoff_date),
             "details": [detail.model_dump() for detail in report_details],
         }
         self.database.update_lead_research_report(
