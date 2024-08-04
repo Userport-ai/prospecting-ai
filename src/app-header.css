@@ -1,12 +1,14 @@
 #nav-header {
   background-color: var(--primary);
-  --logo-width: 20%;
   padding: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
 }
 
 #nav-header #nav-logo-title {
+  margin-left: 2%;
   background-color: var(--primary);
-  width: var(--logo-width);
   display: flex;
   justify-content: start;
   align-items: center;
@@ -20,7 +22,12 @@
 
 #nav-header #nav-menu {
   background-color: var(--primary);
-  width: calc(100% - var(--logo-width));
+  margin-right: 5%;
+  width: fit-content;
+  width: 80%;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
 }
 
 #nav-header .ant-menu-item {
