@@ -340,6 +340,9 @@ class Researcher:
                 # Convert to 02 August, 2024 format.
                 highlight.publish_date_readable_str = highlight.publish_date.strftime(
                     "%d %B, %Y")
+                # Update category human readable string manually.
+                highlight.category_readable_str = content_category_to_human_readable_str(
+                    category=highlight.category)
 
             # Update category human readable string manually.
             rep_detail.category_readable_str = content_category_to_human_readable_str(

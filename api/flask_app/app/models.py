@@ -282,6 +282,8 @@ class LeadResearchReport(BaseModel):
                                    description="MongoDB generated unique identifier for each Content details.")
             category: ContentCategoryEnum = Field(...,
                                                   description="Category of the content. Field is repeated at outer level too.")
+            category_readable_str: str = Field(
+                default="", description="Human readable Category string.")
             concise_summary: str = Field(...,
                                          description="Concise summary of the content.")
             publish_date: datetime = Field(...,

@@ -1,71 +1,161 @@
-#lead-result-outer {
+#lead-research-report-outer {
   width: 100%;
   height: 100%;
   display: flex;
   justify-content: center;
 }
 
-#lead-result-container {
-  width: 70%;
+#lead-research-report-container {
+  width: 80%;
   margin-top: 2%;
   display: flex;
   flex-direction: column;
 }
 
-#lead-result-container .anticon-arrow-left svg {
+#lead-research-report-container #header {
+  display: flex;
+  flex-direction: row;
+}
+
+#lead-research-report-container #header .ant-typography {
+  font-family: "Lato";
+}
+
+#lead-research-report-container #back-arrow {
+  width: 30%;
+}
+
+#lead-research-report-container #person-details-container {
+  width: 40%;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#lead-research-report-container #person-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#lead-research-report-container #person-name {
+  font-weight: 700;
+}
+
+#lead-research-report-container #role-title {
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+#lead-research-report-container #report-dates {
+  width: 30%;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  align-items: end;
+}
+
+#lead-research-report-container #report-creation-date {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+#lead-research-report-container #research-start-date {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+#lead-research-report-container .anticon-arrow-left svg {
   width: 2rem;
   height: 2rem;
   color: var(--primary);
 }
 
-#lead-result-container h3 {
+#lead-research-report-container h3 {
   margin-top: 1rem;
   color: var(--on-surface);
 }
 
-#lead-result-container #info-container {
-  margin-top: 2%;
+#lead-research-report-container #report-details-container {
+  margin-top: 5rem;
 }
 
-#info-container .detail-section-btn {
+#report-details-container .category-btn {
   width: fit-content;
-  background-color: var(--primary-container);
-  color: var(--on-primary-container);
   border-radius: 1.5rem;
   font-size: 1.7rem;
   font-weight: 500;
   padding: 1.8rem;
+  background-color: var(--primary-container);
+  color: var(--on-primary-container);
 }
 
-#info-container .detail-section-btn:hover {
+#report-details-container .category-btn:hover {
   background-color: var(--hover-color);
   color: var(--on-primary);
 }
 
-#info-container .ant-card {
+#report-details-container .category-btn-selected {
+  width: fit-content;
+  border-radius: 1.5rem;
+  font-size: 1.7rem;
+  font-weight: 500;
+  padding: 1.8rem;
+  background-color: var(--hover-color);
+  color: var(--on-primary);
+}
+
+#report-details-container .ant-card {
   padding: 0;
   border-radius: 1.7rem;
   background-color: var(--surface-bright);
 }
 
-#info-container .ant-card .card-text {
-  font-family: "Lato";
-  font-size: 1.7rem;
+#report-details-container .ant-card .card-category {
+  font-size: 2rem;
   color: var(--on-surface);
   font-weight: 550;
+  color: var(--on-surface);
 }
 
-#info-container .ant-card .card-date {
-  font-family: "Lato";
+#lead-research-report-container .card-citation-link-container {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+#lead-research-report-container .card-citation-source-label {
+  color: var(--primary);
+}
+
+#lead-research-report-container .card-date-container {
+  margin-top: 0.3rem;
+}
+
+#report-details-container .ant-card .card-date-label {
+  color: var(--primary);
+}
+
+#report-details-container .ant-card .card-date {
   color: var(--on-surface);
   font-weight: 600;
 }
 
-#lead-result-container .card-citation-link {
-  padding: 0;
+#report-details-container .ant-card .card-text-container {
+  margin-top: 1rem;
 }
 
-#lead-result-container #outreach-container {
+#report-details-container .ant-card .card-text {
+  font-size: 1.6rem;
+  color: var(--on-surface);
+  font-weight: 400;
+}
+
+#lead-research-report-container #outreach-container {
   margin-top: 5%;
 }
 

@@ -5,7 +5,7 @@ import { useNavigate, useLoaderData } from "react-router-dom";
 import { useState } from "react";
 import { sampleReport, outreachMessages } from "./lead-research-report-data";
 
-const { Title, Text } = Typography;
+const { Title, Text, Link } = Typography;
 
 function addLineBreaks(text) {
   return text.split("\n").map((substr) => {
@@ -29,32 +29,81 @@ function OutreachCard({ text }) {
 function HighlightCard({ highlight }) {
   return (
     <Card>
-      <Text className="card-text">{highlight.concise_summary}</Text>
       <div>
-        <Button className="card-citation-link" type="link" href={highlight.url}>
-          {highlight.url}
-        </Button>
+        <Text strong className="card-category">
+          {highlight.category_readable_str}
+        </Text>
       </div>
-      <Text className="card-date">{highlight.publish_date_readable_str}</Text>
+      <div className="card-citation-link-container">
+        <Text className="card-citation-source-label" strong>
+          Source:{" "}
+        </Text>
+        <Link
+          className="card-citation-link"
+          href={highlight.url}
+          target="_blank"
+        >
+          {highlight.url}
+        </Link>
+      </div>
+      <div className="card-date-container">
+        <Text className="card-date-label" strong>
+          Publish Date:{" "}
+        </Text>
+        <Text className="card-date">{highlight.publish_date_readable_str}</Text>
+      </div>
+      <div className="card-text-container">
+        <Text className="card-text">{highlight.concise_summary}</Text>
+      </div>
     </Card>
   );
 }
 
-function DetailSection({ detail }) {
-  const [cardClicked, setCardClicked] = useState(false);
+function CategoriesSection({ report }) {
+  const [categoriesSelected, setCategoriesSeleted] = useState([]);
+
+  function handleCategoryClicked(category) {
+    if (categoriesSelected.filter((cat) => cat === category).length === 0) {
+      // Category not selected yet, add to selection.
+      setCategoriesSeleted([...categoriesSelected, category]);
+    } else {
+      // Category already selected, remove it.
+      setCategoriesSeleted(
+        categoriesSelected.filter((cat) => cat !== category)
+      );
+    }
+  }
+
   return (
     <>
-      <Button
-        className="detail-section-btn"
-        type="primary"
-        onClick={() => setCardClicked(!cardClicked)}
-      >
-        {detail.category_readable_str}
-      </Button>
-      {cardClicked &&
-        detail.highlights.map((highlight) => (
-          <HighlightCard key={highlight.url} highlight={highlight} />
-        ))}
+      {/* These are the categories */}
+      {report.details.map((detail) => {
+        let categoryBtnClass = categoriesSelected.includes(
+          detail.category_readable_str
+        )
+          ? "category-btn-selected"
+          : "category-btn";
+        return (
+          <Button
+            key={detail.category}
+            className={categoryBtnClass}
+            type="primary"
+            onClick={(e) => handleCategoryClicked(e.target.innerText)}
+          >
+            {detail.category_readable_str}
+          </Button>
+        );
+      })}
+      {/* These are the highlights from selected categories. */}
+      {report.details
+        .filter((detail) =>
+          categoriesSelected.includes(detail.category_readable_str)
+        )
+        .flatMap((detail) =>
+          detail.highlights.map((highlight) => (
+            <HighlightCard highlight={highlight} />
+          ))
+        )}
     </>
   );
 }
@@ -76,29 +125,44 @@ function LeadResearchReport() {
   const report = useLoaderData();
 
   return (
-    <div id="lead-result-outer">
-      <div id="lead-result-container">
-        <ArrowLeftOutlined onClick={() => navigate("/")} />
-        <Flex vertical={true} align="flex-start">
-          <Title level={3}>
-            {report.person_name}, {report.person_role_title},{" "}
-            {report.company_name}
-          </Title>
-          <Button type="link" href={report.linkedin_url}>
-            {report.linkedin_url}
-          </Button>
-          <Text>
-            Report Created On: {report.report_creation_date_readable_str}
-          </Text>
-          <Text>
-            Earliest News Date: {report.report_publish_cutoff_date_readable_str}
-          </Text>
-        </Flex>
+    <div id="lead-research-report-outer">
+      <div id="lead-research-report-container">
+        <div id="header">
+          <div id="back-arrow">
+            <ArrowLeftOutlined onClick={() => navigate("/")} />
+          </div>
+          <div id="person-details-container">
+            <div id="person-details">
+              <h1 id="person-name">{report.person_name}</h1>
+              <h3 id="role-title">
+                {report.person_role_title}, {report.company_name}
+              </h3>
+              <Link
+                id="linkedin-url"
+                href={report.linkedin_url}
+                target="_blank"
+              >
+                {report.linkedin_url}
+              </Link>
+            </div>
+          </div>
+          <div id="report-dates">
+            <div id="report-creation-date">
+              <Text>Report Creation Date: </Text>
+              <Text strong>{report.report_creation_date_readable_str}</Text>
+            </div>
+            <div id="research-start-date">
+              <Text>Research Start Date: </Text>
+              <Text strong>
+                {" "}
+                {report.report_publish_cutoff_date_readable_str}
+              </Text>
+            </div>
+          </div>
+        </div>
 
-        <Flex id="info-container" vertical={true} gap="large">
-          {report.details.map((detail) => (
-            <DetailSection key={detail.category} detail={detail} />
-          ))}
+        <Flex id="report-details-container" vertical={false} wrap gap="large">
+          <CategoriesSection report={report} />
         </Flex>
         <Flex id="outreach-container" vertical={true} gap="large">
           <Title level={4}>Sample Outreach Messages</Title>
