@@ -72,6 +72,8 @@ class Researcher:
         lead_research_report.person_name = person_profile.full_name
         lead_research_report.person_role_title = role_title
         lead_research_report.status = LeadResearchReport.Status.FETCHED_BASIC_DETAILS
+        lead_research_report.company_headcount = company_profile.company_size_on_linkedin
+        lead_research_report.company_industry_categories = company_profile.categories
 
         # Insert to database.
         id: str = self.database.insert_lead_research_report(

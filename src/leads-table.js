@@ -1,69 +1,98 @@
-import { Table } from "antd";
+import "./leads-table.css";
+import { Table, Typography } from "antd";
+
+const { Text, Link } = Typography;
+
+function renderLinkedInProfile(person_name, record, index) {
+  const linkedin_url = record.person_linkedin_url;
+  return (
+    <Link href={linkedin_url} target="_blank">
+      {person_name}
+    </Link>
+  );
+}
+
+function renderIndustries(industries, record, index) {
+  return <Text>{industries.join(", ")}</Text>;
+}
+
+function renderResearchStatus(researchStatus, record, index) {
+  const status = record.status === "complete" ? "Complete" : "In Progress";
+  const link =
+    record.status === "complete" ? "/lead-research-reports/" + record.id : "";
+  return <Link href={link}>{status}</Link>;
+}
 
 const columns = [
   {
     title: "Name",
-    dataIndex: "name",
-    key: "name",
-    // render: (_, record) => <a href={record.url}>{record.name}</a>,
+    dataIndex: "person_name",
+    key: "person_name",
+    render: renderLinkedInProfile,
   },
   {
     title: "Role Title",
-    dataIndex: "roleTitle",
-    key: "roleTitle",
+    dataIndex: "person_role_title",
+    key: "person_role_title",
   },
   {
     title: "Company Name",
-    dataIndex: "companyName",
-    key: "companyName",
+    dataIndex: "company_name",
+    key: "company_name",
   },
   {
-    title: "Industry",
-    dataIndex: "industry",
-    key: "industry",
+    title: "Industries",
+    dataIndex: "company_industry_categories",
+    key: "company_industry_categories",
+    render: renderIndustries,
   },
   {
     title: "Company Headcount",
-    dataIndex: "companyHeadcount",
-    key: "companyHeadcount",
+    dataIndex: "company_headcount",
+    key: "company_headcount",
   },
   {
-    title: "Research results",
+    title: "Research Status",
     dataIndex: "researchResults",
     key: "researchResults",
-    render: (_, record) => <a href="/">View</a>,
+    render: renderResearchStatus,
   },
 ];
 
-const data = [
-  {
-    key: "1",
-    name: "John Smith",
-    roleTitle: "CEO",
-    companyName: "Hubspot",
-    industry: "CRM, Marketing tech",
-    companyHeadcount: "10,456",
-    url: "www.linkedin.com",
-  },
-  {
-    key: "1",
-    name: "Jean-Denis Graze",
-    roleTitle: "CTO",
-    companyName: "Plaid",
-    industry: "Financial Services, Payments",
-    companyHeadcount: "1221",
-    url: "www.linkedin.com",
-  },
-  {
-    key: "2",
-    name: "Marc Benioff",
-    roleTitle: "CEO",
-    companyName: "Salesforce",
-    industry: "CRM, ERP, Marketing",
-    companyHeadcount: "15,200",
-    url: "www.linkedin.com",
-  },
-];
-
-const LeadsTable = () => <Table columns={columns} dataSource={data} />;
+// Mock data from server.
+export const leadsResult = {
+  status: "success",
+  leads: [
+    {
+      id: "66ab9633a3bb9048bc1a0be5",
+      creation_date: null,
+      last_updated_date: null,
+      person_linkedin_url: "https://www.linkedin.com/in/zperret",
+      person_profile_id: null,
+      company_profile_id: null,
+      person_name: "Zachary Perret",
+      company_name: "Plaid",
+      person_role_title: "Co-Founder / CEO",
+      status: "complete",
+      company_headcount: 1222,
+      company_industry_categories: [
+        "banking",
+        "finance",
+        "financial-services",
+        "fintech-e067",
+        "insurtech",
+        "software",
+        "wealth-management",
+      ],
+      search_results_map: null,
+      report_creation_date_readable_str: null,
+      report_publish_cutoff_date: null,
+      report_publish_cutoff_date_readable_str: null,
+      details: null,
+    },
+  ],
+};
+function LeadsTable({ leads }) {
+  return <Table id="leads-table" columns={columns} dataSource={leads} />;
+}
 export default LeadsTable;

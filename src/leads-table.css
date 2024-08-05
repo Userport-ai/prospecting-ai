@@ -1,0 +1,21 @@
+#leads-table .ant-table-thead th {
+  background-color: var(--primary-container);
+  color: var(--on-primary-container);
+  border-radius: 0;
+  font-weight: 500;
+}
+
+#leads-table .ant-table-thead th::before {
+  border: 1px solid var(--outline-variant);
+}
+
+#leads-table .ant-table-tbody td {
+  background-color: var(--surface);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+#leads-table .ant-pagination-item {
+  border: 1px solid var(--secondary);
+  color: var(--primary);
+}

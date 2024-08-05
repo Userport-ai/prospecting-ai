@@ -320,6 +320,10 @@ class LeadResearchReport(BaseModel):
         default=None, description="Role title of person at company.")
     status: Optional[Status] = Field(
         default=None, description="Status of the report creation at given point in time.")
+    company_headcount: Optional[int] = Field(
+        default=None, description="Company Headcount during document creation.")
+    company_industry_categories: Optional[List[str]] = Field(
+        default=None, description="Company Industry categories")
     # TODO: Add user and organization information.
 
     # Store search results.
@@ -333,8 +337,8 @@ class LeadResearchReport(BaseModel):
         None, description="Publish Date cutoff beyond which report is created. This can be 3 months, 6 months, 12 months etc. before report creation date.")
     report_publish_cutoff_date_readable_str: Optional[str] = Field(
         default=None, description="Report Publish Date human readable string value.")
-    details: List[ReportDetail] = Field(
-        default=[], description="Report details associated with the lead.")
+    details: Optional[List[ReportDetail]] = Field(
+        default=None, description="Report details associated with the lead.")
 
 
 class PersonProfile(BaseModel):

@@ -2,6 +2,7 @@
 import os
 import contextlib
 from typing import Optional, Dict
+import pymongo
 from collections.abc import Generator
 from pymongo.mongo_client import MongoClient
 from pymongo.client_session import ClientSession
@@ -211,6 +212,23 @@ class Database:
             return None
         return LeadResearchReport(**data_dict)
 
+    def list_lead_research_reports(self, projection: Optional[Dict[str, int]] = None) -> List[LeadResearchReport]:
+        """Returns Lead Research reports for given user and org. Returns only fields specified in the projection dictionary.
+
+        TODO: Once userprofile and org profiles are defined, pass that in as filter.
+        """
+        collection = self._get_lead_research_report_collection()
+        # TODO: Update filter to pass in user and organization as fields to filter on.
+        # TODO: Add pagination using skip() as well.
+        cursor = collection.find({}, projection).sort(
+            [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
+        )
+        lead_research_reports: List[LeadResearchReport] = []
+        for research_report_dict in cursor:
+            lead_research_reports.append(
+                LeadResearchReport(**research_report_dict))
+        return lead_research_reports
+
     def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
         """Sets fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
         collection = self._get_lead_research_report_collection()
@@ -243,6 +261,13 @@ class Database:
 
         content_collection.delete_many({'_id': {'$in': content_ids}})
 
+    def migrate_docs(self, collection: Collection, filter: Dict, update: Dict):
+        """Internal method to migrate many documents in given collection with given updates.
+
+        DO NOT USE in production code.
+        """
+        collection.update_many(filter=filter, update=update)
+
     def _test_connection(self):
         """Helper method to test successful connection to cluster deployment."""
         try:
@@ -255,7 +280,15 @@ class Database:
 if __name__ == "__main__":
 
     db = Database()
-    content_details_id = '66a88a0fa052ee77579340a0'
-    details = db.get_content_details(content_details_id=content_details_id)
+    # content_details_id = '66a88a0fa052ee77579340a0'
+    # details = db.get_content_details(content_details_id=content_details_id)
 
     # db.delete_all_content_details()
+    update = {
+        "$set": {
+            "company_headcount": 1222,
+            "company_industry_categories": ["banking", "finance", "financial-services", "fintech-e067", "insurtech", "software", "wealth-management"],
+        }
+    }
+    db.migrate_docs(
+        collection=db._get_lead_research_report_collection(), filter={}, update=update)

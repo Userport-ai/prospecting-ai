@@ -80,7 +80,7 @@ class LeadResearchReportPOSTResponse(BaseModel):
 
 
 @bp.post('/v1/lead-research-reports')
-def lead_reports_post():
+def post_lead_report():
     db = Database()
 
     # Create research report.
@@ -158,7 +158,7 @@ class LeadResearchReportGETResponse(BaseModel):
 
 
 @bp.get('/v1/lead-research-reports/<string:lead_research_report_id>')
-def lead_reports_get(lead_research_report_id: str):
+def get_lead_report(lead_research_report_id: str):
     # Fetch existing report.
     db = Database()
     try:
@@ -186,6 +186,49 @@ def lead_reports_get(lead_research_report_id: str):
             f"Failed to read report from database with error: {e}")
         raise APIException(
             status_code=500, message="Failed to read research report")
+
+
+class ListLeadsResponse(BaseModel):
+    """API response listing leads."""
+    status: str = Field(...,
+                        description="Status (success) of the response.")
+    leads: List[LeadResearchReport] = Field(
+        ..., description="List of leads.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: str) -> str:
+        if v != ResponseStatus.SUCCESS.value:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.get('/v1/leads')
+def list_leads():
+    # List all leads for given user and org.
+    # TODO: Add limit to the leads response.
+    db = Database()
+    try:
+        projection = {
+            "person_linkedin_url": 1,
+            "person_name": 1,
+            "company_name": 1,
+            "person_role_title": 1,
+            "status": 1,
+            "company_headcount": 1,
+            "company_industry_categories": 1,
+        }
+        lead_research_reports: List[LeadResearchReport] = db.list_lead_research_reports(
+            projection=projection)
+        logger.info(
+            f"Got {len(lead_research_reports)} reports from the database")
+        response = ListLeadsResponse(
+            status=ResponseStatus.SUCCESS.value, leads=lead_research_reports)
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(f"Failed to list with error: {e}")
+        raise APIException(
+            status_code=500, message="Failed to list lead research reports.")
 
 
 @bp.route('/v1/debug', methods=['GET'])

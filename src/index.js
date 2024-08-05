@@ -5,13 +5,18 @@ import AllTemplates from "./all-templates";
 import { templateMessagesLoader } from "./all-templates";
 import CreateTemplateMessage from "./create-template-message";
 import { createTemplateAction } from "./create-template-message";
-import FetchedLeads from "./fetched-leads";
+import Leads from "./leads";
+import { leadsLoader } from "./leads";
 import EnterLeadInfo from "./enter-lead-info";
 import { enterLeadAction } from "./enter-lead-info";
 import LeadResearchReport from "./lead-research-report";
 import { leadResearchReportLoader } from "./lead-research-report";
 import ErrorPage from "./error-page";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import {
+  createBrowserRouter,
+  redirect,
+  RouterProvider,
+} from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";
 import "bootstrap/dist/css/bootstrap.css";
 // Put any other imports below so that CSS from your
@@ -37,11 +42,14 @@ const router = createBrowserRouter([
       {
         // Navigate home to leads page by default
         path: "/",
-        element: <FetchedLeads />,
+        loader: () => {
+          return redirect("/leads");
+        },
       },
       {
         path: "/leads",
-        element: <FetchedLeads />,
+        element: <Leads />,
+        loader: leadsLoader,
       },
       {
         path: "/enter-lead-info",
