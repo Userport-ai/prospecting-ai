@@ -11,7 +11,7 @@ function App() {
       <div id="app-container">
         <AppHeader></AppHeader>
         <Content>
-          <Outlet></Outlet>
+          <Outlet />
         </Content>
       </div>
     </>

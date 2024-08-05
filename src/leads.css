@@ -32,3 +32,7 @@
 #leads-container .ant-btn-primary:hover {
   background-color: var(--hover-color);
 }
+
+#leads-container .ant-spin-dot {
+  color: var(--primary);
+}

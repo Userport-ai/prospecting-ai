@@ -1,16 +1,16 @@
 import "./leads.css";
-import { Typography, Button } from "antd";
+import { Typography, Button, Spin } from "antd";
 import LeadsTable from "./leads-table";
 import { leadsResult } from "./leads-table";
-import { useNavigate, useLoaderData } from "react-router-dom";
+import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 
 const { Title } = Typography;
 
 // Loader to fetch leads.
 export async function leadsLoader() {
-  // const response = await fetch("/api/v1/leads");
-  // const result = await response.json();
-  const result = await leadsResult;
+  const response = await fetch("/api/v1/leads");
+  const result = await response.json();
+  // const result = await leadsResult;
   if (result.status === "error") {
     throw result;
   }
@@ -20,6 +20,8 @@ export async function leadsLoader() {
 function Leads() {
   const navigate = useNavigate();
   const leadsResult = useLoaderData();
+  const navigation = useNavigation();
+  const loading_or_submitting = navigation.state !== "idle";
 
   return (
     <div id="leads-outer">
@@ -31,6 +33,7 @@ function Leads() {
             Add new lead
           </Button>
         </div>
+        <Spin spinning={loading_or_submitting} />;
       </div>
     </div>
   );

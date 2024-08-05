@@ -1,5 +1,6 @@
 import "./leads-table.css";
 import { Table, Typography } from "antd";
+import { useNavigate } from "react-router-dom";
 
 const { Text, Link } = Typography;
 
@@ -18,9 +19,10 @@ function renderIndustries(industries, record, index) {
 
 function renderResearchStatus(researchStatus, record, index) {
   const status = record.status === "complete" ? "Complete" : "In Progress";
-  const link =
-    record.status === "complete" ? "/lead-research-reports/" + record.id : "";
-  return <Link href={link}>{status}</Link>;
+  if (status === "Complete") {
+    return <Link className="research-status">{status}</Link>;
+  }
+  return <Text>{status}</Text>;
 }
 
 const columns = [
@@ -92,7 +94,27 @@ export const leadsResult = {
     },
   ],
 };
+
 function LeadsTable({ leads }) {
-  return <Table id="leads-table" columns={columns} dataSource={leads} />;
+  const navigate = useNavigate();
+  return (
+    <>
+      <Table
+        id="leads-table"
+        columns={columns}
+        dataSource={leads}
+        onRow={(record, index) => {
+          return {
+            onClick: (e) => {
+              if (e.target.classList.contains("research-status") === true) {
+                // Navigate to the Research Report link. This will prevent complete page load.
+                return navigate("/lead-research-reports/" + record.id);
+              }
+            },
+          };
+        }}
+      />
+    </>
+  );
 }
 export default LeadsTable;

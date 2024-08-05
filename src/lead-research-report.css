@@ -12,6 +12,10 @@
   flex-direction: column;
 }
 
+#lead-research-report-container .ant-spin-dot {
+  color: var(--primary);
+}
+
 #lead-research-report-container #header {
   display: flex;
   flex-direction: row;

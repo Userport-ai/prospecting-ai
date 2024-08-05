@@ -47,18 +47,18 @@ const router = createBrowserRouter([
         },
       },
       {
-        path: "/leads",
+        path: "leads",
         element: <Leads />,
         loader: leadsLoader,
       },
       {
-        path: "/enter-lead-info",
+        path: "enter-lead-info",
         element: <EnterLeadInfo />,
         action: enterLeadAction,
         errorElement: <EnterLeadInfo />,
       },
       {
-        path: "/lead-research-reports/:id",
+        path: "lead-research-reports/:id",
         element: <LeadResearchReport />,
         loader: leadResearchReportLoader,
       },

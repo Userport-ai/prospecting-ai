@@ -5,7 +5,6 @@ import {
   Form as RouterForm,
   useRouteError,
   useNavigation,
-  redirect,
 } from "react-router-dom";
 import { useState } from "react";
 
@@ -26,13 +25,8 @@ export async function enterLeadAction({ request, params }) {
   const result = await response.json();
   if (result.status === "error") {
     // Throw error so it can be caught by component.
-    console.log("Got error when calling /api/v1/lead_report: ", result);
+    console.log("Got error when creating lead research report: ", result);
     throw result;
-  }
-
-  if (result.lead_research_report_status === "complete") {
-    // Research complete for lead, route to the research report page.
-    return redirect(`/lead-research-reports/${result.lead_research_report_id}`);
   }
 
   // TODO: Handle state where it research report is still in progress.
@@ -60,7 +54,7 @@ function EnterLeadInfo() {
 
   const navigation = useNavigation();
 
-  const loading_or_submitting = navigation.state != "idle";
+  const loading_or_submitting = navigation.state !== "idle";
 
   return (
     <div id="enter-lead-info-outer">

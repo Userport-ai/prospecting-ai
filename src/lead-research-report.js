@@ -1,7 +1,7 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { Flex, Typography, Button, Card } from "antd";
-import { useNavigate, useLoaderData } from "react-router-dom";
+import { Flex, Typography, Button, Card, Spin } from "antd";
+import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 import { useState } from "react";
 import { sampleReport, outreachMessages } from "./lead-research-report-data";
 
@@ -110,23 +110,26 @@ function CategoriesSection({ report }) {
 
 // Loader to fetch research report for given lead.
 export async function leadResearchReportLoader({ params }) {
-  // const response = await fetch("/api/v1/lead-research-reports/" + params.id);
-  // const result = await response.json();
-  const result = await sampleReport;
+  const response = await fetch("/api/v1/lead-research-reports/" + params.id);
+  const result = await response.json();
+  // const result = await sampleReport;
   if (result.status === "error") {
     console.log("Error getting lead report: ", result);
     throw result;
   }
-  return result;
+  return result.lead_research_report;
 }
 
 function LeadResearchReport() {
   const navigate = useNavigate();
   const report = useLoaderData();
+  const navigation = useNavigation();
+  const loading_or_submitting = navigation.state !== "idle";
 
   return (
     <div id="lead-research-report-outer">
       <div id="lead-research-report-container">
+        <Spin spinning={loading_or_submitting} />;
         <div id="header">
           <div id="back-arrow">
             <ArrowLeftOutlined onClick={() => navigate("/")} />
@@ -139,10 +142,10 @@ function LeadResearchReport() {
               </h3>
               <Link
                 id="linkedin-url"
-                href={report.linkedin_url}
+                href={report.person_linkedin_url}
                 target="_blank"
               >
-                {report.linkedin_url}
+                {report.person_linkedin_url}
               </Link>
             </div>
           </div>
@@ -160,7 +163,6 @@ function LeadResearchReport() {
             </div>
           </div>
         </div>
-
         <Flex id="report-details-container" vertical={false} wrap gap="large">
           <CategoriesSection report={report} />
         </Flex>

@@ -193,11 +193,11 @@ class Database:
                 f'Content Details not found for Id: {content_details_id}')
         return ContentDetails(**data_dict)
 
-    def get_lead_research_report(self, lead_research_report_id: str) -> Optional[LeadResearchReport]:
+    def get_lead_research_report(self, lead_research_report_id: str, projection: Optional[Dict[str, int]] = None) -> Optional[LeadResearchReport]:
         """Returns Lead Research report for given ID."""
         collection = self._get_lead_research_report_collection()
         data_dict = collection.find_one(
-            {"_id": ObjectId(lead_research_report_id)})
+            {"_id": ObjectId(lead_research_report_id)}, projection=projection)
         if not data_dict:
             raise ValueError(
                 f'Lead Research report not found for Id: {lead_research_report_id}')
