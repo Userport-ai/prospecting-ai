@@ -3,10 +3,19 @@ import firebase from "firebase/compat/app";
 import * as firebaseui from "firebaseui";
 import "firebaseui/dist/firebaseui.css";
 import { AuthContext } from "./root";
-import { Navigate } from "react-router-dom";
+import { redirect } from "react-router-dom";
+
+export const loginLoader = (authContext) => {
+  return async () => {
+    if (authContext.user) {
+      // User already logged in, redirect to leads page.
+      return redirect("/leads");
+    }
+  };
+};
 
 function Login() {
-  const { user, auth } = useContext(AuthContext);
+  const { auth } = useContext(AuthContext);
 
   useEffect(() => {
     // This will mount the Firebase Sign In UI and allow user to sign in using given options.
@@ -27,10 +36,6 @@ function Login() {
       firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth);
     ui.start("#firebase-auth-container", uiConfig);
   }, [auth]);
-
-  if (user) {
-    return <Navigate to="/leads" replace />;
-  }
 
   return (
     <>

@@ -2,12 +2,7 @@ import "./leads.css";
 import { Typography, Button, Spin } from "antd";
 import LeadsTable from "./leads-table";
 import { leadsResult } from "./leads-table";
-import {
-  useNavigate,
-  useLoaderData,
-  useNavigation,
-  redirect,
-} from "react-router-dom";
+import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 
 const { Title } = Typography;
 

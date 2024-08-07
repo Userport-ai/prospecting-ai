@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import ReactDOM from "react-dom/client";
 import Root, { AuthContext } from "./root";
 import App from "./App";
-import Login from "./login";
+import Login, { loginLoader } from "./login";
 import AllTemplates from "./all-templates";
 import { templateMessagesLoader } from "./all-templates";
 import CreateTemplateMessage from "./create-template-message";
@@ -20,15 +20,20 @@ import "bootstrap/dist/css/bootstrap.css";
 // Put any other imports below so that CSS from your
 // components takes precedence over default styles.
 import "./index.css";
-import { auth } from "firebaseui";
 
 function AppRoutes() {
   const authContext = useContext(AuthContext);
+  if (authContext.isAuthLoading) {
+    // User auth is still loading, don't render app.
+    return <div></div>;
+  }
+
   const router = (context) =>
     createBrowserRouter([
       {
         path: "/login",
         element: <Login />,
+        loader: loginLoader(context),
       },
       {
         path: "/",

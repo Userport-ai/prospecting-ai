@@ -23,6 +23,7 @@ function Root({ children }) {
   const auth = getAuth(app);
 
   const [user, setUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // Observe auth object for changes in user's signed in state.
   useEffect(() => {
@@ -37,6 +38,7 @@ function Root({ children }) {
         // navigate("/login");
       }
       setUser(authUser);
+      setIsAuthLoading(false);
     });
     return () => unRegistered();
   }, [user]);
@@ -52,6 +54,7 @@ function Root({ children }) {
 
   const value = {
     user,
+    isAuthLoading,
     auth,
     handleLogout,
   };
