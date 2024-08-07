@@ -2,20 +2,33 @@ import "./leads.css";
 import { Typography, Button, Spin } from "antd";
 import LeadsTable from "./leads-table";
 import { leadsResult } from "./leads-table";
-import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
+import {
+  useNavigate,
+  useLoaderData,
+  useNavigation,
+  redirect,
+} from "react-router-dom";
 
 const { Title } = Typography;
 
 // Loader to fetch leads.
-export async function leadsLoader() {
-  const response = await fetch("/api/v1/leads");
-  const result = await response.json();
-  // const result = await leadsResult;
-  if (result.status === "error") {
-    throw result;
-  }
-  return result;
-}
+export const leadsLoader = (authContext) => {
+  return async () => {
+    const { user } = authContext;
+    if (!user) {
+      // User is logged out.
+      // return redirect("/login");
+      return null;
+    }
+    const response = await fetch("/api/v1/leads");
+    const result = await response.json();
+    // const result = await leadsResult;
+    if (result.status === "error") {
+      throw result;
+    }
+    return result;
+  };
+};
 
 function Leads() {
   const navigate = useNavigate();

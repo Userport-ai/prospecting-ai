@@ -3,14 +3,21 @@ import { Flex, Typography, Button } from "antd";
 import { useNavigate } from "react-router-dom";
 import TemplateCard from "./template-card";
 import { getTemplateMessages } from "./create-template-message-data";
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData, redirect } from "react-router-dom";
 
 const { Title } = Typography;
 
-export async function templateMessagesLoader() {
-  const templateMessages = getTemplateMessages();
-  return { templateMessages };
-}
+export const templateMessagesLoader = (authContext) => {
+  return async ({ params }) => {
+    const { user } = authContext;
+    if (!user) {
+      // User is logged out.
+      return redirect("/login");
+    }
+    const templateMessages = getTemplateMessages();
+    return { templateMessages };
+  };
+};
 
 function AllTemplates() {
   const navigate = useNavigate();

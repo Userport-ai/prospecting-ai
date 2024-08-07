@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useContext } from "react";
 import ReactDOM from "react-dom/client";
+import Root, { AuthContext } from "./root";
 import App from "./App";
+import Login from "./login";
 import AllTemplates from "./all-templates";
 import { templateMessagesLoader } from "./all-templates";
 import CreateTemplateMessage from "./create-template-message";
@@ -12,64 +14,65 @@ import { enterLeadAction } from "./enter-lead-info";
 import LeadResearchReport from "./lead-research-report";
 import { leadResearchReportLoader } from "./lead-research-report";
 import ErrorPage from "./error-page";
-import {
-  createBrowserRouter,
-  redirect,
-  RouterProvider,
-} from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";
 import "bootstrap/dist/css/bootstrap.css";
 // Put any other imports below so that CSS from your
 // components takes precedence over default styles.
 import "./index.css";
+import { auth } from "firebaseui";
 
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <App />,
-    errorElement: <ErrorPage />,
-    children: [
+function AppRoutes() {
+  const authContext = useContext(AuthContext);
+  const router = (context) =>
+    createBrowserRouter([
       {
-        path: "/templates",
-        element: <AllTemplates />,
-        loader: templateMessagesLoader,
+        path: "/login",
+        element: <Login />,
       },
       {
-        path: "/create-template",
-        element: <CreateTemplateMessage />,
-        action: createTemplateAction,
-      },
-      {
-        // Navigate home to leads page by default
         path: "/",
-        loader: () => {
-          return redirect("/leads");
-        },
+        element: <App />,
+        errorElement: <ErrorPage />,
+        children: [
+          {
+            path: "templates",
+            element: <AllTemplates />,
+            loader: templateMessagesLoader(context),
+          },
+          {
+            path: "create-template",
+            element: <CreateTemplateMessage />,
+            action: createTemplateAction,
+          },
+          {
+            path: "leads",
+            element: <Leads />,
+            loader: leadsLoader(context),
+          },
+          {
+            path: "enter-lead-info",
+            element: <EnterLeadInfo />,
+            action: enterLeadAction,
+            errorElement: <EnterLeadInfo />,
+          },
+          {
+            path: "lead-research-reports/:id",
+            element: <LeadResearchReport />,
+            loader: leadResearchReportLoader(context),
+          },
+        ],
       },
-      {
-        path: "leads",
-        element: <Leads />,
-        loader: leadsLoader,
-      },
-      {
-        path: "enter-lead-info",
-        element: <EnterLeadInfo />,
-        action: enterLeadAction,
-        errorElement: <EnterLeadInfo />,
-      },
-      {
-        path: "lead-research-reports/:id",
-        element: <LeadResearchReport />,
-        loader: leadResearchReportLoader,
-      },
-    ],
-  },
-]);
+    ]);
+  return <RouterProvider router={router(authContext)} />;
+}
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <Root>
+      <AppRoutes />
+    </Root>
   </React.StrictMode>
 );
 

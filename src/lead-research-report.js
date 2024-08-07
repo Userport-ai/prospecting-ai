@@ -1,7 +1,12 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Flex, Typography, Button, Card, Spin } from "antd";
-import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
+import {
+  useNavigate,
+  useLoaderData,
+  useNavigation,
+  redirect,
+} from "react-router-dom";
 import { useState } from "react";
 import { sampleReport, outreachMessages } from "./lead-research-report-data";
 
@@ -109,16 +114,23 @@ function CategoriesSection({ report }) {
 }
 
 // Loader to fetch research report for given lead.
-export async function leadResearchReportLoader({ params }) {
-  const response = await fetch("/api/v1/lead-research-reports/" + params.id);
-  const result = await response.json();
-  // const result = await sampleReport;
-  if (result.status === "error") {
-    console.log("Error getting lead report: ", result);
-    throw result;
-  }
-  return result.lead_research_report;
-}
+export const leadResearchReportLoader = (authContext) => {
+  return async ({ params }) => {
+    const { user } = authContext;
+    if (!user) {
+      // User is logged out.
+      return redirect("/login");
+    }
+    const response = await fetch("/api/v1/lead-research-reports/" + params.id);
+    const result = await response.json();
+    // const result = await sampleReport;
+    if (result.status === "error") {
+      console.log("Error getting lead report: ", result);
+      throw result;
+    }
+    return result.lead_research_report;
+  };
+};
 
 function LeadResearchReport() {
   const navigate = useNavigate();
