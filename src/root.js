@@ -6,7 +6,7 @@ import {
   sendEmailVerification,
 } from "firebase/auth";
 import { createContext, useEffect, useState } from "react";
-import { Navigate, redirect } from "react-router-dom";
+import { redirect } from "react-router-dom";
 
 export const AuthContext = createContext(null);
 
@@ -50,7 +50,7 @@ function Root({ children }) {
       }
     });
     return () => unRegistered();
-  }, [user]);
+  }, [auth]);
 
   // Callback for User Logout event.
   async function handleLogout() {

@@ -9,9 +9,8 @@
 }
 
 #login-content-container {
-  width: 100%;
-  margin-top: 5%;
-  padding: 2rem;
+  width: 40%;
+  margin-top: 3%;
 
   display: flex;
   flex-direction: column;
@@ -23,15 +22,17 @@
   font-weight: 700;
   font-family: "Lato";
   font-size: 4rem;
+  text-shadow: 0.5px 0.5px var(--primary);
 }
 
 #login-content-container #login-or-signup-text {
-  margin-top: 2rem;
+  margin-top: 1rem;
   color: var(--secondary);
   font-size: medium;
   font-weight: 600;
 }
 
 #login-content-container #firebase-auth-container {
-  margin-top: 1rem;
+  margin-top: 3rem;
+  width: 100%;
 }
