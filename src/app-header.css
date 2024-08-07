@@ -7,7 +7,7 @@
 }
 
 #nav-header #nav-logo-title {
-  margin-left: 2%;
+  margin-left: 1%;
   background-color: var(--primary);
   display: flex;
   justify-content: start;
@@ -41,6 +41,10 @@
 #nav-header .ant-menu-item::after {
   /* Remove hover border bottom color for unselected menu items. */
   border-bottom: none;
+}
+
+#nav-header .ant-menu-submenu-title {
+  color: var(--outline-variant);
 }
 
 #nav-header .ant-menu-title-content {

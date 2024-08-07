@@ -15,9 +15,9 @@ export const leadsLoader = (authContext) => {
       // return redirect("/login");
       return null;
     }
-    const response = await fetch("/api/v1/leads");
-    const result = await response.json();
-    // const result = await leadsResult;
+    // const response = await fetch("/api/v1/leads");
+    // const result = await response.json();
+    const result = await leadsResult;
     if (result.status === "error") {
       throw result;
     }

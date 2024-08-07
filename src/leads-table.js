@@ -17,12 +17,14 @@ function renderIndustries(industries, record, index) {
   return <Text>{industries.join(", ")}</Text>;
 }
 
-function renderResearchStatus(researchStatus, record, index) {
-  const status = record.status === "complete" ? "Complete" : "In Progress";
-  if (status === "Complete") {
-    return <Link className="research-status">{status}</Link>;
+function renderReportStatus(researchStatus, record, index) {
+  var status = "In Progress";
+  if (record.status === "complete") {
+    return <Link className="research-report-ready">Ready</Link>;
+  } else if (record.status == "failed_with_errors") {
+    return <Text className="research-report-error">Error</Text>;
   }
-  return <Text>{status}</Text>;
+  return <Text className="research-report-in-progress">{status}</Text>;
 }
 
 const columns = [
@@ -54,10 +56,10 @@ const columns = [
     key: "company_headcount",
   },
   {
-    title: "Research Status",
+    title: "Report Status",
     dataIndex: "researchResults",
     key: "researchResults",
-    render: renderResearchStatus,
+    render: renderReportStatus,
   },
 ];
 
