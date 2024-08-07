@@ -11,6 +11,7 @@ export const loginLoader = (authContext) => {
       // User already logged in, redirect to leads page.
       return redirect("/leads");
     }
+    return null;
   };
 };
 

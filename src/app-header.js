@@ -2,13 +2,15 @@ import "./app-header.css";
 import { Layout, Menu, Typography } from "antd";
 import { UserOutlined, SettingOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useContext, useState } from "react";
+import { AuthContext } from "./root";
 
 const { Header } = Layout;
 const { Title } = Typography;
 const templates_key = "templates";
 const leads_key = "leads";
 const account_key = "account";
+const logout_key = "logout";
 
 const items = [
   {
@@ -25,10 +27,17 @@ const items = [
     label: "Account",
     key: account_key,
     icon: <SettingOutlined />,
+    children: [
+      {
+        label: "Logout",
+        key: logout_key,
+      },
+    ],
   },
 ];
 
 function AppHeader() {
+  const { handleLogout } = useContext(AuthContext);
   const navigate = useNavigate();
   const [curMenuKey, setCurMenuKey] = useState(leads_key);
   return (
@@ -48,6 +57,8 @@ function AppHeader() {
           } else if (e.key === templates_key) {
             setCurMenuKey(templates_key);
             navigate("/templates");
+          } else if (e.key === logout_key) {
+            handleLogout();
           }
         }}
       ></Menu>

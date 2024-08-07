@@ -1,6 +1,12 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signOut,
+  sendEmailVerification,
+} from "firebase/auth";
 import { createContext, useEffect, useState } from "react";
+import { Navigate, redirect } from "react-router-dom";
 
 export const AuthContext = createContext(null);
 
@@ -28,17 +34,20 @@ function Root({ children }) {
   // Observe auth object for changes in user's signed in state.
   useEffect(() => {
     const unRegistered = onAuthStateChanged(auth, (authUser) => {
+      setUser(authUser);
+      setIsAuthLoading(false);
       if (authUser) {
         console.log("user logged in: ", authUser);
         // user.accessToken
         // user.uid user id
-        // TODO: Navigate to Leads page.
+        if (!authUser.emailVerified) {
+          sendEmailVerification(authUser);
+        }
       } else {
-        console.log("user logged out");
-        // navigate("/login");
+        console.log("user logged out, navigate to login.");
+        // Redirect to login page.
+        return redirect("/login");
       }
-      setUser(authUser);
-      setIsAuthLoading(false);
     });
     return () => unRegistered();
   }, [user]);
