@@ -1,0 +1,37 @@
+#login-header {
+  background-color: var(--primary);
+}
+
+#login-content {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#login-content-container {
+  width: 100%;
+  margin-top: 5%;
+  padding: 2rem;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#login-content-container #company-title {
+  color: var(--primary);
+  font-weight: 700;
+  font-family: "Lato";
+  font-size: 4rem;
+}
+
+#login-content-container #login-or-signup-text {
+  margin-top: 2rem;
+  color: var(--secondary);
+  font-size: medium;
+  font-weight: 600;
+}
+
+#login-content-container #firebase-auth-container {
+  margin-top: 1rem;
+}

@@ -1,9 +1,13 @@
+import "./login.css";
 import { useContext, useEffect } from "react";
 import firebase from "firebase/compat/app";
 import * as firebaseui from "firebaseui";
 import "firebaseui/dist/firebaseui.css";
 import { AuthContext } from "./root";
 import { redirect } from "react-router-dom";
+import { Layout } from "antd";
+
+const { Header, Content } = Layout;
 
 export const loginLoader = (authContext) => {
   return async () => {
@@ -40,8 +44,14 @@ function Login() {
 
   return (
     <>
-      <h1>LOGIN</h1>
-      <div id="firebase-auth-container"></div>
+      <Header id="login-header"></Header>
+      <Content id="login-content">
+        <div id="login-content-container">
+          <h1 id="company-title">Userport.ai</h1>
+          <p id="login-or-signup-text">Login or Sign Up</p>
+          <div id="firebase-auth-container"></div>
+        </div>
+      </Content>
     </>
   );
 }

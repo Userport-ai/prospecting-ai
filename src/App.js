@@ -1,7 +1,7 @@
 import "./App.css";
 import { Layout } from "antd";
 import AppHeader from "./app-header";
-import { Navigate, Outlet, useNavigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "./root";
 
