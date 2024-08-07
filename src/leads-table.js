@@ -21,7 +21,7 @@ function renderReportStatus(researchStatus, record, index) {
   var status = "In Progress";
   if (record.status === "complete") {
     return <Link className="research-report-ready">Ready</Link>;
-  } else if (record.status == "failed_with_errors") {
+  } else if (record.status === "failed_with_errors") {
     return <Text className="research-report-error">Error</Text>;
   }
   return <Text className="research-report-in-progress">{status}</Text>;

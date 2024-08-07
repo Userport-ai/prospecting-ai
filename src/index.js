@@ -14,7 +14,11 @@ import { enterLeadAction } from "./enter-lead-info";
 import LeadResearchReport from "./lead-research-report";
 import { leadResearchReportLoader } from "./lead-research-report";
 import ErrorPage from "./error-page";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import {
+  createBrowserRouter,
+  redirect,
+  RouterProvider,
+} from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";
 import "bootstrap/dist/css/bootstrap.css";
 // Put any other imports below so that CSS from your
@@ -41,6 +45,15 @@ function AppRoutes() {
         errorElement: <ErrorPage />,
         children: [
           {
+            path: "/",
+            loader: () => redirect("/leads"),
+          },
+          {
+            path: "leads",
+            element: <Leads />,
+            loader: leadsLoader(context),
+          },
+          {
             path: "templates",
             element: <AllTemplates />,
             loader: templateMessagesLoader(context),
@@ -49,11 +62,6 @@ function AppRoutes() {
             path: "create-template",
             element: <CreateTemplateMessage />,
             action: createTemplateAction,
-          },
-          {
-            path: "leads",
-            element: <Leads />,
-            loader: leadsLoader(context),
           },
           {
             path: "enter-lead-info",
