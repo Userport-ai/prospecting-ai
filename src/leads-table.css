@@ -18,6 +18,8 @@
 #leads-table .research-report-ready {
   color: rgb(26, 150, 26);
   font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 #leads-table .research-report-in-progress {
