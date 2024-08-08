@@ -10,27 +10,36 @@ import { useState } from "react";
 
 const { Title } = Typography;
 
-export async function enterLeadAction({ request, params }) {
-  const formData = await request.formData();
-  const inputValueMap = Object.fromEntries(formData);
-  const linkedin_url = inputValueMap["linkedin_url"];
+export const enterLeadAction = (authContext) => {
+  return async ({ request, params }) => {
+    const { user } = authContext;
+    if (!user) {
+      // User is logged out.
+      return null;
+    }
 
-  const response = await fetch("/api/v1/lead-research-reports", {
-    method: "POST",
-    body: JSON.stringify({ linkedin_url: linkedin_url }),
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-  const result = await response.json();
-  if (result.status === "error") {
-    // Throw error so it can be caught by component.
-    console.log("Got error when creating lead research report: ", result);
-    throw result;
-  }
+    const formData = await request.formData();
+    const inputValueMap = Object.fromEntries(formData);
+    const linkedin_url = inputValueMap["linkedin_url"];
 
-  // TODO: Handle state where it research report is still in progress.
-}
+    const response = await fetch("/api/v1/lead-research-reports", {
+      method: "POST",
+      body: JSON.stringify({ linkedin_url: linkedin_url }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + user.accessToken,
+      },
+    });
+    const result = await response.json();
+    if (result.status === "error") {
+      // Throw error so it can be caught by component.
+      console.log("Got error when creating lead research report: ", result);
+      throw result;
+    }
+
+    // TODO: Handle state where it research report is still in progress.
+  };
+};
 
 function DisplayError({ error }) {
   if (error) {

@@ -66,7 +66,7 @@ function AppRoutes() {
           {
             path: "enter-lead-info",
             element: <EnterLeadInfo />,
-            action: enterLeadAction,
+            action: enterLeadAction(context),
             errorElement: <EnterLeadInfo />,
           },
           {

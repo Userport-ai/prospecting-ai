@@ -121,7 +121,9 @@ export const leadResearchReportLoader = (authContext) => {
       // User is logged out.
       return redirect("/login");
     }
-    const response = await fetch("/api/v1/lead-research-reports/" + params.id);
+    const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
+      headers: { Authorization: "Bearer " + user.accessToken },
+    });
     const result = await response.json();
     // const result = await sampleReport;
     if (result.status === "error") {

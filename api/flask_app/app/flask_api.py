@@ -1,14 +1,16 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 import logging
 from enum import Enum
 from typing import Optional, List
 from celery import shared_task
+from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
 from app.models import LeadResearchReport
 from app.research_report import Researcher
 from app.utils import Utils
 from app.linkedin_scraper import LinkedInScraper
+from firebase_admin import auth
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -54,6 +56,29 @@ def api_exception(e):
     return jsonify(e.to_dict()), e.status_code
 
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "Authorization" not in request.headers:
+            logger.exception(
+                f"Unauthenticated request, missing Authorization in headers: {request.headers}")
+            raise APIException(
+                status_code=401, message="Missing Authentication credentials in request")
+        bearer = request.headers.get("Authorization")
+        id_token = bearer.split()[1]
+        user = None
+        try:
+            user = auth.verify_id_token(id_token)
+        except Exception as e:
+            logger.exception(f"Failed to verify ID token with error: {e}")
+            raise APIException(
+                status_code=401, message="Invalid Authentication credentials")
+        g.user = user
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
 class CreateLeadResearchReportResponse(BaseModel):
     """API Response of create lead research report request."""
     status: str = Field(...,
@@ -70,6 +95,7 @@ class CreateLeadResearchReportResponse(BaseModel):
 
 
 @bp.post('/v1/lead-research-reports')
+@login_required
 def create_lead_report():
     db = Database()
 
@@ -132,6 +158,7 @@ class GetLeadResearchReportResponse(BaseModel):
 
 
 @bp.get('/v1/lead-research-reports/<string:lead_research_report_id>')
+@login_required
 def get_lead_report(lead_research_report_id: str):
     # Fetch existing report.
     db = Database()
@@ -180,6 +207,7 @@ class ListLeadsResponse(BaseModel):
 
 
 @bp.get('/v1/leads')
+@login_required
 def list_leads():
     # List all leads for given user and org.
     # TODO: Add limit to the leads response.

@@ -12,12 +12,13 @@ export const leadsLoader = (authContext) => {
     const { user } = authContext;
     if (!user) {
       // User is logged out.
-      // return redirect("/login");
       return null;
     }
-    // const response = await fetch("/api/v1/leads");
-    // const result = await response.json();
-    const result = await leadsResult;
+    const response = await fetch("/api/v1/leads", {
+      headers: { Authorization: "Bearer " + user.accessToken },
+    });
+    const result = await response.json();
+    // const result = await leadsResult;
     if (result.status === "error") {
       throw result;
     }

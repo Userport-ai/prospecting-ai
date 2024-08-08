@@ -2,6 +2,7 @@ from flask import Flask
 from app import flask_api
 from celery import Celery, Task
 from logging.config import dictConfig
+import firebase_admin
 
 from dotenv import load_dotenv
 load_dotenv()  # take environment variables from .env.
@@ -58,6 +59,7 @@ def create_app():
         ),
     )
 
+    firebase_admin.initialize_app()
     app.register_blueprint(flask_api.bp)
     celery_init_app(app)
     return app

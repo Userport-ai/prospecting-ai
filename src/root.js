@@ -37,14 +37,11 @@ function Root({ children }) {
       setUser(authUser);
       setIsAuthLoading(false);
       if (authUser) {
-        console.log("user logged in: ", authUser);
-        // user.accessToken
-        // user.uid user id
         if (!authUser.emailVerified) {
+          // Ask user to verify email.
           sendEmailVerification(authUser);
         }
       } else {
-        console.log("user logged out, navigate to login.");
         // Redirect to login page.
         return redirect("/login");
       }

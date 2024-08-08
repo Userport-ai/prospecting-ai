@@ -108,7 +108,9 @@ function LeadsTable({ leads }) {
         onRow={(record, index) => {
           return {
             onClick: (e) => {
-              if (e.target.classList.contains("research-status") === true) {
+              if (
+                e.target.classList.contains("research-report-ready") === true
+              ) {
                 // Navigate to the Research Report link. This will prevent complete page load.
                 return navigate("/lead-research-reports/" + record.id);
               }
