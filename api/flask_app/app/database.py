@@ -194,7 +194,7 @@ class Database:
         return ContentDetails(**data_dict)
 
     def get_lead_research_report(self, lead_research_report_id: str, projection: Optional[Dict[str, int]] = None) -> Optional[LeadResearchReport]:
-        """Returns Lead Research report for given ID."""
+        """Returns Lead Research report for given Report ID."""
         collection = self._get_lead_research_report_collection()
         data_dict = collection.find_one(
             {"_id": ObjectId(lead_research_report_id)}, projection=projection)
@@ -203,24 +203,21 @@ class Database:
                 f'Lead Research report not found for Id: {lead_research_report_id}')
         return LeadResearchReport(**data_dict)
 
-    def get_lead_research_report_by_url(self, person_linkedin_url: str) -> Optional[LeadResearchReport]:
-        """Returns Lead Research report for given person's LinkedIn URL. If it doesn't exist, returns None."""
+    def get_lead_research_report_by_url(self, user_id: str, person_linkedin_url: str) -> Optional[LeadResearchReport]:
+        """Returns Lead Research report for given person's LinkedIn URL and the user who created the report. If it doesn't exist, returns None."""
         collection = self._get_lead_research_report_collection()
         data_dict = collection.find_one(
-            {"person_linkedin_url": person_linkedin_url})
+            {"user_id": user_id, "person_linkedin_url": person_linkedin_url})
         if not data_dict:
             return None
         return LeadResearchReport(**data_dict)
 
-    def list_lead_research_reports(self, projection: Optional[Dict[str, int]] = None) -> List[LeadResearchReport]:
-        """Returns Lead Research reports for given user and org. Returns only fields specified in the projection dictionary.
-
-        TODO: Once userprofile and org profiles are defined, pass that in as filter.
-        """
+    def list_lead_research_reports(self, user_id: str, projection: Optional[Dict[str, int]] = None) -> List[LeadResearchReport]:
+        """Returns Lead Research reports created by given user. Returns only fields specified in the projection dictionary."""
         collection = self._get_lead_research_report_collection()
         # TODO: Update filter to pass in user and organization as fields to filter on.
         # TODO: Add pagination using skip() as well.
-        cursor = collection.find({}, projection).sort(
+        cursor = collection.find({"user_id": user_id}, projection).sort(
             [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
         )
         lead_research_reports: List[LeadResearchReport] = []
@@ -292,3 +289,4 @@ if __name__ == "__main__":
     }
     db.migrate_docs(
         collection=db._get_lead_research_report_collection(), filter={}, update=update)
+    print("done")

@@ -29,8 +29,8 @@ class Researcher:
         # List of URLs that have failed to process.
         self.failed_urls: List[Tuple[str, str]] = []
 
-    def create(self, person_linkedin_url: str) -> LeadResearchReport:
-        """Creates Research report in the database for given lead's LinkedIn URL and returns the report."""
+    def create(self, user_id: str, person_linkedin_url: str) -> LeadResearchReport:
+        """Creates Research report in the database for given lead's LinkedIn URL and given user and returns the report."""
         lead_research_report = LeadResearchReport()
 
         # Compute person profile ID.
@@ -74,6 +74,7 @@ class Researcher:
         lead_research_report.status = LeadResearchReport.Status.FETCHED_BASIC_DETAILS
         lead_research_report.company_headcount = company_profile.company_size_on_linkedin
         lead_research_report.company_industry_categories = company_profile.categories
+        lead_research_report.user_id = user_id
 
         # Insert to database.
         id: str = self.database.insert_lead_research_report(

@@ -1,6 +1,6 @@
 import "./leads.css";
 import { Typography, Button, Spin } from "antd";
-import LeadsTable from "./leads-table";
+import LeadsTable, { emptyLeadsResult } from "./leads-table";
 import { leadsResult } from "./leads-table";
 import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 
@@ -18,7 +18,8 @@ export const leadsLoader = (authContext) => {
       headers: { Authorization: "Bearer " + user.accessToken },
     });
     const result = await response.json();
-    // const result = await leadsResult;
+    // const result = await emptyLeadsResult;
+    // console result = await leadsResult;
     if (result.status === "error") {
       throw result;
     }

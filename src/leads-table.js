@@ -63,6 +63,11 @@ const columns = [
   },
 ];
 
+export const emptyLeadsResult = {
+  status: "success",
+  leads: [],
+};
+
 // Mock data from server.
 export const leadsResult = {
   status: "success",

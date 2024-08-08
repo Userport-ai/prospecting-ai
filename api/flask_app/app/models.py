@@ -324,7 +324,8 @@ class LeadResearchReport(BaseModel):
         default=None, description="Company Headcount during document creation.")
     company_industry_categories: Optional[List[str]] = Field(
         default=None, description="Company Industry categories")
-    # TODO: Add user and organization information.
+    user_id: Optional[str] = Field(
+        default=None, description="User ID of the person who created this report.")
 
     # Store search results.
     search_results_map: Optional[Dict[str, List[str]]] = Field(

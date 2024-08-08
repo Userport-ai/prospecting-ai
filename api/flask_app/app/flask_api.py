@@ -83,8 +83,6 @@ class CreateLeadResearchReportResponse(BaseModel):
     """API Response of create lead research report request."""
     status: str = Field(...,
                         description="Status (success) of the response.")
-    lead_research_report: LeadResearchReport = Field(
-        ..., description="Created Research report.")
 
     @field_validator('status')
     @classmethod
@@ -98,6 +96,7 @@ class CreateLeadResearchReportResponse(BaseModel):
 @login_required
 def create_lead_report():
     db = Database()
+    user_id: str = g.user["uid"]
 
     # Create research report.
     rp = Researcher(database=db)
@@ -108,8 +107,8 @@ def create_lead_report():
 
     logger.info(f"Got request to start report for URL: {person_linkedin_url}")
     try:
-        lead_research_report: Optional[LeadResearchReport] = db.get_lead_research_report_by_url(
-            person_linkedin_url=person_linkedin_url)
+        lead_research_report: Optional[LeadResearchReport] = db.get_lead_research_report_by_url(user_id=user_id,
+                                                                                                person_linkedin_url=person_linkedin_url)
     except Exception as e:
         logger.exception(
             f"Failed to fetch Lead Research report for URL: {person_linkedin_url} with error: {e}")
@@ -124,7 +123,7 @@ def create_lead_report():
 
     try:
         lead_research_report = rp.create(
-            person_linkedin_url=person_linkedin_url)
+            user_id=user_id, person_linkedin_url=person_linkedin_url)
         fetch_search_results_in_background.delay(
             lead_research_report_id=lead_research_report.id)
 
@@ -132,7 +131,6 @@ def create_lead_report():
             f"Created a new lead research report: {lead_research_report.id} for URL: {person_linkedin_url}")
         response = CreateLeadResearchReportResponse(
             status=ResponseStatus.SUCCESS.value,
-            lead_research_report=lead_research_report
         )
         return response.model_dump()
     except Exception as e:
@@ -209,9 +207,10 @@ class ListLeadsResponse(BaseModel):
 @bp.get('/v1/leads')
 @login_required
 def list_leads():
-    # List all leads for given user and org.
+    # List all leads created by given user.
     # TODO: Add limit to the leads response.
     db = Database()
+    user_id: str = g.user["uid"]
     try:
         projection = {
             "person_linkedin_url": 1,
@@ -223,7 +222,7 @@ def list_leads():
             "company_industry_categories": 1,
         }
         lead_research_reports: List[LeadResearchReport] = db.list_lead_research_reports(
-            projection=projection)
+            user_id=user_id, projection=projection)
         logger.info(
             f"Got {len(lead_research_reports)} reports from the database")
         response = ListLeadsResponse(

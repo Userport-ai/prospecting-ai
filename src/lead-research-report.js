@@ -65,12 +65,18 @@ function HighlightCard({ highlight }) {
 }
 
 function CategoriesSection({ report }) {
-  const [categoriesSelected, setCategoriesSeleted] = useState([]);
+  var initialSelectedCategories = [];
+  if (report.details.length > 0) {
+    initialSelectedCategories = [report.details[0].category_readable_str];
+  }
+  const [categoriesSelected, setCategoriesSeleted] = useState(
+    initialSelectedCategories
+  );
 
   function handleCategoryClicked(category) {
     if (categoriesSelected.filter((cat) => cat === category).length === 0) {
-      // Category not selected yet, add to selection.
-      setCategoriesSeleted([...categoriesSelected, category]);
+      // Category not selected yet, prepend to selection.
+      setCategoriesSeleted([category, ...categoriesSelected]);
     } else {
       // Category already selected, remove it.
       setCategoriesSeleted(
@@ -100,9 +106,14 @@ function CategoriesSection({ report }) {
         );
       })}
       {/* These are the highlights from selected categories. */}
-      {report.details
-        .filter((detail) =>
-          categoriesSelected.includes(detail.category_readable_str)
+      {categoriesSelected
+        .map(
+          (selectedCategory) =>
+            // Filtered category guaranteed to exist and size 1 since selected categories
+            // are from the same details array.
+            report.details.filter(
+              (detail) => detail.category_readable_str === selectedCategory
+            )[0]
         )
         .flatMap((detail) =>
           detail.highlights.map((highlight) => (
