@@ -264,7 +264,7 @@ class ContentDetails(BaseModel):
 
 
 class LeadResearchReport(BaseModel):
-    """Report containing lead research."""
+    """Research report associated with a lead."""
 
     class Status(str, Enum):
         # Fetched basic details about the person and company.
@@ -299,7 +299,6 @@ class LeadResearchReport(BaseModel):
         highlights: List[Highlight] = Field(
             ..., description="List of Highlights associated with given category.")
 
-    """Research report associated with a lead."""
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
     creation_date: Optional[datetime] = Field(
@@ -340,6 +339,28 @@ class LeadResearchReport(BaseModel):
         default=None, description="Report Publish Date human readable string value.")
     details: Optional[List[ReportDetail]] = Field(
         default=None, description="Report details associated with the lead.")
+
+
+class OutreachEmailTemplate(BaseModel):
+    """Email template created by a user for outreach."""
+    id: Optional[PyObjectId] = Field(
+        alias="_id", default=None, description="MongoDB generated unique identifier for Outreach Email Template.")
+    user_id: Optional[str] = Field(
+        default=None, description="User ID of the user who created the email template.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date in UTC timezone when this document was inserted in the database.")
+    creation_date_readable_str: Optional[str] = Field(
+        default=None, description="Human Readable Date string when this document was inserted in the database.")
+    persona_role_titles: Optional[List[str]] = Field(
+        default=None, description="Role Titles for the persona this template is targeting. Can be more than one title.")
+    description: Optional[str] = Field(
+        default=None, description="Free form text describing the persona's skillset or specific interests.")
+    message: Optional[str] = Field(
+        default=None, description="Message template used for outreach to role titles above.")
+    last_updated_date: Optional[datetime] = Field(
+        default=None, description="Date in UTC timezone when this document was last updated in the database.")
+    last_updated_date_readable_str: Optional[str] = Field(
+        default=None, description="Human Readable Date string when this document was last updated in the database.")
 
 
 class PersonProfile(BaseModel):

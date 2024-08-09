@@ -13,13 +13,12 @@ To keep track of your employees sentiments, do you mind spending 20 minutes to s
 
 export const exampleTemplate = {
   roleTitles: "VP of HR",
-  additionalKeywords: "Employee happiness",
   message: hrTemplateMessage,
 };
 
-export const ceoTemplate = {
-  roleTitles: "CEO",
-  additionalKeywords: "",
+export const vpMarketingTemplate = {
+  roleTitles: "VP of Marketing",
+  description: "Experience in Performance Marketing",
   message: ceoTemplateMessage,
 };
 
@@ -30,6 +29,6 @@ export function getTemplateMessages() {
 }
 
 export function createTemplateMessage() {
-  createdMessages.push(ceoTemplate);
+  createdMessages.push(vpMarketingTemplate);
   return createdMessages;
 }

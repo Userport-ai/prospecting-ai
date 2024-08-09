@@ -1,79 +1,130 @@
 import "./create-template-message.css";
 import {
-  ceoTemplate,
+  vpMarketingTemplate,
   createTemplateMessage,
 } from "./create-template-message-data";
-import { Flex, Typography, Form, Input, Button } from "antd";
+import { Typography, Input, Button, Spin } from "antd";
 import BackArrow from "./back-arrow";
 import { useState } from "react";
-import { Form as RouterForm, redirect } from "react-router-dom";
+import { Form as RouterForm, useNavigation, redirect } from "react-router-dom";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 
-export async function createTemplateAction() {
-  createTemplateMessage();
-  return redirect("/templates");
+export const createTemplateAction = (authContext) => {
+  return async ({ request }) => {
+    const { user } = authContext;
+    if (!user) {
+      // User is logged out.
+      return null;
+    }
+    const formData = await request.formData();
+    const apiRequest = Object.fromEntries(formData);
+    if (apiRequest["persona_role_titles"].length === 0) {
+      throw { message: "Role Titles Cannot be empty", status_code: 400 };
+    }
+    if (apiRequest["message"].length === 0) {
+      throw { message: "Template message Cannot be empty", status_code: 400 };
+    }
+
+    const response = await fetch("/api/v1/outreach-email-templates", {
+      method: "POST",
+      body: JSON.stringify(apiRequest),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + user.accessToken,
+      },
+    });
+    const result = await response.json();
+    if (result.status === "error") {
+      console.log("Got error when creating outreach email template: ", result);
+      throw result;
+    }
+
+    // Successful creation, go back to all templates page.
+    return redirect("/templates");
+  };
+};
+
+function DisplaySpinState({ loading_or_submitting }) {
+  return (
+    <div id="spinner-container">
+      <Spin spinning={loading_or_submitting} />
+    </div>
+  );
 }
 
 function CreateTemplateMessage() {
-  const [currMessage, setCurrMessage] = useState(ceoTemplate.message);
+  const [currMessage, setCurrMessage] = useState(vpMarketingTemplate.message);
+  const navigation = useNavigation();
+  const loading_or_submitting = navigation.state !== "idle";
+
   return (
     <div id="create-template-message-outer">
       <div id="create-template-message-area">
-        <Flex
-          id="create-template-message-container"
-          vertical={true}
-          gap="middle"
-        >
-          <Flex vertical={false} gap="middle">
-            <BackArrow />
-            <Title level={3}>Create Template Message</Title>
-          </Flex>
-          <Form
-            layout="vertical"
-            labelCol={{ span: 10 }}
-            wrapperCol={{ span: 20 }}
-          >
-            <Form.Item
-              label="Role Titles"
-              name="role-titles"
-              rules={[
-                { required: true, message: "Please enter valid role titles!" },
-              ]}
-            >
-              <Input defaultValue={ceoTemplate.roleTitles} />
-            </Form.Item>
-
-            <Form.Item
-              label="Additional Keywords (optional)"
-              name="additional-keywords"
-              rules={[{ required: false }]}
-            >
-              <Input defaultValue={ceoTemplate.additionalKeywords} />
-            </Form.Item>
-
-            <Form.Item
-              label="Message"
-              name="message"
-              rules={[{ required: true, message: "Message cannot be empty!" }]}
-            >
-              <TextArea
-                defaultValue={currMessage}
-                value={currMessage}
-                onChange={(e) => setCurrMessage(e.target.value)}
-                autoSize={{ minRows: 5, maxRows: 100 }}
-              />
-            </Form.Item>
-          </Form>
-          <Flex id="btn-container" vertical={false} justify="flex-end">
+        <DisplaySpinState loading_or_submitting={loading_or_submitting} />
+        <div id="page-title">
+          <BackArrow />
+        </div>
+        <div id="create-template-message-container">
+          <div id="form-container">
+            <Title level={3}>Create Email Template</Title>
             <RouterForm method="post">
-              <Button type="primary" htmlType="submit">
-                Create
-              </Button>
+              <div id="role-titles-container">
+                <label htmlFor="persona-role-titles-input">
+                  Persona Role Titles
+                </label>
+                <Text className="label-helper-text">
+                  You can enter multiple roles by separating them with commas.
+                  Ex: VP of Sales, Director of Sales, CEO.
+                </Text>
+                <Input
+                  id="persona-role-titles-input"
+                  name="persona_role_titles"
+                  defaultValue={vpMarketingTemplate.roleTitles}
+                />
+              </div>
+
+              <div id="description-container">
+                <label htmlFor="description-input">
+                  Description (Optional)
+                </label>
+                <Text className="label-helper-text">
+                  Free form text describing the persona's skillset or background
+                  or any other specific detail. Ex: Experienced in Outbound
+                  Sales.
+                </Text>
+                <Input
+                  id="description-input"
+                  name="description"
+                  defaultValue={vpMarketingTemplate.description}
+                />
+              </div>
+
+              <div id="message-container">
+                <label htmlFor="message-textarea">Message</label>
+                <Text className="label-helper-text">
+                  The template message that shines light on the problem and
+                  provides the value proposition of your product.
+                </Text>
+                <TextArea
+                  id="message-textarea"
+                  name="message"
+                  defaultValue={currMessage}
+                  value={currMessage}
+                  onChange={(e) => setCurrMessage(e.target.value)}
+                  autoSize={{ minRows: 10, maxRows: 100 }}
+                />
+              </div>
+
+              <div id="btn-container">
+                <Button type="primary" htmlType="submit">
+                  Create
+                </Button>
+              </div>
             </RouterForm>
-          </Flex>
-        </Flex>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ from celery import shared_task
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
-from app.models import LeadResearchReport
+from app.models import LeadResearchReport, OutreachEmailTemplate
 from app.research_report import Researcher
 from app.utils import Utils
 from app.linkedin_scraper import LinkedInScraper
@@ -25,16 +25,16 @@ class ResponseStatus(str, Enum):
 
 class ErrorDetails(BaseModel):
     """Details of Error response."""
-    status: str = Field(...,
-                        description="Status (error) of the response.")
+    status: ResponseStatus = Field(...,
+                                   description="Status (error) of the response.")
     status_code: int = Field(...,
                              description="Status code associated with error.")
     message: str = Field(..., description="Message associated with error.")
 
     @field_validator('status')
     @classmethod
-    def status_must_be_error(cls, v: str) -> str:
-        if v != ResponseStatus.ERROR.value:
+    def status_must_be_error(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.ERROR:
             raise ValueError(f'Expected error status, got: {v}')
         return v
 
@@ -45,7 +45,7 @@ class APIException(Exception):
     def __init__(self, status_code: int, message: str) -> None:
         self.status_code: int = status_code
         self.error_details = ErrorDetails(
-            status=ResponseStatus.ERROR.value, status_code=status_code, message=message)
+            status=ResponseStatus.ERROR, status_code=status_code, message=message)
 
     def to_dict(self):
         return self.error_details.model_dump()
@@ -81,13 +81,13 @@ def login_required(f):
 
 class CreateLeadResearchReportResponse(BaseModel):
     """API Response of create lead research report request."""
-    status: str = Field(...,
-                        description="Status (success) of the response.")
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
 
     @field_validator('status')
     @classmethod
-    def status_must_be_success(cls, v: str) -> str:
-        if v != ResponseStatus.SUCCESS.value:
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
             raise ValueError(f'Expected success status, got: {v}')
         return v
 
@@ -130,7 +130,7 @@ def create_lead_report():
         logger.info(
             f"Created a new lead research report: {lead_research_report.id} for URL: {person_linkedin_url}")
         response = CreateLeadResearchReportResponse(
-            status=ResponseStatus.SUCCESS.value,
+            status=ResponseStatus.SUCCESS,
         )
         return response.model_dump()
     except Exception as e:
@@ -142,15 +142,15 @@ def create_lead_report():
 
 class GetLeadResearchReportResponse(BaseModel):
     """API Response to get lead research report request."""
-    status: str = Field(...,
-                        description="Status (success) of the response.")
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
     lead_research_report: LeadResearchReport = Field(
         ..., description="Fetched Lead Research report.")
 
     @field_validator('status')
     @classmethod
-    def status_must_be_success(cls, v: str) -> str:
-        if v != ResponseStatus.SUCCESS.value:
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
             raise ValueError(f'Expected success status, got: {v}')
         return v
 
@@ -178,7 +178,7 @@ def get_lead_report(lead_research_report_id: str):
         logger.info(
             f"Found research report for ID: {lead_research_report_id}")
         response = GetLeadResearchReportResponse(
-            status=ResponseStatus.SUCCESS.value,
+            status=ResponseStatus.SUCCESS,
             lead_research_report=lead_research_report
         )
         return response.model_dump()
@@ -191,15 +191,15 @@ def get_lead_report(lead_research_report_id: str):
 
 class ListLeadsResponse(BaseModel):
     """API response listing leads."""
-    status: str = Field(...,
-                        description="Status (success) of the response.")
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
     leads: List[LeadResearchReport] = Field(
         ..., description="List of leads.")
 
     @field_validator('status')
     @classmethod
-    def status_must_be_success(cls, v: str) -> str:
-        if v != ResponseStatus.SUCCESS.value:
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
             raise ValueError(f'Expected success status, got: {v}')
         return v
 
@@ -226,12 +226,63 @@ def list_leads():
         logger.info(
             f"Got {len(lead_research_reports)} reports from the database")
         response = ListLeadsResponse(
-            status=ResponseStatus.SUCCESS.value, leads=lead_research_reports)
+            status=ResponseStatus.SUCCESS, leads=lead_research_reports)
         return response.model_dump()
     except Exception as e:
         logger.exception(f"Failed to list with error: {e}")
         raise APIException(
             status_code=500, message="Failed to list lead research reports.")
+
+
+class CreateOutreachTemplateResponse(BaseModel):
+    """API response for creating Outreach Email template."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.post('/v1/outreach-email-templates')
+@login_required
+def create_outreach_email_template():
+    """Create Outreach Email template."""
+    db = Database()
+    user_id: str = g.user["uid"]
+
+    persona_role_titles: List[str] = None
+    description: str = None
+    message: str = None
+    try:
+        persona_role_titles = [title.strip() for title in request.json.get(
+            "persona_role_titles").split(",")]
+        description = request.json.get("description")
+        message = request.json.get("message")
+    except Exception as e:
+        logger.exception(
+            f"Failed to fetch input for creating email template for request: {request} with error: {e}")
+        raise APIException(
+            status_code=400, message="Invalid request parameters for template creation")
+
+    try:
+        outreach_email_template = OutreachEmailTemplate(
+            user_id=user_id, persona_role_titles=persona_role_titles, description=description, message=message)
+        template_id: str = db.insert_outreach_email_template(
+            outreach_email_template=outreach_email_template)
+        logger.info(
+            f"Created email template with ID: {template_id} for role titles: {persona_role_titles}")
+        response = CreateOutreachTemplateResponse(
+            status=ResponseStatus.SUCCESS)
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to create email template for request: {request} with error: {e}")
+        raise APIException(
+            status_code=500, message="Internal Error when creating email template")
 
 
 @bp.route('/v1/debug', methods=['GET'])

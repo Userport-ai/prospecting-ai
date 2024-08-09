@@ -69,3 +69,7 @@ button {
   justify-content: center;
   width: 100%;
 }
+
+.ant-spin-dot {
+  color: var(--primary);
+}

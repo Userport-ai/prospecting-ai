@@ -61,7 +61,7 @@ function AppRoutes() {
           {
             path: "create-template",
             element: <CreateTemplateMessage />,
-            action: createTemplateAction,
+            action: createTemplateAction(context),
           },
           {
             path: "enter-lead-info",

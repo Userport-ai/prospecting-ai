@@ -1,7 +1,7 @@
 import "./app-header.css";
 import { Layout, Menu, Typography } from "antd";
 import { UserOutlined, SettingOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
 
@@ -38,8 +38,11 @@ const items = [
 
 function AppHeader() {
   const { handleLogout } = useContext(AuthContext);
+  const location = useLocation();
+  const curMenuKey = location.pathname.includes("template")
+    ? templates_key
+    : leads_key;
   const navigate = useNavigate();
-  const [curMenuKey, setCurMenuKey] = useState(leads_key);
   return (
     <Header id="nav-header">
       <div id="nav-logo-title">
@@ -52,10 +55,8 @@ function AppHeader() {
         selectedKeys={[curMenuKey]}
         onClick={(e) => {
           if (e.key === leads_key) {
-            setCurMenuKey(leads_key);
             navigate("/leads");
           } else if (e.key === templates_key) {
-            setCurMenuKey(templates_key);
             navigate("/templates");
           } else if (e.key === logout_key) {
             handleLogout();

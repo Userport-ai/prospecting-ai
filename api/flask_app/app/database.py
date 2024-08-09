@@ -11,6 +11,7 @@ from pymongo.collection import Collection
 from pymongo.results import UpdateResult
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
+from datetime import datetime
 from app.utils import Utils
 from app.models import (
     PersonProfile,
@@ -18,7 +19,8 @@ from app.models import (
     ContentDetails,
     LinkedInPost,
     WebPage,
-    LeadResearchReport
+    LeadResearchReport,
+    OutreachEmailTemplate
 )
 from typing import List
 
@@ -65,6 +67,10 @@ class Database:
     def _get_lead_research_report_collection(self) -> Collection:
         """Returns Lead Research Report collection."""
         return self.db['lead_research_reports']
+
+    def _get_outreach_email_template_collection(self) -> Collection:
+        """Returns Outreach Email Templates collection."""
+        return self.db['outreach_email_templates']
 
     def insert_person_profile(self, person_profile: PersonProfile) -> str:
         """Inserts Person information as a document in the database and returns the created Id."""
@@ -136,6 +142,24 @@ class Database:
         collection = self._get_lead_research_report_collection()
         result = collection.insert_one(
             lead_research_report.model_dump(exclude=Database._exclude_id()), session=session)
+        return str(result.inserted_id)
+
+    def insert_outreach_email_template(self, outreach_email_template: OutreachEmailTemplate, session: Optional[ClientSession] = None) -> str:
+        """Inserts Outreach Email template in the database and returns the created Id."""
+        if outreach_email_template.id:
+            raise ValueError(
+                f"Outreach Email Template instance cannot have an Id before db insertion: {outreach_email_template}")
+        current_time: datetime = Utils.create_utc_time_now()
+        current_time_readable_str: str = Utils.to_human_readable_date_str(
+            current_time)
+        outreach_email_template.creation_date = current_time
+        outreach_email_template.creation_date_readable_str = current_time_readable_str
+        outreach_email_template.last_updated_date = current_time
+        outreach_email_template.last_updated_date_readable_str = current_time_readable_str
+
+        collection = self._get_outreach_email_template_collection()
+        result = collection.insert_one(
+            outreach_email_template.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
 
     @contextlib.contextmanager

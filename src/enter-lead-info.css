@@ -56,7 +56,3 @@ input {
 #form-container #spinner-container {
   margin-top: 5%;
 }
-
-#form-container .ant-spin-dot {
-  color: var(--primary);
-}
