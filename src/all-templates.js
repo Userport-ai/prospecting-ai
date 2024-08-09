@@ -1,14 +1,14 @@
 import "./all-templates.css";
-import { Typography, Button } from "antd";
+import { Typography, Button, Spin } from "antd";
 import { useNavigate } from "react-router-dom";
 import TemplateCard from "./template-card";
 import { exampleTemplateResponse } from "./create-template-message-data";
-import { useLoaderData, redirect } from "react-router-dom";
+import { useLoaderData, redirect, useNavigation } from "react-router-dom";
 
 const { Title } = Typography;
 
 export const templateMessagesLoader = (authContext) => {
-  return async ({ params }) => {
+  return async () => {
     const { user } = authContext;
     if (!user) {
       // User is logged out.
@@ -41,23 +41,28 @@ function TemplatesView({ templateMessages }) {
 
 function AllTemplates() {
   const navigate = useNavigate();
+  const navigation = useNavigation();
+  const loading_or_submitting = navigation.state !== "idle";
   const outreachEmailTemplates = useLoaderData();
 
   return (
     <div id="all-templates-outer">
-      <div id="all-templates-outer-container">
-        <div id="templates-title-container">
-          <Title level={3}>All Email Templates</Title>
-          <Button
-            type="primary"
-            htmlType="submit"
-            onClick={() => navigate("/create-template")}
-          >
-            Create
-          </Button>
-        </div>
-        <div id="template-cards-container">
-          <TemplatesView templateMessages={outreachEmailTemplates} />
+      <div id="outer-with-spinner">
+        <Spin spinning={loading_or_submitting} />;
+        <div id="all-templates-outer-container">
+          <div id="templates-title-container">
+            <Title level={3}>All Email Templates</Title>
+            <Button
+              type="primary"
+              htmlType="submit"
+              onClick={() => navigate("/create-template")}
+            >
+              Create
+            </Button>
+          </div>
+          <div id="template-cards-container">
+            <TemplatesView templateMessages={outreachEmailTemplates} />
+          </div>
         </div>
       </div>
     </div>

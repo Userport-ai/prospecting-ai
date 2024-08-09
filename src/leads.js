@@ -77,6 +77,9 @@ function Leads() {
   return (
     <div id="leads-outer">
       <div id="leads-container">
+        <div id="spinner-container">
+          <Spin spinning={loading_or_submitting} />;
+        </div>
         <Title level={3}>Leads</Title>
         <LeadsTable leads={leads} />
         <div id="add-leads-btn-container">
@@ -84,7 +87,6 @@ function Leads() {
             Add new lead
           </Button>
         </div>
-        <Spin spinning={loading_or_submitting} />;
       </div>
     </div>
   );
