@@ -8,16 +8,46 @@
 #all-templates-outer-container {
   width: 70%;
   margin-top: 5%;
+
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+#all-templates-outer-container #templates-title-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+#all-templates-outer-container #templates-title-container h3 {
+  color: var(--on-primary-container);
+}
+
+#all-templates-outer-container #template-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+#all-templates-outer-container #no-templates-created-container {
+  background-color: var(--surface-container-low);
+  padding: 4rem;
+
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#all-templates-outer-container #no-templates-created-container h2 {
+  color: var(--secondary);
 }
 
 #all-templates-outer-container .ant-card {
-  width: 45%;
-  height: fit-content;
   border: 1px solid var(--outline-variant);
 }
 
 #all-templates-outer-container .ant-typography {
-  font-family: "Lato";
   color: var(--on-surface);
 }
 
@@ -27,6 +57,7 @@
 
 #all-templates-outer-container .ant-btn {
   width: fit-content;
+  font-size: 1.6rem;
   height: 4rem;
   background-color: var(--primary);
   border-radius: 1.5rem;

@@ -285,6 +285,50 @@ def create_outreach_email_template():
             status_code=500, message="Internal Error when creating email template")
 
 
+class ListOutreachEmailTemplatesResponse(BaseModel):
+    """API response for listing Outreach Email templates."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+    outreach_email_templates: List[OutreachEmailTemplate] = Field(
+        ..., description="List of Outreach email templates created by the user.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.get('/v1/outreach-email-templates')
+@login_required
+def list_outreach_email_templates():
+    """List Outreach Email templates created by the user."""
+    db = Database()
+    user_id: str = g.user["uid"]
+
+    try:
+        projection = {
+            "persona_role_titles": 1,
+            "description": 1,
+            "message": 1,
+            "creation_date_readable_str": 1,
+            "last_updated_date_readable_str": 1,
+        }
+        outreach_email_templates: List[OutreachEmailTemplate] = db.list_outreach_email_templates(
+            user_id=user_id, projection=projection)
+        logger.info(
+            f"Fetched {len(outreach_email_templates)} outreach email templates for user: {user_id}")
+        response = ListOutreachEmailTemplatesResponse(
+            status=ResponseStatus.SUCCESS, outreach_email_templates=outreach_email_templates)
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to List outreach email templates with error: {e}")
+        raise APIException(
+            status_code=500, message="Internal Error when listing outreach email templates")
+
+
 @bp.route('/v1/debug', methods=['GET'])
 def debug():
     # Only used for debugging locally, do not call in production.

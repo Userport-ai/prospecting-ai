@@ -16,19 +16,27 @@ function TemplateCard({ templateDetails }) {
   }
 
   return (
-    <Card className="template-card">
+    <Card key={templateDetails.id} className="template-card">
       <Flex vertical={true} gap="middle">
         <Flex vertical={false} gap="small">
           <Text className="card-key">Role Titles:</Text>
-          <Text>{templateDetails.roleTitles}</Text>
+          <Text>{templateDetails.persona_role_titles}</Text>
         </Flex>
         <Flex vertical={false} gap="small">
-          <Text className="card-key">Additional Keywords:</Text>
-          <Text>{templateDetails.additionalKeywords}</Text>
+          <Text className="card-key">Description (Optional):</Text>
+          <Text>{templateDetails.description}</Text>
         </Flex>
         <Flex vertical={true} gap="small">
           <Text className="card-key">Message:</Text>
           <Text>{addLineBreaks(templateDetails.message)}</Text>
+        </Flex>
+        <Flex vertical={false} gap="small">
+          <Text className="card-key">Created:</Text>
+          <Text>{templateDetails.creation_date_readable_str}</Text>
+        </Flex>
+        <Flex vertical={false} gap="small">
+          <Text className="card-key">Last Edited:</Text>
+          <Text>{templateDetails.last_updated_date_readable_str}</Text>
         </Flex>
       </Flex>
     </Card>

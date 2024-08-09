@@ -1,8 +1,8 @@
 import "./all-templates.css";
-import { Flex, Typography, Button } from "antd";
+import { Typography, Button } from "antd";
 import { useNavigate } from "react-router-dom";
 import TemplateCard from "./template-card";
-import { getTemplateMessages } from "./create-template-message-data";
+import { exampleTemplateResponse } from "./create-template-message-data";
 import { useLoaderData, redirect } from "react-router-dom";
 
 const { Title } = Typography;
@@ -14,36 +14,52 @@ export const templateMessagesLoader = (authContext) => {
       // User is logged out.
       return redirect("/login");
     }
-    const templateMessages = getTemplateMessages();
-    return { templateMessages };
+    const response = await fetch("/api/v1/outreach-email-templates", {
+      headers: { Authorization: "Bearer " + user.accessToken },
+    });
+    const result = await response.json();
+    // const result = exampleTemplateResponse;
+    if (result.status === "error") {
+      throw result;
+    }
+    return result.outreach_email_templates;
   };
 };
 
+function TemplatesView({ templateMessages }) {
+  if (templateMessages.length === 0) {
+    return (
+      <div id="no-templates-created-container">
+        <h2>No Templates Created</h2>
+      </div>
+    );
+  }
+  return templateMessages.map((template) => (
+    <TemplateCard key={template.id} templateDetails={template} />
+  ));
+}
+
 function AllTemplates() {
   const navigate = useNavigate();
-  const { templateMessages } = useLoaderData();
+  const outreachEmailTemplates = useLoaderData();
 
   return (
     <div id="all-templates-outer">
-      <Flex id="all-templates-outer-container" vertical={true} gap="large">
-        <Title level={3}>Template Messages</Title>
-        <Flex vertical={false} wrap gap={100}>
-          {templateMessages.map((template) => (
-            <TemplateCard templateDetails={template} />
-          ))}
-        </Flex>
-
-        <Flex vertical={false} justify="flex-start">
+      <div id="all-templates-outer-container">
+        <div id="templates-title-container">
+          <Title level={3}>All Email Templates</Title>
           <Button
             type="primary"
             htmlType="submit"
-            // TODO: change to use action and send data to server
             onClick={() => navigate("/create-template")}
           >
-            Create new template
+            Create
           </Button>
-        </Flex>
-      </Flex>
+        </div>
+        <div id="template-cards-container">
+          <TemplatesView templateMessages={outreachEmailTemplates} />
+        </div>
+      </div>
     </div>
   );
 }

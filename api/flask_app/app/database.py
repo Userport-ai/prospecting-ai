@@ -250,6 +250,18 @@ class Database:
                 LeadResearchReport(**research_report_dict))
         return lead_research_reports
 
+    def list_outreach_email_templates(self, user_id: str, projection: Optional[Dict[str, int]] = None) -> List[OutreachEmailTemplate]:
+        """Returns Outreach Emails created by given user. Returns only fields specified in the projection dictionary."""
+        collection = self._get_outreach_email_template_collection()
+        cursor = collection.find({"user_id": user_id}, projection).sort(
+            [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
+        )
+        outreach_email_templates: List[OutreachEmailTemplate] = []
+        for outreach_email_template_dict in cursor:
+            outreach_email_templates.append(
+                OutreachEmailTemplate(**outreach_email_template_dict))
+        return outreach_email_templates
+
     def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
         """Sets fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
         collection = self._get_lead_research_report_collection()

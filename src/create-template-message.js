@@ -1,8 +1,4 @@
 import "./create-template-message.css";
-import {
-  vpMarketingTemplate,
-  createTemplateMessage,
-} from "./create-template-message-data";
 import { Typography, Input, Button, Spin } from "antd";
 import BackArrow from "./back-arrow";
 import { useState } from "react";
@@ -55,7 +51,7 @@ function DisplaySpinState({ loading_or_submitting }) {
 }
 
 function CreateTemplateMessage() {
-  const [currMessage, setCurrMessage] = useState(vpMarketingTemplate.message);
+  const [currMessage, setCurrMessage] = useState("");
   const navigation = useNavigation();
   const loading_or_submitting = navigation.state !== "idle";
 
@@ -81,7 +77,6 @@ function CreateTemplateMessage() {
                 <Input
                   id="persona-role-titles-input"
                   name="persona_role_titles"
-                  defaultValue={vpMarketingTemplate.roleTitles}
                 />
               </div>
 
@@ -94,11 +89,7 @@ function CreateTemplateMessage() {
                   or any other specific detail. Ex: Experienced in Outbound
                   Sales.
                 </Text>
-                <Input
-                  id="description-input"
-                  name="description"
-                  defaultValue={vpMarketingTemplate.description}
-                />
+                <Input id="description-input" name="description" />
               </div>
 
               <div id="message-container">
@@ -110,7 +101,6 @@ function CreateTemplateMessage() {
                 <TextArea
                   id="message-textarea"
                   name="message"
-                  defaultValue={currMessage}
                   value={currMessage}
                   onChange={(e) => setCurrMessage(e.target.value)}
                   autoSize={{ minRows: 10, maxRows: 100 }}

@@ -1,11 +1,9 @@
 .template-card .ant-card {
-  width: 45%;
-  height: fit-content;
   border: 1px solid var(--outline-variant);
 }
 
 .template-card .ant-typography {
-  font-family: "Lato";
+  font-size: 1.5rem;
   color: var(--on-surface);
 }
 
