@@ -58,6 +58,9 @@ function HighlightCard({ highlight }) {
         <Text className="card-date">{highlight.publish_date_readable_str}</Text>
       </div>
       <div className="card-text-container">
+        <Text className="card-text-label" strong>
+          Summary
+        </Text>
         <Text className="card-text">{highlight.concise_summary}</Text>
       </div>
     </Card>
@@ -132,11 +135,11 @@ export const leadResearchReportLoader = (authContext) => {
       // User is logged out.
       return redirect("/login");
     }
-    const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
-      headers: { Authorization: "Bearer " + user.accessToken },
-    });
-    const result = await response.json();
-    // const result = await sampleReport;
+    // const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
+    //   headers: { Authorization: "Bearer " + user.accessToken },
+    // });
+    // const result = await response.json();
+    const result = await sampleReport;
     if (result.status === "error") {
       console.log("Error getting lead report: ", result);
       throw result;
@@ -176,11 +179,11 @@ function LeadResearchReport() {
           </div>
           <div id="report-dates">
             <div id="report-creation-date">
-              <Text>Report Creation Date: </Text>
+              <Text className="report-dates-label">Report Creation Date: </Text>
               <Text strong>{report.report_creation_date_readable_str}</Text>
             </div>
             <div id="research-start-date">
-              <Text>Research Start Date: </Text>
+              <Text className="report-dates-label">Research Start Date: </Text>
               <Text strong>
                 {" "}
                 {report.report_publish_cutoff_date_readable_str}

@@ -318,7 +318,7 @@ def list_outreach_email_templates():
         outreach_email_templates: List[OutreachEmailTemplate] = db.list_outreach_email_templates(
             user_id=user_id, projection=projection)
         logger.info(
-            f"Fetched {len(outreach_email_templates)} outreach email templates for user: {user_id}")
+            f"Fetched {len(outreach_email_templates)} outreach email templates")
         response = ListOutreachEmailTemplatesResponse(
             status=ResponseStatus.SUCCESS, outreach_email_templates=outreach_email_templates)
         return response.model_dump()

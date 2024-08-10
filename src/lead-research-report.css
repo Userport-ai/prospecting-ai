@@ -67,6 +67,10 @@
   gap: 1rem;
 }
 
+#lead-research-report-container .report-dates-label {
+  color: var(--primary);
+}
+
 #lead-research-report-container .anticon-arrow-left svg {
   width: 2rem;
   height: 2rem;
@@ -111,13 +115,13 @@
   padding: 0;
   border-radius: 1.7rem;
   background-color: var(--surface-bright);
+  border: 1px solid var(--on-surface);
 }
 
 #report-details-container .ant-card .card-category {
   font-size: 2rem;
   color: var(--on-surface);
   font-weight: 550;
-  color: var(--on-surface);
 }
 
 #lead-research-report-container .card-citation-link-container {
@@ -147,12 +151,20 @@
 
 #report-details-container .ant-card .card-text-container {
   margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+#report-details-container .ant-card .card-text-label {
+  margin-top: 1rem;
+  font-size: 1.6rem;
+  color: var(--primary);
 }
 
 #report-details-container .ant-card .card-text {
-  font-size: 1.6rem;
-  color: var(--on-surface);
-  font-weight: 400;
+  font-size: 1.7rem;
+  color: var(--secondary);
+  font-weight: 500;
 }
 
 #lead-research-report-container #outreach-container {
@@ -166,7 +178,6 @@
 }
 
 #outreach-container .ant-card .outreach-text {
-  font-family: "Lato";
   font-size: 1.7rem;
   color: var(--on-surface);
   font-weight: 550;
