@@ -1,9 +1,10 @@
 import "./template-card.css";
-import { Card, Flex, Typography } from "antd";
+import { Card, Flex, Typography, Button } from "antd";
+import { DeleteOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
-function TemplateCard({ templateDetails }) {
+function TemplateCard({ templateDetails, onDeleteTemplate }) {
   function addLineBreaks(text) {
     return text.split("\n").map((substr) => {
       return (
@@ -15,13 +16,25 @@ function TemplateCard({ templateDetails }) {
     });
   }
 
+  function handleDelete() {
+    return onDeleteTemplate(templateDetails.id);
+  }
+
   return (
     <Card key={templateDetails.id} className="template-card">
       <Flex vertical={true} gap="middle">
-        <Flex vertical={false} gap="small">
-          <Text className="card-key">Role Titles:</Text>
-          <Text>{templateDetails.persona_role_titles}</Text>
-        </Flex>
+        <div className="template-role-titles-and-buttons">
+          <Flex vertical={false} gap="small">
+            <Text className="card-key">Role Titles:</Text>
+            <Text>{templateDetails.persona_role_titles}</Text>
+          </Flex>
+          <Button
+            className="delete-btn"
+            onClick={handleDelete}
+            icon={<DeleteOutlined style={{ color: "#65558f" }} />}
+          ></Button>
+        </div>
+
         <Flex vertical={false} gap="small">
           <Text className="card-key">Description (Optional):</Text>
           <Text>{templateDetails.description}</Text>

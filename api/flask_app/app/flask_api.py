@@ -329,6 +329,40 @@ def list_outreach_email_templates():
             status_code=500, message="Internal Error when listing outreach email templates")
 
 
+class DeleteOutreachTemplateResponse(BaseModel):
+    """API response for deleting Outreach Email template."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.delete('/v1/outreach-email-templates/<string:outreach_email_template_id>')
+@login_required
+def delete_outreach_email_template(outreach_email_template_id: str):
+    """Delete Outreach Email template with given ID."""
+    db = Database()
+
+    try:
+        db.delete_outreach_email_templates(
+            outreach_email_template_id=outreach_email_template_id)
+        logger.info(
+            f"Deleted Outreach Email template ID {outreach_email_template_id} successfully")
+        response = DeleteOutreachTemplateResponse(
+            status=ResponseStatus.SUCCESS)
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to delete Outreach Email template ID: {outreach_email_template_id} with error: {e}")
+        raise APIException(
+            status_code=500, message="Internal Error when deleting Outreach Email template")
+
+
 @bp.route('/v1/debug', methods=['GET'])
 def debug():
     # Only used for debugging locally, do not call in production.

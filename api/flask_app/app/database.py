@@ -271,6 +271,15 @@ class Database:
             raise ValueError(
                 f"Could not update research report with ID: {lead_research_report_id}")
 
+    def delete_outreach_email_templates(self, outreach_email_template_id: str):
+        """Deletes outreach email template with given ID."""
+        collection = self._get_outreach_email_template_collection()
+        result = collection.delete_one(
+            {"_id": ObjectId(outreach_email_template_id)})
+        if result.deleted_count != 1:
+            raise ValueError(
+                f"Failed to delete document with ID: {outreach_email_template_id}, deleted {result.deleted_count} docs.")
+
     def delete_all_content_details(self):
         """Deletes all content details and associated web pages and LinkedIn posts."""
         content_collection = self.get_content_details_collection()

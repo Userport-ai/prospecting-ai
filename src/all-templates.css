@@ -7,6 +7,7 @@
 }
 
 #all-templates-outer #outer-with-spinner {
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -17,9 +18,8 @@
 }
 
 #all-templates-outer-container {
-  width: 70%;
   margin-top: 5%;
-
+  width: 70%;
   display: flex;
   flex-direction: column;
   gap: 3rem;
@@ -66,7 +66,7 @@
   font-weight: 600;
 }
 
-#all-templates-outer-container .ant-btn {
+#all-templates-outer-container #create-template-btn {
   width: fit-content;
   font-size: 1.6rem;
   height: 4rem;
@@ -74,6 +74,6 @@
   border-radius: 1.5rem;
 }
 
-#all-templates-outer-container .ant-btn:hover {
+#all-templates-outer-container #create-template-btn:hover {
   background-color: var(--hover-color);
 }

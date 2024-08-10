@@ -17,10 +17,18 @@ export const createTemplateAction = (authContext) => {
     const formData = await request.formData();
     const apiRequest = Object.fromEntries(formData);
     if (apiRequest["persona_role_titles"].length === 0) {
-      throw { message: "Role Titles Cannot be empty", status_code: 400 };
+      const error_obj = {
+        message: "Role Titles Cannot be empty",
+        status_code: 400,
+      };
+      throw error_obj;
     }
     if (apiRequest["message"].length === 0) {
-      throw { message: "Template message Cannot be empty", status_code: 400 };
+      const error_obj = {
+        message: "Template message Cannot be empty",
+        status_code: 400,
+      };
+      throw error_obj;
     }
 
     const response = await fetch("/api/v1/outreach-email-templates", {

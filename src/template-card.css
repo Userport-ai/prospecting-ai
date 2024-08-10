@@ -10,3 +10,20 @@
 .template-card .card-key {
   font-weight: 600;
 }
+
+.template-card .template-role-titles-and-buttons {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.template-card .template-role-titles-and-buttons .delete-btn {
+  width: 4rem;
+  height: 4rem;
+  border: 0.5px solid var(--primary);
+}
+
+.template-card .template-role-titles-and-buttons .delete-btn:hover {
+  background-color: var(--surface-bright);
+  border: 0.5px solid var(--primary);
+}

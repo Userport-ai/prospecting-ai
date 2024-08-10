@@ -73,3 +73,8 @@ button {
 .ant-spin-dot {
   color: var(--primary);
 }
+
+/* Global Modal button colors. Hover styles don't seem to work, don't know why. */
+.ant-modal-confirm-btns .ant-btn-primary {
+  background-color: var(--primary);
+}

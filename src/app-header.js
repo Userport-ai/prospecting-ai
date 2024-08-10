@@ -2,7 +2,7 @@ import "./app-header.css";
 import { Layout, Menu, Typography } from "antd";
 import { UserOutlined, SettingOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import { AuthContext } from "./root";
 
 const { Header } = Layout;

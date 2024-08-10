@@ -2,8 +2,6 @@
 // Asking this as speaking with some of our engineering customers like X and Y , I've learned that a major challenge facing engineering teams today is productivity being hindered by time spent searching for technical documentation within the SDLC, but no worries- Glean solves this problem and much more!\n
 // To save your team from spending 20% of every workday looking for information, do you mind spending 20 mins to see Glean in action?`;
 
-import { message } from "antd";
-
 const hrTemplateMessage = `Do you have visibility when employees are not feeling the most productive in your organization today?\n
 We have spoken to a ton of HR leaders from Visa and Stripe and they all attest to an experience where it's very hard to track employee morale at scale.\n
 To ensure employees don't leave for your competition due to morale issues, do you mind spending 20 minutes to learn about WorkHR?`;
