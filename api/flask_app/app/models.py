@@ -303,6 +303,17 @@ class LeadResearchReport(BaseModel):
         highlights: List[Highlight] = Field(
             ..., description="List of Highlights associated with given category.")
 
+    class ChosenOutreachEmailTemplate(BaseModel):
+        """Outreach Template chosen for this Lead. If ID is None, then none of the existing templates were chosen at that time."""
+        id: Optional[PyObjectId] = Field(
+            default=None, description="ID of the selected OutreachEmailTemplate. Set to None if none of the templates created by the user were selected.")
+        creation_date: Optional[datetime] = Field(
+            default=None, description="Date in UTC Timezone when the template choosing was done. It is set even when no template is chosen.")
+        # TODO: Reference name field of Outreach Template here.
+        message: Optional[str] = Field(
+            default=None, description="Message template used for outreach to role titles above.")
+        reason: Optional[str] = Field(default=None, description="Reason why this template or None was selected.")
+
     class PersonalizedEmail(BaseModel):
         """Personalized Email addressed to a given lead in the lead research report."""
         id: Optional[PyObjectId] = Field(
@@ -363,6 +374,10 @@ class LeadResearchReport(BaseModel):
     details: Optional[List[ReportDetail]] = Field(
         default=None, description="Report details associated with the lead.")
 
+    # Chosen Outreach Email template.
+    chosen_outreach_email_template: Optional[ChosenOutreachEmailTemplate] = Field(
+        default=None, description="Outreach Email template that matches this Lead's profile.")
+
     # Outreach fields.
     personalized_emails: Optional[List[PersonalizedEmail]] = Field(
         default=None, description="List of Personalized emails that will be used for outreach.")
@@ -386,6 +401,7 @@ class OutreachEmailTemplate(BaseModel):
         default=None, description="Date in UTC timezone when this document was inserted in the database.")
     creation_date_readable_str: Optional[str] = Field(
         default=None, description="Human Readable Date string when this document was inserted in the database.")
+    # TODO: Add name field to this template to make it easy to reference in the UI.
     persona_role_titles: Optional[List[str]] = Field(
         default=None, description="Role Titles for the persona this template is targeting. Can be more than one title.")
     description: Optional[str] = Field(
@@ -396,6 +412,16 @@ class OutreachEmailTemplate(BaseModel):
         default=None, description="Date in UTC timezone when this document was last updated in the database.")
     last_updated_date_readable_str: Optional[str] = Field(
         default=None, description="Human Readable Date string when this document was last updated in the database.")
+
+    def to_persona_description_markdown(self) -> str:
+        """Returns Persona description formatted as Markdown string."""
+        return (
+            "## Persona Details\n"
+            f"ID: {self.id}\n"
+            f"Role Titles: {self.persona_role_titles}\n"
+            f"Description: {self.description if self.description else 'Unknown'}\n"
+            "\n"
+        )
 
 
 class PersonProfile(BaseModel):
@@ -447,6 +473,28 @@ class PersonProfile(BaseModel):
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
 
+        def to_markdown(self) -> str:
+            """Returns Markdown formatted string for given experience. Used for email template matching."""
+            duration_str = ""
+            if self.starts_at:
+                duration_str = Utils.to_human_readable_date_str(
+                    self.starts_at) + " - "
+
+            if self.ends_at:
+                duration_str += Utils.to_human_readable_date_str(self.ends_at)
+            elif self.starts_at:
+                # Start date exists but no end date, current experience.
+                duration_str += "Current"
+
+            return (
+                "## Experience\n"
+                f"Duration: {duration_str if duration_str != '' else 'Unknown'}\n"
+                f"Company: {self.company if self.company else 'Unknown'}\n"
+                f"Role Title: {self.title if self.title else 'Unknown'}\n"
+                f"Role Description: {self.description if self.description else 'Unknown'}\n"
+                "\n"
+            )
+
     class Education(BaseModel):
         """Education details of this person."""
         starts_at: Optional[datetime] = Field(
@@ -481,6 +529,28 @@ class PersonProfile(BaseModel):
             profile_date = PersonProfile.Date(**v)
             # Convert Date object to datetime object in UTC timezone.
             return Utils.create_utc_datetime(day=profile_date.day, month=profile_date.month, year=profile_date.year)
+
+        def to_markdown(self) -> str:
+            """Returns Markdown formatted string for given education. Used for email template matching."""
+            duration_str = ""
+            if self.starts_at:
+                duration_str = Utils.to_human_readable_date_str(
+                    self.starts_at) + " - "
+
+            if self.ends_at:
+                duration_str += Utils.to_human_readable_date_str(self.ends_at)
+            elif self.starts_at:
+                # Start date exists but no end date, current experience.
+                duration_str += "Current"
+
+            return (
+                "## Education\n"
+                f"Duration: {duration_str if duration_str != '' else 'Unknown'}\n"
+                f"School: {self.school if self.school else 'Unknown'}\n"
+                f"Degree: {self.degree_name if self.degree_name else 'Unknown'}\n"
+                f"Description: {self.description if self.description else 'Unknown'}\n"
+                "\n"
+            )
 
     class AccomplishmentOrg(BaseModel):
         """Defined by Proxycurl: https://nubela.co/proxycurl/docs#people-api-person-profile-endpoint-response-accomplishmentorg"""
@@ -766,6 +836,25 @@ class PersonProfile(BaseModel):
             raise ValueError(
                 f"Could not find experience in profile with company: {company_name}. Profile: {self}")
         return experience.company_linkedin_profile_url
+
+    def to_markdown(self) -> str:
+        """Returns Markdown representation of the person's profile. Will be used to match outreach email templates."""
+
+        markdown: str = (
+            f"Name: {self.full_name}\n"
+            f"Occupation: {self.occupation}\n"
+            f"Profile Headline:  {self.headline}\n"
+            f"About: {self.summary if self.summary else 'Unknown'}\n"
+            f"Skills: {str(self.skills) if len(self.skills) > 0 else 'Unknown'}\n"
+            "\n"
+        )
+        for exp in self.experiences:
+            markdown += exp.to_markdown()
+
+        for ed in self.education:
+            markdown += ed.to_markdown()
+
+        return markdown
 
 
 class CompanyProfile(BaseModel):
