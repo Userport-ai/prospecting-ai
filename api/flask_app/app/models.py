@@ -16,8 +16,10 @@ PyObjectId = Annotated[str, BeforeValidator(str)]
 
 class OpenAITokenUsage(BaseModel):
     """Token usage when calling workflows using Open AI models."""
-    url: str = Field(...,
-                     description="URL for which tokens are being tracked.")
+    url: Optional[str] = Field(default=None,
+                               description="URL for which tokens are being tracked. Set when parsing web page and None otherwise.")
+    highlight_ids: Optional[List[str]] = Field(
+        default=None, description="Content Highlights that resulted in token usage. Set when personalizing email and None otherwise.")
     operation_tag: str = Field(
         ..., description="Tag describing the operation for which cost is computed.")
     prompt_tokens: int = Field(..., description="Prompt tokens used")
@@ -59,6 +61,7 @@ class ContentTypeEnum(str, Enum):
     NONE_OF_THE_ABOVE = "none_of_the_above"
 
 
+# Update Personalization class in personalization module whenever enums are updated below.
 class ContentCategoryEnum(str, Enum):
     """Enum values associated with ContentCategory class."""
     PERSONAL_THOUGHTS = "personal_thoughts"
@@ -270,7 +273,8 @@ class LeadResearchReport(BaseModel):
         # Fetched basic details about the person and company.
         FETCHED_BASIC_DETAILS = "fetched_basic_details"
         FETCHED_SEARCH_RESULTS = "fetched_search_results"
-        PROCESSED_CONTENTS_IN_URLS = "processed_contents_in_urls"
+        PROCESSED_CONTENT_IN_URLS = "processed_content_in_urls"
+        COMPLETED_RECENT_NEWS_AGGREGATION = "completed_recent_news_aggregation"
         COMPLETE = "complete"
         FAILED_WITH_ERRORS = "failed_with_errors"
 
@@ -279,7 +283,7 @@ class LeadResearchReport(BaseModel):
         class Highlight(BaseModel):
             """Highhlight associated with report."""
             id: PyObjectId = Field(...,
-                                   description="MongoDB generated unique identifier for each Content details.")
+                                   description="ID of the Content detail referenced in creating this highlight.")
             category: ContentCategoryEnum = Field(...,
                                                   description="Category of the content. Field is repeated at outer level too.")
             category_readable_str: str = Field(
@@ -298,6 +302,25 @@ class LeadResearchReport(BaseModel):
             default="", description="Human readable Category string.")
         highlights: List[Highlight] = Field(
             ..., description="List of Highlights associated with given category.")
+
+    class PersonalizedEmail(BaseModel):
+        """Personalized Email addressed to a given lead in the lead research report."""
+        id: Optional[PyObjectId] = Field(
+            alias="_id", default=None, description="MongoDB generated unique identifier for Personalized Email.")
+        creation_date: Optional[datetime] = Field(
+            default=None, description="Date in UTC timezone when this document was inserted in the database.")
+        creation_date_readable_str: Optional[str] = Field(
+            default=None, description="Human Readable Date string when this document was inserted in the database.")
+        last_updated_date: Optional[datetime] = Field(
+            default=None, description="Date in UTC timezone when this document was last updated in the database.")
+        last_updated_date_readable_str: Optional[str] = Field(
+            default=None, description="Human Readable Date string when this document was last updated in the database.")
+        referenced_highlight_ids: Optional[List[str]] = Field(
+            default=None, description="The IDs of the highlights that were used to generate this personalized email. In the beginning, we expect to only reference one highlight but in the future this can hold multiple.")
+        subject_line: Optional[str] = Field(
+            default=None, description="Generated subject Line of the email.")
+        email_opener: Optional[str] = Field(
+            default=None, description="1-2 line opener of the email referencing the highlights mentioned above.")
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
@@ -339,6 +362,18 @@ class LeadResearchReport(BaseModel):
         default=None, description="Report Publish Date human readable string value.")
     details: Optional[List[ReportDetail]] = Field(
         default=None, description="Report details associated with the lead.")
+
+    # Outreach fields.
+    personalized_emails: Optional[List[PersonalizedEmail]] = Field(
+        default=None, description="List of Personalized emails that will be used for outreach.")
+
+    # Methods.
+    def get_all_highlights(self):
+        """Returns all highlights for given report."""
+        all_highlights: List[LeadResearchReport.ReportDetail.Highlight] = []
+        for report_detail in self.details:
+            all_highlights.extend(report_detail.highlights)
+        return all_highlights
 
 
 class OutreachEmailTemplate(BaseModel):

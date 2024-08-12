@@ -212,7 +212,6 @@ class WebPageScraper:
     """
 
     # Open AI configurations.
-    # OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_USERPORT_API_KEY")
     OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
     OPENAI_EMBEDDING_FUNCTION = OpenAIEmbeddings(

@@ -191,11 +191,14 @@ function LeadResearchReport() {
             </div>
           </div>
         </div>
-        <Flex id="report-details-container" vertical={false} wrap gap="large">
-          <CategoriesSection report={report} />
-        </Flex>
+        <div id="title-and-report-details-container">
+          <h1>Recent News</h1>
+          <Flex id="report-details-container" vertical={false} wrap gap="large">
+            <CategoriesSection report={report} />
+          </Flex>
+        </div>
         <Flex id="outreach-container" vertical={true} gap="large">
-          <Title level={4}>Sample Outreach Messages</Title>
+          <h1>Personalized Outreach Emails</h1>
           <OutreachCard key="1" text={outreachMessages[0]} />
           <OutreachCard key="2" text={outreachMessages[1]} />
         </Flex>

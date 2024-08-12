@@ -39,6 +39,7 @@
 }
 
 #lead-research-report-container #person-name {
+  color: var(--primary);
   font-weight: 700;
 }
 
@@ -82,8 +83,17 @@
   color: var(--on-surface);
 }
 
+#lead-research-report-container #title-and-report-details-container {
+  margin-top: 3rem;
+}
+
+#lead-research-report-container #title-and-report-details-container h1 {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 #lead-research-report-container #report-details-container {
-  margin-top: 5rem;
+  margin-top: 2rem;
 }
 
 #report-details-container .category-btn {
@@ -168,7 +178,12 @@
 }
 
 #lead-research-report-container #outreach-container {
-  margin-top: 5%;
+  margin-top: 5rem;
+}
+
+#lead-research-report-container #outreach-container h1 {
+  color: var(--primary);
+  font-weight: 600;
 }
 
 #outreach-container .ant-card {
@@ -180,5 +195,4 @@
 #outreach-container .ant-card .outreach-text {
   font-size: 1.7rem;
   color: var(--on-surface);
-  font-weight: 550;
 }
