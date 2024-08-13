@@ -27,6 +27,14 @@ function addLineBreaks(text) {
 // Represents Personalized Emails to the lead.
 function PersonalizedEmails({ report }) {
   // TODO: Handle case when chosen outreach template is null.
+  function getEmailBodyText(personalized_email, report) {
+    return (
+      personalized_email.email_opener +
+      "\n\n" +
+      report.chosen_outreach_email_template.message
+    );
+  }
+
   return (
     <div id="personalized-emails-with-title-container">
       <h1>Emails</h1>
@@ -35,19 +43,31 @@ function PersonalizedEmails({ report }) {
           <Card>
             <div className="email-subject-container">
               <Text className="email-subject-label">Subject</Text>
-              <Text className="email-subject-text">
-                {personalized_email.email_subject_line}
-              </Text>
+              <div className="email-subject-text-container">
+                <Text className="email-subject-text">
+                  {personalized_email.email_subject_line}
+                </Text>
+                <Text
+                  copyable={{
+                    text: personalized_email.email_subject_line,
+                    tooltips: ["Copy Subject"],
+                  }}
+                ></Text>
+              </div>
             </div>
             <div className="email-body-container">
               <Text className="email-body-label">Body</Text>
-              <Text className="outreach-text">
-                {addLineBreaks(
-                  personalized_email.email_opener +
-                    "\n\n" +
-                    report.chosen_outreach_email_template.message
-                )}
-              </Text>
+              <div className="email-body-text-container">
+                <Text className="email-body-text">
+                  {addLineBreaks(getEmailBodyText(personalized_email, report))}
+                </Text>
+                <Text
+                  copyable={{
+                    text: getEmailBodyText(personalized_email, report),
+                    tooltips: ["Copy Email Body"],
+                  }}
+                ></Text>
+              </div>
             </div>
           </Card>
         ))}

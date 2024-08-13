@@ -249,6 +249,13 @@
   box-shadow: 1px 1px;
 }
 
+/* Copy Icon styling */
+#personalized-emails-container .anticon-copy svg {
+  color: var(--hover-color);
+  width: 2rem;
+  height: 2rem;
+}
+
 #personalized-emails-container .ant-card .email-subject-container {
   display: flex;
   flex-direction: column;
@@ -261,7 +268,15 @@
   font-weight: 600;
 }
 
-#personalized-emails-container .email-subject-container .email-subject-text {
+#personalized-emails-container .email-subject-text-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+#personalized-emails-container
+  .email-subject-text-container
+  .email-subject-text {
   font-size: 1.7rem;
   color: var(--secondary);
   font-weight: 500;
@@ -280,7 +295,13 @@
   font-weight: 600;
 }
 
-#personalized-emails-container .email-body-container .outreach-text {
+#personalized-emails-container .email-body-text-container {
+  display: flex;
+  flex-direction: row;
+  gap: 2rem;
+}
+
+#personalized-emails-container .email-body-text-container .email-body-text {
   font-size: 1.7rem;
   color: var(--secondary);
   font-weight: 500;
