@@ -1,6 +1,6 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { Flex, Typography, Button, Card, Spin } from "antd";
+import { Flex, Typography, Button, Card, Spin, Layout } from "antd";
 import {
   useNavigate,
   useLoaderData,
@@ -10,7 +10,7 @@ import {
 import { useState } from "react";
 import { sampleReport, outreachMessages } from "./lead-research-report-data";
 
-const { Title, Text, Link } = Typography;
+const { Text, Link } = Typography;
 
 function addLineBreaks(text) {
   return text.split("\n").map((substr) => {
@@ -23,11 +23,62 @@ function addLineBreaks(text) {
   });
 }
 
-function OutreachCard({ text }) {
+function PersonalizedEmailCard({
+  personalized_email,
+  chosen_outreach_email_template,
+}) {
+  // TODO: Handle case when chosen outreach template is null.
   return (
     <Card>
-      <Text className="outreach-text">{addLineBreaks(text)}</Text>
+      <div className="email-subject-container">
+        <Text className="email-subject-label">Subject</Text>
+        <Text className="email-subject-text">
+          {personalized_email.email_subject_line}
+        </Text>
+      </div>
+      <div className="email-body-container">
+        <Text className="email-body-label">Body</Text>
+        <Text className="outreach-text">
+          {addLineBreaks(
+            personalized_email.email_opener +
+              "\n\n" +
+              chosen_outreach_email_template.message
+          )}
+        </Text>
+      </div>
     </Card>
+  );
+}
+
+function PersonalizedEmails({ report }) {
+  return (
+    <div id="outreach-container">
+      <h1>Personalized Outreach Emails</h1>
+      {report.personalized_emails.map((personalized_email) => (
+        <PersonalizedEmailCard
+          personalized_email={personalized_email}
+          chosen_outreach_email_template={report.chosen_outreach_email_template}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SelectedOutreachEmailTemplate({ report }) {
+  return (
+    <div id="selected-email-template-container">
+      <h1>Selected Outreach Email Template</h1>
+      <Card id="email-template-card">
+        <div id="template-message-container">
+          <Text className="card-text-label" strong>
+            Message
+          </Text>
+          <Text id="template-message-text">
+            {addLineBreaks(report.chosen_outreach_email_template.message)}
+          </Text>
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -127,6 +178,53 @@ function CategoriesSection({ report }) {
   );
 }
 
+function RecentNews({ report }) {
+  return (
+    <div id="title-and-report-details-container">
+      <h1>Recent News</h1>
+      <Flex id="report-details-container" vertical={false} wrap gap="large">
+        <CategoriesSection report={report} />
+      </Flex>
+    </div>
+  );
+}
+
+function ReportHeader({ report }) {
+  const navigate = useNavigate();
+  return (
+    <div id="header">
+      <div id="back-arrow">
+        <ArrowLeftOutlined onClick={() => navigate("/")} />
+      </div>
+      <div id="person-details-container">
+        <div id="person-details">
+          <h1 id="person-name">{report.person_name}</h1>
+          <h3 id="role-title">
+            {report.person_role_title}, {report.company_name}
+          </h3>
+          <Link
+            id="linkedin-url"
+            href={report.person_linkedin_url}
+            target="_blank"
+          >
+            {report.person_linkedin_url}
+          </Link>
+        </div>
+      </div>
+      <div id="report-dates">
+        <div id="report-creation-date">
+          <Text className="report-dates-label">Report Creation Date: </Text>
+          <Text strong>{report.report_creation_date_readable_str}</Text>
+        </div>
+        <div id="research-start-date">
+          <Text className="report-dates-label">Research Start Date: </Text>
+          <Text strong> {report.report_publish_cutoff_date_readable_str}</Text>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Loader to fetch research report for given lead.
 export const leadResearchReportLoader = (authContext) => {
   return async ({ params }) => {
@@ -148,8 +246,8 @@ export const leadResearchReportLoader = (authContext) => {
   };
 };
 
+// Main Component.
 function LeadResearchReport() {
-  const navigate = useNavigate();
   const report = useLoaderData();
   const navigation = useNavigation();
   const loading_or_submitting = navigation.state !== "idle";
@@ -158,50 +256,10 @@ function LeadResearchReport() {
     <div id="lead-research-report-outer">
       <div id="lead-research-report-container">
         <Spin spinning={loading_or_submitting} />;
-        <div id="header">
-          <div id="back-arrow">
-            <ArrowLeftOutlined onClick={() => navigate("/")} />
-          </div>
-          <div id="person-details-container">
-            <div id="person-details">
-              <h1 id="person-name">{report.person_name}</h1>
-              <h3 id="role-title">
-                {report.person_role_title}, {report.company_name}
-              </h3>
-              <Link
-                id="linkedin-url"
-                href={report.person_linkedin_url}
-                target="_blank"
-              >
-                {report.person_linkedin_url}
-              </Link>
-            </div>
-          </div>
-          <div id="report-dates">
-            <div id="report-creation-date">
-              <Text className="report-dates-label">Report Creation Date: </Text>
-              <Text strong>{report.report_creation_date_readable_str}</Text>
-            </div>
-            <div id="research-start-date">
-              <Text className="report-dates-label">Research Start Date: </Text>
-              <Text strong>
-                {" "}
-                {report.report_publish_cutoff_date_readable_str}
-              </Text>
-            </div>
-          </div>
-        </div>
-        <div id="title-and-report-details-container">
-          <h1>Recent News</h1>
-          <Flex id="report-details-container" vertical={false} wrap gap="large">
-            <CategoriesSection report={report} />
-          </Flex>
-        </div>
-        <Flex id="outreach-container" vertical={true} gap="large">
-          <h1>Personalized Outreach Emails</h1>
-          <OutreachCard key="1" text={outreachMessages[0]} />
-          <OutreachCard key="2" text={outreachMessages[1]} />
-        </Flex>
+        <ReportHeader report={report} />
+        <RecentNews report={report} />
+        <SelectedOutreachEmailTemplate report={report} />
+        <PersonalizedEmails report={report} />
       </div>
     </div>
   );

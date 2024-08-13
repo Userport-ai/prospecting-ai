@@ -46,7 +46,7 @@ function AppHeader() {
   return (
     <Header id="nav-header">
       <div id="nav-logo-title">
-        <Title level={3}>Userport.ai</Title>
+        <Title level={3}>Userport</Title>
       </div>
       <Menu
         id="nav-menu"

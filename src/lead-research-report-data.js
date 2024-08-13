@@ -15,6 +15,7 @@ export const sampleReport = {
     status: "complete",
     company_headcount: null,
     company_industry_categories: null,
+    user_id: null,
     search_results_map: null,
     report_creation_date_readable_str: "04 August, 2024",
     report_publish_cutoff_date: null,
@@ -381,6 +382,77 @@ export const sampleReport = {
         ],
       },
     ],
+    chosen_outreach_email_template: {
+      id: "66b99cb49c27d1bc9122ed06",
+      creation_date: "2024-08-13T02:54:16.329000",
+      message:
+        "Given you lead an team of more than 1000 employees, do you face challenges understanding the sentiment of your team after major announcements?\n\nAsking this as speaking with some of our customers like Visa and Stripe, I've learned that a major challenge facing unicorn companies is the impact of big announcements on employee productivity.\n\nTo keep track of your employees sentiments, do you mind spending 20 minutes to see WorkHR in action?",
+      reason:
+        "Zachary Perret is a Co-Founder and CEO at Plaid, which is a fintech company. This matches the role title and industry described in the Persona with ID 66b99cb49c27d1bc9122ed06.",
+    },
+    personalized_emails: [
+      {
+        id: "66baecd4914935040bcf6299",
+        creation_date: "2024-08-13T05:19:16.389000",
+        creation_date_readable_str: "13 August, 2024",
+        last_updated_date: "2024-08-13T05:19:16.389000",
+        last_updated_date_readable_str: "13 August, 2024",
+        referenced_highlight_ids: null,
+        email_subject_line:
+          "Zachary, excited about fintech the same way you predict it?",
+        email_opener:
+          "Hi Zachary, I found your 2024 fintech predictions absolutely fascinating, especially your take on the imminent reinvestment in fintech growth and the rise of real-time bank payments. Your insights paint an exciting picture of the industry's future, and I couldn't agree more!",
+      },
+      {
+        id: "66baecd4914935040bcf629a",
+        creation_date: "2024-08-13T05:19:16.389000",
+        creation_date_readable_str: "13 August, 2024",
+        last_updated_date: "2024-08-13T05:19:16.389000",
+        last_updated_date_readable_str: "13 August, 2024",
+        referenced_highlight_ids: null,
+        email_subject_line:
+          "Zachary, inspired by your focus on tackling financial injustice!",
+        email_opener:
+          "Hi Zachary, kudos on being recognized for tackling financial exclusion and partnering with over 12,000 institutions! Your dedication, especially in light of the Visa acquisition's challenges, is truly inspiring.",
+      },
+      {
+        id: "66baecd4914935040bcf629b",
+        creation_date: "2024-08-13T05:19:16.389000",
+        creation_date_readable_str: "13 August, 2024",
+        last_updated_date: "2024-08-13T05:19:16.389000",
+        last_updated_date_readable_str: "13 August, 2024",
+        referenced_highlight_ids: null,
+        email_subject_line:
+          "Zachary, excited about Plaid's Consumer Report revolutionizing credit underwriting?",
+        email_opener:
+          "Hi Zachary, noticed your repost about tackling credit underwriting issues with the launch of Plaid's Consumer Report. I'm thrilled to see how you are simplifying credit risk decisions and improving data accessibility for businesses.",
+      },
+      {
+        id: "66baecd4914935040bcf629c",
+        creation_date: "2024-08-13T05:19:16.389000",
+        creation_date_readable_str: "13 August, 2024",
+        last_updated_date: "2024-08-13T05:19:16.389000",
+        last_updated_date_readable_str: "13 August, 2024",
+        referenced_highlight_ids: null,
+        email_subject_line:
+          "Zachary, tackling team sentiment challenges at Plaid post big announcements?",
+        email_opener:
+          "Hi Zachary, I was truly inspired by your insights on building a people-first organization and the proactive strategies you shared in your recent interview! Your approach to flexible execution while valuing individual and collective growth at Plaid is remarkable.",
+      },
+      {
+        id: "66baecd4914935040bcf629d",
+        creation_date: "2024-08-13T05:19:16.389000",
+        creation_date_readable_str: "13 August, 2024",
+        last_updated_date: "2024-08-13T05:19:16.389000",
+        last_updated_date_readable_str: "13 August, 2024",
+        referenced_highlight_ids: null,
+        email_subject_line:
+          "Zachary, curious about your take on Plaid's potential IPO at Cambrian event?",
+        email_opener:
+          "Hi Zachary, thrilled to see you speaking at Cambrian’s first in-person event in four years this February. Your insights on why San Francisco is special and the future plans for Plaid, including a potential IPO, are eagerly awaited!",
+      },
+    ],
+    personalized_emails_tokens_used: null,
   },
 };
 const outreachMesageOne =
