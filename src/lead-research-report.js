@@ -1,6 +1,6 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { Flex, Typography, Button, Card, Spin, Layout } from "antd";
+import { Flex, Typography, Button, Card, Spin, Tabs } from "antd";
 import {
   useNavigate,
   useLoaderData,
@@ -53,7 +53,6 @@ function PersonalizedEmailCard({
 function PersonalizedEmails({ report }) {
   return (
     <div id="outreach-container">
-      <h1>Personalized Outreach Emails</h1>
       {report.personalized_emails.map((personalized_email) => (
         <PersonalizedEmailCard
           personalized_email={personalized_email}
@@ -66,19 +65,16 @@ function PersonalizedEmails({ report }) {
 
 function SelectedOutreachEmailTemplate({ report }) {
   return (
-    <div id="selected-email-template-container">
-      <h1>Selected Outreach Email Template</h1>
-      <Card id="email-template-card">
-        <div id="template-message-container">
-          <Text className="card-text-label" strong>
-            Message
-          </Text>
-          <Text id="template-message-text">
-            {addLineBreaks(report.chosen_outreach_email_template.message)}
-          </Text>
-        </div>
-      </Card>
-    </div>
+    <Card id="email-template-card">
+      <div id="template-message-container">
+        <Text className="card-text-label" strong>
+          Message
+        </Text>
+        <Text id="template-message-text">
+          {addLineBreaks(report.chosen_outreach_email_template.message)}
+        </Text>
+      </div>
+    </Card>
   );
 }
 
@@ -180,12 +176,9 @@ function CategoriesSection({ report }) {
 
 function RecentNews({ report }) {
   return (
-    <div id="title-and-report-details-container">
-      <h1>Recent News</h1>
-      <Flex id="report-details-container" vertical={false} wrap gap="large">
-        <CategoriesSection report={report} />
-      </Flex>
-    </div>
+    <Flex id="report-details-container" vertical={false} wrap gap="large">
+      <CategoriesSection report={report} />
+    </Flex>
   );
 }
 
@@ -257,9 +250,25 @@ function LeadResearchReport() {
       <div id="lead-research-report-container">
         <Spin spinning={loading_or_submitting} />;
         <ReportHeader report={report} />
-        <RecentNews report={report} />
-        <SelectedOutreachEmailTemplate report={report} />
-        <PersonalizedEmails report={report} />
+        <Tabs
+          items={[
+            {
+              label: <h1>Recent News</h1>,
+              key: 1,
+              children: <RecentNews report={report} />,
+            },
+            {
+              label: <h1>Email Template</h1>,
+              key: 2,
+              children: <SelectedOutreachEmailTemplate report={report} />,
+            },
+            {
+              label: <h1>Personalized Emails</h1>,
+              key: 3,
+              children: <PersonalizedEmails report={report} />,
+            },
+          ]}
+        />
       </div>
     </div>
   );
