@@ -43,9 +43,9 @@ class Personalization:
         lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
         # TODO: Uncomment this once status is properly updated in production.
-        # if lead_research_report.status != LeadResearchReport.Status.COMPLETED_RECENT_NEWS_AGGREGATION:
+        # if lead_research_report.status != LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE:
         #     raise ValueError(
-        #         f"Expected report status to be: {LeadResearchReport.Status.COMPLETED_RECENT_NEWS_AGGREGATION}, got: {lead_research_report.status}")
+        #         f"Expected report status to be: {LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE}, got: {lead_research_report.status}")
 
         all_highlights: List[LeadResearchReport.ReportDetail.Highlight] = lead_research_report.get_all_highlights()
         if len(all_highlights) == 0:

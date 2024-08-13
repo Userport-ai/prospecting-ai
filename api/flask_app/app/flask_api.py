@@ -369,7 +369,9 @@ def debug():
     report_id = request.args.get("lead_report_id")
     # process_search_results_in_background.delay(
     #     lead_research_report_id=report_id)
-    aggregate_report_in_background.delay(lead_research_report_id=report_id)
+    # aggregate_report_in_background.delay(lead_research_report_id=report_id)
+    choose_outreach_email_template_in_background.delay(
+        lead_research_report_id=report_id)
     return {"status": "ok"}
 
 
@@ -403,6 +405,8 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
             lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Finished processing search ULRs for report: {lead_research_report_id}")
+
+        # Create Research report.
         aggregate_report_in_background.delay(
             lead_research_report_id=lead_research_report_id)
     except Exception as e:
@@ -427,9 +431,36 @@ def aggregate_report_in_background(self, lead_research_report_id: str):
     r = Researcher(database=Database())
     try:
         r.aggregate(lead_research_report_id=lead_research_report_id)
+
+        # Select email outreach template.
+        choose_outreach_email_template_in_background.delay(
+            lead_research_report_id=lead_research_report_id)
     except Exception as e:
         logger.exception(
             f"Error in aggregating research report: {lead_research_report_id} with details: {e}")
+        if self.request.retries >= max_retries:
+            # Done with retries, mark task as failed.
+            setFields = {"status": LeadResearchReport.Status.FAILED_WITH_ERRORS,
+                         "last_updated_date": Utils.create_utc_time_now()}
+            r.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
+                                                   setFields=setFields)
+
+        # Retry after 5 seconds.
+        raise self.retry(exc=e, max_retries=max_retries, countdown=5)
+
+
+@shared_task(bind=True, acks_late=True)
+def choose_outreach_email_template_in_background(self, lead_research_report_id: str):
+    max_retries = 2
+    r = Researcher(database=Database())
+    try:
+        r.choose_outreach_email_template(
+            lead_research_report_id=lead_research_report_id)
+        logger.info(
+            f"Outreach template Selection complete in background for report ID: {lead_research_report_id}")
+    except Exception as e:
+        logger.exception(
+            f"Error in Choosing Outreach Email template for research report: {lead_research_report_id} with details: {e}")
         if self.request.retries >= max_retries:
             # Done with retries, mark task as failed.
             setFields = {"status": LeadResearchReport.Status.FAILED_WITH_ERRORS,

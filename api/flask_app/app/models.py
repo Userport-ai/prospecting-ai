@@ -271,10 +271,11 @@ class LeadResearchReport(BaseModel):
 
     class Status(str, Enum):
         # Fetched basic details about the person and company.
-        FETCHED_BASIC_DETAILS = "fetched_basic_details"
-        FETCHED_SEARCH_RESULTS = "fetched_search_results"
-        PROCESSED_CONTENT_IN_URLS = "processed_content_in_urls"
-        COMPLETED_RECENT_NEWS_AGGREGATION = "completed_recent_news_aggregation"
+        BASIC_PROFILE_FETCHED = "basic_profile_fetched"
+        URLS_FROM_SEARCH_ENGINE_FETCHED = "urls_from_search_engine_fetched"
+        CONTENT_PROCESSING_COMPLETE = "content_processing_complete"
+        RECENT_NEWS_AGGREGATION_COMPLETE = "recent_news_aggregation_complete"
+        EMAIL_TEMPLATE_SELECTION_COMPLETE = "email_template_selection_complete"
         COMPLETE = "complete"
         FAILED_WITH_ERRORS = "failed_with_errors"
 
@@ -312,7 +313,8 @@ class LeadResearchReport(BaseModel):
         # TODO: Reference name field of Outreach Template here.
         message: Optional[str] = Field(
             default=None, description="Message template used for outreach to role titles above.")
-        reason: Optional[str] = Field(default=None, description="Reason why this template or None was selected.")
+        reason: Optional[str] = Field(
+            default=None, description="Reason why this template or None was selected.")
 
     class PersonalizedEmail(BaseModel):
         """Personalized Email addressed to a given lead in the lead research report."""

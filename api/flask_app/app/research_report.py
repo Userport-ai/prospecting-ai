@@ -8,6 +8,7 @@ from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
 from app.search_engine_workflow import SearchEngineWorkflow
 from app.web_page_scraper import WebPageScraper, PageContentInfo
+from app.outreach_template import OutreachTemplateMatcher
 from app.models import (
     ContentDetails,
     ContentTypeEnum,
@@ -28,6 +29,8 @@ class Researcher:
             database=database, max_search_results_per_query=15)
         # List of URLs that have failed to process.
         self.failed_urls: List[Tuple[str, str]] = []
+        self.outreach_template_matcher = OutreachTemplateMatcher(
+            database=database)
 
     def create(self, user_id: str, person_linkedin_url: str) -> LeadResearchReport:
         """Creates Research report in the database for given lead's LinkedIn URL and given user and returns the report."""
@@ -71,7 +74,7 @@ class Researcher:
         lead_research_report.company_name = company_name
         lead_research_report.person_name = person_profile.full_name
         lead_research_report.person_role_title = role_title
-        lead_research_report.status = LeadResearchReport.Status.FETCHED_BASIC_DETAILS
+        lead_research_report.status = LeadResearchReport.Status.BASIC_PROFILE_FETCHED
         lead_research_report.company_headcount = company_profile.company_size_on_linkedin
         lead_research_report.company_industry_categories = company_profile.categories
         lead_research_report.user_id = user_id
@@ -106,7 +109,7 @@ class Researcher:
             f"Got {len(unique_urls)} search results for all the queries.")
         setFields = {
             "search_results_map": search_results_map,
-            "status": LeadResearchReport.Status.FETCHED_SEARCH_RESULTS,
+            "status": LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED,
             "last_updated_date": Utils.create_utc_time_now(),
         }
         self.database.update_lead_research_report(
@@ -144,7 +147,7 @@ class Researcher:
                     self.failed_urls.append((url, e))
 
         if len(self.failed_urls) > 0:
-            setFields = {"status": LeadResearchReport.Status.PROCESSED_CONTENTS_IN_URLS,
+            setFields = {"status": LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE,
                          "last_updated_date": Utils.create_utc_time_now()}
             self.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
                                                       setFields=setFields)
@@ -358,7 +361,7 @@ class Researcher:
             logger.info(f"Num highlights: {len(detail.highlights)}")
 
         setFields = {
-            "status": LeadResearchReport.Status.COMPLETE,
+            "status": LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE,
             "last_updated_date": Utils.create_utc_time_now(),
             "report_creation_date_readable_str": Utils.to_human_readable_date_str(time_now),
             "report_publish_cutoff_date": report_publish_cutoff_date,
@@ -369,6 +372,22 @@ class Researcher:
             lead_research_report_id=lead_research_report_id, setFields=setFields)
 
         logger.info(f"Done with aggregating report: {lead_research_report_id}")
+
+    def choose_outreach_email_template(self, lead_research_report_id: str):
+        """Choose Email template for the lead based on their persona."""
+        chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = self.outreach_template_matcher.match(
+            lead_research_report_id=lead_research_report_id)
+
+        # Update lead research report.
+        setFields = {
+            "status": LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE,
+            "last_updated_date": Utils.create_utc_time_now(),
+            "chosen_outreach_email_template": chosen_outreach_email_template.model_dump(),
+        }
+        self.database.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
+        logger.info(
+            f"Completed Choosing Outreach Email Template for lead report: {lead_research_report_id}")
 
 
 if __name__ == "__main__":
