@@ -12,6 +12,7 @@ import { sampleReport, outreachMessages } from "./lead-research-report-data";
 
 const { Text, Link } = Typography;
 
+// Replace newlines with HTML break tags.
 function addLineBreaks(text) {
   return text.split("\n").map((substr) => {
     return (
@@ -23,62 +24,69 @@ function addLineBreaks(text) {
   });
 }
 
-function PersonalizedEmailCard({
-  personalized_email,
-  chosen_outreach_email_template,
-}) {
+// Represents Personalized Emails to the lead.
+function PersonalizedEmails({ report }) {
   // TODO: Handle case when chosen outreach template is null.
   return (
-    <Card>
-      <div className="email-subject-container">
-        <Text className="email-subject-label">Subject</Text>
-        <Text className="email-subject-text">
-          {personalized_email.email_subject_line}
-        </Text>
+    <div id="personalized-emails-with-title-container">
+      <h1>Emails</h1>
+      <div id="personalized-emails-container">
+        {report.personalized_emails.map((personalized_email) => (
+          <Card>
+            <div className="email-subject-container">
+              <Text className="email-subject-label">Subject</Text>
+              <Text className="email-subject-text">
+                {personalized_email.email_subject_line}
+              </Text>
+            </div>
+            <div className="email-body-container">
+              <Text className="email-body-label">Body</Text>
+              <Text className="outreach-text">
+                {addLineBreaks(
+                  personalized_email.email_opener +
+                    "\n\n" +
+                    report.chosen_outreach_email_template.message
+                )}
+              </Text>
+            </div>
+          </Card>
+        ))}
       </div>
-      <div className="email-body-container">
-        <Text className="email-body-label">Body</Text>
-        <Text className="outreach-text">
-          {addLineBreaks(
-            personalized_email.email_opener +
-              "\n\n" +
-              chosen_outreach_email_template.message
-          )}
-        </Text>
-      </div>
-    </Card>
-  );
-}
-
-function PersonalizedEmails({ report }) {
-  return (
-    <div id="outreach-container">
-      {report.personalized_emails.map((personalized_email) => (
-        <PersonalizedEmailCard
-          personalized_email={personalized_email}
-          chosen_outreach_email_template={report.chosen_outreach_email_template}
-        />
-      ))}
     </div>
   );
 }
 
-function SelectedOutreachEmailTemplate({ report }) {
+// The email template selected for given lead.
+function SelectedEmailTemplate({ report }) {
   return (
-    <Card id="email-template-card">
-      <div id="template-message-container">
-        <Text className="card-text-label" strong>
-          Message
-        </Text>
-        <Text id="template-message-text">
-          {addLineBreaks(report.chosen_outreach_email_template.message)}
-        </Text>
-      </div>
-    </Card>
+    <div id="selected-email-template-with-title-container">
+      <h1>Selected Email Template</h1>
+      <Card id="email-template-card">
+        <div id="template-message-container">
+          <Text className="card-text-label" strong>
+            Message
+          </Text>
+          <Text id="template-message-text">
+            {addLineBreaks(report.chosen_outreach_email_template.message)}
+          </Text>
+        </div>
+      </Card>
+    </div>
   );
 }
 
-function HighlightCard({ highlight }) {
+// Represents selected Email Template and Personalized Emails generated for the lead.
+function EmailTemplateAndPersonalizedEmails({ report }) {
+  return (
+    <>
+      <SelectedEmailTemplate report={report} />
+      <PersonalizedEmails report={report} />
+    </>
+  );
+}
+
+// Represents Highlight from the leads' news.
+function Highlight({ highlight }) {
   return (
     <Card>
       <div>
@@ -114,7 +122,8 @@ function HighlightCard({ highlight }) {
   );
 }
 
-function CategoriesSection({ report }) {
+// Represents Categories buttons and associated highlights.
+function CategoriesAndHighlights({ report }) {
   var initialSelectedCategories = [];
   if (report.details.length > 0) {
     initialSelectedCategories = [report.details[0].category_readable_str];
@@ -167,7 +176,7 @@ function CategoriesSection({ report }) {
         )
         .flatMap((detail) =>
           detail.highlights.map((highlight) => (
-            <HighlightCard highlight={highlight} />
+            <Highlight highlight={highlight} />
           ))
         )}
     </>
@@ -177,7 +186,7 @@ function CategoriesSection({ report }) {
 function RecentNews({ report }) {
   return (
     <Flex id="report-details-container" vertical={false} wrap gap="large">
-      <CategoriesSection report={report} />
+      <CategoriesAndHighlights report={report} />
     </Flex>
   );
 }
@@ -258,14 +267,9 @@ function LeadResearchReport() {
               children: <RecentNews report={report} />,
             },
             {
-              label: <h1>Email Template</h1>,
-              key: 2,
-              children: <SelectedOutreachEmailTemplate report={report} />,
-            },
-            {
               label: <h1>Personalized Emails</h1>,
-              key: 3,
-              children: <PersonalizedEmails report={report} />,
+              key: 2,
+              children: <EmailTemplateAndPersonalizedEmails report={report} />,
             },
           ]}
         />

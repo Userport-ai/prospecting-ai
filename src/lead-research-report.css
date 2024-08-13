@@ -192,7 +192,16 @@
   font-weight: 500;
 }
 
-#lead-research-report-container #email-template-card {
+#lead-research-report-container #selected-email-template-with-title-container {
+  margin-top: 2rem;
+}
+
+#selected-email-template-with-title-container h1 {
+  color: var(--on-surface-lighter);
+  font-weight: 600;
+}
+
+#selected-email-template-with-title-container #email-template-card {
   margin-top: 2rem;
   padding: 0;
   border-radius: 1.7rem;
@@ -217,50 +226,62 @@
   font-weight: 500;
 }
 
-#lead-research-report-container #outreach-container {
+#lead-research-report-container #personalized-emails-with-title-container {
+  margin-top: 4rem;
+}
+
+#personalized-emails-with-title-container h1 {
+  color: var(--on-surface-lighter);
+  font-weight: 600;
+}
+
+#personalized-emails-with-title-container #personalized-emails-container {
   margin-top: 2rem;
   display: flex;
   flex-direction: column;
   gap: 3rem;
 }
 
-#outreach-container .ant-card {
+#personalized-emails-container .ant-card {
   padding: 0;
   border-radius: 1.7rem;
   border: 1px solid var(--hover-color);
   box-shadow: 1px 1px;
 }
 
-#outreach-container .ant-card .email-subject-container {
+#personalized-emails-container .ant-card .email-subject-container {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-#outreach-container .email-subject-container .email-subject-label {
+#personalized-emails-container .email-subject-container .email-subject-label {
   font-size: 1.7rem;
   color: var(--primary);
   font-weight: 600;
 }
 
-#outreach-container .email-subject-container .email-subject-text {
+#personalized-emails-container .email-subject-container .email-subject-text {
   font-size: 1.7rem;
+  color: var(--secondary);
+  font-weight: 500;
 }
 
-#outreach-container .ant-card .email-body-container {
+#personalized-emails-container .ant-card .email-body-container {
   margin-top: 2rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-#outreach-container .email-body-container .email-body-label {
+#personalized-emails-container .email-body-container .email-body-label {
   font-size: 1.7rem;
   color: var(--primary);
   font-weight: 600;
 }
 
-#outreach-container .email-body-container .outreach-text {
+#personalized-emails-container .email-body-container .outreach-text {
   font-size: 1.7rem;
-  color: var(--on-surface);
+  color: var(--secondary);
+  font-weight: 500;
 }
