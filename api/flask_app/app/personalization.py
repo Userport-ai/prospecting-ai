@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime
 from typing import List, Optional
 from app.database import Database
 from app.models import LeadResearchReport, ContentCategoryEnum, OpenAITokenUsage
@@ -33,19 +34,19 @@ class Personalization:
 
     def __init__(self, database: Database) -> None:
         self.database = database
+        self.openai_tokens_used: Optional[OpenAITokenUsage] = None
 
-    def generate_personalized_emails(self, lead_research_report_id: str, referenced_highlight_ids: Optional[List[str]] = None):
-        """Generates personalized emails for given lead using the given highlights as reference.
+    def generate_personalized_emails(self, lead_research_report_id: str, referenced_highlight_ids: Optional[List[str]] = None) -> List[LeadResearchReport.PersonalizedEmail]:
+        """Generates personalized emails for given lead using the given highlights as reference and returns the list.
 
         If no highlights are provided, then k highlights are auto-selected by the method and the 
         personalized emails are generated using them as references.
         """
         lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
-        # TODO: Uncomment this once status is properly updated in production.
-        # if lead_research_report.status != LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE:
-        #     raise ValueError(
-        #         f"Expected report status to be: {LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE}, got: {lead_research_report.status}")
+        if lead_research_report.status != LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE:
+            raise ValueError(
+                f"Expected report status to be: {LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE}, got: {lead_research_report.status}")
 
         all_highlights: List[LeadResearchReport.ReportDetail.Highlight] = lead_research_report.get_all_highlights()
         if len(all_highlights) == 0:
@@ -63,11 +64,14 @@ class Personalization:
         logger.info(
             f"Got {len(referenced_highlights)} reference highlights for email personalization.")
 
-        template_message = (
-            "Given you lead an team of more than 1000 employees, do you face challenges understanding the sentiment of your team after major announcements?\n"
-            "Asking this as speaking with some of our customers like Visa and Stripe, I've learned that a major challenge facing unicorn companies is the impact of big announcements on employee productivity.\n"
-            "To keep track of your employees sentiments, do you mind spending 20 minutes to see WorkHR in action?\n"
-        )
+        chosen_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = lead_research_report.chosen_outreach_email_template
+        template_message: str = ""
+        if chosen_email_template.id:
+            # TODO: Handle the case when no template matched.
+            template_message = chosen_email_template.message
+
+        generated_personalized_emails: List[LeadResearchReport.PersonalizedEmail] = [
+        ]
         with get_openai_callback() as cb:
             for highlight in referenced_highlights:
                 email_subject_line: str = self.generate_email_subject_line(
@@ -76,10 +80,19 @@ class Personalization:
                                                                template_message=template_message, email_subject_line=email_subject_line)
                 logger.info(f"Email Subject Line: {email_subject_line}")
                 logger.info(f"Email Opener: {email_opener}\n\n")
+                generated_personalized_emails.append(LeadResearchReport.PersonalizedEmail(
+                    # IDs, creation and update dates will be generated when inserting into the database.
+                    referenced_highlight_ids=referenced_highlight_ids,
+                    email_subject_line=email_subject_line,
+                    email_opener=email_opener,
+                ))
 
-            tokens_used = OpenAITokenUsage(highlight_ids=referenced_highlight_ids, operation_tag=Personalization.OPERATION_TAG_NAME,
-                                           prompt_tokens=cb.prompt_tokens, completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-            logger.info(f"Total tokens used: {tokens_used}")
+            self.openai_tokens_used = OpenAITokenUsage(highlight_ids=referenced_highlight_ids, operation_tag=Personalization.OPERATION_TAG_NAME,
+                                                       prompt_tokens=cb.prompt_tokens, completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+            logger.info(
+                f"Total tokens used in email personalization: {self.openai_tokens_used}")
+
+        return generated_personalized_emails
 
     def generate_email_subject_line(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport, template_message: str):
         """Generates Personalized email subject line for lead using given highlight and Lead research report."""
@@ -102,8 +115,13 @@ class Personalization:
             "9. [Pain Point]: There’s a better way!\n"
             "10. Excited about using [Product Name that solves the pain point] to ease your [Pain Point]?\n"
             "11. [Prospect First Name], tackling [Pain Point] after [specific announcement or event]?\n"
-            "12. [Prospect First Name], curious about your take on [Content or Issue or Trend]?\n\n"
-            "13. [Prospect First Name], your [Content or post] got me thinking..."
+            "12. [Prospect First Name], curious about your take on [Content or Issue or Trend]?\n"
+            "13. [Prospect First Name], your [Content or post] got me thinking...\n"
+            "14. [Prospect First Name], inspired by your [Content] - must read for [audience]!\n"
+            "15. Curious about your take on [Content or Product or Story] after your chat with [Interviewer or Podcast Host]?\n"
+            "16. Curious about how [Product or Feature] has influenced [Company's decisions]?\n"
+            "17. Curious about your take on tackling [Pain point]?\n"
+            "\n"
             "## Prospect Details\n"
             "Name: {person_name}\n"
             "Company: {company_name}\n"
@@ -156,7 +174,10 @@ class Personalization:
             "7. Hi [Prospect First Name], kudos on being recognized about [Recognition Description]! [Explain why the Recognition means something]\n"
             "8. Hi [Prospect First Name], thrilled to see you'll be sharing insights about [Product or some other Content]. Looking forward to learning [some detail about the Product or Content]!\n"
             "9. Hi [Prospect First Name], your [Content or Post] were truly insightful! Given your expertise, I wanted to touch base on how you are addressing [Pain Point].\n"
-            "10. Hi [Prospect First Name], Congratulations on how you are tacking [Pain Point] and achieving [accomplishment]! Your dedication to addressing [Problem] is truly inspiring, especially amidst [Challenges they are facing].\n\n"
+            "10. Hi [Prospect First Name], Congratulations on how you are tacking [Pain Point] and achieving [accomplishment]! Your dedication to addressing [Problem] is truly inspiring, especially amidst [Challenges they are facing].\n"
+            "11. Hi [Prospect First Name], I was truly inspired by your thoughts on [recent Content or Post]! Your proactive approach of [doing a task] reflects an exceptional commitment to [a set positive attributes].\n"
+            "12. Hi [Prospect First Name], kudos on taking a step towards [Solving a Problem] with the launch of [Product]! It's inspiring to see how [Company Name] can [Accomplish something] using [Product or Feature].\n"
+            "\n"
             "**Prospect Details:**\n"
             "Name: {person_name}\n"
             "Company: {company_name}\n"
@@ -255,8 +276,18 @@ class Personalization:
                 result_highlights.append(highlight)
         return result_highlights
 
+    def get_tokens_used(self) -> OpenAITokenUsage:
+        """Returns tokens used so far in personalization. Throws exception if personalized workflow is not run yet."""
+        if not self.openai_tokens_used:
+            raise ValueError(
+                f"Personalization Workflow not run yet, not tokens used!")
+        return self.openai_tokens_used
+
 
 if __name__ == "__main__":
     pz = Personalization(database=Database())
-    pz.generate_personalized_emails(
+    email_list = pz.generate_personalized_emails(
         lead_research_report_id="66ab9633a3bb9048bc1a0be5")
+    email_list_json = [email.model_dump_json() for email in email_list]
+    import pprint
+    pprint.pprint(email_list_json)

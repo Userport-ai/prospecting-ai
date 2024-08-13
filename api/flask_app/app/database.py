@@ -20,7 +20,8 @@ from app.models import (
     LinkedInPost,
     WebPage,
     LeadResearchReport,
-    OutreachEmailTemplate
+    OutreachEmailTemplate,
+    OpenAITokenUsage
 )
 from typing import List
 
@@ -161,6 +162,38 @@ class Database:
         result = collection.insert_one(
             outreach_email_template.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
+
+    def insert_personalized_emails_and_update_status(self, lead_research_report_id: str, personalized_emails: List[LeadResearchReport.PersonalizedEmail], personalized_emails_tokens_used: OpenAITokenUsage, status: LeadResearchReport.Status):
+        """Inserts personalized emails and tokens used into given lead research report. It will override entire list of existing personalized emails if any."""
+        creation_date: datetime = Utils.create_utc_time_now()
+        creation_date_readable_str: str = Utils.to_human_readable_date_str(
+            creation_date)
+        last_updated_date = creation_date
+        last_updated_date_readable_str = creation_date_readable_str
+
+        for email in personalized_emails:
+            email.creation_date = creation_date
+            email.creation_date_readable_str = creation_date_readable_str
+            email.last_updated_date = last_updated_date
+            email.last_updated_date_readable_str = last_updated_date_readable_str
+
+        # Convert to list of Python dictionaries and insert ObjectIds manually.
+        personalized_emails_dict_list: List[Dict] = [email.model_dump(
+            exclude=Database._exclude_id()) for email in personalized_emails]
+        for email_dict in personalized_emails_dict_list:
+            email_dict["_id"] = ObjectId()
+
+        collection = self._get_lead_research_report_collection()
+        setFields = {
+            "status": status,
+            "personalized_emails": personalized_emails_dict_list,
+            "personalized_emails_tokens_used": personalized_emails_tokens_used.model_dump(),
+        }
+        result = collection.update_one(
+            {"_id": ObjectId(lead_research_report_id)}, {"$set": setFields})
+        if result.matched_count == 0:
+            raise ValueError(
+                f"Could not insert personalized emails for research report with ID: {lead_research_report_id}")
 
     @contextlib.contextmanager
     def transaction_session(self) -> Generator[ClientSession, None]:
@@ -326,12 +359,20 @@ if __name__ == "__main__":
     # details = db.get_content_details(content_details_id=content_details_id)
 
     # db.delete_all_content_details()
+
+    # Migration script.
     update = {
         "$set": {
             "company_headcount": 1222,
             "company_industry_categories": ["banking", "finance", "financial-services", "fintech-e067", "insurtech", "software", "wealth-management"],
         }
     }
-    db.migrate_docs(
-        collection=db._get_lead_research_report_collection(), filter={}, update=update)
+    # db.migrate_docs(
+    #     collection=db._get_lead_research_report_collection(), filter={}, update=update)
     print("done")
+
+    # db.insert_personalized_emails(lead_research_report_id="", personalized_emails=[
+    #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="hello"),
+    #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="world"),
+    #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="userport"),
+    # ])

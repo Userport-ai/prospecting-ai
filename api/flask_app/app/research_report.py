@@ -9,12 +9,14 @@ from app.linkedin_scraper import LinkedInScraper
 from app.search_engine_workflow import SearchEngineWorkflow
 from app.web_page_scraper import WebPageScraper, PageContentInfo
 from app.outreach_template import OutreachTemplateMatcher
+from app.personalization import Personalization
 from app.models import (
     ContentDetails,
     ContentTypeEnum,
     ContentCategoryEnum,
     WebPage,
-    LinkedInPost
+    LinkedInPost,
+    OpenAITokenUsage
 )
 
 logger = logging.getLogger()
@@ -31,6 +33,7 @@ class Researcher:
         self.failed_urls: List[Tuple[str, str]] = []
         self.outreach_template_matcher = OutreachTemplateMatcher(
             database=database)
+        self.personalization = Personalization(database=database)
 
     def create(self, user_id: str, person_linkedin_url: str) -> LeadResearchReport:
         """Creates Research report in the database for given lead's LinkedIn URL and given user and returns the report."""
@@ -388,6 +391,18 @@ class Researcher:
             lead_research_report_id=lead_research_report_id, setFields=setFields)
         logger.info(
             f"Completed Choosing Outreach Email Template for lead report: {lead_research_report_id}")
+
+    def generate_personalized_emails(self, lead_research_report_id: str):
+        """Generate personalized emails for lead based on their profile and email templates."""
+        personalized_emails: List[LeadResearchReport.PersonalizedEmail] = self.personalization.generate_personalized_emails(
+            lead_research_report_id=lead_research_report_id)
+        personalized_emails_tokens_used: OpenAITokenUsage = self.personalization.get_tokens_used()
+
+        # Update lead research report.
+        self.database.insert_personalized_emails_and_update_status(lead_research_report_id=lead_research_report_id, personalized_emails=personalized_emails,
+                                                                   personalized_emails_tokens_used=personalized_emails_tokens_used, status=LeadResearchReport.Status.COMPLETE)
+        logger.info(
+            f"Completed Generating personalized emails for lead report: {lead_research_report_id}")
 
 
 if __name__ == "__main__":

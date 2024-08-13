@@ -82,7 +82,7 @@ class OutreachTemplateMatcher:
         if not result.matched_persona_id:
             logger.warning(
                 f"None of the emails templates matched with for Person profile ID: {person_profile.id} for user ID: {email_templates[0].user_id}")
-            return LeadResearchReport.ChosenOutreachEmailTemplate(id=None, reason=result.reason)
+            return LeadResearchReport.ChosenOutreachEmailTemplate(id=None, reason=result.reason, message=None, creation_date=Utils.create_utc_time_now())
 
         logger.info(f"Chosen template per LLM: {result}")
 

@@ -330,7 +330,7 @@ class LeadResearchReport(BaseModel):
             default=None, description="Human Readable Date string when this document was last updated in the database.")
         referenced_highlight_ids: Optional[List[str]] = Field(
             default=None, description="The IDs of the highlights that were used to generate this personalized email. In the beginning, we expect to only reference one highlight but in the future this can hold multiple.")
-        subject_line: Optional[str] = Field(
+        email_subject_line: Optional[str] = Field(
             default=None, description="Generated subject Line of the email.")
         email_opener: Optional[str] = Field(
             default=None, description="1-2 line opener of the email referencing the highlights mentioned above.")
@@ -383,6 +383,8 @@ class LeadResearchReport(BaseModel):
     # Outreach fields.
     personalized_emails: Optional[List[PersonalizedEmail]] = Field(
         default=None, description="List of Personalized emails that will be used for outreach.")
+    personalized_emails_tokens_used: Optional[OpenAITokenUsage] = Field(
+        default=None, description="Total Open AI tokens used in generating personalized emails.")
 
     # Methods.
     def get_all_highlights(self):
