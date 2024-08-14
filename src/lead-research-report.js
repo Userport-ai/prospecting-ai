@@ -8,7 +8,7 @@ import {
   redirect,
 } from "react-router-dom";
 import { useState } from "react";
-import { sampleReport, outreachMessages } from "./lead-research-report-data";
+import { sampleReport } from "./lead-research-report-data";
 
 const { Text, Link } = Typography;
 
@@ -26,8 +26,13 @@ function addLineBreaks(text) {
 
 // Represents Personalized Emails to the lead.
 function PersonalizedEmails({ report }) {
-  // TODO: Handle case when chosen outreach template is null.
   function getEmailBodyText(personalized_email, report) {
+    if (report.chosen_outreach_email_template.id === null) {
+      // No template chosen, return only email opener.
+      return personalized_email.email_opener;
+    }
+
+    // Return email opener as well as choen template.
     return (
       personalized_email.email_opener +
       "\n\n" +
@@ -78,6 +83,10 @@ function PersonalizedEmails({ report }) {
 
 // The email template selected for given lead.
 function SelectedEmailTemplate({ report }) {
+  if (report.chosen_outreach_email_template.id === null) {
+    // No template was chosen, return null.
+    return null;
+  }
   return (
     <div id="selected-email-template-with-title-container">
       <h1>Selected Email Template</h1>

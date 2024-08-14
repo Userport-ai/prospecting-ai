@@ -1,5 +1,3 @@
-import { ceoTemplateMessage } from "./create-template-message-data";
-
 export const sampleReport = {
   status: "success",
   lead_research_report: {
@@ -455,14 +453,3 @@ export const sampleReport = {
     personalized_emails_tokens_used: null,
   },
 };
-const outreachMesageOne =
-  `Hi Zachary, \n\nCongrats on Plaid being named #1 for the Finance category of Most Innovative Companies for 2024! \
-It’s great to see new features via RTP & FedNow while keeping the ecosystem safe at the same time with anti-fraud tools like Signal!\n\n` +
-  ceoTemplateMessage;
-
-const outreachMesageTwo =
-  `Hi Zachary,\n\nCongrats on the recent launch of Plaid Layer! \
-  It’s so cool that you can verify a user’s identity just by using their phone number using Layer and also improve user conversion rates by nearly 90%.\n\n` +
-  ceoTemplateMessage;
-
-export const outreachMessages = [outreachMesageOne, outreachMesageTwo];
