@@ -1,29 +1,57 @@
-.template-card .ant-card {
+.template-card {
   border: 1px solid var(--outline-variant);
 }
 
-.template-card .ant-typography {
-  font-size: 1.5rem;
-  color: var(--on-surface);
+.template-card .contents-and-btn-container {
+  display: flex;
+  flex-direction: row;
 }
 
-.template-card .card-key {
+.contents-and-btn-container .delete-btn {
+  border: 0.5px solid var(--primary);
+  padding: 4px;
+}
+
+.contents-and-btn-container .delete-btn svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.contents-and-btn-container .delete-btn:hover {
+  background-color: var(--surface-bright);
+  border: 0.5px solid var(--primary);
+}
+
+.template-card .card-contents-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.card-contents-container .card-key {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 1.6rem;
+}
+
+.card-contents-container .card-key-value-text {
+  color: var(--secondary);
+  font-size: 1.7rem;
+}
+
+.template-card .created-date-container,
+.updated-date-container {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+.template-card .dates-container .date-key {
+  color: var(--primary);
   font-weight: 600;
 }
 
-.template-card .template-role-titles-and-buttons {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-}
-
-.template-card .template-role-titles-and-buttons .delete-btn {
-  width: 4rem;
-  height: 4rem;
-  border: 0.5px solid var(--primary);
-}
-
-.template-card .template-role-titles-and-buttons .delete-btn:hover {
-  background-color: var(--surface-bright);
-  border: 0.5px solid var(--primary);
+.template-card .dates-container .date-key-value-text {
+  color: var(--secondary);
+  font-weight: 500;
 }

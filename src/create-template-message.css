@@ -36,52 +36,29 @@
   font-size: 1.6rem;
   margin-top: 1rem;
 }
-
-#create-template-message-container .label-helper-text {
-  color: var(--secondary);
-}
-
 #create-template-message-container #form-container h3 {
   color: var(--on-surface);
   margin-bottom: 2rem;
 }
 
-#create-template-message-container .ant-form-item-label label {
-  font-size: 1.7rem;
-  font-family: "Lato";
-  font-weight: 600;
+#create-template-message-container #form-container #form-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
-#create-template-message-container #role-titles-container {
+#create-template-message-container #form-container .form-item-container {
   display: flex;
   flex-direction: column;
 }
 
-#create-template-message-container #role-titles-container label {
+#create-template-message-container #form-container label {
   font-size: 1.7rem;
   font-weight: 600;
 }
 
-#create-template-message-container #description-container {
-  margin-top: 2rem;
-  display: flex;
-  flex-direction: column;
-}
-
-#create-template-message-container #description-container label {
-  font-size: 1.7rem;
-  font-weight: 600;
-}
-
-#create-template-message-container #message-container {
-  margin-top: 2rem;
-  display: flex;
-  flex-direction: column;
-}
-
-#create-template-message-container #message-container label {
-  font-size: 1.7rem;
-  font-weight: 600;
+#create-template-message-container #form-container .label-helper-text {
+  color: var(--secondary);
 }
 
 #create-template-message-container #btn-container {

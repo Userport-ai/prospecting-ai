@@ -1,5 +1,5 @@
 import "./all-templates.css";
-import { Typography, Button, Spin, Modal } from "antd";
+import { Button, Spin, Modal } from "antd";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import TemplateCard from "./template-card";
@@ -8,7 +8,6 @@ import { useLoaderData, redirect, useNavigation } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
 
-const { Title } = Typography;
 const { confirm } = Modal;
 
 export const templateMessagesLoader = (authContext) => {
@@ -122,7 +121,7 @@ function AllTemplates() {
           <Spin spinning={loading_or_submitting} />;
           <div id="all-templates-outer-container">
             <div id="templates-title-container">
-              <Title level={3}>All Email Templates</Title>
+              <h1>All Email Templates</h1>
               <Button
                 id="create-template-btn"
                 type="primary"

@@ -405,7 +405,8 @@ class OutreachEmailTemplate(BaseModel):
         default=None, description="Date in UTC timezone when this document was inserted in the database.")
     creation_date_readable_str: Optional[str] = Field(
         default=None, description="Human Readable Date string when this document was inserted in the database.")
-    # TODO: Add name field to this template to make it easy to reference in the UI.
+    name: Optional[str] = Field(
+        default=None, description="User provided name to reference this template.")
     persona_role_titles: Optional[List[str]] = Field(
         default=None, description="Role Titles for the persona this template is targeting. Can be more than one title.")
     description: Optional[str] = Field(

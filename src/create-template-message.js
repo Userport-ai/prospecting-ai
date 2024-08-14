@@ -16,6 +16,13 @@ export const createTemplateAction = (authContext) => {
     }
     const formData = await request.formData();
     const apiRequest = Object.fromEntries(formData);
+    if (apiRequest["name"].length === 0) {
+      const error_obj = {
+        message: "Template Name Cannot be empty",
+        status_code: 400,
+      };
+      throw error_obj;
+    }
     if (apiRequest["persona_role_titles"].length === 0) {
       const error_obj = {
         message: "Role Titles Cannot be empty",
@@ -74,51 +81,63 @@ function CreateTemplateMessage() {
           <div id="form-container">
             <Title level={3}>Create Email Template</Title>
             <RouterForm method="post">
-              <div id="role-titles-container">
-                <label htmlFor="persona-role-titles-input">
-                  Persona Role Titles
-                </label>
-                <Text className="label-helper-text">
-                  You can enter multiple roles by separating them with commas.
-                  Ex: VP of Sales, Director of Sales, CEO.
-                </Text>
-                <Input
-                  id="persona-role-titles-input"
-                  name="persona_role_titles"
-                />
-              </div>
+              <div id="form-item-list">
+                <div className="form-item-container">
+                  <label htmlFor="name-input">Template Name</label>
+                  <Text className="label-helper-text">
+                    Enter a name for the template that you can use to reference
+                    it. You can any enter name, just ensure it is unique among
+                    all your templates.
+                  </Text>
+                  <Input id="name-input" name="name" />
+                </div>
 
-              <div id="description-container">
-                <label htmlFor="description-input">
-                  Description (Optional)
-                </label>
-                <Text className="label-helper-text">
-                  Free form text describing the persona's skillset or background
-                  or any other specific detail. Ex: Experienced in Outbound
-                  Sales.
-                </Text>
-                <Input id="description-input" name="description" />
-              </div>
+                <div className="form-item-container">
+                  <label htmlFor="persona-role-titles-input">
+                    Persona Role Titles
+                  </label>
+                  <Text className="label-helper-text">
+                    You can enter multiple roles by separating them with commas.
+                    Ex: VP of Sales, Director of Sales, CEO.
+                  </Text>
+                  <Input
+                    id="persona-role-titles-input"
+                    name="persona_role_titles"
+                  />
+                </div>
 
-              <div id="message-container">
-                <label htmlFor="message-textarea">Message</label>
-                <Text className="label-helper-text">
-                  The template message that shines light on the problem and
-                  provides the value proposition of your product.
-                </Text>
-                <TextArea
-                  id="message-textarea"
-                  name="message"
-                  value={currMessage}
-                  onChange={(e) => setCurrMessage(e.target.value)}
-                  autoSize={{ minRows: 10, maxRows: 100 }}
-                />
-              </div>
+                <div className="form-item-container">
+                  <label htmlFor="description-input">
+                    Description (Optional)
+                  </label>
+                  <Text className="label-helper-text">
+                    Free form text describing the persona's skillset or
+                    background or any other specific detail. Ex: Experienced in
+                    Outbound Sales.
+                  </Text>
+                  <Input id="description-input" name="description" />
+                </div>
 
-              <div id="btn-container">
-                <Button type="primary" htmlType="submit">
-                  Create
-                </Button>
+                <div className="form-item-container">
+                  <label htmlFor="message-textarea">Message</label>
+                  <Text className="label-helper-text">
+                    The template message that shines light on the problem and
+                    provides the value proposition of your product.
+                  </Text>
+                  <TextArea
+                    id="message-textarea"
+                    name="message"
+                    value={currMessage}
+                    onChange={(e) => setCurrMessage(e.target.value)}
+                    autoSize={{ minRows: 10, maxRows: 100 }}
+                  />
+                </div>
+
+                <div id="btn-container">
+                  <Button type="primary" htmlType="submit">
+                    Create
+                  </Button>
+                </div>
               </div>
             </RouterForm>
           </div>

@@ -256,10 +256,12 @@ def create_outreach_email_template():
     db = Database()
     user_id: str = g.user["uid"]
 
+    name: str = None
     persona_role_titles: List[str] = None
     description: str = None
     message: str = None
     try:
+        name = request.json.get("name")
         persona_role_titles = [title.strip() for title in request.json.get(
             "persona_role_titles").split(",")]
         description = request.json.get("description")
@@ -272,7 +274,7 @@ def create_outreach_email_template():
 
     try:
         outreach_email_template = OutreachEmailTemplate(
-            user_id=user_id, persona_role_titles=persona_role_titles, description=description, message=message)
+            user_id=user_id, name=name, persona_role_titles=persona_role_titles, description=description, message=message)
         template_id: str = db.insert_outreach_email_template(
             outreach_email_template=outreach_email_template)
         logger.info(
@@ -311,6 +313,7 @@ def list_outreach_email_templates():
 
     try:
         projection = {
+            "name": 1,
             "persona_role_titles": 1,
             "description": 1,
             "message": 1,

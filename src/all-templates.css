@@ -31,8 +31,9 @@
   justify-content: space-between;
 }
 
-#all-templates-outer-container #templates-title-container h3 {
-  color: var(--on-primary-container);
+#all-templates-outer-container #templates-title-container h1 {
+  color: var(--primary);
+  font-weight: 600;
 }
 
 #all-templates-outer-container #template-cards-container {
@@ -52,18 +53,6 @@
 
 #all-templates-outer-container #no-templates-created-container h2 {
   color: var(--secondary);
-}
-
-#all-templates-outer-container .ant-card {
-  border: 1px solid var(--outline-variant);
-}
-
-#all-templates-outer-container .ant-typography {
-  color: var(--on-surface);
-}
-
-#all-templates-outer-container .card-key {
-  font-weight: 600;
 }
 
 #all-templates-outer-container #create-template-btn {
