@@ -7,9 +7,11 @@ import {
   useNavigation,
   redirect,
 } from "react-router-dom";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { reportWithSelectedTemplate } from "./lead-report-with-template-data";
 import { reportWithNoTemplate } from "./lead-report-no-template-data";
+import SelectTemplateModal from "./select-template-modal";
+import { AuthContext } from "./root";
 
 const { Text, Link } = Typography;
 
@@ -27,6 +29,7 @@ function addLineBreaks(text) {
 
 // Represents Personalized Emails to the lead.
 function PersonalizedEmails({ report }) {
+  // Helper to get email body text from personalized email and report.
   function getEmailBodyText(personalized_email, report) {
     if (report.chosen_outreach_email_template.id === null) {
       // No template chosen, return only email opener.
@@ -41,41 +44,52 @@ function PersonalizedEmails({ report }) {
     );
   }
 
+  // A single EmailCard component.
+  function EmailCard({ personalized_email, report }) {
+    return (
+      <Card>
+        <div className="email-subject-container">
+          <Text className="email-subject-label">Subject</Text>
+          <div className="email-subject-text-container">
+            <Text className="email-subject-text">
+              {personalized_email.email_subject_line}
+            </Text>
+            <Text
+              copyable={{
+                text: personalized_email.email_subject_line,
+                tooltips: ["Copy Subject"],
+              }}
+            ></Text>
+          </div>
+        </div>
+        <div className="email-body-container">
+          <Text className="email-body-label">Body</Text>
+          <div className="email-body-text-container">
+            <Text className="email-body-text">
+              {addLineBreaks(getEmailBodyText(personalized_email, report))}
+            </Text>
+            <Text
+              copyable={{
+                text: getEmailBodyText(personalized_email, report),
+                tooltips: ["Copy Email Body"],
+              }}
+            ></Text>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div id="personalized-emails-with-title-container">
       <h1>Emails</h1>
       <div id="personalized-emails-container">
         {report.personalized_emails.map((personalized_email) => (
-          <Card>
-            <div className="email-subject-container">
-              <Text className="email-subject-label">Subject</Text>
-              <div className="email-subject-text-container">
-                <Text className="email-subject-text">
-                  {personalized_email.email_subject_line}
-                </Text>
-                <Text
-                  copyable={{
-                    text: personalized_email.email_subject_line,
-                    tooltips: ["Copy Subject"],
-                  }}
-                ></Text>
-              </div>
-            </div>
-            <div className="email-body-container">
-              <Text className="email-body-label">Body</Text>
-              <div className="email-body-text-container">
-                <Text className="email-body-text">
-                  {addLineBreaks(getEmailBodyText(personalized_email, report))}
-                </Text>
-                <Text
-                  copyable={{
-                    text: getEmailBodyText(personalized_email, report),
-                    tooltips: ["Copy Email Body"],
-                  }}
-                ></Text>
-              </div>
-            </div>
-          </Card>
+          <EmailCard
+            key={personalized_email.id}
+            personalized_email={personalized_email}
+            report={report}
+          />
         ))}
       </div>
     </div>
@@ -84,13 +98,52 @@ function PersonalizedEmails({ report }) {
 
 // The email template selected for given lead.
 function SelectedEmailTemplate({ report }) {
+  const { user } = useContext(AuthContext);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [outreachTemplates, setOutreachTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+
+  // Create modal to allow user to select template.
+  async function selectTemplateModal() {
+    // Fetch list of templates created by the given user.
+    setTemplatesLoading(true);
+    const response = await fetch("/api/v1/outreach-email-templates", {
+      headers: { Authorization: "Bearer " + user.accessToken },
+    });
+    const result = await response.json();
+    if (result.status === "error") {
+      throw result;
+    }
+    if (result.outreach_email_templates.length === 0) {
+      const error_obj = {
+        message: "No Templates found, please create templates first!",
+        status_code: 400,
+      };
+      throw error_obj;
+    }
+    setOutreachTemplates(result.outreach_email_templates);
+    setTemplatesLoading(false);
+    setModalOpen(true);
+  }
+
+  function onTemplateSelected() {
+    setModalOpen(false);
+    // TODO: Call API to update selected template.
+  }
+
+  function onTemplateCancel() {
+    setModalOpen(false);
+  }
+
   var selectedTemplateView = null;
   if (report.chosen_outreach_email_template.id === null) {
     // No template was chosen, return empty data.
     selectedTemplateView = (
       <div id="no-template-selected">
         <Empty description={<Text>No Template matched</Text>}>
-          <Button>Add Manually</Button>
+          <Button onClick={selectTemplateModal} loading={templatesLoading}>
+            Add a template
+          </Button>
         </Empty>
       </div>
     );
@@ -120,6 +173,12 @@ function SelectedEmailTemplate({ report }) {
 
   return (
     <div id="selected-email-template-with-title-container">
+      <SelectTemplateModal
+        modalOpen={modalOpen}
+        outreachTemplates={outreachTemplates}
+        onSelect={onTemplateSelected}
+        onCancel={onTemplateCancel}
+      />
       <h1>Selected Email Template</h1>
       {selectedTemplateView}
     </div>
@@ -227,7 +286,7 @@ function CategoriesAndHighlights({ report }) {
         )
         .flatMap((detail) =>
           detail.highlights.map((highlight) => (
-            <Highlight highlight={highlight} />
+            <Highlight key={highlight.id} highlight={highlight} />
           ))
         )}
     </>
@@ -290,8 +349,8 @@ export const leadResearchReportLoader = (authContext) => {
     //   headers: { Authorization: "Bearer " + user.accessToken },
     // });
     // const result = await response.json();
-    // const result = await reportWithSelectedTemplate;
-    const result = await reportWithNoTemplate;
+    const result = await reportWithSelectedTemplate;
+    // const result = await reportWithNoTemplate;
     if (result.status === "error") {
       console.log("Error getting lead report: ", result);
       throw result;
