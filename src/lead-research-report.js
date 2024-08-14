@@ -1,6 +1,6 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { Flex, Typography, Button, Card, Spin, Tabs } from "antd";
+import { Flex, Typography, Button, Card, Spin, Tabs, Empty } from "antd";
 import {
   useNavigate,
   useLoaderData,
@@ -8,7 +8,8 @@ import {
   redirect,
 } from "react-router-dom";
 import { useState } from "react";
-import { sampleReport } from "./lead-research-report-data";
+import { reportWithSelectedTemplate } from "./lead-report-with-template-data";
+import { reportWithNoTemplate } from "./lead-report-no-template-data";
 
 const { Text, Link } = Typography;
 
@@ -83,14 +84,19 @@ function PersonalizedEmails({ report }) {
 
 // The email template selected for given lead.
 function SelectedEmailTemplate({ report }) {
+  var selectedTemplateView = null;
   if (report.chosen_outreach_email_template.id === null) {
-    // No template was chosen, return null.
-    // TODO: Add option to manually select template.
-    return null;
-  }
-  return (
-    <div id="selected-email-template-with-title-container">
-      <h1>Selected Email Template</h1>
+    // No template was chosen, return empty data.
+    selectedTemplateView = (
+      <div id="no-template-selected">
+        <Empty description={<Text>No Template matched</Text>}>
+          <Button>Add Manually</Button>
+        </Empty>
+      </div>
+    );
+  } else {
+    // Show selected template.
+    selectedTemplateView = (
       <Card id="email-template-card">
         <div id="template-name-container">
           <Text className="card-text-label" strong>
@@ -109,6 +115,13 @@ function SelectedEmailTemplate({ report }) {
           </Text>
         </div>
       </Card>
+    );
+  }
+
+  return (
+    <div id="selected-email-template-with-title-container">
+      <h1>Selected Email Template</h1>
+      {selectedTemplateView}
     </div>
   );
 }
@@ -277,7 +290,8 @@ export const leadResearchReportLoader = (authContext) => {
     //   headers: { Authorization: "Bearer " + user.accessToken },
     // });
     // const result = await response.json();
-    const result = await sampleReport;
+    // const result = await reportWithSelectedTemplate;
+    const result = await reportWithNoTemplate;
     if (result.status === "error") {
       console.log("Error getting lead report: ", result);
       throw result;

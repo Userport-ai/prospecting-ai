@@ -201,6 +201,25 @@
   font-weight: 600;
 }
 
+#selected-email-template-with-title-container #no-template-selected {
+  display: flex;
+  flex-direction: row;
+}
+
+#selected-email-template-with-title-container #no-template-selected button {
+  background-color: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
+}
+
+#selected-email-template-with-title-container
+  #no-template-selected
+  button:hover {
+  background-color: var(--hover-color);
+  border: 1px solid var(--on-primary);
+  font-weight: 600;
+}
+
 #selected-email-template-with-title-container #email-template-card {
   margin-top: 2rem;
   padding: 0;
@@ -233,7 +252,7 @@
 }
 
 #lead-research-report-container #personalized-emails-with-title-container {
-  margin-top: 4rem;
+  margin-top: 6rem;
 }
 
 #personalized-emails-with-title-container h1 {

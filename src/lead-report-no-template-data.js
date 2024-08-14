@@ -1,4 +1,4 @@
-export const sampleReport = {
+export const reportWithNoTemplate = {
   status: "success",
   lead_research_report: {
     id: "66ab9633a3bb9048bc1a0be5",
@@ -381,11 +381,10 @@ export const sampleReport = {
       },
     ],
     chosen_outreach_email_template: {
-      id: "66b99cb49c27d1bc9122ed06",
+      id: null,
       creation_date: null,
-      name: "CEOs from fintench startups",
-      message:
-        "Given you lead an team of more than 1000 employees, do you face challenges understanding the sentiment of your team after major announcements?\n\nAsking this as speaking with some of our customers like Visa and Stripe, I've learned that a major challenge facing unicorn companies is the impact of big announcements on employee productivity.\n\nTo keep track of your employees sentiments, do you mind spending 20 minutes to see WorkHR in action?",
+      name: null,
+      message: null,
       reason: null,
     },
     personalized_emails: [
