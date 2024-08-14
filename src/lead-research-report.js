@@ -150,24 +150,33 @@ function SelectedEmailTemplate({ report }) {
   } else {
     // Show selected template.
     selectedTemplateView = (
-      <Card id="email-template-card">
-        <div id="template-name-container">
-          <Text className="card-text-label" strong>
-            Name:
-          </Text>
-          <Text className="template-text">
-            {report.chosen_outreach_email_template.name}
-          </Text>
-        </div>
-        <div id="template-message-container">
-          <Text className="card-text-label" strong>
-            Message
-          </Text>
-          <Text className="template-text">
-            {addLineBreaks(report.chosen_outreach_email_template.message)}
-          </Text>
-        </div>
-      </Card>
+      <>
+        <Button
+          id="change-email-template-btn"
+          onClick={selectTemplateModal}
+          loading={templatesLoading}
+        >
+          Change Template
+        </Button>
+        <Card id="email-template-card">
+          <div id="template-name-container">
+            <Text className="card-text-label" strong>
+              Name:
+            </Text>
+            <Text className="template-text">
+              {report.chosen_outreach_email_template.name}
+            </Text>
+          </div>
+          <div id="template-message-container">
+            <Text className="card-text-label" strong>
+              Message
+            </Text>
+            <Text className="template-text">
+              {addLineBreaks(report.chosen_outreach_email_template.message)}
+            </Text>
+          </div>
+        </Card>
+      </>
     );
   }
 

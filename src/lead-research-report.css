@@ -220,6 +220,18 @@
   font-weight: 600;
 }
 
+#selected-email-template-with-title-container #change-email-template-btn {
+  margin-top: 1rem;
+  color: var(--on-primary);
+  background-color: var(--primary);
+  border: 0;
+  font-weight: 600;
+}
+
+#selected-email-template-with-title-container #change-email-template-btn:hover {
+  background-color: var(--hover-color);
+}
+
 #selected-email-template-with-title-container #email-template-card {
   margin-top: 2rem;
   padding: 0;
