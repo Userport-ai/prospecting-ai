@@ -363,12 +363,11 @@ if __name__ == "__main__":
     # Migration script.
     update = {
         "$set": {
-            "company_headcount": 1222,
-            "company_industry_categories": ["banking", "finance", "financial-services", "fintech-e067", "insurtech", "software", "wealth-management"],
+            "name": "Performance Marketing Executives",
         }
     }
     # db.migrate_docs(
-    #     collection=db._get_lead_research_report_collection(), filter={}, update=update)
+    #     collection=db._get_outreach_email_template_collection(), filter={"_id": ObjectId("66b779d1b413550e7fb4c0fb")}, update=update)
     print("done")
 
     # db.insert_personalized_emails(lead_research_report_id="", personalized_emails=[

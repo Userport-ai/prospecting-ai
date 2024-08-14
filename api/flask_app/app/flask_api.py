@@ -172,8 +172,17 @@ def get_lead_report(lead_research_report_id: str):
             "report_creation_date_readable_str": 1,
             "report_publish_cutoff_date_readable_str": 1,
             "details": 1,
-            "chosen_outreach_email_template": 1,
-            "personalized_emails": 1,
+            "chosen_outreach_email_template": {
+                "id": 1,
+                "name": 1,
+                "message": 1,
+            },
+            "personalized_emails": {
+                "_id": 1,
+                "referenced_highlight_ids": 1,
+                "email_subject_line": 1,
+                "email_opener": 1,
+            },
         }
         lead_research_report: LeadResearchReport = db.get_lead_research_report(
             lead_research_report_id=lead_research_report_id, projection=projection)

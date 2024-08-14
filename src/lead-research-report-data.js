@@ -382,19 +382,19 @@ export const sampleReport = {
     ],
     chosen_outreach_email_template: {
       id: "66b99cb49c27d1bc9122ed06",
-      creation_date: "2024-08-13T02:54:16.329000",
+      creation_date: null,
+      name: "CEOs from fintench startups",
       message:
         "Given you lead an team of more than 1000 employees, do you face challenges understanding the sentiment of your team after major announcements?\n\nAsking this as speaking with some of our customers like Visa and Stripe, I've learned that a major challenge facing unicorn companies is the impact of big announcements on employee productivity.\n\nTo keep track of your employees sentiments, do you mind spending 20 minutes to see WorkHR in action?",
-      reason:
-        "Zachary Perret is a Co-Founder and CEO at Plaid, which is a fintech company. This matches the role title and industry described in the Persona with ID 66b99cb49c27d1bc9122ed06.",
+      reason: null,
     },
     personalized_emails: [
       {
         id: "66baecd4914935040bcf6299",
-        creation_date: "2024-08-13T05:19:16.389000",
-        creation_date_readable_str: "13 August, 2024",
-        last_updated_date: "2024-08-13T05:19:16.389000",
-        last_updated_date_readable_str: "13 August, 2024",
+        creation_date: null,
+        creation_date_readable_str: null,
+        last_updated_date: null,
+        last_updated_date_readable_str: null,
         referenced_highlight_ids: null,
         email_subject_line:
           "Zachary, excited about fintech the same way you predict it?",
@@ -403,10 +403,10 @@ export const sampleReport = {
       },
       {
         id: "66baecd4914935040bcf629a",
-        creation_date: "2024-08-13T05:19:16.389000",
-        creation_date_readable_str: "13 August, 2024",
-        last_updated_date: "2024-08-13T05:19:16.389000",
-        last_updated_date_readable_str: "13 August, 2024",
+        creation_date: null,
+        creation_date_readable_str: null,
+        last_updated_date: null,
+        last_updated_date_readable_str: null,
         referenced_highlight_ids: null,
         email_subject_line:
           "Zachary, inspired by your focus on tackling financial injustice!",
@@ -415,10 +415,10 @@ export const sampleReport = {
       },
       {
         id: "66baecd4914935040bcf629b",
-        creation_date: "2024-08-13T05:19:16.389000",
-        creation_date_readable_str: "13 August, 2024",
-        last_updated_date: "2024-08-13T05:19:16.389000",
-        last_updated_date_readable_str: "13 August, 2024",
+        creation_date: null,
+        creation_date_readable_str: null,
+        last_updated_date: null,
+        last_updated_date_readable_str: null,
         referenced_highlight_ids: null,
         email_subject_line:
           "Zachary, excited about Plaid's Consumer Report revolutionizing credit underwriting?",
@@ -427,10 +427,10 @@ export const sampleReport = {
       },
       {
         id: "66baecd4914935040bcf629c",
-        creation_date: "2024-08-13T05:19:16.389000",
-        creation_date_readable_str: "13 August, 2024",
-        last_updated_date: "2024-08-13T05:19:16.389000",
-        last_updated_date_readable_str: "13 August, 2024",
+        creation_date: null,
+        creation_date_readable_str: null,
+        last_updated_date: null,
+        last_updated_date_readable_str: null,
         referenced_highlight_ids: null,
         email_subject_line:
           "Zachary, tackling team sentiment challenges at Plaid post big announcements?",
@@ -439,10 +439,10 @@ export const sampleReport = {
       },
       {
         id: "66baecd4914935040bcf629d",
-        creation_date: "2024-08-13T05:19:16.389000",
-        creation_date_readable_str: "13 August, 2024",
-        last_updated_date: "2024-08-13T05:19:16.389000",
-        last_updated_date_readable_str: "13 August, 2024",
+        creation_date: null,
+        creation_date_readable_str: null,
+        last_updated_date: null,
+        last_updated_date_readable_str: null,
         referenced_highlight_ids: null,
         email_subject_line:
           "Zachary, curious about your take on Plaid's potential IPO at Cambrian event?",

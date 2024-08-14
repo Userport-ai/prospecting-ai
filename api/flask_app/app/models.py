@@ -310,7 +310,8 @@ class LeadResearchReport(BaseModel):
             default=None, description="ID of the selected OutreachEmailTemplate. Set to None if none of the templates created by the user were selected.")
         creation_date: Optional[datetime] = Field(
             default=None, description="Date in UTC Timezone when the template choosing was done. It is set even when no template is chosen.")
-        # TODO: Reference name field of Outreach Template here.
+        name: Optional[str] = Field(
+            default=None, description="Name of the temmplate selected.")
         message: Optional[str] = Field(
             default=None, description="Message template used for outreach to role titles above.")
         reason: Optional[str] = Field(

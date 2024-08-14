@@ -85,17 +85,26 @@ function PersonalizedEmails({ report }) {
 function SelectedEmailTemplate({ report }) {
   if (report.chosen_outreach_email_template.id === null) {
     // No template was chosen, return null.
+    // TODO: Add option to manually select template.
     return null;
   }
   return (
     <div id="selected-email-template-with-title-container">
       <h1>Selected Email Template</h1>
       <Card id="email-template-card">
+        <div id="template-name-container">
+          <Text className="card-text-label" strong>
+            Name:
+          </Text>
+          <Text className="template-text">
+            {report.chosen_outreach_email_template.name}
+          </Text>
+        </div>
         <div id="template-message-container">
           <Text className="card-text-label" strong>
             Message
           </Text>
-          <Text id="template-message-text">
+          <Text className="template-text">
             {addLineBreaks(report.chosen_outreach_email_template.message)}
           </Text>
         </div>
