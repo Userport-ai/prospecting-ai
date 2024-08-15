@@ -18,7 +18,7 @@ export const templateMessagesLoader = (authContext) => {
       return redirect("/login");
     }
     const response = await fetch("/api/v1/outreach-email-templates", {
-      headers: { Authorization: "Bearer " + user.accessToken },
+      headers: { Authorization: "Bearer " + user.getIdToken() },
     });
     const result = await response.json();
     // const result = exampleTemplateResponse;
@@ -44,7 +44,7 @@ const showDeletionConfirmModal = (
         "api/v1/outreach-email-templates/" + templateId,
         {
           method: "DELETE",
-          headers: { Authorization: "Bearer " + user.accessToken },
+          headers: { Authorization: "Bearer " + user.getIdToken() },
         }
       );
       const result = await response.json();

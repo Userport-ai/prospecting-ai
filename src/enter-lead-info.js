@@ -27,7 +27,7 @@ export const enterLeadAction = (authContext) => {
       body: JSON.stringify({ linkedin_url: linkedin_url }),
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + user.accessToken,
+        Authorization: "Bearer " + user.getIdToken(),
       },
     });
     const result = await response.json();

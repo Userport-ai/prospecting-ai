@@ -15,8 +15,9 @@ const { Title } = Typography;
 // Helper to fetch list of leads created by this user.
 // TODO: Implement pagination.
 async function fetch_leads(user) {
+  // Get Id token using Firebase API instead of accessing token directly per: https://stackoverflow.com/questions/47803495/error-firebase-id-token-has-expired.
   const response = await fetch("/api/v1/leads", {
-    headers: { Authorization: "Bearer " + user.accessToken },
+    headers: { Authorization: "Bearer " + user.getIdToken() },
   });
   const result = await response.json();
   // const result = await emptyLeadsResult;

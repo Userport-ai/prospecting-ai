@@ -108,7 +108,7 @@ function SelectedEmailTemplate({ report }) {
     // Fetch list of templates created by the given user.
     setTemplatesLoading(true);
     const response = await fetch("/api/v1/outreach-email-templates", {
-      headers: { Authorization: "Bearer " + user.accessToken },
+      headers: { Authorization: "Bearer " + user.getIdToken() },
     });
     const result = await response.json();
     if (result.status === "error") {
@@ -355,7 +355,7 @@ export const leadResearchReportLoader = (authContext) => {
       return redirect("/login");
     }
     // const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
-    //   headers: { Authorization: "Bearer " + user.accessToken },
+    //   headers: { Authorization: "Bearer " + user.getIdToken() },
     // });
     // const result = await response.json();
     const result = await reportWithSelectedTemplate;

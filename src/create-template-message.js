@@ -43,7 +43,7 @@ export const createTemplateAction = (authContext) => {
       body: JSON.stringify(apiRequest),
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + user.accessToken,
+        Authorization: "Bearer " + user.getIdToken(),
       },
     });
     const result = await response.json();
