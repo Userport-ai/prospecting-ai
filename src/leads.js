@@ -16,8 +16,9 @@ const { Title } = Typography;
 // TODO: Implement pagination.
 async function fetch_leads(user) {
   // Get Id token using Firebase API instead of accessing token directly per: https://stackoverflow.com/questions/47803495/error-firebase-id-token-has-expired.
+  const idToken = await user.getIdToken();
   const response = await fetch("/api/v1/leads", {
-    headers: { Authorization: "Bearer " + user.getIdToken() },
+    headers: { Authorization: "Bearer " + idToken },
   });
   const result = await response.json();
   // const result = await emptyLeadsResult;

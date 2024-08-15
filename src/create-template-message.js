@@ -38,12 +38,13 @@ export const createTemplateAction = (authContext) => {
       throw error_obj;
     }
 
+    const idToken = await user.getIdToken();
     const response = await fetch("/api/v1/outreach-email-templates", {
       method: "POST",
       body: JSON.stringify(apiRequest),
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + user.getIdToken(),
+        Authorization: "Bearer " + idToken,
       },
     });
     const result = await response.json();

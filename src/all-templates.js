@@ -17,8 +17,9 @@ export const templateMessagesLoader = (authContext) => {
       // User is logged out.
       return redirect("/login");
     }
+    const idToken = await user.getIdToken();
     const response = await fetch("/api/v1/outreach-email-templates", {
-      headers: { Authorization: "Bearer " + user.getIdToken() },
+      headers: { Authorization: "Bearer " + idToken },
     });
     const result = await response.json();
     // const result = exampleTemplateResponse;
@@ -40,11 +41,12 @@ const showDeletionConfirmModal = (
     icon: <ExclamationCircleOutlined />,
     content: "This event cannot be undone.",
     async onOk() {
+      const idToken = await user.getIdToken();
       const response = await fetch(
         "api/v1/outreach-email-templates/" + templateId,
         {
           method: "DELETE",
-          headers: { Authorization: "Bearer " + user.getIdToken() },
+          headers: { Authorization: "Bearer " + idToken },
         }
       );
       const result = await response.json();

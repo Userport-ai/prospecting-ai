@@ -22,12 +22,13 @@ export const enterLeadAction = (authContext) => {
     const inputValueMap = Object.fromEntries(formData);
     const linkedin_url = inputValueMap["linkedin_url"];
 
+    const idToken = await user.getIdToken();
     const response = await fetch("/api/v1/lead-research-reports", {
       method: "POST",
       body: JSON.stringify({ linkedin_url: linkedin_url }),
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + user.getIdToken(),
+        Authorization: "Bearer " + idToken,
       },
     });
     const result = await response.json();
