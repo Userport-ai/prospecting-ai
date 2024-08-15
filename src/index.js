@@ -5,7 +5,9 @@ import App from "./App";
 import Login, { loginLoader } from "./login";
 import AllTemplates from "./all-templates";
 import { templateMessagesLoader } from "./all-templates";
-import CreateTemplateMessage from "./create-template-message";
+import CreateOrEditTemplateMessage, {
+  createOrEditTemplateLoader,
+} from "./create-template-message";
 import { createTemplateAction } from "./create-template-message";
 import Leads from "./leads";
 import { leadsLoader } from "./leads";
@@ -59,8 +61,15 @@ function AppRoutes() {
             loader: templateMessagesLoader(context),
           },
           {
-            path: "create-template",
-            element: <CreateTemplateMessage />,
+            path: "templates/create",
+            element: <CreateOrEditTemplateMessage />,
+            loader: createOrEditTemplateLoader(context),
+            action: createTemplateAction(context),
+          },
+          {
+            path: "templates/edit/:id",
+            element: <CreateOrEditTemplateMessage />,
+            loader: createOrEditTemplateLoader(context),
             action: createTemplateAction(context),
           },
           {

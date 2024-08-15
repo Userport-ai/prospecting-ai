@@ -10,6 +10,7 @@ import { AuthContext } from "./root";
 
 const { confirm } = Modal;
 
+// Loader for templates created by a user.
 export const templateMessagesLoader = (authContext) => {
   return async () => {
     const { user } = authContext;
@@ -17,12 +18,12 @@ export const templateMessagesLoader = (authContext) => {
       // User is logged out.
       return redirect("/login");
     }
-    const idToken = await user.getIdToken();
-    const response = await fetch("/api/v1/outreach-email-templates", {
-      headers: { Authorization: "Bearer " + idToken },
-    });
-    const result = await response.json();
-    // const result = exampleTemplateResponse;
+    // const idToken = await user.getIdToken();
+    // const response = await fetch("/api/v1/outreach-email-templates", {
+    //   headers: { Authorization: "Bearer " + idToken },
+    // });
+    // const result = await response.json();
+    const result = exampleTemplateResponse;
     if (result.status === "error") {
       throw result;
     }
@@ -128,7 +129,7 @@ function AllTemplates() {
                 id="create-template-btn"
                 type="primary"
                 htmlType="submit"
-                onClick={() => navigate("/create-template")}
+                onClick={() => navigate("/templates/create")}
               >
                 Create
               </Button>

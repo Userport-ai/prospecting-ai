@@ -377,6 +377,44 @@ def create_outreach_email_template():
             status_code=500, message="Internal Error when creating email template")
 
 
+class GetOutreachEmailTemplateResponse(BaseModel):
+    """API response for fetching a single Outreach Email template."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+    outreach_email_template: OutreachEmailTemplate = Field(
+        ..., description="Outreach email template requested by user in request.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.get('/v1/outreach-email-templates/<string:outreach_email_template_id>')
+@login_required
+def get_outreach_email_template(outreach_email_template_id: str):
+    """Get Outreach Email template with given ID."""
+    db = Database()
+
+    try:
+        outreach_email_template: OutreachEmailTemplate = db.get_outreach_email_template(
+            outreach_email_template_id=outreach_email_template_id)
+        response = GetOutreachEmailTemplateResponse(
+            status=ResponseStatus.SUCCESS,
+            outreach_email_template=outreach_email_template
+        )
+        logger.info(
+            f"Got Outreach Email template for ID: {outreach_email_template_id}")
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to get Outreach Email template for ID: {outreach_email_template_id} with error: {e}")
+        raise APIException(
+            status_code=500, message="Internal Error when fetching Outreach Email template")
+
+
 class ListOutreachEmailTemplatesResponse(BaseModel):
     """API response for listing Outreach Email templates."""
     status: ResponseStatus = Field(...,

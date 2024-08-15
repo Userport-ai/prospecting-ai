@@ -2,11 +2,47 @@ import "./create-template-message.css";
 import { Typography, Input, Button, Spin } from "antd";
 import BackArrow from "./back-arrow";
 import { useState } from "react";
-import { Form as RouterForm, useNavigation, redirect } from "react-router-dom";
+import {
+  Form as RouterForm,
+  useNavigation,
+  redirect,
+  useLoaderData,
+} from "react-router-dom";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
+// Loader for template. If it is creation flow, returns null, else returns existing template details from backend.
+export const createOrEditTemplateLoader = (authContext) => {
+  return async ({ params }) => {
+    const { user } = authContext;
+    if (!user) {
+      // User is logged out.
+      return redirect("/login");
+    }
+    if (params.id === undefined) {
+      // Create template flow, load nothing.
+      return null;
+    }
+
+    // Fetch template to edit from backend.
+    const templateId = params.id;
+    const idToken = await user.getIdToken();
+    const response = await fetch(
+      "/api/v1/outreach-email-templates/" + templateId,
+      {
+        headers: { Authorization: "Bearer " + idToken },
+      }
+    );
+    const result = await response.json();
+    if (result.status === "error") {
+      throw result;
+    }
+    return result.outreach_email_template;
+  };
+};
+
+// Creates new template after user fills out new template form.
 export const createTemplateAction = (authContext) => {
   return async ({ request }) => {
     const { user } = authContext;
@@ -66,10 +102,17 @@ function DisplaySpinState({ loading_or_submitting }) {
   );
 }
 
-function CreateTemplateMessage() {
-  const [currMessage, setCurrMessage] = useState("");
+function CreateOrEditTemplateMessage() {
+  const existingOutreachTemplate = useLoaderData();
+  const [currMessage, setCurrMessage] = useState(
+    existingOutreachTemplate ? existingOutreachTemplate.message : ""
+  );
   const navigation = useNavigation();
   const loading_or_submitting = navigation.state !== "idle";
+  const pageTitle = existingOutreachTemplate
+    ? "Edit Email Template"
+    : "Create Email Template";
+  const actionButtonText = existingOutreachTemplate ? "Save" : "Create";
 
   return (
     <div id="create-template-message-outer">
@@ -80,7 +123,7 @@ function CreateTemplateMessage() {
         </div>
         <div id="create-template-message-container">
           <div id="form-container">
-            <Title level={3}>Create Email Template</Title>
+            <Title level={3}>{pageTitle}</Title>
             <RouterForm method="post">
               <div id="form-item-list">
                 <div className="form-item-container">
@@ -90,7 +133,15 @@ function CreateTemplateMessage() {
                     it. You can any enter name, just ensure it is unique among
                     all your templates.
                   </Text>
-                  <Input id="name-input" name="name" />
+                  <Input
+                    id="name-input"
+                    name="name"
+                    defaultValue={
+                      existingOutreachTemplate
+                        ? existingOutreachTemplate.name
+                        : ""
+                    }
+                  />
                 </div>
 
                 <div className="form-item-container">
@@ -104,6 +155,11 @@ function CreateTemplateMessage() {
                   <Input
                     id="persona-role-titles-input"
                     name="persona_role_titles"
+                    defaultValue={
+                      existingOutreachTemplate
+                        ? existingOutreachTemplate.persona_role_titles
+                        : ""
+                    }
                   />
                 </div>
 
@@ -116,7 +172,15 @@ function CreateTemplateMessage() {
                     background or any other specific detail. Ex: Experienced in
                     Outbound Sales.
                   </Text>
-                  <Input id="description-input" name="description" />
+                  <Input
+                    id="description-input"
+                    name="description"
+                    defaultValue={
+                      existingOutreachTemplate
+                        ? existingOutreachTemplate.description
+                        : ""
+                    }
+                  />
                 </div>
 
                 <div className="form-item-container">
@@ -136,7 +200,7 @@ function CreateTemplateMessage() {
 
                 <div id="btn-container">
                   <Button type="primary" htmlType="submit">
-                    Create
+                    {actionButtonText}
                   </Button>
                 </div>
               </div>
@@ -148,4 +212,4 @@ function CreateTemplateMessage() {
   );
 }
 
-export default CreateTemplateMessage;
+export default CreateOrEditTemplateMessage;

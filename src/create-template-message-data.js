@@ -15,9 +15,10 @@ export const exampleTemplateResponse = {
   status: "success",
   outreach_email_templates: [
     {
-      id: "66b5d71c4417d6da618921fa",
+      id: "66b99cb49c27d1bc9122ed06",
       user_id: null,
       creation_date: null,
+      name: "Marketing folks",
       creation_date_readable_str: "09 August, 2024",
       persona_role_titles: ["VP of Marketing"],
       description: "Experience in Performance Marketing",

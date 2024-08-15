@@ -7,19 +7,25 @@
   flex-direction: row;
 }
 
-.contents-and-btn-container .delete-btn {
+.contents-and-btn-container .btns-container {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+.contents-and-btn-container button {
   border: 0.5px solid var(--primary);
   padding: 4px;
 }
 
-.contents-and-btn-container .delete-btn svg {
-  width: 2rem;
-  height: 2rem;
-}
-
-.contents-and-btn-container .delete-btn:hover {
+.contents-and-btn-container button:hover {
   background-color: var(--surface-bright);
   border: 0.5px solid var(--primary);
+}
+
+.contents-and-btn-container button svg {
+  width: 2rem;
+  height: 2rem;
 }
 
 .template-card .card-contents-container {

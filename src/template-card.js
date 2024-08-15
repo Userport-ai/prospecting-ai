@@ -1,10 +1,12 @@
 import "./template-card.css";
 import { Card, Flex, Typography, Button } from "antd";
-import { DeleteOutlined } from "@ant-design/icons";
+import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
 const { Text } = Typography;
 
 function TemplateCard({ templateDetails, onDeleteTemplate }) {
+  const navigate = useNavigate();
   function addLineBreaks(text) {
     return text.split("\n").map((substr) => {
       return (
@@ -22,6 +24,11 @@ function TemplateCard({ templateDetails, onDeleteTemplate }) {
 
   function handleDelete() {
     return onDeleteTemplate(templateDetails.id);
+  }
+
+  function handleEdit() {
+    // Navigate to edit page.
+    navigate("/templates/edit/" + templateDetails.id);
   }
 
   return (
@@ -67,11 +74,18 @@ function TemplateCard({ templateDetails, onDeleteTemplate }) {
             </div>
           </div>
         </div>
-        <Button
-          className="delete-btn"
-          onClick={handleDelete}
-          icon={<DeleteOutlined style={{ color: "#65558f" }} />}
-        ></Button>
+        <div className="btns-container">
+          <Button
+            className="edit-btn"
+            onClick={handleEdit}
+            icon={<EditOutlined style={{ color: "#65558f" }} />}
+          ></Button>
+          <Button
+            className="delete-btn"
+            onClick={handleDelete}
+            icon={<DeleteOutlined style={{ color: "#65558f" }} />}
+          ></Button>
+        </div>
       </div>
     </Card>
   );
