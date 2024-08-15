@@ -5,6 +5,7 @@
 .template-card .contents-and-btn-container {
   display: flex;
   flex-direction: row;
+  justify-content: space-between;
 }
 
 .contents-and-btn-container .btns-container {

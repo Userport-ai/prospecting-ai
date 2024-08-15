@@ -8,7 +8,7 @@ import { templateMessagesLoader } from "./all-templates";
 import CreateOrEditTemplateMessage, {
   createOrEditTemplateLoader,
 } from "./create-template-message";
-import { createTemplateAction } from "./create-template-message";
+import { createOrEditTemplateAction } from "./create-template-message";
 import Leads from "./leads";
 import { leadsLoader } from "./leads";
 import EnterLeadInfo from "./enter-lead-info";
@@ -64,13 +64,13 @@ function AppRoutes() {
             path: "templates/create",
             element: <CreateOrEditTemplateMessage />,
             loader: createOrEditTemplateLoader(context),
-            action: createTemplateAction(context),
+            action: createOrEditTemplateAction(context),
           },
           {
             path: "templates/edit/:id",
             element: <CreateOrEditTemplateMessage />,
             loader: createOrEditTemplateLoader(context),
-            action: createTemplateAction(context),
+            action: createOrEditTemplateAction(context),
           },
           {
             path: "enter-lead-info",

@@ -42,13 +42,20 @@ export const createOrEditTemplateLoader = (authContext) => {
   };
 };
 
-// Creates new template after user fills out new template form.
-export const createTemplateAction = (authContext) => {
-  return async ({ request }) => {
+// Creates or edits template after user fills out new template form.
+export const createOrEditTemplateAction = (authContext) => {
+  return async ({ params, request }) => {
     const { user } = authContext;
     if (!user) {
       // User is logged out.
       return null;
+    }
+
+    // Template ID will be null when creating a template.
+    var templateId = null;
+    if (params.id !== undefined) {
+      // Send Update template request to given template ID.
+      templateId = params.id;
     }
     const formData = await request.formData();
     const apiRequest = Object.fromEntries(formData);
@@ -75,8 +82,17 @@ export const createTemplateAction = (authContext) => {
     }
 
     const idToken = await user.getIdToken();
-    const response = await fetch("/api/v1/outreach-email-templates", {
-      method: "POST",
+
+    var apiEndpoint = "/api/v1/outreach-email-templates";
+    var apiMethod = "POST";
+    if (templateId !== null) {
+      // Edit template endpoint.
+      apiEndpoint = apiEndpoint + "/" + templateId;
+      apiMethod = "PUT";
+    }
+
+    const response = await fetch(apiEndpoint, {
+      method: apiMethod,
       body: JSON.stringify(apiRequest),
       headers: {
         "Content-Type": "application/json",
@@ -85,11 +101,10 @@ export const createTemplateAction = (authContext) => {
     });
     const result = await response.json();
     if (result.status === "error") {
-      console.log("Got error when creating outreach email template: ", result);
       throw result;
     }
 
-    // Successful creation, go back to all templates page.
+    // Successful creation or edit, go back to all templates page.
     return redirect("/templates");
   };
 };

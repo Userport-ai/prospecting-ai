@@ -460,6 +460,63 @@ def list_outreach_email_templates():
             status_code=500, message="Internal Error when listing outreach email templates")
 
 
+class UpdateOutreachEmailTemplatesResponse(BaseModel):
+    """API response for updating Outreach Email template."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.put('/v1/outreach-email-templates/<string:outreach_email_template_id>')
+@login_required
+def update_outreach_email_template(outreach_email_template_id: str):
+    """Updates Outreach Email template with given ID."""
+    db = Database()
+
+    name: str = None
+    persona_role_titles: List[str] = None
+    description: str = None
+    message: str = None
+    try:
+        name = request.json.get("name")
+        persona_role_titles = [title.strip() for title in request.json.get(
+            "persona_role_titles").split(",")]
+        description = request.json.get("description")
+        message = request.json.get("message")
+    except Exception as e:
+        logger.exception(
+            f"Failed to fetch input for updating email template ID: {outreach_email_template_id} with error: {e}")
+        raise APIException(
+            status_code=400, message="Invalid request parameters for template updation")
+
+    try:
+        setFields = {
+            "name": name,
+            "persona_role_titles": persona_role_titles,
+            "description": description,
+            "message": message,
+        }
+        db.update_outreach_email_template(
+            outreach_email_template_id=outreach_email_template_id, setFields=setFields)
+        response = UpdateOutreachEmailTemplatesResponse(
+            status=ResponseStatus.SUCCESS,
+        )
+        logger.info(
+            f"Updated Outreach Email template for ID: {outreach_email_template_id}")
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to Update Outreach Email template for ID: {outreach_email_template_id} with error: {e}")
+        raise APIException(
+            status_code=500, message="Internal Error when Updating Outreach Email template")
+
+
 class DeleteOutreachTemplateResponse(BaseModel):
     """API response for deleting Outreach Email template."""
     status: ResponseStatus = Field(...,

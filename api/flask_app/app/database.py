@@ -297,7 +297,7 @@ class Database:
         return outreach_email_templates
 
     def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
-        """Sets fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
+        """Updates fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
         collection = self._get_lead_research_report_collection()
         if "last_updated_date" not in setFields:
             setFields["last_updated_date"] = Utils.create_utc_time_now()
@@ -307,6 +307,21 @@ class Database:
         if res.matched_count == 0:
             raise ValueError(
                 f"Could not update research report with ID: {lead_research_report_id}")
+
+    def update_outreach_email_template(self, outreach_email_template_id: str, setFields: Dict[str, str]):
+        """Updates fields for given Outreach Email Template ID. Assumes that fields are existing fields in the OutreachEmailTemplate Document model."""
+        collection = self._get_outreach_email_template_collection()
+        if "last_updated_date" not in setFields:
+            time_now: datetime = Utils.create_utc_time_now()
+            setFields["last_updated_date"] = time_now
+            setFields["last_updated_date_readable_str"] = Utils.to_human_readable_date_str(
+                time_now)
+
+        res: UpdateResult = collection.update_one(
+            {"_id": ObjectId(outreach_email_template_id)}, {"$set": setFields})
+        if res.matched_count == 0:
+            raise ValueError(
+                f"Could not update outreach email template with ID: {outreach_email_template_id}")
 
     def delete_outreach_email_templates(self, outreach_email_template_id: str):
         """Deletes outreach email template with given ID."""
