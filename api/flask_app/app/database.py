@@ -2,6 +2,7 @@
 import os
 import contextlib
 from typing import Optional, Dict
+from itertools import chain
 import pymongo
 from collections.abc import Generator
 from pymongo.mongo_client import MongoClient
@@ -163,8 +164,8 @@ class Database:
             outreach_email_template.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
 
-    def insert_personalized_emails_and_update_status(self, lead_research_report_id: str, personalized_emails: List[LeadResearchReport.PersonalizedEmail], personalized_emails_tokens_used: OpenAITokenUsage, status: LeadResearchReport.Status):
-        """Inserts personalized emails and tokens used into given lead research report. It will override entire list of existing personalized emails if any."""
+    def get_db_ready_personalized_emails(self, personalized_emails: List[LeadResearchReport.PersonalizedEmail]) -> List[Dict]:
+        """Returns a personalized email list of dictionaries from given input meail list that is populated and ready to be inserted in the database."""
         creation_date: datetime = Utils.create_utc_time_now()
         creation_date_readable_str: str = Utils.to_human_readable_date_str(
             creation_date)
@@ -183,17 +184,7 @@ class Database:
         for email_dict in personalized_emails_dict_list:
             email_dict["_id"] = ObjectId()
 
-        collection = self._get_lead_research_report_collection()
-        setFields = {
-            "status": status,
-            "personalized_emails": personalized_emails_dict_list,
-            "personalized_emails_tokens_used": personalized_emails_tokens_used.model_dump(),
-        }
-        result = collection.update_one(
-            {"_id": ObjectId(lead_research_report_id)}, {"$set": setFields})
-        if result.matched_count == 0:
-            raise ValueError(
-                f"Could not insert personalized emails for research report with ID: {lead_research_report_id}")
+        return personalized_emails_dict_list
 
     @contextlib.contextmanager
     def transaction_session(self) -> Generator[ClientSession, None]:
@@ -250,7 +241,7 @@ class Database:
                 f'Content Details not found for Id: {content_details_id}')
         return ContentDetails(**data_dict)
 
-    def get_lead_research_report(self, lead_research_report_id: str, projection: Optional[Dict[str, int]] = None) -> Optional[LeadResearchReport]:
+    def get_lead_research_report(self, lead_research_report_id: str, projection: Optional[Dict[str, int]] = None) -> LeadResearchReport:
         """Returns Lead Research report for given Report ID."""
         collection = self._get_lead_research_report_collection()
         data_dict = collection.find_one(
@@ -268,6 +259,16 @@ class Database:
         if not data_dict:
             return None
         return LeadResearchReport(**data_dict)
+
+    def get_outreach_email_template(self, outreach_email_template_id: str, projection: Optional[Dict[str, int]] = None) -> OutreachEmailTemplate:
+        """Returns Outreach Email Template for given Template ID."""
+        collection = self._get_outreach_email_template_collection()
+        data_dict = collection.find_one(
+            {"_id": ObjectId(outreach_email_template_id)}, projection=projection)
+        if not data_dict:
+            raise ValueError(
+                f'Outreach Email Template not found for Id: {outreach_email_template_id}')
+        return OutreachEmailTemplate(**data_dict)
 
     def list_lead_research_reports(self, user_id: str, projection: Optional[Dict[str, int]] = None) -> List[LeadResearchReport]:
         """Returns Lead Research reports created by given user. Returns only fields specified in the projection dictionary."""
@@ -298,6 +299,9 @@ class Database:
     def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
         """Sets fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
         collection = self._get_lead_research_report_collection()
+        if "last_updated_date" not in setFields:
+            setFields["last_updated_date"] = Utils.create_utc_time_now()
+
         res: UpdateResult = collection.update_one(
             {"_id": ObjectId(lead_research_report_id)}, {"$set": setFields})
         if res.matched_count == 0:
@@ -361,13 +365,14 @@ if __name__ == "__main__":
     # db.delete_all_content_details()
 
     # Migration script.
-    update = {
-        "$set": {
-            "name": "Performance Marketing Executives",
-        }
-    }
+    # update = {
+    #     "$set": {
+    #         "personalized_emails.$.highlight_id": "66a8e6adbc8a1e4270c9b29f",
+    #     }
+    # }
+
     # db.migrate_docs(
-    #     collection=db._get_outreach_email_template_collection(), filter={"_id": ObjectId("66b779d1b413550e7fb4c0fb")}, update=update)
+    #     collection=db._get_lead_research_report_collection(), filter={"personalized_emails._id": ObjectId("66baecd4914935040bcf629d")}, update=update)
     print("done")
 
     # db.insert_personalized_emails(lead_research_report_id="", personalized_emails=[

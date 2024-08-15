@@ -1,6 +1,15 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { Flex, Typography, Button, Card, Spin, Tabs, Empty } from "antd";
+import {
+  Flex,
+  Typography,
+  Button,
+  Card,
+  Spin,
+  Tabs,
+  Empty,
+  Skeleton,
+} from "antd";
 import {
   useNavigate,
   useLoaderData,
@@ -28,10 +37,16 @@ function addLineBreaks(text) {
 }
 
 // Represents Personalized Emails to the lead.
-function PersonalizedEmails({ report }) {
+function PersonalizedEmails({
+  chosen_outreach_email_template,
+  personalized_emails,
+}) {
   // Helper to get email body text from personalized email and report.
-  function getEmailBodyText(personalized_email, report) {
-    if (report.chosen_outreach_email_template.id === null) {
+  function getEmailBodyText(
+    personalized_email,
+    chosen_outreach_email_template
+  ) {
+    if (chosen_outreach_email_template.id === null) {
       // No template chosen, return only email opener.
       return personalized_email.email_opener;
     }
@@ -40,12 +55,12 @@ function PersonalizedEmails({ report }) {
     return (
       personalized_email.email_opener +
       "\n\n" +
-      report.chosen_outreach_email_template.message
+      chosen_outreach_email_template.message
     );
   }
 
   // A single EmailCard component.
-  function EmailCard({ personalized_email, report }) {
+  function EmailCard({ personalized_email, chosen_outreach_email_template }) {
     return (
       <Card>
         <div className="email-subject-container">
@@ -66,11 +81,19 @@ function PersonalizedEmails({ report }) {
           <Text className="email-body-label">Body</Text>
           <div className="email-body-text-container">
             <Text className="email-body-text">
-              {addLineBreaks(getEmailBodyText(personalized_email, report))}
+              {addLineBreaks(
+                getEmailBodyText(
+                  personalized_email,
+                  chosen_outreach_email_template
+                )
+              )}
             </Text>
             <Text
               copyable={{
-                text: getEmailBodyText(personalized_email, report),
+                text: getEmailBodyText(
+                  personalized_email,
+                  chosen_outreach_email_template
+                ),
                 tooltips: ["Copy Email Body"],
               }}
             ></Text>
@@ -84,11 +107,11 @@ function PersonalizedEmails({ report }) {
     <div id="personalized-emails-with-title-container">
       <h1>Emails</h1>
       <div id="personalized-emails-container">
-        {report.personalized_emails.map((personalized_email) => (
+        {personalized_emails.map((personalized_email) => (
           <EmailCard
             key={personalized_email.id}
             personalized_email={personalized_email}
-            report={report}
+            chosen_outreach_email_template={chosen_outreach_email_template}
           />
         ))}
       </div>
@@ -97,7 +120,10 @@ function PersonalizedEmails({ report }) {
 }
 
 // The email template selected for given lead.
-function SelectedEmailTemplate({ report }) {
+function SelectedEmailTemplate({
+  chosen_outreach_email_template,
+  onTemplateSelection,
+}) {
   const { user } = useContext(AuthContext);
   const [modalOpen, setModalOpen] = useState(false);
   const [outreachTemplates, setOutreachTemplates] = useState([]);
@@ -127,9 +153,9 @@ function SelectedEmailTemplate({ report }) {
     setModalOpen(true);
   }
 
-  function onTemplateSelected() {
+  function onTemplateOk(templateId) {
     setModalOpen(false);
-    // TODO: Call API to update selected template.
+    onTemplateSelection(templateId);
   }
 
   function onTemplateCancel() {
@@ -137,7 +163,7 @@ function SelectedEmailTemplate({ report }) {
   }
 
   var selectedTemplateView = null;
-  if (report.chosen_outreach_email_template.id === null) {
+  if (chosen_outreach_email_template.id === null) {
     // No template was chosen, return empty data.
     selectedTemplateView = (
       <div id="no-template-selected">
@@ -156,6 +182,7 @@ function SelectedEmailTemplate({ report }) {
           id="change-email-template-btn"
           onClick={selectTemplateModal}
           loading={templatesLoading}
+          disabled={templatesLoading}
         >
           Change Template
         </Button>
@@ -165,7 +192,7 @@ function SelectedEmailTemplate({ report }) {
               Name:
             </Text>
             <Text className="template-text">
-              {report.chosen_outreach_email_template.name}
+              {chosen_outreach_email_template.name}
             </Text>
           </div>
           <div id="template-message-container">
@@ -173,7 +200,7 @@ function SelectedEmailTemplate({ report }) {
               Message
             </Text>
             <Text className="template-text">
-              {addLineBreaks(report.chosen_outreach_email_template.message)}
+              {addLineBreaks(chosen_outreach_email_template.message)}
             </Text>
           </div>
         </Card>
@@ -186,7 +213,7 @@ function SelectedEmailTemplate({ report }) {
       <SelectTemplateModal
         modalOpen={modalOpen}
         outreachTemplates={outreachTemplates}
-        onSelect={onTemplateSelected}
+        onSelect={onTemplateOk}
         onCancel={onTemplateCancel}
       />
       <h1>Selected Email Template</h1>
@@ -196,11 +223,75 @@ function SelectedEmailTemplate({ report }) {
 }
 
 // Represents selected Email Template and Personalized Emails generated for the lead.
-function EmailTemplateAndPersonalizedEmails({ report }) {
+function EmailTemplateAndPersonalizedEmails(props) {
+  const { user } = useContext(AuthContext);
+  const [chosen_outreach_email_template, setOutreachTemplate] = useState(
+    props.chosen_outreach_email_template
+  );
+  const [personalized_emails, setPersonalizedEmails] = useState(
+    props.personalized_emails
+  );
+  const [templateUpdating, setTemplateUpdating] = useState(false);
+
+  //Updates new template in report on selection by user.
+  async function updateNewTemplate(templateId) {
+    setTemplateUpdating(true);
+    const idToken = await user.getIdToken();
+    const response = await fetch("/api/v1/lead-research-reports/template", {
+      method: "POST",
+      body: JSON.stringify({
+        lead_research_report_id: props.lead_research_report_id,
+        selected_template_id: templateId,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + idToken,
+      },
+    });
+    const result = await response.json();
+    if (result.status === "error") {
+      throw result;
+    }
+    setOutreachTemplate(result.chosen_outreach_email_template);
+    setPersonalizedEmails(result.personalized_emails);
+    setTemplateUpdating(false);
+
+    // Code to test UI.
+    // setTimeout(() => {
+    //   setTemplateUpdating(false);
+    // }, 5000);
+  }
+
+  if (templateUpdating) {
+    // Show skeleton with loading screen while template and emails are updating.
+    return (
+      <>
+        <Flex vertical={false} justify="center">
+          <h3>
+            Updating template and emails. This can take a few minutes, please
+            wait.
+          </h3>
+        </Flex>
+        <Skeleton
+          active
+          paragraph={{
+            rows: 20,
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <>
-      <SelectedEmailTemplate report={report} />
-      <PersonalizedEmails report={report} />
+      <SelectedEmailTemplate
+        chosen_outreach_email_template={chosen_outreach_email_template}
+        onTemplateSelection={updateNewTemplate}
+      />
+      <PersonalizedEmails
+        chosen_outreach_email_template={chosen_outreach_email_template}
+        personalized_emails={personalized_emails}
+      />
     </>
   );
 }
@@ -243,10 +334,10 @@ function Highlight({ highlight }) {
 }
 
 // Represents Categories buttons and associated highlights.
-function CategoriesAndHighlights({ report }) {
+function CategoriesAndHighlights({ details }) {
   var initialSelectedCategories = [];
-  if (report.details.length > 0) {
-    initialSelectedCategories = [report.details[0].category_readable_str];
+  if (details.length > 0) {
+    initialSelectedCategories = [details[0].category_readable_str];
   }
   const [categoriesSelected, setCategoriesSeleted] = useState(
     initialSelectedCategories
@@ -267,7 +358,7 @@ function CategoriesAndHighlights({ report }) {
   return (
     <>
       {/* These are the categories */}
-      {report.details.map((detail) => {
+      {details.map((detail) => {
         let categoryBtnClass = categoriesSelected.includes(
           detail.category_readable_str
         )
@@ -290,7 +381,7 @@ function CategoriesAndHighlights({ report }) {
           (selectedCategory) =>
             // Filtered category guaranteed to exist and size 1 since selected categories
             // are from the same details array.
-            report.details.filter(
+            details.filter(
               (detail) => detail.category_readable_str === selectedCategory
             )[0]
         )
@@ -303,10 +394,10 @@ function CategoriesAndHighlights({ report }) {
   );
 }
 
-function RecentNews({ report }) {
+function RecentNews({ details }) {
   return (
     <Flex id="report-details-container" vertical={false} wrap gap="large">
-      <CategoriesAndHighlights report={report} />
+      <CategoriesAndHighlights details={details} />
     </Flex>
   );
 }
@@ -355,12 +446,12 @@ export const leadResearchReportLoader = (authContext) => {
       // User is logged out.
       return redirect("/login");
     }
-    // const idToken = await user.getIdToken();
-    // const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
-    //   headers: { Authorization: "Bearer " + idToken },
-    // });
-    // const result = await response.json();
-    const result = await reportWithSelectedTemplate;
+    const idToken = await user.getIdToken();
+    const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
+      headers: { Authorization: "Bearer " + idToken },
+    });
+    const result = await response.json();
+    // const result = await reportWithSelectedTemplate;
     // const result = await reportWithNoTemplate;
     if (result.status === "error") {
       console.log("Error getting lead report: ", result);
@@ -385,13 +476,21 @@ function LeadResearchReport() {
           items={[
             {
               label: <h1>Recent News</h1>,
-              key: 1,
-              children: <RecentNews report={report} />,
+              key: "1",
+              children: <RecentNews details={report.details} />,
             },
             {
               label: <h1>Personalized Emails</h1>,
-              key: 2,
-              children: <EmailTemplateAndPersonalizedEmails report={report} />,
+              key: "2",
+              children: (
+                <EmailTemplateAndPersonalizedEmails
+                  lead_research_report_id={report.id}
+                  chosen_outreach_email_template={
+                    report.chosen_outreach_email_template
+                  }
+                  personalized_emails={report.personalized_emails}
+                />
+              ),
             },
           ]}
         />

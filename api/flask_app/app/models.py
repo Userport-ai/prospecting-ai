@@ -27,6 +27,18 @@ class OpenAITokenUsage(BaseModel):
     total_tokens: int = Field(..., description="Total tokens used")
     total_cost_in_usd: float = Field(...,
                                      description="Total cost of tokens used.")
+    
+    def add_tokens(self, another: "OpenAITokenUsage") -> "OpenAITokenUsage":
+        """Add and return tokens from another instance of OpenAITokenUsage class."""
+        return OpenAITokenUsage(
+            url=self.url,
+            highlight_ids=self.highlight_ids,
+            operation_tag=self.operation_tag,
+            prompt_tokens=self.prompt_tokens + another.prompt_tokens,
+            completion_tokens=self.completion_tokens + another.completion_tokens,
+            total_tokens= self.total_tokens + another.total_tokens,
+            total_cost_in_usd=self.total_cost_in_usd + another.total_cost_in_usd,
+        )
 
 
 class WebPage(BaseModel):
@@ -283,26 +295,26 @@ class LeadResearchReport(BaseModel):
         """Details associated with the report."""
         class Highlight(BaseModel):
             """Highhlight associated with report."""
-            id: PyObjectId = Field(...,
+            id: Optional[PyObjectId] = Field(default=None,
                                    description="ID of the Content detail referenced in creating this highlight.")
-            category: ContentCategoryEnum = Field(...,
+            category: Optional[ContentCategoryEnum] = Field(default=None,
                                                   description="Category of the content. Field is repeated at outer level too.")
-            category_readable_str: str = Field(
-                default="", description="Human readable Category string.")
-            concise_summary: str = Field(...,
+            category_readable_str: Optional[str] = Field(
+                default=None, description="Human readable Category string.")
+            concise_summary: Optional[str] = Field(default=None,
                                          description="Concise summary of the content.")
-            publish_date: datetime = Field(...,
+            publish_date: Optional[datetime] = Field(default=None,
                                            description="Publish date of the content.")
-            publish_date_readable_str: str = Field(default="",
+            publish_date_readable_str: Optional[str] = Field(default=None,
                                                    description="Human readable publish date string.")
-            url: str = Field(..., description="URL of the content.")
+            url: Optional[str] = Field(default=None, description="URL of the content.")
 
-        category: ContentCategoryEnum = Field(...,
+        category: Optional[ContentCategoryEnum] = Field(default=None,
                                               description="Category of the highlights.")
-        category_readable_str: str = Field(
-            default="", description="Human readable Category string.")
-        highlights: List[Highlight] = Field(
-            ..., description="List of Highlights associated with given category.")
+        category_readable_str: Optional[str] = Field(
+            default=None, description="Human readable Category string.")
+        highlights: Optional[List[Highlight]] = Field(
+            default=None, description="List of Highlights associated with given category.")
 
     class ChosenOutreachEmailTemplate(BaseModel):
         """Outreach Template chosen for this Lead. If ID is None, then none of the existing templates were chosen at that time."""
@@ -318,19 +330,21 @@ class LeadResearchReport(BaseModel):
             default=None, description="Reason why this template or None was selected.")
 
     class PersonalizedEmail(BaseModel):
-        """Personalized Email addressed to a given lead in the lead research report."""
+        """Personalized Email addressed to a given lead in the lead research report. Uses chosen template if it exists else generates email without template."""
         id: Optional[PyObjectId] = Field(
             alias="_id", default=None, description="MongoDB generated unique identifier for Personalized Email.")
         creation_date: Optional[datetime] = Field(
             default=None, description="Date in UTC timezone when this document was inserted in the database.")
         creation_date_readable_str: Optional[str] = Field(
             default=None, description="Human Readable Date string when this document was inserted in the database.")
+        # If the user wants to edit generated emails.
         last_updated_date: Optional[datetime] = Field(
             default=None, description="Date in UTC timezone when this document was last updated in the database.")
         last_updated_date_readable_str: Optional[str] = Field(
             default=None, description="Human Readable Date string when this document was last updated in the database.")
-        referenced_highlight_ids: Optional[List[str]] = Field(
-            default=None, description="The IDs of the highlights that were used to generate this personalized email. In the beginning, we expect to only reference one highlight but in the future this can hold multiple.")
+        highlight_id: Optional[str] = Field(
+            default=None, description="The IDs of the Highlight that was referenced to generate this personalized email.")
+        # TODO: Add highlight URL as well.
         email_subject_line: Optional[str] = Field(
             default=None, description="Generated subject Line of the email.")
         email_opener: Optional[str] = Field(

@@ -394,7 +394,7 @@ export const reportWithNoTemplate = {
         creation_date_readable_str: null,
         last_updated_date: null,
         last_updated_date_readable_str: null,
-        referenced_highlight_ids: null,
+        highlight_id: null,
         email_subject_line:
           "Zachary, excited about fintech the same way you predict it?",
         email_opener:
@@ -406,7 +406,7 @@ export const reportWithNoTemplate = {
         creation_date_readable_str: null,
         last_updated_date: null,
         last_updated_date_readable_str: null,
-        referenced_highlight_ids: null,
+        highlight_id: null,
         email_subject_line:
           "Zachary, inspired by your focus on tackling financial injustice!",
         email_opener:
@@ -418,7 +418,7 @@ export const reportWithNoTemplate = {
         creation_date_readable_str: null,
         last_updated_date: null,
         last_updated_date_readable_str: null,
-        referenced_highlight_ids: null,
+        highlight_id: null,
         email_subject_line:
           "Zachary, excited about Plaid's Consumer Report revolutionizing credit underwriting?",
         email_opener:
@@ -430,7 +430,7 @@ export const reportWithNoTemplate = {
         creation_date_readable_str: null,
         last_updated_date: null,
         last_updated_date_readable_str: null,
-        referenced_highlight_ids: null,
+        highlight_id: null,
         email_subject_line:
           "Zachary, tackling team sentiment challenges at Plaid post big announcements?",
         email_opener:
@@ -442,7 +442,7 @@ export const reportWithNoTemplate = {
         creation_date_readable_str: null,
         last_updated_date: null,
         last_updated_date_readable_str: null,
-        referenced_highlight_ids: null,
+        highlight_id: null,
         email_subject_line:
           "Zachary, curious about your take on Plaid's potential IPO at Cambrian event?",
         email_opener:

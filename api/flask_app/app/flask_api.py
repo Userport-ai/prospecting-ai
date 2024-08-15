@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 import logging
+import time
 from enum import Enum
 from typing import Optional, List
 from celery import shared_task
@@ -179,7 +180,7 @@ def get_lead_report(lead_research_report_id: str):
             },
             "personalized_emails": {
                 "_id": 1,
-                "referenced_highlight_ids": 1,
+                "highlight_id": 1,
                 "email_subject_line": 1,
                 "email_opener": 1,
             },
@@ -243,6 +244,82 @@ def list_leads():
         logger.exception(f"Failed to list with error: {e}")
         raise APIException(
             status_code=500, message="Failed to list lead research reports.")
+
+
+class UpdateTemplateInReportResponse(BaseModel):
+    """API response after updateing template and personalized emails in Lead Research Report."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+    chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = Field(
+        ..., description="Updated outreach email template.")
+    personalized_emails: List[LeadResearchReport.PersonalizedEmail] = Field(
+        ..., description="Updated personalized emails.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.post('/v1/lead-research-reports/template')
+@login_required
+def update_template_in_lead_report():
+    # Update template in given lead report. This will regenerate personalized emails using this new template.
+    db = Database()
+
+    lead_research_report_id: str = None
+    selected_template_id: str = None
+    try:
+        lead_research_report_id: str = request.json.get(
+            "lead_research_report_id")
+        selected_template_id: str = request.json.get("selected_template_id")
+    except Exception as e:
+        logger.exception(
+            f"Failed to select template in lead report for request: {request} with error: {e}")
+        raise APIException(
+            status_code=400, message="Invalid request parameters for template selection in lead report.")
+
+    logger.info(
+        f"Got template ID: {selected_template_id} update request in lead report ID: {lead_research_report_id}")
+
+    start_time = time.time()
+    rp = Researcher(database=db)
+    try:
+        rp.update_template_and_regen_emails(
+            lead_research_report_id=lead_research_report_id, selected_template_id=selected_template_id)
+
+        # Fetch and return updated email template and personalized emails.
+        projection = {
+            "chosen_outreach_email_template": {
+                "id": 1,
+                "name": 1,
+                "message": 1,
+            },
+            "personalized_emails": {
+                "_id": 1,
+                "highlight_id": 1,
+                "email_subject_line": 1,
+                "email_opener": 1,
+            },
+        }
+        lead_research_report: LeadResearchReport = db.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id, projection=projection)
+        logger.info(
+            f"Successfully Updated template and emails for Lead Report ID: {lead_research_report_id}")
+        response = UpdateTemplateInReportResponse(
+            status=ResponseStatus.SUCCESS,
+            chosen_outreach_email_template=lead_research_report.chosen_outreach_email_template,
+            personalized_emails=lead_research_report.personalized_emails,
+        )
+        logger.info(
+            f"Time elapsed for updating template and emails for report ID: {lead_research_report_id}: {time.time()-start_time} seconds")
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to update a new template with ID: {selected_template_id} in lead report: {lead_research_report_id} with error: {e}")
+        raise APIException(status_code=500, message="Failed to select ")
 
 
 class CreateOutreachTemplateResponse(BaseModel):
@@ -458,8 +535,8 @@ def aggregate_report_in_background(self, lead_research_report_id: str):
             f"Error in aggregating research report: {lead_research_report_id} with details: {e}")
         if self.request.retries >= max_retries:
             # Done with retries, mark task as failed.
-            setFields = {"status": LeadResearchReport.Status.FAILED_WITH_ERRORS,
-                         "last_updated_date": Utils.create_utc_time_now()}
+            setFields = {
+                "status": LeadResearchReport.Status.FAILED_WITH_ERRORS}
             r.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
                                                    setFields=setFields)
 
@@ -485,8 +562,8 @@ def choose_outreach_email_template_in_background(self, lead_research_report_id: 
             f"Error in Choosing Outreach Email template for research report: {lead_research_report_id} with details: {e}")
         if self.request.retries >= max_retries:
             # Done with retries, mark task as failed.
-            setFields = {"status": LeadResearchReport.Status.FAILED_WITH_ERRORS,
-                         "last_updated_date": Utils.create_utc_time_now()}
+            setFields = {
+                "status": LeadResearchReport.Status.FAILED_WITH_ERRORS}
             r.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
                                                    setFields=setFields)
 
@@ -508,8 +585,8 @@ def generate_personalized_emails_in_background(self, lead_research_report_id: st
             f"Error in generating personalized emails for research report: {lead_research_report_id} with details: {e}")
         if self.request.retries >= max_retries:
             # Done with retries, mark task as failed.
-            setFields = {"status": LeadResearchReport.Status.FAILED_WITH_ERRORS,
-                         "last_updated_date": Utils.create_utc_time_now()}
+            setFields = {
+                "status": LeadResearchReport.Status.FAILED_WITH_ERRORS}
             r.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
                                                    setFields=setFields)
 

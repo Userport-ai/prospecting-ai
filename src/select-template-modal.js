@@ -42,7 +42,7 @@ function SelectTemplateModal({
   }
 
   const handleOk = () => {
-    onSelect();
+    onSelect(selectedTemplateId);
   };
   const handleCancel = () => {
     onCancel();

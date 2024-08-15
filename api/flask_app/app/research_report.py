@@ -3,7 +3,6 @@ from typing import Optional, List, Dict, Set, Tuple
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from app.utils import Utils
-from app.models import LeadResearchReport, PersonProfile, CompanyProfile, content_category_to_human_readable_str
 from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
 from app.search_engine_workflow import SearchEngineWorkflow
@@ -16,7 +15,12 @@ from app.models import (
     ContentCategoryEnum,
     WebPage,
     LinkedInPost,
-    OpenAITokenUsage
+    OpenAITokenUsage,
+    LeadResearchReport,
+    PersonProfile,
+    CompanyProfile,
+    OutreachEmailTemplate,
+    content_category_to_human_readable_str
 )
 
 logger = logging.getLogger()
@@ -113,7 +117,6 @@ class Researcher:
         setFields = {
             "search_results_map": search_results_map,
             "status": LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED,
-            "last_updated_date": Utils.create_utc_time_now(),
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
@@ -150,8 +153,8 @@ class Researcher:
                     self.failed_urls.append((url, e))
 
         if len(self.failed_urls) > 0:
-            setFields = {"status": LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE,
-                         "last_updated_date": Utils.create_utc_time_now()}
+            setFields = {
+                "status": LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE}
             self.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
                                                       setFields=setFields)
             raise ValueError(
@@ -365,7 +368,6 @@ class Researcher:
 
         setFields = {
             "status": LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE,
-            "last_updated_date": Utils.create_utc_time_now(),
             "report_creation_date_readable_str": Utils.to_human_readable_date_str(time_now),
             "report_publish_cutoff_date": report_publish_cutoff_date,
             "report_publish_cutoff_date_readable_str": Utils.to_human_readable_date_str(report_publish_cutoff_date),
@@ -384,7 +386,6 @@ class Researcher:
         # Update lead research report.
         setFields = {
             "status": LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE,
-            "last_updated_date": Utils.create_utc_time_now(),
             "chosen_outreach_email_template": chosen_outreach_email_template.model_dump(),
         }
         self.database.update_lead_research_report(
@@ -399,10 +400,48 @@ class Researcher:
         personalized_emails_tokens_used: OpenAITokenUsage = self.personalization.get_tokens_used()
 
         # Update lead research report.
-        self.database.insert_personalized_emails_and_update_status(lead_research_report_id=lead_research_report_id, personalized_emails=personalized_emails,
-                                                                   personalized_emails_tokens_used=personalized_emails_tokens_used, status=LeadResearchReport.Status.COMPLETE)
+        personalized_emails_dict_list: List[Dict] = self.database.get_db_ready_personalized_emails(
+            personalized_emails=personalized_emails)
+        setFields = {
+            "status": LeadResearchReport.Status.COMPLETE,
+            "personalized_emails": personalized_emails_dict_list,
+            "personalized_emails_tokens_used": personalized_emails_tokens_used.model_dump(),
+        }
+        self.database.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
         logger.info(
             f"Completed Generating personalized emails for lead report: {lead_research_report_id}")
+
+    def update_template_and_regen_emails(self, lead_research_report_id: str, selected_template_id: str):
+        """Updates existing lead research report with selected template and regenerates personalized emails using that template."""
+        outreach_email_template: OutreachEmailTemplate = self.database.get_outreach_email_template(
+            outreach_email_template_id=selected_template_id)
+        lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id)
+
+        chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = OutreachTemplateMatcher.from_outreach_template(
+            outreach_email_template=outreach_email_template)
+        regenned_personalized_emails: List[LeadResearchReport.PersonalizedEmail] = self.personalization.regenerate_personalized_emails(
+            lead_research_report=lead_research_report, chosen_outreach_email_template=chosen_outreach_email_template)
+
+        # Add email tokens used to existing email tokens object in the report.
+        total_tokens_used_so_far: OpenAITokenUsage = lead_research_report.personalized_emails_tokens_used.add_tokens(
+            self.personalization.get_tokens_used())
+
+        # Update lead research report.
+        personalized_emails_dict_list: List[Dict] = self.database.get_db_ready_personalized_emails(
+            personalized_emails=regenned_personalized_emails)
+        setFields = {
+            "status": LeadResearchReport.Status.COMPLETE,
+            "chosen_outreach_email_template": chosen_outreach_email_template.model_dump(),
+            "personalized_emails": personalized_emails_dict_list,
+            "personalized_emails_tokens_used": total_tokens_used_so_far.model_dump(),
+        }
+        self.database.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
+
+        logger.info(
+            f"Completed template update and regenning of personalized emails for lead report: {lead_research_report_id}")
 
 
 if __name__ == "__main__":

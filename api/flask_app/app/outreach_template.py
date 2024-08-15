@@ -95,9 +95,21 @@ class OutreachTemplateMatcher:
 
         return LeadResearchReport.ChosenOutreachEmailTemplate(
             id=result.matched_persona_id,
+            name=chosen_email_template.name,
             creation_date=Utils.create_utc_time_now(),
             message=chosen_email_template.message,
             reason=result.reason,
+        )
+
+    @staticmethod
+    def from_outreach_template(outreach_email_template: OutreachEmailTemplate) -> LeadResearchReport.ChosenOutreachEmailTemplate:
+        """Helper to return Lead report template from given outreach template."""
+        return LeadResearchReport.ChosenOutreachEmailTemplate(
+            id=outreach_email_template.id,
+            name=outreach_email_template.name,
+            creation_date=Utils.create_utc_time_now(),
+            message=outreach_email_template.message,
+            reason="Manual Selection by user.",
         )
 
 
