@@ -27,7 +27,7 @@ class OpenAITokenUsage(BaseModel):
     total_tokens: int = Field(..., description="Total tokens used")
     total_cost_in_usd: float = Field(...,
                                      description="Total cost of tokens used.")
-    
+
     def add_tokens(self, another: "OpenAITokenUsage") -> "OpenAITokenUsage":
         """Add and return tokens from another instance of OpenAITokenUsage class."""
         return OpenAITokenUsage(
@@ -36,7 +36,7 @@ class OpenAITokenUsage(BaseModel):
             operation_tag=self.operation_tag,
             prompt_tokens=self.prompt_tokens + another.prompt_tokens,
             completion_tokens=self.completion_tokens + another.completion_tokens,
-            total_tokens= self.total_tokens + another.total_tokens,
+            total_tokens=self.total_tokens + another.total_tokens,
             total_cost_in_usd=self.total_cost_in_usd + another.total_cost_in_usd,
         )
 
@@ -296,21 +296,22 @@ class LeadResearchReport(BaseModel):
         class Highlight(BaseModel):
             """Highhlight associated with report."""
             id: Optional[PyObjectId] = Field(default=None,
-                                   description="ID of the Content detail referenced in creating this highlight.")
+                                             description="ID of the Content detail referenced in creating this highlight.")
             category: Optional[ContentCategoryEnum] = Field(default=None,
-                                                  description="Category of the content. Field is repeated at outer level too.")
+                                                            description="Category of the content. Field is repeated at outer level too.")
             category_readable_str: Optional[str] = Field(
                 default=None, description="Human readable Category string.")
             concise_summary: Optional[str] = Field(default=None,
-                                         description="Concise summary of the content.")
+                                                   description="Concise summary of the content.")
             publish_date: Optional[datetime] = Field(default=None,
-                                           description="Publish date of the content.")
+                                                     description="Publish date of the content.")
             publish_date_readable_str: Optional[str] = Field(default=None,
-                                                   description="Human readable publish date string.")
-            url: Optional[str] = Field(default=None, description="URL of the content.")
+                                                             description="Human readable publish date string.")
+            url: Optional[str] = Field(
+                default=None, description="URL of the content.")
 
         category: Optional[ContentCategoryEnum] = Field(default=None,
-                                              description="Category of the highlights.")
+                                                        description="Category of the highlights.")
         category_readable_str: Optional[str] = Field(
             default=None, description="Human readable Category string.")
         highlights: Optional[List[Highlight]] = Field(
@@ -344,7 +345,8 @@ class LeadResearchReport(BaseModel):
             default=None, description="Human Readable Date string when this document was last updated in the database.")
         highlight_id: Optional[str] = Field(
             default=None, description="The IDs of the Highlight that was referenced to generate this personalized email.")
-        # TODO: Add highlight URL as well.
+        highlight_url: Optional[str] = Field(
+            default=None, description="The source URL which was used to create the highlight.")
         email_subject_line: Optional[str] = Field(
             default=None, description="Generated subject Line of the email.")
         email_opener: Optional[str] = Field(

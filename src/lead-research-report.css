@@ -343,3 +343,18 @@
   color: var(--secondary);
   font-weight: 500;
 }
+
+#personalized-emails-container .ant-card .email-highlight-url-container {
+  margin-top: 3rem;
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+#personalized-emails-container
+  .ant-card
+  .email-highlight-url-container
+  .source-label {
+  color: var(--primary);
+  font-weight: 600;
+}

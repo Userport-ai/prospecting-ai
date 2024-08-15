@@ -181,6 +181,7 @@ def get_lead_report(lead_research_report_id: str):
             "personalized_emails": {
                 "_id": 1,
                 "highlight_id": 1,
+                "highlight_url": 1,
                 "email_subject_line": 1,
                 "email_opener": 1,
             },
@@ -300,6 +301,7 @@ def update_template_in_lead_report():
             "personalized_emails": {
                 "_id": 1,
                 "highlight_id": 1,
+                "highlight_url": 1,
                 "email_subject_line": 1,
                 "email_opener": 1,
             },

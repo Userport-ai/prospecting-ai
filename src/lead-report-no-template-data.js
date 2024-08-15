@@ -395,6 +395,8 @@ export const reportWithNoTemplate = {
         last_updated_date: null,
         last_updated_date_readable_str: null,
         highlight_id: null,
+        highlight_url:
+          "https://www.linkedin.com/posts/zperret_insider-interview-with-zach-perret-founder-activity-7176776931000922112-pOhi",
         email_subject_line:
           "Zachary, excited about fintech the same way you predict it?",
         email_opener:
@@ -407,6 +409,8 @@ export const reportWithNoTemplate = {
         last_updated_date: null,
         last_updated_date_readable_str: null,
         highlight_id: null,
+        highlight_url:
+          "https://www.linkedin.com/posts/zperret_insider-interview-with-zach-perret-founder-activity-7176776931000922112-pOhi",
         email_subject_line:
           "Zachary, inspired by your focus on tackling financial injustice!",
         email_opener:
@@ -419,6 +423,8 @@ export const reportWithNoTemplate = {
         last_updated_date: null,
         last_updated_date_readable_str: null,
         highlight_id: null,
+        highlight_url:
+          "https://www.linkedin.com/posts/zperret_insider-interview-with-zach-perret-founder-activity-7176776931000922112-pOhi",
         email_subject_line:
           "Zachary, excited about Plaid's Consumer Report revolutionizing credit underwriting?",
         email_opener:
@@ -431,6 +437,8 @@ export const reportWithNoTemplate = {
         last_updated_date: null,
         last_updated_date_readable_str: null,
         highlight_id: null,
+        highlight_url:
+          "https://www.linkedin.com/posts/zperret_insider-interview-with-zach-perret-founder-activity-7176776931000922112-pOhi",
         email_subject_line:
           "Zachary, tackling team sentiment challenges at Plaid post big announcements?",
         email_opener:
@@ -443,6 +451,8 @@ export const reportWithNoTemplate = {
         last_updated_date: null,
         last_updated_date_readable_str: null,
         highlight_id: null,
+        highlight_url:
+          "https://www.linkedin.com/posts/zperret_insider-interview-with-zach-perret-founder-activity-7176776931000922112-pOhi",
         email_subject_line:
           "Zachary, curious about your take on Plaid's potential IPO at Cambrian event?",
         email_opener:

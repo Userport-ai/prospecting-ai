@@ -99,6 +99,12 @@ function PersonalizedEmails({
             ></Text>
           </div>
         </div>
+        <div className="email-highlight-url-container">
+          <Text className="source-label">Source:</Text>
+          <Link href={personalized_email.highlight_url} target="_blank">
+            {personalized_email.highlight_url}
+          </Link>
+        </div>
       </Card>
     );
   }
@@ -255,11 +261,6 @@ function EmailTemplateAndPersonalizedEmails(props) {
     setOutreachTemplate(result.chosen_outreach_email_template);
     setPersonalizedEmails(result.personalized_emails);
     setTemplateUpdating(false);
-
-    // Code to test UI.
-    // setTimeout(() => {
-    //   setTemplateUpdating(false);
-    // }, 5000);
   }
 
   if (templateUpdating) {

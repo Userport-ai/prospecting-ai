@@ -120,6 +120,7 @@ class Personalization:
         return LeadResearchReport.PersonalizedEmail(
             # IDs, creation and update dates will be generated when inserting into the database.
             highlight_id=highlight.id,
+            highlight_url=highlight.url,
             email_subject_line=email_subject_line,
             email_opener=email_opener,
         )
