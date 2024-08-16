@@ -1,5 +1,5 @@
 import "./create-template-message.css";
-import { Typography, Input, Button, Spin } from "antd";
+import { Typography, Input, Button, Skeleton } from "antd";
 import BackArrow from "./back-arrow";
 import { useState } from "react";
 import {
@@ -109,30 +109,31 @@ export const createOrEditTemplateAction = (authContext) => {
   };
 };
 
-function DisplaySpinState({ loading_or_submitting }) {
-  return (
-    <div id="spinner-container">
-      <Spin spinning={loading_or_submitting} />
-    </div>
-  );
-}
-
 function CreateOrEditTemplateMessage() {
   const existingOutreachTemplate = useLoaderData();
   const [currMessage, setCurrMessage] = useState(
     existingOutreachTemplate ? existingOutreachTemplate.message : ""
   );
-  const navigation = useNavigation();
-  const loading_or_submitting = navigation.state !== "idle";
+  const component_is_loading = useNavigation().state !== "idle";
   const pageTitle = existingOutreachTemplate
     ? "Edit Email Template"
     : "Create Email Template";
   const actionButtonText = existingOutreachTemplate ? "Save" : "Create";
 
+  if (component_is_loading) {
+    return (
+      <Skeleton
+        active
+        paragraph={{
+          rows: 20,
+        }}
+      />
+    );
+  }
+
   return (
     <div id="create-template-message-outer">
       <div id="create-template-message-area">
-        <DisplaySpinState loading_or_submitting={loading_or_submitting} />
         <div id="page-title">
           <BackArrow />
         </div>

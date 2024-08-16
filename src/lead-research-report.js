@@ -1,15 +1,6 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import {
-  Flex,
-  Typography,
-  Button,
-  Card,
-  Spin,
-  Tabs,
-  Empty,
-  Skeleton,
-} from "antd";
+import { Flex, Typography, Button, Card, Tabs, Empty, Skeleton } from "antd";
 import {
   useNavigate,
   useLoaderData,
@@ -465,13 +456,22 @@ export const leadResearchReportLoader = (authContext) => {
 // Main Component.
 function LeadResearchReport() {
   const report = useLoaderData();
-  const navigation = useNavigation();
-  const loading_or_submitting = navigation.state !== "idle";
+  const component_is_loading = useNavigation().state !== "idle";
+
+  if (component_is_loading) {
+    return (
+      <Skeleton
+        active
+        paragraph={{
+          rows: 20,
+        }}
+      />
+    );
+  }
 
   return (
     <div id="lead-research-report-outer">
       <div id="lead-research-report-container">
-        <Spin spinning={loading_or_submitting} />;
         <ReportHeader report={report} />
         <Tabs
           items={[

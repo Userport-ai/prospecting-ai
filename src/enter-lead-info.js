@@ -1,5 +1,5 @@
 import "./enter-lead-info.css";
-import { Typography, Flex, Form, Input, Button, Spin } from "antd";
+import { Typography, Flex, Form, Input, Button, Skeleton } from "antd";
 import BackArrow from "./back-arrow";
 import {
   Form as RouterForm,
@@ -54,22 +54,21 @@ function DisplayError({ error }) {
   return null;
 }
 
-function DisplaySpinState({ loading_or_submitting }) {
-  return (
-    <Flex id="spinner-container" vertical={false} justify="center">
-      <Spin spinning={loading_or_submitting} />
-    </Flex>
-  );
-}
-
 function EnterLeadInfo() {
   const [inputURL, setInputURL] = useState("");
-
   const error = useRouteError();
+  const component_is_loading = useNavigation().state !== "idle";
 
-  const navigation = useNavigation();
-
-  const loading_or_submitting = navigation.state !== "idle";
+  if (component_is_loading) {
+    return (
+      <Skeleton
+        active
+        paragraph={{
+          rows: 20,
+        }}
+      />
+    );
+  }
 
   return (
     <div id="enter-lead-info-outer">
@@ -93,13 +92,12 @@ function EnterLeadInfo() {
               <Button
                 type="primary"
                 htmlType="submit"
-                disabled={loading_or_submitting}
+                disabled={component_is_loading}
               >
                 Submit
               </Button>
             </Flex>
           </RouterForm>
-          <DisplaySpinState loading_or_submitting={loading_or_submitting} />
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import "./all-templates.css";
-import { Button, Spin, Modal } from "antd";
+import { Button, Skeleton, Modal } from "antd";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import TemplateCard from "./template-card";
@@ -88,11 +88,21 @@ function TemplatesView({ templateMessages, onDeleteTemplate }) {
 
 function AllTemplates() {
   const navigate = useNavigate();
-  const navigation = useNavigation();
-  const loading_or_submitting = navigation.state !== "idle";
+  const component_is_loading = useNavigation().state !== "idle";
   const outreachEmailTemplates = useLoaderData();
   const [emailTemplates, setEmailTemplates] = useState(outreachEmailTemplates);
   const { user } = useContext(AuthContext);
+
+  if (component_is_loading) {
+    return (
+      <Skeleton
+        active
+        paragraph={{
+          rows: 20,
+        }}
+      />
+    );
+  }
 
   // Handle template deletion success in Modal.
   function handleTemplateDeletionSuccessInModal(templateId) {
@@ -121,7 +131,6 @@ function AllTemplates() {
     <>
       <div id="all-templates-outer">
         <div id="outer-with-spinner">
-          <Spin spinning={loading_or_submitting} />;
           <div id="all-templates-outer-container">
             <div id="templates-title-container">
               <h1>All Email Templates</h1>

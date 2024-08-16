@@ -1,5 +1,5 @@
 import "./leads.css";
-import { Typography, Button, Spin } from "antd";
+import { Typography, Button, Skeleton } from "antd";
 import LeadsTable from "./leads-table";
 import {
   emptyLeadsResult,
@@ -50,8 +50,7 @@ function Leads() {
   const gotLeads = useLoaderData();
   const [leads, setLeads] = useState(gotLeads);
 
-  const navigation = useNavigation();
-  const component_is_loading = navigation.state !== "idle";
+  const component_is_loading = useNavigation().state !== "idle";
   const should_poll_periodically = leads.some(
     (lead) => !["complete", "failed_with_errors"].includes(lead.status)
   );
@@ -75,13 +74,20 @@ function Leads() {
     // User not logged in, return.
     return null;
   }
+  if (component_is_loading) {
+    return (
+      <Skeleton
+        active
+        paragraph={{
+          rows: 20,
+        }}
+      />
+    );
+  }
 
   return (
     <div id="leads-outer">
       <div id="leads-container">
-        <div id="spinner-container">
-          <Spin spinning={component_is_loading} />;
-        </div>
         <Title level={3}>Leads</Title>
         <LeadsTable leads={leads} />
         <div id="add-leads-btn-container">
