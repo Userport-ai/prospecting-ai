@@ -1,0 +1,77 @@
+#verify-email-header {
+  background-color: var(--primary);
+}
+
+#verify-email-page-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#verify-email-container {
+  width: 40%;
+  margin-top: 4rem;
+  border: 1px solid #afabb2;
+  border-radius: 10px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#verify-email-title-container {
+  width: 100%;
+  padding: 1rem 0;
+
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#verify-email-title-container h1 {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+#verify-email-instructions {
+  margin-top: 1rem;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+#email-verification-button {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  font-size: 1.6rem;
+  width: 60%;
+  padding: 2rem 0;
+  color: var(--on-primary);
+  background-color: var(--primary);
+}
+
+#email-verification-button:hover {
+  background-color: var(--hover-color);
+  border: 0;
+}
+
+#confirm-email-instructions {
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+#email-confirm-button {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  font-size: 1.6rem;
+  width: 60%;
+  padding: 2rem 0;
+  color: var(--on-primary);
+  background-color: var(--primary);
+}
+
+#email-confirm-button:hover {
+  background-color: var(--hover-color);
+  border: 0;
+}

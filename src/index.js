@@ -29,6 +29,7 @@ import "./index.css";
 import EnteredLeadSuccess, {
   enteredLeadSuccessLoader,
 } from "./entered-lead-success";
+import VerifyEmail from "./verify-email";
 
 function AppRoutes() {
   const authContext = useContext(AuthContext);
@@ -42,7 +43,13 @@ function AppRoutes() {
       {
         path: "/login",
         element: <Login />,
+        errorElement: <ErrorPage />,
         loader: loginLoader(context),
+      },
+      {
+        path: "/verify-email",
+        element: <VerifyEmail />,
+        errorElement: <ErrorPage />,
       },
       {
         path: "/",

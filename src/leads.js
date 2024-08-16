@@ -6,7 +6,12 @@ import {
   leadsInProgressResult,
   leadsResult,
 } from "./leads-table-data";
-import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
+import {
+  useNavigate,
+  useLoaderData,
+  useNavigation,
+  redirect,
+} from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "./root";
 
@@ -37,6 +42,10 @@ export const leadsLoader = (authContext) => {
     if (!user) {
       // User is logged out.
       return null;
+    }
+    // If user email is not verified, redirect.
+    if (!user.emailVerified) {
+      return redirect("/verify-email");
     }
     return fetch_leads(user);
   };

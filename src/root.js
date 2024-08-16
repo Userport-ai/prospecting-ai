@@ -1,12 +1,6 @@
 import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  onAuthStateChanged,
-  signOut,
-  sendEmailVerification,
-} from "firebase/auth";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { createContext, useEffect, useState } from "react";
-import { redirect } from "react-router-dom";
 
 export const AuthContext = createContext(null);
 
@@ -36,15 +30,6 @@ function Root({ children }) {
     const unRegistered = onAuthStateChanged(auth, (authUser) => {
       setUser(authUser);
       setIsAuthLoading(false);
-      if (authUser) {
-        if (!authUser.emailVerified) {
-          // Ask user to verify email.
-          sendEmailVerification(authUser);
-        }
-      } else {
-        // Redirect to login page.
-        return redirect("/login");
-      }
     });
     return () => unRegistered();
   }, [auth]);
