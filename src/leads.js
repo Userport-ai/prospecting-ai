@@ -51,7 +51,7 @@ function Leads() {
   const [leads, setLeads] = useState(gotLeads);
 
   const navigation = useNavigation();
-  const loading_or_submitting = navigation.state !== "idle";
+  const component_is_loading = navigation.state !== "idle";
   const should_poll_periodically = leads.some(
     (lead) => !["complete", "failed_with_errors"].includes(lead.status)
   );
@@ -80,7 +80,7 @@ function Leads() {
     <div id="leads-outer">
       <div id="leads-container">
         <div id="spinner-container">
-          <Spin spinning={loading_or_submitting} />;
+          <Spin spinning={component_is_loading} />;
         </div>
         <Title level={3}>Leads</Title>
         <LeadsTable leads={leads} />

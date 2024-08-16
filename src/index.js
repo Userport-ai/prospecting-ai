@@ -26,6 +26,9 @@ import "bootstrap/dist/css/bootstrap.css";
 // Put any other imports below so that CSS from your
 // components takes precedence over default styles.
 import "./index.css";
+import EnteredLeadSuccess, {
+  enteredLeadSuccessLoader,
+} from "./entered-lead-success";
 
 function AppRoutes() {
   const authContext = useContext(AuthContext);
@@ -77,6 +80,11 @@ function AppRoutes() {
             element: <EnterLeadInfo />,
             action: enterLeadAction(context),
             errorElement: <EnterLeadInfo />,
+          },
+          {
+            path: "leads/create/success",
+            element: <EnteredLeadSuccess />,
+            loader: enteredLeadSuccessLoader,
           },
           {
             path: "lead-research-reports/:id",

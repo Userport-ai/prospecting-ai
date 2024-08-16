@@ -1,0 +1,14 @@
+#lead-sucess-subtitle-container {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#lead-sucess-subtitle-container .ant-typography {
+  font-size: 1.5rem;
+}
+
+#lead-sucess-subtitle-container .text-no-link {
+  color: var(--secondary);
+}

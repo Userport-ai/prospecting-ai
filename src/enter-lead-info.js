@@ -5,11 +5,13 @@ import {
   Form as RouterForm,
   useRouteError,
   useNavigation,
+  redirect,
 } from "react-router-dom";
 import { useState } from "react";
 
 const { Title } = Typography;
 
+// Submits lead information to backend.
 export const enterLeadAction = (authContext) => {
   return async ({ request, params }) => {
     const { user } = authContext;
@@ -22,6 +24,7 @@ export const enterLeadAction = (authContext) => {
     const inputValueMap = Object.fromEntries(formData);
     const linkedin_url = inputValueMap["linkedin_url"];
 
+    // Create lead in the backend.
     const idToken = await user.getIdToken();
     const response = await fetch("/api/v1/lead-research-reports", {
       method: "POST",
@@ -38,7 +41,9 @@ export const enterLeadAction = (authContext) => {
       throw result;
     }
 
-    // TODO: Handle state where it research report is still in progress.
+    // Redirect to success page with instructions for the user.
+    const urlParams = new URLSearchParams({ url: linkedin_url }).toString();
+    return redirect("/leads/create/success?" + urlParams);
   };
 };
 
