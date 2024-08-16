@@ -85,7 +85,7 @@ function Leads() {
         <Title level={3}>Leads</Title>
         <LeadsTable leads={leads} />
         <div id="add-leads-btn-container">
-          <Button type="primary" onClick={() => navigate("/enter-lead-info")}>
+          <Button type="primary" onClick={() => navigate("/leads/create")}>
             Add new lead
           </Button>
         </div>

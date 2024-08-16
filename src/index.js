@@ -73,7 +73,7 @@ function AppRoutes() {
             action: createOrEditTemplateAction(context),
           },
           {
-            path: "enter-lead-info",
+            path: "leads/create",
             element: <EnterLeadInfo />,
             action: enterLeadAction(context),
             errorElement: <EnterLeadInfo />,
