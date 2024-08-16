@@ -125,7 +125,7 @@ function CreateOrEditTemplateMessage() {
       <Skeleton
         active
         paragraph={{
-          rows: 20,
+          rows: 15,
         }}
       />
     );

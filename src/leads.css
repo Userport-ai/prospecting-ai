@@ -7,28 +7,30 @@
 
 #leads-container {
   width: 80%;
-  margin-top: 5%;
+  margin-top: 5rem;
   display: flex;
   flex-direction: column;
 }
 
-#leads-container h3 {
-  color: var(--primary);
-}
-
-#leads-container #add-leads-btn-container {
-  margin-top: 5%;
+#leads-container #title-and-btn-container {
   display: flex;
   flex-direction: row;
-  justify-content: end;
+  justify-content: space-between;
+
+  margin-bottom: 1rem;
 }
 
-#leads-container .ant-btn-primary {
+#title-and-btn-container h1 {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+#title-and-btn-container .ant-btn-primary {
   width: fit-content;
   background-color: var(--primary);
-  border-radius: 1.5rem;
+  font-size: 1.6rem;
 }
 
-#leads-container .ant-btn-primary:hover {
+#title-and-btn-container .ant-btn-primary:hover {
   background-color: var(--hover-color);
 }

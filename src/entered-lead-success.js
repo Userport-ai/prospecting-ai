@@ -20,7 +20,7 @@ function EnteredLeadSuccess() {
       <Skeleton
         active
         paragraph={{
-          rows: 10,
+          rows: 15,
         }}
       />
     );

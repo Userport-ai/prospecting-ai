@@ -64,7 +64,7 @@ function EnterLeadInfo() {
       <Skeleton
         active
         paragraph={{
-          rows: 20,
+          rows: 15,
         }}
       />
     );

@@ -267,7 +267,7 @@ function EmailTemplateAndPersonalizedEmails(props) {
         <Skeleton
           active
           paragraph={{
-            rows: 20,
+            rows: 15,
           }}
         />
       </>
@@ -463,7 +463,7 @@ function LeadResearchReport() {
       <Skeleton
         active
         paragraph={{
-          rows: 20,
+          rows: 15,
         }}
       />
     );

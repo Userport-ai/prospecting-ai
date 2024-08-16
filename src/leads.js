@@ -88,7 +88,7 @@ function Leads() {
       <Skeleton
         active
         paragraph={{
-          rows: 20,
+          rows: 15,
         }}
       />
     );
@@ -97,13 +97,13 @@ function Leads() {
   return (
     <div id="leads-outer">
       <div id="leads-container">
-        <Title level={3}>Leads</Title>
-        <LeadsTable leads={leads} />
-        <div id="add-leads-btn-container">
+        <div id="title-and-btn-container">
+          <h1>Leads</h1>
           <Button type="primary" onClick={() => navigate("/leads/create")}>
             Add new lead
           </Button>
         </div>
+        <LeadsTable leads={leads} />
       </div>
     </div>
   );
