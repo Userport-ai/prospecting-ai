@@ -7,9 +7,8 @@ from celery import shared_task
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
-from app.models import LeadResearchReport, OutreachEmailTemplate
+from app.models import LeadResearchReport, OutreachEmailTemplate, User
 from app.research_report import Researcher
-from app.utils import Utils
 from app.linkedin_scraper import LinkedInScraper
 from firebase_admin import auth
 
@@ -78,6 +77,11 @@ def login_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+def get_user_state_db_projection():
+    """Returns dictionary with user state field that will serve as projection into to MongoDB query."""
+    return {"state": 1}
 
 
 class CreateLeadResearchReportResponse(BaseModel):
@@ -208,6 +212,8 @@ class ListLeadsResponse(BaseModel):
                                    description="Status (success) of the response.")
     leads: List[LeadResearchReport] = Field(
         ..., description="List of leads.")
+    user: User = Field(...,
+                       description="User object for curently authenticated user.")
 
     @field_validator('status')
     @classmethod
@@ -224,6 +230,7 @@ def list_leads():
     # TODO: Add limit to the leads response.
     db = Database()
     user_id: str = g.user["uid"]
+    start_time = time.time()
     try:
         projection = {
             "person_linkedin_url": 1,
@@ -238,8 +245,12 @@ def list_leads():
             user_id=user_id, projection=projection)
         logger.info(
             f"Got {len(lead_research_reports)} reports from the database")
+        user = db.get_or_create_user(user_id=user_id,
+                                     projection=get_user_state_db_projection())
         response = ListLeadsResponse(
-            status=ResponseStatus.SUCCESS, leads=lead_research_reports)
+            status=ResponseStatus.SUCCESS, leads=lead_research_reports, user=user)
+        logger.info(
+            f"Time taken for fetching leads for user ID: {user_id}: {time.time() - start_time} seconds")
         return response.model_dump()
     except Exception as e:
         logger.exception(f"Failed to list with error: {e}")

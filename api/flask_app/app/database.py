@@ -1,8 +1,8 @@
 
 import os
+import logging
 import contextlib
 from typing import Optional, Dict
-from itertools import chain
 import pymongo
 from collections.abc import Generator
 from pymongo.mongo_client import MongoClient
@@ -22,11 +22,13 @@ from app.models import (
     WebPage,
     LeadResearchReport,
     OutreachEmailTemplate,
-    OpenAITokenUsage
+    User
 )
 from typing import List
 
 load_dotenv()
+
+logger = logging.getLogger()
 
 
 class Database:
@@ -45,6 +47,10 @@ class Database:
     def _exclude_id() -> List[str]:
         """Helper to exclude ID during model_dump call."""
         return ['id']
+
+    def _get_users_collection(self) -> Collection:
+        """Returns Users collection."""
+        return self.db['users']
 
     def _get_person_profiles_collection(self) -> Collection:
         """Returns Person Profiles collection."""
@@ -73,6 +79,20 @@ class Database:
     def _get_outreach_email_template_collection(self) -> Collection:
         """Returns Outreach Email Templates collection."""
         return self.db['outreach_email_templates']
+
+    def _create_new_user(self, user_id: str) -> User:
+        """Creates a new user in the database and returns created user object.
+
+        Private method, should not be called by external clients.
+        """
+        user = User(_id=user_id, state=User.State.NEW_USER)
+        creation_date: datetime = Utils.create_utc_time_now()
+        user.creation_date = creation_date
+        user.last_updated_date = creation_date
+
+        collection = self._get_users_collection()
+        collection.insert_one(user.model_dump(by_alias=True))
+        return user
 
     def insert_person_profile(self, person_profile: PersonProfile) -> str:
         """Inserts Person information as a document in the database and returns the created Id."""
@@ -198,6 +218,20 @@ class Database:
         with self.mongo_client.start_session() as session:
             with session.start_transaction():
                 yield session
+
+    def get_or_create_user(self, user_id: str, projection: Optional[Dict[str, int]] = None) -> User:
+        """Returns User for given ID. If the user does not exist, creates one in the database and returns it."""
+        collection = self._get_users_collection()
+        data_dict = collection.find_one(
+            {"_id": user_id}, projection=projection)
+        if not data_dict:
+            logger.info(
+                f"User ID: {user_id} does not exist in database, creating one.")
+            self._create_new_user(user_id=user_id)
+            logger.info(f"Created User with ID: {user_id} in the database.")
+            data_dict = collection.find_one(
+                {"_id": user_id}, projection=projection)
+        return User(**data_dict)
 
     def get_person_profile(self, person_profile_id: str) -> PersonProfile:
         """Returns person profile for given ID."""

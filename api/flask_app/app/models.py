@@ -14,6 +14,27 @@ import re
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
+class User(BaseModel):
+    """Represents a real user who has signed up for the application."""
+
+    class State(str, Enum):
+        # Enum defining current State of a user in the application.
+        # This will help tailor application for each user.
+        NEW_USER = "new_user"
+        CREATED_FIRST_TEMPLATE = "created_first_template"
+        ADDED_FIRST_LEAD = "added_first_lead"
+        VIEWED_LEAD_RESEARCH_REPORT = "viewed_lead_research_report"
+
+    id: Optional[str] = Field(
+        alias="_id", default=None, description="Auth system generated unique identifier for authenticated user.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date in UTC timezone when this user document was inserted in the database.")
+    last_updated_date: Optional[datetime] = Field(
+        default=None, description="Date in UTC timezone when this user document was last updated in the database.")
+    state: Optional[State] = Field(
+        default=None, description="State of user using which we can tailor the frontend of the application. Example: User Onboarding.")
+
+
 class OpenAITokenUsage(BaseModel):
     """Token usage when calling workflows using Open AI models."""
     url: Optional[str] = Field(default=None,

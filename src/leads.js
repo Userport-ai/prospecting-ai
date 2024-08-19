@@ -1,5 +1,5 @@
 import "./leads.css";
-import { Typography, Button, Skeleton } from "antd";
+import { Button, Skeleton } from "antd";
 import LeadsTable from "./leads-table";
 import {
   emptyLeadsResult,
@@ -14,8 +14,6 @@ import {
 } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "./root";
-
-const { Title } = Typography;
 
 // Helper to fetch list of leads created by this user.
 // TODO: Implement pagination.
@@ -32,7 +30,12 @@ async function fetch_leads(user) {
   if (result.status === "error") {
     throw result;
   }
-  return result.leads;
+  const userState = result.user.state;
+  if (userState === "new_user") {
+    // If new user, redirect to /templates so they can first create a template.
+    return redirect("/templates");
+  }
+  return result;
 }
 
 // Loader to fetch leads before component mounts.
@@ -56,8 +59,8 @@ export const leadsLoader = (authContext) => {
 function Leads() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  const gotLeads = useLoaderData();
-  const [leads, setLeads] = useState(gotLeads);
+  const gotLeadsResponse = useLoaderData();
+  const [leads, setLeads] = useState(gotLeadsResponse.leads);
 
   const component_is_loading = useNavigation().state !== "idle";
   const should_poll_periodically = leads.some(
