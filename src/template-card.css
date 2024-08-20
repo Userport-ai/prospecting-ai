@@ -36,7 +36,7 @@
 }
 
 .card-contents-container .card-key {
-  color: var(--primary);
+  color: var(--secondary);
   font-weight: 600;
   font-size: 1.6rem;
 }
@@ -54,7 +54,7 @@
 }
 
 .template-card .dates-container .date-key {
-  color: var(--primary);
+  color: var(--secondary);
   font-weight: 600;
 }
 
