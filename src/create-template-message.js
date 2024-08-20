@@ -8,21 +8,34 @@ import {
   redirect,
   useLoaderData,
 } from "react-router-dom";
+import {
+  stateAfterFirstTemplateCreation,
+  userHasNotCreatedTemplate,
+} from "./helper-functions";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 // Loader for template. If it is creation flow, returns null, else returns existing template details from backend.
 export const createOrEditTemplateLoader = (authContext) => {
-  return async ({ params }) => {
+  return async ({ request, params }) => {
     const { user } = authContext;
     if (!user) {
       // User is logged out.
       return redirect("/login");
     }
+    // Loader response object.
+    var loaderResponse = { userState: null, outreachEmailTemplate: null };
+
+    if (request.url) {
+      // User state present in the URL.
+      const url = new URL(request.url);
+      loaderResponse.userState = url.searchParams.get("state");
+    }
+
     if (params.id === undefined) {
-      // Create template flow, load nothing.
-      return null;
+      // Create template flow, return response immediately.
+      return loaderResponse;
     }
 
     // Fetch template to edit from backend.
@@ -38,7 +51,8 @@ export const createOrEditTemplateLoader = (authContext) => {
     if (result.status === "error") {
       throw result;
     }
-    return result.outreach_email_template;
+    loaderResponse.outreachEmailTemplate = result.outreach_email_template;
+    return loaderResponse;
   };
 };
 
@@ -91,6 +105,7 @@ export const createOrEditTemplateAction = (authContext) => {
       apiMethod = "PUT";
     }
 
+    // Send request to server to create or edit template.
     const response = await fetch(apiEndpoint, {
       method: apiMethod,
       body: JSON.stringify(apiRequest),
@@ -104,13 +119,34 @@ export const createOrEditTemplateAction = (authContext) => {
       throw result;
     }
 
+    // Update user state if first template creation.
+    if (apiRequest["first_template_creation"]) {
+      const userStateResponse = await fetch("/api/v1/users", {
+        method: "PUT",
+        body: JSON.stringify({ state: stateAfterFirstTemplateCreation() }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + idToken,
+        },
+      });
+
+      const userStateResult = await userStateResponse.json();
+      if (userStateResult.status === "error") {
+        throw result;
+      }
+    }
+
     // Successful creation or edit, go back to all templates page.
     return redirect("/templates");
   };
 };
 
 function CreateOrEditTemplateMessage() {
-  const existingOutreachTemplate = useLoaderData();
+  const loaderResponse = useLoaderData();
+  const firstTemplateCreation = userHasNotCreatedTemplate(
+    loaderResponse.userState
+  );
+  const existingOutreachTemplate = loaderResponse.outreachEmailTemplate;
   const [currMessage, setCurrMessage] = useState(
     existingOutreachTemplate ? existingOutreachTemplate.message : ""
   );
@@ -213,6 +249,13 @@ function CreateOrEditTemplateMessage() {
                     autoSize={{ minRows: 10, maxRows: 100 }}
                   />
                 </div>
+
+                {/* Whether this is the first template the user is creating */}
+                <Input
+                  hidden={true}
+                  name="first_template_creation"
+                  defaultValue={firstTemplateCreation}
+                />
 
                 <div id="btn-container">
                   <Button type="primary" htmlType="submit">

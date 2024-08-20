@@ -1,14 +1,23 @@
 import "./all-templates.css";
-import { Button, Skeleton, Modal } from "antd";
+import { Button, Skeleton, Modal, Typography } from "antd";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import TemplateCard from "./template-card";
-import { exampleTemplateResponse } from "./create-template-message-data";
+import {
+  exampleTemplateResponse,
+  noTemplatesResponse,
+} from "./create-template-message-data";
 import { useLoaderData, redirect, useNavigation } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
+import OnboardingProgressBar from "./onboarding-progress-bar";
+import {
+  isUserOnboarding,
+  userHasNotCreatedTemplate,
+} from "./helper-functions";
 
 const { confirm } = Modal;
+const { Text } = Typography;
 
 // Loader for templates created by a user.
 export const templateMessagesLoader = (authContext) => {
@@ -24,10 +33,11 @@ export const templateMessagesLoader = (authContext) => {
     });
     const result = await response.json();
     // const result = exampleTemplateResponse;
+    // const result = noTemplatesResponse;
     if (result.status === "error") {
       throw result;
     }
-    return result.outreach_email_templates;
+    return result;
   };
 };
 
@@ -73,7 +83,15 @@ function TemplatesView({ templateMessages, onDeleteTemplate }) {
   if (templateMessages.length === 0) {
     return (
       <div id="no-templates-created-container">
-        <h2>No Templates Created</h2>
+        <h2>No Templates Created Yet</h2>
+        <Text className="templates-description">
+          Email templates shine light on the pain points of the prospect and
+          explain the value proposition of their solution.
+        </Text>
+        <Text className="templates-description">
+          Use the Create button above to create templates for each type of
+          persona you plan to target.
+        </Text>
       </div>
     );
   }
@@ -89,8 +107,13 @@ function TemplatesView({ templateMessages, onDeleteTemplate }) {
 function AllTemplates() {
   const navigate = useNavigate();
   const component_is_loading = useNavigation().state !== "idle";
-  const outreachEmailTemplates = useLoaderData();
-  const [emailTemplates, setEmailTemplates] = useState(outreachEmailTemplates);
+  const loaderResult = useLoaderData();
+  const [emailTemplates, setEmailTemplates] = useState(
+    loaderResult.outreach_email_templates
+  );
+  // User object stored in server's database.
+  const userFromServer = loaderResult.user;
+  // This is Firebase user object.
   const { user } = useContext(AuthContext);
 
   if (component_is_loading) {
@@ -127,8 +150,26 @@ function AllTemplates() {
     );
   }
 
+  // Handler for when user clicks Create new template button.
+  function handleCreateNewTemplate() {
+    var nextPage = "/templates/create";
+    if (userHasNotCreatedTemplate(userFromServer.state)) {
+      // Pass this information about the user in the URL path.
+      const urlParams = new URLSearchParams({
+        state: userFromServer.state,
+      }).toString();
+      nextPage += `?${urlParams}`;
+    }
+    return navigate(nextPage);
+  }
+
   return (
     <>
+      {isUserOnboarding(userFromServer) && (
+        <OnboardingProgressBar
+          userFromServer={userFromServer}
+        ></OnboardingProgressBar>
+      )}
       <div id="all-templates-outer">
         <div id="outer-with-spinner">
           <div id="all-templates-outer-container">
@@ -138,7 +179,7 @@ function AllTemplates() {
                 id="create-template-btn"
                 type="primary"
                 htmlType="submit"
-                onClick={() => navigate("/templates/create")}
+                onClick={handleCreateNewTemplate}
               >
                 Create
               </Button>

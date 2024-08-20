@@ -23,7 +23,7 @@ class User(BaseModel):
         NEW_USER = "new_user"
         CREATED_FIRST_TEMPLATE = "created_first_template"
         ADDED_FIRST_LEAD = "added_first_lead"
-        VIEWED_LEAD_RESEARCH_REPORT = "viewed_lead_research_report"
+        VIEWED_PERSONALIZED_EMAILS = "viewed_personalized_emails"
 
     id: Optional[str] = Field(
         alias="_id", default=None, description="Auth system generated unique identifier for authenticated user.")

@@ -84,6 +84,51 @@ def get_user_state_db_projection():
     return {"state": 1}
 
 
+class UpdateUserResponse(BaseModel):
+    """API Response of update user request."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.put('/v1/users')
+@login_required
+def update_user():
+    db = Database()
+    user_id: str = g.user["uid"]
+
+    state: User.State = None
+    try:
+        # Only allow state updates for now.
+        state = User.State(request.json.get('state'))
+    except Exception as e:
+        logger.exception(
+            f"Failed to update user ID: {user_id} with error: {e}")
+        raise APIException(
+            status_code=400, message="Invalid request parameters for user updation.")
+
+    try:
+        setFields = {
+            "state": state,
+        }
+        db.update_user(user_id=user_id, setFields=setFields)
+        logger.info(
+            f"Successfully updated state for user: {user_id} to {state}")
+        response = UpdateUserResponse(status=ResponseStatus.SUCCESS)
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to update user ID: {user_id} state to {state} with error: {e}")
+        raise APIException(
+            status_code=500, message="Failed to update user due to internal error.")
+
+
 class CreateLeadResearchReportResponse(BaseModel):
     """API Response of create lead research report request."""
     status: ResponseStatus = Field(...,
@@ -432,6 +477,8 @@ class ListOutreachEmailTemplatesResponse(BaseModel):
                                    description="Status (success) of the response.")
     outreach_email_templates: List[OutreachEmailTemplate] = Field(
         ..., description="List of Outreach email templates created by the user.")
+    user: User = Field(...,
+                       description="User object for curently authenticated user.")
 
     @field_validator('status')
     @classmethod
@@ -461,8 +508,10 @@ def list_outreach_email_templates():
             user_id=user_id, projection=projection)
         logger.info(
             f"Fetched {len(outreach_email_templates)} outreach email templates")
+        user = db.get_or_create_user(
+            user_id=user_id, projection=get_user_state_db_projection())
         response = ListOutreachEmailTemplatesResponse(
-            status=ResponseStatus.SUCCESS, outreach_email_templates=outreach_email_templates)
+            status=ResponseStatus.SUCCESS, outreach_email_templates=outreach_email_templates, user=user)
         return response.model_dump()
     except Exception as e:
         logger.exception(

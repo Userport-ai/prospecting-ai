@@ -29,3 +29,14 @@ export const exampleTemplateResponse = {
     },
   ],
 };
+
+export const noTemplatesResponse = {
+  status: "success",
+  outreach_email_templates: [],
+  user: {
+    id: "2DzzbZ0u8oNom7hImMnCZs7KDfC2",
+    creation_date: null,
+    last_updated_date: null,
+    state: "new_user",
+  },
+};

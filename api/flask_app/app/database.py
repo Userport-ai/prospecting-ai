@@ -330,6 +330,18 @@ class Database:
                 OutreachEmailTemplate(**outreach_email_template_dict))
         return outreach_email_templates
 
+    def update_user(self, user_id: str, setFields: Dict[str, str]):
+        """Updates fields for given User object. Assumes that fields are existing fields in the User Document model."""
+        collection = self._get_users_collection()
+        if "last_updated_date" not in setFields:
+            setFields["last_updated_date"] = Utils.create_utc_time_now()
+
+        res: UpdateResult = collection.update_one(
+            {"_id": user_id}, {"$set": setFields})
+        if res.matched_count == 0:
+            raise ValueError(
+                f"Could not update User with ID: {user_id} in the database.")
+
     def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
         """Updates fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
         collection = self._get_lead_research_report_collection()
