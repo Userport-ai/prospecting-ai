@@ -11,7 +11,36 @@ export function userHasNotCreatedTemplate(userState) {
   return userState === "new_user" ? true : false;
 }
 
+// Returns true if given user state has not created a lead yet and false otherwise.
+export function userHasNotCreatedLead(userState) {
+  return userState === "created_first_template" ? true : false;
+}
+
 // Returns user state after first template creation is successful.
 export function stateAfterFirstTemplateCreation() {
   return "created_first_template";
+}
+
+// Returns user state after first lead creation is successful.
+export function stateAfterFirstLeadCreation() {
+  return "added_first_lead";
+}
+
+// Function that updates user state on the server and returns the result.
+// Throws an error if the update failed.
+export async function updateUserStateOnServer(newState, idToken) {
+  const response = await fetch("/api/v1/users", {
+    method: "PUT",
+    body: JSON.stringify({ state: newState }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + idToken,
+    },
+  });
+
+  const result = await response.json();
+  if (result.status === "error") {
+    throw result;
+  }
+  return result;
 }

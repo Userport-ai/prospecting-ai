@@ -36,3 +36,19 @@
   border: 1px solid var(--secondary);
   color: var(--primary);
 }
+
+#leads-table-empty-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#leads-table-empty-container h2 {
+  color: var(--primary);
+}
+
+#leads-table-empty-container .instructions-text {
+  font-size: 1.5rem;
+  color: var(--secondary);
+  font-weight: 600;
+}

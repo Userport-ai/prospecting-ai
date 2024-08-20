@@ -1,6 +1,12 @@
 export const emptyLeadsResult = {
   status: "success",
   leads: [],
+  user: {
+    id: "2DzzbZ0u8oNom7hImMnCZs7KDfC2",
+    creation_date: null,
+    last_updated_date: null,
+    state: "created_first_template",
+  },
 };
 
 // Mock data from server.

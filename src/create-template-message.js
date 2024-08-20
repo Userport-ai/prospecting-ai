@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 import {
   stateAfterFirstTemplateCreation,
+  updateUserStateOnServer,
   userHasNotCreatedTemplate,
 } from "./helper-functions";
 
@@ -96,7 +97,6 @@ export const createOrEditTemplateAction = (authContext) => {
     }
 
     const idToken = await user.getIdToken();
-
     var apiEndpoint = "/api/v1/outreach-email-templates";
     var apiMethod = "POST";
     if (templateId !== null) {
@@ -121,19 +121,7 @@ export const createOrEditTemplateAction = (authContext) => {
 
     // Update user state if first template creation.
     if (apiRequest["first_template_creation"]) {
-      const userStateResponse = await fetch("/api/v1/users", {
-        method: "PUT",
-        body: JSON.stringify({ state: stateAfterFirstTemplateCreation() }),
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + idToken,
-        },
-      });
-
-      const userStateResult = await userStateResponse.json();
-      if (userStateResult.status === "error") {
-        throw result;
-      }
+      await updateUserStateOnServer(stateAfterFirstTemplateCreation(), idToken);
     }
 
     // Successful creation or edit, go back to all templates page.
@@ -250,7 +238,7 @@ function CreateOrEditTemplateMessage() {
                   />
                 </div>
 
-                {/* Whether this is the first template the user is creating */}
+                {/* Whether this is the first template the user is creating. */}
                 <Input
                   hidden={true}
                   name="first_template_creation"

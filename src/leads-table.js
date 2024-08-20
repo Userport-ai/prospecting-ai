@@ -4,6 +4,27 @@ import { useNavigate } from "react-router-dom";
 
 const { Text, Link } = Typography;
 
+// Returns empty state of Table when there are no rows.
+function TableEmptyState() {
+  return (
+    <div id="leads-table-empty-container">
+      <h2>No leads added</h2>
+      <Text className="instructions-text">
+        Leads are the prospects who you want to target in your outreach
+        campaigns.
+      </Text>
+      <Text className="instructions-text">
+        Once you add a new lead, AI will automatically research and fetch public
+        information about the lead or their company.
+      </Text>
+      <Text className="instructions-text">
+        AI will also automatically select the template matching the leads's
+        persona and created personalized emails for you.
+      </Text>
+    </div>
+  );
+}
+
 function renderLinkedInProfile(person_name, record, index) {
   const linkedin_url = record.person_linkedin_url;
   return (
@@ -71,6 +92,9 @@ function LeadsTable({ leads }) {
         id="leads-table"
         columns={columns}
         dataSource={leads}
+        locale={{
+          emptyText: <TableEmptyState />,
+        }}
         onRow={(record, index) => {
           return {
             onClick: (e) => {

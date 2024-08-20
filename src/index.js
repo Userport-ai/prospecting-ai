@@ -11,7 +11,7 @@ import CreateOrEditTemplateMessage, {
 import { createOrEditTemplateAction } from "./create-template-message";
 import Leads from "./leads";
 import { leadsLoader } from "./leads";
-import EnterLeadInfo from "./enter-lead-info";
+import EnterLeadInfo, { enterLeadInfoLoader } from "./enter-lead-info";
 import { enterLeadAction } from "./enter-lead-info";
 import LeadResearchReport from "./lead-research-report";
 import { leadResearchReportLoader } from "./lead-research-report";
@@ -85,6 +85,7 @@ function AppRoutes() {
           {
             path: "leads/create",
             element: <EnterLeadInfo />,
+            loader: enterLeadInfoLoader,
             action: enterLeadAction(context),
             errorElement: <EnterLeadInfo />,
           },

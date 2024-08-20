@@ -6,8 +6,14 @@ import {
   useRouteError,
   useNavigation,
   redirect,
+  useLoaderData,
 } from "react-router-dom";
 import { useState } from "react";
+import {
+  stateAfterFirstLeadCreation,
+  updateUserStateOnServer,
+  userHasNotCreatedLead,
+} from "./helper-functions";
 
 const { Title } = Typography;
 
@@ -23,6 +29,7 @@ export const enterLeadAction = (authContext) => {
     const formData = await request.formData();
     const inputValueMap = Object.fromEntries(formData);
     const linkedin_url = inputValueMap["linkedin_url"];
+    const first_lead_addition = inputValueMap["first_lead_addition"];
 
     // Create lead in the backend.
     const idToken = await user.getIdToken();
@@ -35,10 +42,16 @@ export const enterLeadAction = (authContext) => {
       },
     });
     const result = await response.json();
+    // const result = { status: "success" };
     if (result.status === "error") {
       // Throw error so it can be caught by component.
       console.log("Got error when creating lead research report: ", result);
       throw result;
+    }
+
+    // Update user state if first lead addition.
+    if (first_lead_addition) {
+      await updateUserStateOnServer(stateAfterFirstLeadCreation(), idToken);
     }
 
     // Redirect to success page with instructions for the user.
@@ -54,10 +67,21 @@ function DisplayError({ error }) {
   return null;
 }
 
+export function enterLeadInfoLoader({ request }) {
+  if (!request.url) {
+    // User state not passed in the URL.
+    return null;
+  }
+  const url = new URL(request.url);
+  return url.searchParams.get("state");
+}
+
+// Main component.
 function EnterLeadInfo() {
   const [inputURL, setInputURL] = useState("");
   const error = useRouteError();
   const component_is_loading = useNavigation().state !== "idle";
+  const firstLeadAddition = userHasNotCreatedLead(useLoaderData());
 
   if (component_is_loading) {
     return (
@@ -82,12 +106,19 @@ function EnterLeadInfo() {
           <RouterForm id="enter-lead-form" method="post">
             <Form.Item label="LinkedIn URL">
               <Input
-                defaultValue="https://www.linkedin.com/in/zperret/"
                 value={inputURL}
                 onChange={(e) => setInputURL(e.target.value)}
                 name="linkedin_url"
               />
             </Form.Item>
+
+            {/* Whether this is the first lead the user is adding. */}
+            <Input
+              hidden={true}
+              name="first_lead_addition"
+              defaultValue={firstLeadAddition}
+            />
+
             <Flex vertical={false} justify="flex-end">
               <Button
                 type="primary"

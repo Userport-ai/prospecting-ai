@@ -14,6 +14,8 @@ import {
 } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "./root";
+import { isUserOnboarding, userHasNotCreatedLead } from "./helper-functions";
+import OnboardingProgressBar from "./onboarding-progress-bar";
 
 // Helper to fetch list of leads created by this user.
 // TODO: Implement pagination.
@@ -59,8 +61,9 @@ export const leadsLoader = (authContext) => {
 function Leads() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  const gotLeadsResponse = useLoaderData();
-  const [leads, setLeads] = useState(gotLeadsResponse.leads);
+  const loaderResponse = useLoaderData();
+  const userFromServer = loaderResponse.user;
+  const [leads, setLeads] = useState(loaderResponse.leads);
 
   const component_is_loading = useNavigation().state !== "idle";
   const should_poll_periodically = leads.some(
@@ -97,12 +100,28 @@ function Leads() {
     );
   }
 
+  // Handle Add Lead button click by user.
+  function handleAddLeadClick() {
+    var nextPage = "/leads/create";
+    if (userHasNotCreatedLead(userFromServer.state)) {
+      // Pass this information about the user in the URL path.
+      const urlParams = new URLSearchParams({
+        state: userFromServer.state,
+      }).toString();
+      nextPage += `?${urlParams}`;
+    }
+    return navigate(nextPage);
+  }
+
   return (
     <div id="leads-outer">
+      {isUserOnboarding(userFromServer) && (
+        <OnboardingProgressBar userFromServer={userFromServer} />
+      )}
       <div id="leads-container">
         <div id="title-and-btn-container">
           <h1>Leads</h1>
-          <Button type="primary" onClick={() => navigate("/leads/create")}>
+          <Button type="primary" onClick={handleAddLeadClick}>
             Add new lead
           </Button>
         </div>

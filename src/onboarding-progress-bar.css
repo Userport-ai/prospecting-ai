@@ -16,14 +16,28 @@
 }
 
 #onboarding-progress-steps-container .ant-steps-item-title {
-  font-weight: 500;
-  color: var(--primary);
+  font-weight: 400;
+  color: var(--secondary);
+}
+
+#onboarding-progress-steps-container
+  .ant-steps-item-process
+  .ant-steps-item-title {
+  font-weight: 700;
+}
+
+#onboarding-progress-steps-container
+  .ant-steps-item-process
+  .ant-steps-item-icon {
+  background-color: var(--secondary);
+  border: none;
 }
 
 #onboarding-progress-steps-container
   .ant-steps-item-finish
   .ant-steps-item-icon {
-  background-color: var(--primary);
+  background-color: var(--hover-color);
+  border: none;
 }
 
 #onboarding-progress-steps-container
