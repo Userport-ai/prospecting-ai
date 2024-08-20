@@ -4,6 +4,7 @@ import { redirect } from "react-router-dom";
 import {
   getUserFromServer,
   userHasNotCreatedTemplate,
+  userHasNotViewedWelcomePage,
 } from "./helper-functions";
 
 // This is the loader that is
@@ -21,7 +22,10 @@ export const loggedInLoader = (authContext) => {
     }
     const idToken = await user.getIdToken();
     const userFromServer = await getUserFromServer(idToken);
-    if (userHasNotCreatedTemplate(userFromServer.state)) {
+    if (userHasNotViewedWelcomePage(userFromServer.state)) {
+      // Redirect to welcome page first.
+      return redirect("/welcome");
+    } else if (userHasNotCreatedTemplate(userFromServer.state)) {
       // Redirect to /templates so they can first create a template.
       return redirect("/templates");
     }

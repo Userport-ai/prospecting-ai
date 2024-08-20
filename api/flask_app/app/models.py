@@ -21,6 +21,7 @@ class User(BaseModel):
         # Enum defining current State of a user in the application.
         # This will help tailor application for each user.
         NEW_USER = "new_user"
+        VIEWED_WELCOME_PAGE = "viewed_welcome_page"
         CREATED_FIRST_TEMPLATE = "created_first_template"
         ADDED_FIRST_LEAD = "added_first_lead"
         VIEWED_PERSONALIZED_EMAILS = "viewed_personalized_emails"

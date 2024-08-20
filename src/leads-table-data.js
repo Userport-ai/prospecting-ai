@@ -6,7 +6,7 @@ export const emptyLeadsResult = {
     creation_date: null,
     last_updated_date: null,
     // state: "created_first_template",
-    state: "new_user",
+    state: "viewed_welcome_page",
   },
 };
 

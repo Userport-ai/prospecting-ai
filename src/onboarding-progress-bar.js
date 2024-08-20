@@ -5,7 +5,7 @@ function OnboardingProgressBar({ userFromServer }) {
   const userState = userFromServer.state;
   var currentValue = 0;
   var currentStatus = "process";
-  if (userState === "new_user") {
+  if (userState === "viewed_welcome_page") {
     currentValue = 0;
   } else if (userState === "created_first_template") {
     currentValue = 1;

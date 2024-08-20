@@ -37,6 +37,6 @@ export const noTemplatesResponse = {
     id: "2DzzbZ0u8oNom7hImMnCZs7KDfC2",
     creation_date: null,
     last_updated_date: null,
-    state: "new_user",
+    state: "viewed_welcome_page",
   },
 };

@@ -31,6 +31,7 @@ import EnteredLeadSuccess, {
 } from "./entered-lead-success";
 import VerifyEmail from "./verify-email";
 import { loggedInLoader } from "./logged-in";
+import WelcomePage from "./welcome-page";
 
 function AppRoutes() {
   const authContext = useContext(AuthContext);
@@ -65,6 +66,10 @@ function AppRoutes() {
           {
             path: "/",
             loader: () => redirect("/leads"),
+          },
+          {
+            path: "/welcome",
+            element: <WelcomePage />,
           },
           {
             path: "leads",

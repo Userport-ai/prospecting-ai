@@ -6,9 +6,14 @@ export function isUserOnboarding(userFromServer) {
   return userState !== "viewed_personalized_emails" ? true : false;
 }
 
+// Returns true if given user state has not seen Welcome Page yet and false otherwise.
+export function userHasNotViewedWelcomePage(userState) {
+  return userState === "new_user" ? true : false;
+}
+
 // Returns true if given user state has not created a template yet and false otherwise.
 export function userHasNotCreatedTemplate(userState) {
-  return userState === "new_user" ? true : false;
+  return userState === "viewed_welcome_page" ? true : false;
 }
 
 // Returns true if given user state has not created a lead yet and false otherwise.
@@ -19,6 +24,11 @@ export function userHasNotCreatedLead(userState) {
 // Returns true if given user state has not viwed personalized emails yet and false otherwise.
 export function userHasNotViewedPersonalizedEmail(userState) {
   return userState === "added_first_lead" ? true : false;
+}
+
+// Returns user state after viewing welcome page is successful.
+export function stateAfterViewingWelcomePage() {
+  return "viewed_welcome_page";
 }
 
 // Returns user state after first template creation is successful.
