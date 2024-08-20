@@ -16,6 +16,11 @@ export function userHasNotCreatedLead(userState) {
   return userState === "created_first_template" ? true : false;
 }
 
+// Returns true if given user state has not viwed personalized emails yet and false otherwise.
+export function userHasNotViewedPersonalizedEmail(userState) {
+  return userState === "added_first_lead" ? true : false;
+}
+
 // Returns user state after first template creation is successful.
 export function stateAfterFirstTemplateCreation() {
   return "created_first_template";
@@ -24,6 +29,11 @@ export function stateAfterFirstTemplateCreation() {
 // Returns user state after first lead creation is successful.
 export function stateAfterFirstLeadCreation() {
   return "added_first_lead";
+}
+
+// Returns user state after personalized emails are viewed.
+export function stateAfterViewedPersonalizedEmails() {
+  return "viewed_personalized_emails";
 }
 
 // Function that updates user state on the server and returns the result.
@@ -43,4 +53,17 @@ export async function updateUserStateOnServer(newState, idToken) {
     throw result;
   }
   return result;
+}
+
+// Fetches User object from the server.
+// Throws an error if the fetch failed.
+export async function getUserFromServer(idToken) {
+  const response = await fetch("/api/v1/users", {
+    headers: { Authorization: "Bearer " + idToken },
+  });
+  const result = await response.json();
+  if (result.status === "error") {
+    throw result;
+  }
+  return result.user;
 }

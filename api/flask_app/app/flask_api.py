@@ -84,6 +84,40 @@ def get_user_state_db_projection():
     return {"state": 1}
 
 
+class GetUserResponse(BaseModel):
+    """API Response of get user request."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+    user: User = Field(...,
+                       description="User object for curently authenticated user.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.get('/v1/users')
+@login_required
+def get_user():
+    db = Database()
+    user_id: str = g.user["uid"]
+
+    try:
+        user = db.get_or_create_user(
+            user_id=user_id, projection=get_user_state_db_projection())
+        response = GetUserResponse(status=ResponseStatus.SUCCESS, user=user)
+        logger.info(f"Got user for ID: {user_id} from database.")
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to get user for ID: {user_id} with error: {e}")
+        raise APIException(
+            status_code=500, message="Failed to get User due to internal error.")
+
+
 class UpdateUserResponse(BaseModel):
     """API Response of update user request."""
     status: ResponseStatus = Field(...,
@@ -196,6 +230,8 @@ class GetLeadResearchReportResponse(BaseModel):
                                    description="Status (success) of the response.")
     lead_research_report: LeadResearchReport = Field(
         ..., description="Fetched Lead Research report.")
+    user: User = Field(...,
+                       description="User object for curently authenticated user.")
 
     @field_validator('status')
     @classmethod
@@ -210,6 +246,8 @@ class GetLeadResearchReportResponse(BaseModel):
 def get_lead_report(lead_research_report_id: str):
     # Fetch existing report.
     db = Database()
+    user_id: str = g.user["uid"]
+
     try:
         logger.info(
             f"Got lead research report ID: {lead_research_report_id}")
@@ -239,9 +277,12 @@ def get_lead_report(lead_research_report_id: str):
             lead_research_report_id=lead_research_report_id, projection=projection)
         logger.info(
             f"Found research report for ID: {lead_research_report_id}")
+        user = db.get_or_create_user(user_id=user_id,
+                                     projection=get_user_state_db_projection())
         response = GetLeadResearchReportResponse(
             status=ResponseStatus.SUCCESS,
-            lead_research_report=lead_research_report
+            lead_research_report=lead_research_report,
+            user=user
         )
         return response.model_dump()
     except Exception as e:

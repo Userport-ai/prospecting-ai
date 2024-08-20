@@ -86,6 +86,17 @@ const columns = [
 
 function LeadsTable({ leads }) {
   const navigate = useNavigate();
+
+  // Handle user click of a report on a givent able row.
+  const handleTableRowClick = (record) => {
+    return (e) => {
+      if (e.target.classList.contains("research-report-ready") === true) {
+        // Navigate to the Research Report link. This will prevent complete page load.
+        return navigate("/lead-research-reports/" + record.id);
+      }
+    };
+  };
+
   return (
     <>
       <Table
@@ -97,14 +108,7 @@ function LeadsTable({ leads }) {
         }}
         onRow={(record, index) => {
           return {
-            onClick: (e) => {
-              if (
-                e.target.classList.contains("research-report-ready") === true
-              ) {
-                // Navigate to the Research Report link. This will prevent complete page load.
-                return navigate("/lead-research-reports/" + record.id);
-              }
-            },
+            onClick: handleTableRowClick(record),
           };
         }}
       />

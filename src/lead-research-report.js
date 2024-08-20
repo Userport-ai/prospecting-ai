@@ -7,11 +7,19 @@ import {
   useNavigation,
   redirect,
 } from "react-router-dom";
-import { useContext, useState } from "react";
+import { act, useContext, useState } from "react";
 import { reportWithSelectedTemplate } from "./lead-report-with-template-data";
 import { reportWithNoTemplate } from "./lead-report-no-template-data";
 import SelectTemplateModal from "./select-template-modal";
 import { AuthContext } from "./root";
+import {
+  getUserFromServer,
+  isUserOnboarding,
+  stateAfterViewedPersonalizedEmails,
+  updateUserStateOnServer,
+  userHasNotViewedPersonalizedEmail,
+} from "./helper-functions";
+import OnboardingProgressBar from "./onboarding-progress-bar";
 
 const { Text, Link } = Typography;
 
@@ -183,7 +191,7 @@ function SelectedEmailTemplate({
         >
           Change Template
         </Button>
-        <Card id="email-template-card">
+        <Card key="selected-template-card-key" id="email-template-card">
           <div id="template-name-container">
             <Text className="card-text-label" strong>
               Name:
@@ -436,27 +444,30 @@ export const leadResearchReportLoader = (authContext) => {
     const { user } = authContext;
     if (!user) {
       // User is logged out.
-      return redirect("/login");
+      return null;
     }
     const idToken = await user.getIdToken();
-    const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
-      headers: { Authorization: "Bearer " + idToken },
-    });
-    const result = await response.json();
-    // const result = await reportWithSelectedTemplate;
+    // const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
+    //   headers: { Authorization: "Bearer " + idToken },
+    // });
+    // const result = await response.json();
+    const result = await reportWithSelectedTemplate;
     // const result = await reportWithNoTemplate;
     if (result.status === "error") {
       console.log("Error getting lead report: ", result);
       throw result;
     }
-    return result.lead_research_report;
+    return result;
   };
 };
 
 // Main Component.
 function LeadResearchReport() {
-  const report = useLoaderData();
+  const loaderResponse = useLoaderData();
+  const report = loaderResponse.lead_research_report;
+  const [userFromServer, setUserFromServer] = useState(loaderResponse.user);
   const component_is_loading = useNavigation().state !== "idle";
+  const { user } = useContext(AuthContext);
 
   if (component_is_loading) {
     return (
@@ -469,20 +480,63 @@ function LeadResearchReport() {
     );
   }
 
+  // Helper to get tab key for Recent News tab.
+  function recentNewsTabKey() {
+    return "1";
+  }
+
+  // Helper to get tab key for Personalized Email tab.
+  function personalizedEmailsTabKey() {
+    return "2";
+  }
+
+  // Handler for when user changes tab.
+  async function onActiveTabChange(activeKey) {
+    if (
+      activeKey !== recentNewsTabKey() &&
+      activeKey !== personalizedEmailsTabKey()
+    ) {
+      const error_obj = {
+        message: `Invalid Tab key value: ${activeKey}`,
+        status_code: 500,
+      };
+      throw error_obj;
+    }
+
+    if (
+      activeKey == personalizedEmailsTabKey() &&
+      userHasNotViewedPersonalizedEmail(userFromServer.state)
+    ) {
+      // First time user is viewing personalized emails, update the user state on server and then the UI.
+      // User is onboarded now.
+      const idToken = await user.getIdToken();
+      await updateUserStateOnServer(
+        stateAfterViewedPersonalizedEmails(),
+        idToken
+      );
+      const gotUserFromServer = await getUserFromServer(idToken);
+      setUserFromServer(gotUserFromServer);
+    }
+  }
+
   return (
     <div id="lead-research-report-outer">
+      {isUserOnboarding(userFromServer) && (
+        <OnboardingProgressBar userFromServer={userFromServer} />
+      )}
       <div id="lead-research-report-container">
         <ReportHeader report={report} />
         <Tabs
+          onChange={onActiveTabChange}
           items={[
             {
               label: <h1>Recent News</h1>,
-              key: "1",
+              key: recentNewsTabKey(),
               children: <RecentNews details={report.details} />,
             },
             {
               label: <h1>Personalized Emails</h1>,
-              key: "2",
+              key: personalizedEmailsTabKey(),
               children: (
                 <EmailTemplateAndPersonalizedEmails
                   lead_research_report_id={report.id}

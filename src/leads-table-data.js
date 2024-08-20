@@ -41,6 +41,12 @@ export const leadsResult = {
       details: null,
     },
   ],
+  user: {
+    id: "2DzzbZ0u8oNom7hImMnCZs7KDfC2",
+    creation_date: null,
+    last_updated_date: null,
+    state: "added_first_lead",
+  },
 };
 
 // Mock data from server.
@@ -75,4 +81,10 @@ export const leadsInProgressResult = {
       details: null,
     },
   ],
+  user: {
+    id: "2DzzbZ0u8oNom7hImMnCZs7KDfC2",
+    creation_date: null,
+    last_updated_date: null,
+    state: "created_first_template",
+  },
 };
