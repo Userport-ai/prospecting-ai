@@ -20,8 +20,8 @@ function VerifyEmail() {
   }
 
   if (user.emailVerified) {
-    // User email already verified, redirect to app.
-    return <Navigate to="/leads" replace />;
+    // User email already verified, redirect to logged in.
+    return <Navigate to="/logged-in" replace />;
   }
 
   function VerifyEmailStep({ onEmailSent }) {

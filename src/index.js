@@ -30,6 +30,7 @@ import EnteredLeadSuccess, {
   enteredLeadSuccessLoader,
 } from "./entered-lead-success";
 import VerifyEmail from "./verify-email";
+import { loggedInLoader } from "./logged-in";
 
 function AppRoutes() {
   const authContext = useContext(AuthContext);
@@ -50,6 +51,11 @@ function AppRoutes() {
         path: "/verify-email",
         element: <VerifyEmail />,
         errorElement: <ErrorPage />,
+      },
+      {
+        path: "/logged-in",
+        errorElement: <ErrorPage />,
+        loader: loggedInLoader(context),
       },
       {
         path: "/",

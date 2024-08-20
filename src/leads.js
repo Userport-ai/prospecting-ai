@@ -1,5 +1,5 @@
 import "./leads.css";
-import { Button, Skeleton } from "antd";
+import { Button, Modal, Skeleton } from "antd";
 import LeadsTable from "./leads-table";
 import {
   emptyLeadsResult,
@@ -14,28 +14,27 @@ import {
 } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "./root";
-import { isUserOnboarding, userHasNotCreatedLead } from "./helper-functions";
+import {
+  isUserOnboarding,
+  userHasNotCreatedLead,
+  userHasNotCreatedTemplate,
+} from "./helper-functions";
 import OnboardingProgressBar from "./onboarding-progress-bar";
 
 // Helper to fetch list of leads created by this user.
 // TODO: Implement pagination.
-async function fetch_leads(user) {
+async function listLeads(user) {
   // Get Id token using Firebase API instead of accessing token directly per: https://stackoverflow.com/questions/47803495/error-firebase-id-token-has-expired.
   const idToken = await user.getIdToken();
-  // const response = await fetch("/api/v1/leads", {
-  //   headers: { Authorization: "Bearer " + idToken },
-  // });
-  // const result = await response.json();
+  const response = await fetch("/api/v1/leads", {
+    headers: { Authorization: "Bearer " + idToken },
+  });
+  const result = await response.json();
   // const result = await emptyLeadsResult;
-  const result = await leadsResult;
+  // const result = await leadsResult;
   // const result = await leadsInProgressResult;
   if (result.status === "error") {
     throw result;
-  }
-  const userState = result.user.state;
-  if (userState === "new_user") {
-    // If new user, redirect to /templates so they can first create a template.
-    return redirect("/templates");
   }
   return result;
 }
@@ -48,11 +47,8 @@ export const leadsLoader = (authContext) => {
       // User is logged out.
       return null;
     }
-    // If user email is not verified, redirect.
-    if (!user.emailVerified) {
-      return redirect("/verify-email");
-    }
-    return fetch_leads(user);
+    const result = await listLeads(user);
+    return result;
   };
 };
 
@@ -79,8 +75,8 @@ function Leads() {
     }
 
     const intervalId = setInterval(async () => {
-      const leads = await fetch_leads(user);
-      setLeads(leads);
+      const result = await listLeads(user);
+      setLeads(result.leads);
     }, POLLING_INTERVAL);
     return () => clearInterval(intervalId);
   }, [should_poll_periodically, user, POLLING_INTERVAL]);
@@ -102,6 +98,15 @@ function Leads() {
 
   // Handle Add Lead button click by user.
   function handleAddLeadClick() {
+    if (userHasNotCreatedTemplate(userFromServer.state)) {
+      // Prompt the user that they need to create a template first.
+      Modal.error({
+        title: "Template not created yet",
+        content: "Please create template for the persona first.",
+      });
+      return;
+    }
+
     var nextPage = "/leads/create";
     if (userHasNotCreatedLead(userFromServer.state)) {
       // Pass this information about the user in the URL path.

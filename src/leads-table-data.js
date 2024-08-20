@@ -5,7 +5,8 @@ export const emptyLeadsResult = {
     id: "2DzzbZ0u8oNom7hImMnCZs7KDfC2",
     creation_date: null,
     last_updated_date: null,
-    state: "created_first_template",
+    // state: "created_first_template",
+    state: "new_user",
   },
 };
 

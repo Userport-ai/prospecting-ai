@@ -12,8 +12,8 @@ const { Header, Content } = Layout;
 export const loginLoader = (authContext) => {
   return async () => {
     if (authContext.user) {
-      // User already logged in, redirect to leads page.
-      return redirect("/leads");
+      // User already logged in, redirect to logged in page.
+      return redirect("/logged-in");
     }
     return null;
   };

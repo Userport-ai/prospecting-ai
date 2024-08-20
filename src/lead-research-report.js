@@ -1,13 +1,8 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Flex, Typography, Button, Card, Tabs, Empty, Skeleton } from "antd";
-import {
-  useNavigate,
-  useLoaderData,
-  useNavigation,
-  redirect,
-} from "react-router-dom";
-import { act, useContext, useState } from "react";
+import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
+import { useContext, useState } from "react";
 import { reportWithSelectedTemplate } from "./lead-report-with-template-data";
 import { reportWithNoTemplate } from "./lead-report-no-template-data";
 import SelectTemplateModal from "./select-template-modal";
@@ -504,7 +499,7 @@ function LeadResearchReport() {
     }
 
     if (
-      activeKey == personalizedEmailsTabKey() &&
+      activeKey === personalizedEmailsTabKey() &&
       userHasNotViewedPersonalizedEmail(userFromServer.state)
     ) {
       // First time user is viewing personalized emails, update the user state on server and then the UI.

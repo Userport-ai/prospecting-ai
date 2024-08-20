@@ -55,11 +55,11 @@ function AppHeader() {
         selectedKeys={[curMenuKey]}
         onClick={(e) => {
           if (e.key === leads_key) {
-            navigate("/leads");
+            return navigate("/leads");
           } else if (e.key === templates_key) {
-            navigate("/templates");
+            return navigate("/templates");
           } else if (e.key === logout_key) {
-            handleLogout();
+            return handleLogout();
           }
         }}
       ></Menu>
