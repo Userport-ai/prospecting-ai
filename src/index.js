@@ -22,6 +22,7 @@ import {
   RouterProvider,
 } from "react-router-dom";
 import reportWebVitals from "./reportWebVitals";
+// Do not remove bootstrap, it is likely used a dependency by libraries.
 import "bootstrap/dist/css/bootstrap.css";
 // Put any other imports below so that CSS from your
 // components takes precedence over default styles.
