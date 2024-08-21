@@ -1,0 +1,14 @@
+# Not using Alpine image since it is missing gcc, Rust and other deps needed for our image.
+FROM python:3.9
+WORKDIR /flask_app
+
+# flask_app/app/ in local directory gets mapped to flask_app/app in container.
+COPY api/flask_app/app ./app
+COPY api/flask_app/requirements.txt ./requirements.txt
+COPY api/flask_app/.env api/flask_app/.env.production ./
+RUN pip install -r ./requirements.txt
+
+ENV FLASK_ENV=dev
+EXPOSE 5000
+# We use only 1 worker per container and scale number of containers. Based on recommendation from a Stack Overflow post.
+CMD ["gunicorn","--bind", "0.0.0.0:5000", "app:create_app"]

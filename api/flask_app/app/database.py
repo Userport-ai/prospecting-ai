@@ -412,9 +412,10 @@ class Database:
         """Helper method to test successful connection to cluster deployment."""
         try:
             self.mongo_client.admin.command('ping')
-            print("Pinged your deployment. You successfully connected to MongoDB wohoo!")
+            logger.info(
+                "Pinged your deployment. You successfully connected to MongoDB wohoo!")
         except Exception as e:
-            print(e)
+            logger.exception(e)
 
 
 if __name__ == "__main__":

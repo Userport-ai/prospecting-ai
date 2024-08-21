@@ -88,3 +88,10 @@ Start Local redis server: `redis-server`
 Purge unacked tasks in Celery Task queue: `celery -A app.make_celery purge`
 
 Retry management in Celery Task example: https://stackoverflow.com/questions/67968018/how-to-execute-some-code-at-last-retry-of-a-celery-task
+
+
+## Docker Commainds
+
+Building Frontend: `docker build -f Dockerfile.frontend -t add1993/userport-frontend .`
+
+Building Backend: `docker build -f Dockerfile.backend -t add1993/userport-backend .`

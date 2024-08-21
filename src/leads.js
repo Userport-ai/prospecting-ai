@@ -6,12 +6,7 @@ import {
   leadsInProgressResult,
   leadsResult,
 } from "./leads-table-data";
-import {
-  useNavigate,
-  useLoaderData,
-  useNavigation,
-  redirect,
-} from "react-router-dom";
+import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "./root";
 import {
