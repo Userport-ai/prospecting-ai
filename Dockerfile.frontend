@@ -13,4 +13,6 @@ RUN yarn build
 # Build step #2: build an nginx container
 FROM nginx:stable-alpine
 COPY --from=build-step /app/build /usr/share/nginx/html
+ARG GIT_COMMIT
+LABEL "git_commit"=$GIT_COMMIT
 # Base nginx image already has a CMD statement which exposes the container on port 80.

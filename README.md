@@ -92,10 +92,12 @@ Retry management in Celery Task example: https://stackoverflow.com/questions/679
 
 ## Docker Commands
 
-Building Frontend for GKE Deployment in production: `docker build -f Dockerfile.frontend -t add1993/userport-frontend .`
+Building Frontend for GKE Deployment in production: `docker build -f Dockerfile.frontend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/frontend .`
 
 Building Backend for GKE Deployment in production: `docker build -f Dockerfile.backend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/backend .`
 
 Docker CMD for running Flask server: `CMD ["gunicorn","--bind", "0.0.0.0:5000", "app:create_app"]`
 
 Docker CMD for running Celery Worker: `CMD ["celery", "-A", "app.make_celery worker", "--loglevel=INFO"]`
+
+Tag a local image with a new name (usually before push to registry): `docker tag <local image name or image ID> <new image name>`
