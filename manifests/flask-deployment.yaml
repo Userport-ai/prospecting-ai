@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-api
+  labels:
+    name: flask-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flask-api
+  template:
+    metadata:
+      labels:
+        app: flask-api
+    spec:
+      containers:
+      - name: flask-api
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:prod
+        env:
+        - name: FLASK_CELERY__broker_url
+          # Referencing the Redis Service.
+          value: "redis://redis-service"
+          # Referencing the Redis Service.
+        - name: FLASK_CELERY__result_backend
+          value: "redis://redis-service"
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 250m
+        ports:
+        - containerPort: 5000
+

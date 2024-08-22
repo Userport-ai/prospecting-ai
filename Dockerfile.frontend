@@ -1,6 +1,7 @@
 # Reference: https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project.
-# Build step #1: build the React front end
-FROM node:20-alpine AS build-step
+# Build step #1: build the React front end.
+# We need to specify --platform=linux/amd64 to force build for the x86_64 platform architecture (found on Cloud instances) since we are on Mac M series which has arm64 architecture.
+FROM --platform=linux/amd64 node:20-alpine AS build-step
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -11,7 +12,7 @@ RUN yarn install
 RUN yarn build
 
 # Build step #2: build an nginx container
-FROM nginx:stable-alpine
+FROM --platform=linux/amd64 nginx:stable-alpine
 COPY --from=build-step /app/build /usr/share/nginx/html
 ARG GIT_COMMIT
 LABEL "git_commit"=$GIT_COMMIT

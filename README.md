@@ -92,12 +92,47 @@ Retry management in Celery Task example: https://stackoverflow.com/questions/679
 
 ## Docker Commands
 
-Building Frontend for GKE Deployment in production: `docker build -f Dockerfile.frontend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/frontend .`
+We want to specify platform as linux/amd64 since we are usually building these images on Mac M1s which by default select linux/arm64 as the target platform and this causes Deployment on Cloud to fail.
 
-Building Backend for GKE Deployment in production: `docker build -f Dockerfile.backend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/backend .`
+Building Frontend for GKE Deployment in production: `docker build --platform linux/amd64 -f Dockerfile.frontend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/frontend .`
+
+Building Backend for GKE Deployment in production: `docker build --platform linux/amd64 -f Dockerfile.backend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/backend .`
 
 Docker CMD for running Flask server: `CMD ["gunicorn","--bind", "0.0.0.0:5000", "app:create_app"]`
 
 Docker CMD for running Celery Worker: `CMD ["celery", "-A", "app.make_celery worker", "--loglevel=INFO"]`
 
+Get list of local images: `docker image list`
+
 Tag a local image with a new name (usually before push to registry): `docker tag <local image name or image ID> <new image name>`
+
+Delete unused Docker images locally: `docker system prune -a` 
+
+# Kubernetes Commands
+
+[Reference doc](https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl#install_kubectl)
+
+Check path of kubectl binary to ensure its the one inside Google Cloud SDK: `which kubectl`
+
+Get contexts (contains a cluster, a user and namespace) that kubectl can connect to: `kubectl config view`
+
+To get the default context that kubctl connects to: `kubectl config current-context`
+
+Create a GKE deployment: `kubectl apply -f <deployment file>`
+
+Get detailed information abotu GKE deployment: `kubectl describe deployment <deployment name>`
+
+Details of installed components in Google Cloud SDK: `gcloud info`
+
+
+## GKE Debugging
+
+To view all pods in deployment, their status and logs from failures if any.
+
+Get all pods deployed: `kubectl get pods`
+
+Get log from chosen pod: `kubectl logs <Pod Name>`
+
+Stackoverflow links to help debug architecture related issues:
+1. https://stackoverflow.com/questions/77766805/aws-batch-run-ecr-repository-error-exec-usr-local-bin-python3-exec-format-err
+2. Layer already exists: https://stackoverflow.com/questions/48188268/docker-push-seems-not-to-update-image-layer-already-exists. I saw this problem too that prevented the app from running in the Cloud even after it was built for amd64 locally. Somehow the Cloud image was caching some layers that decided the platform of the image and that never changed even though I pushed new amd64 images multiple times. The solution I used was to delete the entire repository of the remote registry and start over with a fresh repository. Then my image upload resulted in a successful container run. This post talks about how maybe a fix to this problem may be to retag the new image, maybe we will try it out in the future.

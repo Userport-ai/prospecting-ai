@@ -1,7 +1,9 @@
 # This Dockerfile creates a Flask App image to be used only for GKE deployment purposes in production.
 # There is no CMD stage because that will be provided in the Kubernetes configuration.
 # Not using Alpine image since it is missing gcc, Rust and other deps needed for our image.
-FROM python:3.9
+# We need to specify --platform=linux/amd64 to force build for the x86_64 platform architecture (found on Cloud instances) since we are on Mac M series which has arm64 architecture.
+FROM --platform=linux/amd64 python:3.9 AS build
+# FROM python:3.9
 WORKDIR /flask_app
 
 # flask_app/app/ in local directory gets mapped to flask_app/app in container.
@@ -16,3 +18,6 @@ LABEL "env"=production
 LABEL "git_commit"=$GIT_COMMIT
 
 EXPOSE 5000
+# We should be able to specify this command in Kuberneter Mainfest file as well. Let's test 
+# if it works with Celery first and then update this Dockerfile if it does.
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:create_app"]
