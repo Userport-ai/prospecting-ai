@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: react
+  labels:
+    name: react
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: react
+  template:
+    metadata:
+      labels:
+        app: react
+    spec:
+      containers:
+      - name: react
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/frontend:prod
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 250m
+        ports:
+        - containerPort: 8080

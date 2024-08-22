@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  labels:
+    name: celery-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+    spec:
+      containers:
+      - name: celery-worker
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:prod
+        env:
+        - name: FLASK_CELERY__broker_url
+          # Referencing the Redis Service.
+          value: "redis://redis-service"
+          # Referencing the Redis Service.
+        - name: FLASK_CELERY__result_backend
+          value: "redis://redis-service"
+        # Command to run Celery worker.
+        command: ["celery"]
+        args: ["-A", "app.make_celery", "worker", "--loglevel=INFO"]
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 250m
+        ports:
+        - containerPort: 5000
