@@ -1,3 +1,5 @@
+# This Dockerfile creates a Flask App image to be used only for GKE deployment purposes in production.
+# There is no CMD stage because that will be provided in the Kubernetes configuration.
 # Not using Alpine image since it is missing gcc, Rust and other deps needed for our image.
 FROM python:3.9
 WORKDIR /flask_app
@@ -8,7 +10,9 @@ COPY api/flask_app/requirements.txt ./requirements.txt
 COPY api/flask_app/.env api/flask_app/.env.production ./
 RUN pip install -r ./requirements.txt
 
-ENV FLASK_ENV=dev
+ARG GIT_COMMIT
+ENV FLASK_ENV=production
+LABEL "env"=production
+LABEL "git_commit"=$GIT_COMMIT
+
 EXPOSE 5000
-# We use only 1 worker per container and scale number of containers. Based on recommendation from a Stack Overflow post.
-CMD ["gunicorn","--bind", "0.0.0.0:5000", "app:create_app"]
