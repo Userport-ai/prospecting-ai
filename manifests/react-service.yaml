@@ -4,9 +4,9 @@ kind: Service
 metadata:
   name: react-service
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: react
   ports:
   - port: 80
-    targetPort: 8080
+    targetPort: 80
