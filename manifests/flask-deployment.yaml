@@ -24,10 +24,6 @@ spec:
           # Referencing the Redis Service.
         - name: FLASK_CELERY__result_backend
           value: "redis://redis-service"
-        readinessProbe:
-          httpGet:
-            path: "/api/v1/healthz"
-            port: 5000
         resources:
           limits:
             cpu: 1000m
