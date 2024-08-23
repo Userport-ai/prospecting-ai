@@ -120,7 +120,24 @@ To get the default context that kubctl connects to: `kubectl config current-cont
 
 Create a GKE deployment: `kubectl apply -f <deployment file>`
 
-Get detailed information abotu GKE deployment: `kubectl describe deployment <deployment name>`
+Get deployment name in GKE: `kubectl get deployments`
+
+Get detailed information about GKE deployment: `kubectl describe deployment <deployment name>`
+
+## Updating Deployments
+
+Reference: https://kubernetes.io/docs/tutorials/kubernetes-basics/update/update-intro/
+
+CheatSheet for updating resources: https://kubernetes.io/docs/reference/kubectl/quick-reference/#updating-resources. It has rollout undo commands also.
+
+Use this command to check Image IDs of each pod: `kubectl describe pods`
+
+Update the manifest file with the new version and then run `kubectl apply -f <manifest file>`.
+Same command for creation and updation and version of prod build tracked in git.
+
+Get status of deployment rollout: `kubectl rollout status deployment/<deployment name>`
+
+Restart rollout of deployment. Used when you need to update something like Secrets or Config maps or when app is in bad state and you want to restart your pod to get it back to healthy: `kubectl rollout restart deployment/<deployment name>`
 
 Details of installed components in Google Cloud SDK: `gcloud info`
 

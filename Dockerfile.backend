@@ -20,4 +20,4 @@ LABEL "git_commit"=$GIT_COMMIT
 EXPOSE 5000
 # We should be able to specify this command in Kuberneter Mainfest file as well. Let's test 
 # if it works with Celery first and then update this Dockerfile if it does.
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:create_app"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:create_app()"]

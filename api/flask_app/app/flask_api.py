@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, Response
 import logging
 import time
 from enum import Enum
@@ -77,6 +77,15 @@ def login_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+@bp.route('/v1/healthz')
+def get_health_check():
+    """
+    This is required in production for Health Check of server.
+    Reference: https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks.
+    """
+    return Response(status=200)
 
 
 def get_user_state_db_projection():

@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: my-ingress
+  name: userport-ingress
   annotations:
     # If the class annotation is not specified it defaults to "gce".
     kubernetes.io/ingress.class: "gce"
@@ -17,10 +17,10 @@ spec:
             name: react-service
             port:
               number: 80
-      # - path: /v2
-      #   pathType: ImplementationSpecific
-      #   backend:
-      #     service:
-      #       name: hello-world-2
-      #       port:
-      #         number: 80
+      - path: /api/*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: flask-api-service
+            port:
+              number: 80
