@@ -89,6 +89,9 @@ Purge unacked tasks in Celery Task queue: `celery -A app.make_celery purge`
 
 Retry management in Celery Task example: https://stackoverflow.com/questions/67968018/how-to-execute-some-code-at-last-retry-of-a-celery-task
 
+Gunicorn server: `gunicorn -b localhost:5000 app:create_app()`
+
+Gcloud authentication: `gcloud auth login`
 
 ## Docker Commands
 
