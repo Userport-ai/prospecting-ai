@@ -408,14 +408,9 @@ class Database:
         """
         collection.update_many(filter=filter, update=update)
 
-    def _test_connection(self):
+    def test_connection(self):
         """Helper method to test successful connection to cluster deployment."""
-        try:
-            self.mongo_client.admin.command('ping')
-            logger.info(
-                "Pinged your deployment. You successfully connected to MongoDB wohoo!")
-        except Exception as e:
-            logger.exception(e)
+        self.mongo_client.admin.command('ping')
 
 
 if __name__ == "__main__":

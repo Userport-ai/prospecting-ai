@@ -79,6 +79,24 @@ def login_required(f):
     return decorated_function
 
 
+@bp.route('/v1/dbz')
+def get_db_check():
+    """
+    This is required in production for Health Check of server.
+    Reference: https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks.
+    """
+    try:
+        db = Database()
+        db.test_connection()
+        logger.info(
+            "Pinged your deployment. You successfully connected to MongoDB wohoo!")
+        return Response(status=200)
+    except Exception as e:
+        logger.exception(
+            f"Failed to connect to Mongodb instance with error: {e}")
+        raise APIException(status_code=500, message="Failed db health check")
+
+
 @bp.route('/v1/healthz')
 def get_health_check():
     """
