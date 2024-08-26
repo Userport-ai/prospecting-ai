@@ -8,21 +8,17 @@ from app.database import Database
 from app.models import LeadResearchReport, OutreachEmailTemplate, PersonProfile
 from app.utils import Utils
 
-from dotenv import load_dotenv
-load_dotenv()
-
 logger = logging.getLogger()
 
 
 class OutreachTemplateMatcher:
     """Helps fetch and match Outreach email template for a given lead."""
 
-    # Open AI configurations.
-    OPENAI_API_KEY = os.getenv("OPENAI_USERPORT_API_KEY")
-    OPENAI_GPT_4O_MODEL = os.getenv("OPENAI_GPT_4O_MODEL")
-
     def __init__(self, database: Database) -> None:
         self.database = database
+        # Open AI configurations.
+        self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
+        self.OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
 
     def match(self, lead_research_report_id: str) -> LeadResearchReport.ChosenOutreachEmailTemplate:
         """Matches and returns the chosen outreach email template for given lead."""
@@ -74,8 +70,8 @@ class OutreachTemplateMatcher:
             reason: Optional[str] = Field(
                 default=None, description="Reason for why a given Persona or None was chosen.")
 
-        llm = ChatOpenAI(temperature=0, model_name=OutreachTemplateMatcher.OPENAI_GPT_4O_MODEL,
-                         api_key=OutreachTemplateMatcher.OPENAI_API_KEY).with_structured_output(MatchedPersona)
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL,
+                         api_key=self.OPENAI_API_KEY).with_structured_output(MatchedPersona)
         chain = prompt | llm
         result: MatchedPersona = chain.invoke(
             {"person_profile_markdown": person_profile_markdown})

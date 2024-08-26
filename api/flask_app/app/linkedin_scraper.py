@@ -15,8 +15,6 @@ from langchain_openai import OpenAIEmbeddings
 # from pydantic import BaseModel, Field
 # Can't use pydantic base model because cant embed this class in model class inherting from langchain base model.
 from langchain_core.pydantic_v1 import BaseModel, Field
-from dotenv import load_dotenv
-load_dotenv()
 
 
 class LinkedInPostDetails(BaseModel):
@@ -56,10 +54,8 @@ class LinkedInPostDetails(BaseModel):
 class LinkedInScraper:
     """Scrapes information from LinkedIn like user profile, company profile and posts and extracts content from it."""
 
-    PILOTERR_API_KEY = os.getenv("PILOTERR_API_KEY")
     PILOTERR_POST_ENDPOINT = "https://piloterr.com/api/v2/linkedin/post/info"
 
-    PROXYCURL_API_KEY = os.getenv("PROXYCURL_API_KEY")
     PROXYCURL_PERSON_PROFILE_ENDPOINT = "https://nubela.co/proxycurl/api/v2/linkedin"
     PROXYCURL_COMPANY_PROFILE_ENDPOINT = "https://nubela.co/proxycurl/api/linkedin/company"
 
@@ -70,10 +66,7 @@ class LinkedInScraper:
     OPERATION_TAG_NAME = "linkedin_post_scrape"
 
     # OpenAI configurations.
-    OPENAI_API_KEY = os.getenv("OPENAI_USERPORT_API_KEY")
     OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
-    OPENAI_EMBEDDING_FUNCTION = OpenAIEmbeddings(
-        model=OPENAI_EMBEDDING_MODEL, api_key=OPENAI_API_KEY)
 
     # Metadata Constant keys.
     URL = "url"
@@ -81,29 +74,28 @@ class LinkedInScraper:
     DOCUMENTS = "documents"
     IDS = "ids"
 
-    def __init__(self, url: str, dev_mode: bool = False) -> None:
+    def __init__(self, dev_mode: bool = False) -> None:
+        self.PILOTERR_API_KEY = os.environ["PILOTERR_API_KEY"]
+        self.PROXYCURL_API_KEY = os.environ["PROXYCURL_API_KEY"]
         self.dev_mode = dev_mode
-        self.url = url
-        if dev_mode:
-            self.db = Chroma(persist_directory=LinkedInScraper.CHROMA_DB_PATH,
-                             embedding_function=LinkedInScraper.OPENAI_EMBEDDING_FUNCTION)
-            self.index()
 
-    def index(self):
+    def index(self, url: str):
         if not self.dev_mode:
             raise ValueError("Method should not be called in production.")
 
+        # Init local db.
+        self.db = Chroma(persist_directory=LinkedInScraper.CHROMA_DB_PATH,
+                         embedding_function=OpenAIEmbeddings(model=LinkedInScraper.OPENAI_EMBEDDING_MODEL, api_key=os.environ["OPENAI_USERPORT_API_KEY"]))
         post: Optional[LinkedInPostOld] = self.get_linkedin_post_from_db()
         if post:
             print("LinkedIn Post found in Db")
             self.post = post
         else:
             print("Fetching LinkedIn Post from API and writing it to db.")
-            self.post = LinkedInScraper.fetch_linkedin_post(post_url=self.url)
+            self.post = self.fetch_linkedin_post(post_url=url)
             self.create_linkedin_post_in_db(post=self.post)
 
-    @staticmethod
-    def fetch_linkedin_post(post_url: str) -> LinkedInPostOld:
+    def fetch_linkedin_post(self, post_url: str) -> LinkedInPostOld:
         """Fetches and returns LinkedIn post information for given URL.
 
         Piloterr API documentation: https://www.piloterr.com/library/linkedin-post-info.
@@ -117,7 +109,7 @@ class LinkedInScraper:
         if not LinkedInScraper.is_valid_post(post_url):
             raise ValueError(f"Invalid LinkedIn post URL format: {post_url}")
 
-        headers = LinkedInScraper._get_piloterr_request_headers()
+        headers = self._get_piloterr_request_headers()
         post_id: str = LinkedInScraper._get_post_id(post_url=post_url)
         params = LinkedInScraper._get_piloterr_query_params(query=post_id)
         try:
@@ -547,8 +539,7 @@ class LinkedInScraper:
             stack.append(c)
         return stack
 
-    @staticmethod
-    def fetch_person_profile(profile_url: str) -> Optional[PersonProfile]:
+    def fetch_person_profile(self, profile_url: str) -> Optional[PersonProfile]:
         """Fetches and returns LinkedIn Profile information of a given person from URL. Returns None if profile not found.
 
         Proxycurl API documentation: https://nubela.co/proxycurl/docs
@@ -560,7 +551,7 @@ class LinkedInScraper:
                 f"Invalid URL format for LinkedIn profile: {profile_url}")
 
         headers = {
-            'Authorization': f'Bearer {LinkedInScraper.PROXYCURL_API_KEY}'
+            'Authorization': f'Bearer {self.PROXYCURL_API_KEY}'
         }
         params = {
             'linkedin_profile_url': profile_url,
@@ -596,8 +587,7 @@ class LinkedInScraper:
         profile.linkedin_url = profile_url
         return profile
 
-    @staticmethod
-    def fetch_company_profile(profile_url: str) -> Optional[PersonProfile]:
+    def fetch_company_profile(self, profile_url: str) -> Optional[PersonProfile]:
         """Fetches and returns LinkedIn Profile information of a given Company from URL. Returns None if company not found.
 
         Proxycurl API documentation: https://nubela.co/proxycurl/docs#company-api-company-profile-endpoint
@@ -607,7 +597,7 @@ class LinkedInScraper:
                 f"Invalid URL format for LinkedIn company profile: {profile_url}")
 
         headers = {
-            'Authorization': f'Bearer {LinkedInScraper.PROXYCURL_API_KEY}'
+            'Authorization': f'Bearer {self.PROXYCURL_API_KEY}'
         }
         params = {
             'url': profile_url,
@@ -691,12 +681,11 @@ class LinkedInScraper:
             'query': query,
         }
 
-    @staticmethod
-    def _get_piloterr_request_headers() -> Dict:
+    def _get_piloterr_request_headers(self) -> Dict:
         """Returns standard request headers for Piloterr APIs."""
         return {
             'Content-Type': 'application/json',
-            'x-api-key': LinkedInScraper.PILOTERR_API_KEY
+            'x-api-key': self.PILOTERR_API_KEY
         }
 
     def create_linkedin_post_in_db(self, post_url: str, post: LinkedInPostOld):
@@ -721,11 +710,11 @@ class LinkedInScraper:
         post_dict: Dict = json.loads(post_json)
         return LinkedInPostOld(**post_dict)
 
-    def delete_linkedin_post_from_db(self):
+    def delete_linkedin_post_from_db(self, url: str):
         """Delete LinkedIn post from database."""
         post_ids: List[str] = self.db.get(where={
             "$and": [
-                {LinkedInScraper.URL: self.url},
+                {LinkedInScraper.URL: url},
                 {LinkedInScraper.POST: True}
             ]
         })[LinkedInScraper.IDS]
@@ -769,4 +758,4 @@ if __name__ == "__main__":
 
     # profile_url = "https://www.linkedin.com/company/plaid-"
     profile_url = "https://www.linkedin.com/company/stripe/"
-    LinkedInScraper.fetch_company_profile(profile_url=profile_url)
+    LinkedInScraper().fetch_company_profile(profile_url=profile_url)

@@ -18,9 +18,6 @@ from app.utils import Utils
 from app.models import ContentTypeEnum, ContentCategoryEnum, OpenAITokenUsage
 from app.linkedin_scraper import LinkedInScraper, LinkedInPostDetails
 
-from dotenv import load_dotenv
-load_dotenv()
-
 logger = logging.getLogger()
 
 
@@ -211,13 +208,7 @@ class WebPageScraper:
     Set dev_mode to True only when using in development for testing.
     """
 
-    # Open AI configurations.
-    OPENAI_API_KEY = os.getenv("OPENAI_USERPORT_API_KEY")
     OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
-    OPENAI_EMBEDDING_FUNCTION = OpenAIEmbeddings(
-        model=OPENAI_EMBEDDING_MODEL, api_key=OPENAI_API_KEY)
-    OPENAI_GPT_4O_MINI_MODEL = os.getenv("OPENAI_GPT_4O_MINI_MODEL")
-    OPENAI_GPT_4O_MODEL = os.getenv("OPENAI_GPT_4O_MODEL")
 
     # Chroma DB path for saving indices locally during development. Do not use in production.
     # Reference: https://python.langchain.com/v0.2/docs/integrations/vectorstores/chroma/#basic-example-including-saving-to-disk.
@@ -240,12 +231,18 @@ class WebPageScraper:
         self.url = url
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+
+        # Open AI configurations.
+        self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
+        self.OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
+        self.OPENAI_GPT_4O_MINI_MODEL = os.environ["OPENAI_GPT_4O_MINI_MODEL"]
+
         self.dev_mode = dev_mode
         self.all_user_agents = self.load_all_user_agents()
 
         if dev_mode:
             self.db = Chroma(persist_directory=WebPageScraper.CHROMA_DB_PATH,
-                             embedding_function=WebPageScraper.OPENAI_EMBEDDING_FUNCTION)
+                             embedding_function=OpenAIEmbeddings(model=WebPageScraper.OPENAI_EMBEDDING_MODEL, api_key=self.OPENAI_API_KEY))
             self.index()
 
     def index(self):
@@ -451,7 +448,7 @@ class WebPageScraper:
             # Add repost template to post template.
             post_template = post_template + repost_template
 
-        llm = ChatOpenAI(temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(
             PostSummary)
         prompt = PromptTemplate.from_template(post_template)
         chain = prompt | llm
@@ -489,7 +486,7 @@ class WebPageScraper:
             "New Passage:\n"
             "{new_passage}\n"
         )
-        llm = ChatOpenAI(temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(
             ContentConciseSummary)
         prompt = PromptTemplate.from_template(summary_prompt_template)
         detailed_summary: str = ""
@@ -529,7 +526,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY)
         chain = prompt | llm
 
         return chain.invoke(detailed_summary).content
@@ -546,7 +543,7 @@ class WebPageScraper:
         )
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY)
         prompt = PromptTemplate.from_template(prompt_template)
 
         # We will fetch author and publish date details from the page header + first page body chunk.
@@ -590,7 +587,7 @@ class WebPageScraper:
         content: str = "".join(
             [doc.page_content for doc in page_body_chunks])
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(ContentType)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentType)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         content = (
@@ -617,7 +614,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(ContentCategory)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentCategory)
         chain = prompt | llm
 
         # Be very careful making changes to this prompt, it may result in worse results.
@@ -682,7 +679,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(ContentAuthorAndPublishDate)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentAuthorAndPublishDate)
         chain = prompt | llm
         return chain.invoke(text)
 
@@ -704,7 +701,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(ContentDate)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentDate)
         chain = prompt | llm
         result: ContentDate = chain.invoke(parsed_date)
 
@@ -732,7 +729,7 @@ class WebPageScraper:
 
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(IsRequestingUserContact)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(IsRequestingUserContact)
         prompt = PromptTemplate.from_template(prompt_template)
         if len(page_structure.body_chunks) == 0:
             raise ValueError(
@@ -762,7 +759,7 @@ class WebPageScraper:
 
          # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(FocusOnCompany)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(FocusOnCompany)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         result: FocusOnCompany = chain.invoke(
@@ -786,7 +783,7 @@ class WebPageScraper:
 
          # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(FocusOnPerson)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(FocusOnPerson)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         result: FocusOnPerson = chain.invoke(
@@ -841,7 +838,7 @@ class WebPageScraper:
         page_body: str = remaining_md_page
         # Try max 5 times to fetch footer.
         for _ in range(0, 5):
-            footer_result = WebPageScraper.fetch_page_footer(
+            footer_result = self.fetch_page_footer(
                 page_without_header=remaining_md_page, openai_temperature=opeani_temperature)
             if footer_result.footer_first_sentence is None:
                 # Use random value between 0 and 1 for new temperature and try again.
@@ -907,8 +904,7 @@ class WebPageScraper:
 
         return (page_header, remaining_md_page)
 
-    @staticmethod
-    def fetch_page_footer(page_without_header: str, openai_temperature: float = 0) -> PageFooterResult:
+    def fetch_page_footer(self, page_without_header: str, openai_temperature: float = 0) -> PageFooterResult:
         """Use LLM to fetch the footer in given page without header."""
         prompt_template = (
             "You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.\n"
@@ -920,7 +916,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=openai_temperature, model_name=WebPageScraper.OPENAI_GPT_4O_MODEL, api_key=WebPageScraper.OPENAI_API_KEY).with_structured_output(PageFooterResult)
+            temperature=openai_temperature, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(PageFooterResult)
         chain = prompt | llm
 
         try:

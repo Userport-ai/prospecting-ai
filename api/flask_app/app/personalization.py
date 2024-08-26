@@ -10,9 +10,6 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_community.callbacks import get_openai_callback
 
-from dotenv import load_dotenv
-load_dotenv()
-
 logger = logging.getLogger()
 
 
@@ -26,14 +23,14 @@ class PersonalizedEmail(BaseModel):
 class Personalization:
     """Helps generate personalized messages for a given lead."""
 
-    # Open AI configurations.
-    OPENAI_API_KEY = os.getenv("OPENAI_USERPORT_API_KEY")
-    OPENAI_GPT_4O_MODEL = os.getenv("OPENAI_GPT_4O_MODEL")
-
     OPERATION_TAG_NAME = "email_personalization"
 
     def __init__(self, database: Database) -> None:
         self.database = database
+
+        # Open AI configurations.
+        self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
+        self.OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
         self.openai_tokens_used: Optional[OpenAITokenUsage] = None
 
     def generate_personalized_emails(self, lead_research_report_id: str) -> List[LeadResearchReport.PersonalizedEmail]:
@@ -185,8 +182,8 @@ class Personalization:
             subject_line: Optional[str] = Field(
                 default=None, description="Subject Line of the email.")
 
-        llm = ChatOpenAI(temperature=1.3, model_name=Personalization.OPENAI_GPT_4O_MODEL,
-                         api_key=Personalization.OPENAI_API_KEY).with_structured_output(EmailSubjectLine)
+        llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MODEL,
+                         api_key=self.OPENAI_API_KEY).with_structured_output(EmailSubjectLine)
 
         chain = prompt | llm
         result: EmailSubjectLine = chain.invoke({
@@ -261,8 +258,8 @@ class Personalization:
             email_opener: Optional[str] = Field(
                 default=None, description="Personalized email opener addressed to the recipient.")
 
-        llm = ChatOpenAI(temperature=1.3, model_name=Personalization.OPENAI_GPT_4O_MODEL,
-                         api_key=Personalization.OPENAI_API_KEY).with_structured_output(EmailOpener)
+        llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MODEL,
+                         api_key=self.OPENAI_API_KEY).with_structured_output(EmailOpener)
 
         chain = prompt | llm
         result: EmailOpener = chain.invoke({

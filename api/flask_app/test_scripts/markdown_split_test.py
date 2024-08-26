@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 OPENAI_EMBEDDING_FUNCTION = OpenAIEmbeddings(
-    model="text-embedding-ada-002", api_key=os.getenv("OPENAI_USERPORT_API_KEY"))
+    model="text-embedding-ada-002", api_key=os.environ["OPENAI_USERPORT_API_KEY"])
 
 # url = "https://www.spkaa.com/blog/devops-world-2023-recap-and-the-best-highlights"
 # url = "https://plaid.com/blog/year-in-review-2023/"
@@ -117,11 +117,11 @@ class FooterDetector(BaseModel):
                         description="Reason for why this was chosen as footer start point.")
 
 
-OPENAI_GPT_3_5_TURBO_MODEL = os.getenv("OPENAI_GPT_3_5_TURBO_MODEL")
-OPENAI_GPT_4O_MODEL = os.getenv("OPENAI_GPT_4O_MODEL")
-OPENAI_API_KEY = os.getenv("OPENAI_USERPORT_API_KEY")
+OPENAI_GPT_3_5_TURBO_MODEL = os.environ["OPENAI_GPT_3_5_TURBO_MODEL"]
+OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
+OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
 llm = ChatOpenAI(
-    temperature=0, model_name=OPENAI_GPT_4O_MODE, api_key=OPENAI_API_KEY).with_structured_output(FooterDetector)
+    temperature=0, model_name=OPENAI_GPT_4O_MODEL, api_key=OPENAI_API_KEY).with_structured_output(FooterDetector)
 last_chunk = md_header_splits[-1]
 prompt_template = """
 You are a smart web page analyzer. Given below is the final chunk of a parsed web page in Markdown format.

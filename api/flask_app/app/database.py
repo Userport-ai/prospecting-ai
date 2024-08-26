@@ -11,7 +11,6 @@ from pymongo.server_api import ServerApi
 from pymongo.collection import Collection
 from pymongo.results import UpdateResult
 from bson.objectid import ObjectId
-from dotenv import load_dotenv
 from datetime import datetime
 from app.utils import Utils
 from app.models import (
@@ -26,24 +25,20 @@ from app.models import (
 )
 from typing import List
 
-load_dotenv()
-
 logger = logging.getLogger()
 
 
 class Database:
     """Database class wrapping around MongoDB."""
-
-    MONGODB_CONNECTION_URL = os.getenv("MONGODB_CONNECTION_URI")
     MONGODB_DB_NAME = "userport_db"
 
     def __init__(self) -> None:
         # Create a new client and connect to the server
         self.mongo_client = MongoClient(
-            Database.MONGODB_CONNECTION_URL, server_api=ServerApi('1'))
+            os.environ["MONGODB_CONNECTION_URI"], server_api=ServerApi('1'))
         self.db = self.mongo_client[Database.MONGODB_DB_NAME]
 
-    @staticmethod
+    @ staticmethod
     def _exclude_id() -> List[str]:
         """Helper to exclude ID during model_dump call."""
         return ['id']
@@ -206,7 +201,7 @@ class Database:
 
         return personalized_emails_dict_list
 
-    @contextlib.contextmanager
+    @ contextlib.contextmanager
     def transaction_session(self) -> Generator[ClientSession, None]:
         """Wrapper Context manager around MongoDB client session to skip creating a new instance method for each new type of transacation.
 

@@ -49,7 +49,8 @@ class Researcher:
         if not person_profile:
             logger.info(
                 f"Person LinkedIn profile: {person_linkedin_url} NOT found in database.")
-            person_profile = LinkedInScraper.fetch_person_profile(
+            linkedin_scraper = LinkedInScraper()
+            person_profile = linkedin_scraper.fetch_person_profile(
                 profile_url=person_linkedin_url)
             lead_research_report.person_profile_id = self.database.insert_person_profile(
                 person_profile=person_profile)
@@ -67,7 +68,8 @@ class Researcher:
         if not company_profile:
             logger.info(
                 f"Company {company_linkedin_url} profile NOT found in database.")
-            company_profile = LinkedInScraper.fetch_company_profile(
+            linkedin_scraper = LinkedInScraper()
+            company_profile = linkedin_scraper.fetch_company_profile(
                 profile_url=company_linkedin_url)
             lead_research_report.company_profile_id = self.database.insert_company_profile(
                 company_profile=company_profile)

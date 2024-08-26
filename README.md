@@ -89,7 +89,7 @@ Purge unacked tasks in Celery Task queue: `celery -A app.make_celery purge`
 
 Retry management in Celery Task example: https://stackoverflow.com/questions/67968018/how-to-execute-some-code-at-last-retry-of-a-celery-task
 
-Gunicorn server: `gunicorn -b localhost:5000 app:create_app()`
+Gunicorn server: `gunicorn -b localhost:5000 "app:create_app()"`
 
 Gcloud authentication: `gcloud auth login`
 
@@ -122,6 +122,9 @@ Get contexts (contains a cluster, a user and namespace) that kubectl can connect
 To get the default context that kubctl connects to: `kubectl config current-context`
 
 Create a GKE deployment: `kubectl apply -f <deployment file>`
+
+Deploy backend and celery worker at the same version to be safe.
+Use `kubectl apply -f manifests/flask-deployment.yaml,manifests/celery-worker-deployment.yaml`
 
 Get deployment name in GKE: `kubectl get deployments`
 

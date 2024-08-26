@@ -9,17 +9,11 @@ from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
 from langchain_community.utilities import BingSearchAPIWrapper
 
-from dotenv import load_dotenv
-load_dotenv()
-
 logger = logging.getLogger()
 
 
 class SearchEngineWorkflow:
     """Searches the web using search engine for content related to given person and their current company."""
-    BING_SEARCH_SUBSCRIPTION_KEY = os.getenv(
-        'BING_SEARCH_V7_SUBSCRIPTION_KEY')
-    BING_SEARCH_API_ENDPOINT = os.getenv('BING_SEARCH_V7_ENDPOINT')
 
     def __init__(self, database: Database, max_search_results_per_query: int = 20) -> None:
         self.database = database
@@ -27,8 +21,8 @@ class SearchEngineWorkflow:
         self.blocklist_domains = set(
             ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com", "bloomberg.com"])
         self.all_user_agents = self.load_all_user_agents()
-        self.bing_search = BingSearchAPIWrapper(bing_search_url=SearchEngineWorkflow.BING_SEARCH_API_ENDPOINT,
-                                                bing_subscription_key=SearchEngineWorkflow.BING_SEARCH_SUBSCRIPTION_KEY, k=self.max_search_results_per_query)
+        self.bing_search = BingSearchAPIWrapper(bing_search_url=os.environ['BING_SEARCH_V7_ENDPOINT'],
+                                                bing_subscription_key=os.environ['BING_SEARCH_V7_SUBSCRIPTION_KEY'], k=self.max_search_results_per_query)
 
     def get_search_results(self, search_queries: List[str], max_results_per_query: int) -> Dict[str, List[str]]:
         """Returns search result links for given search query using Bing Web search API.
