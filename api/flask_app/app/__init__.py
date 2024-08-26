@@ -6,30 +6,54 @@ from logging.config import dictConfig
 import firebase_admin
 from dotenv import load_dotenv
 
-# Logging configuration for the Flask app.
-dictConfig(
-    {
-        "version": 1,
-        "formatters": {
-            "default": {
-                "format": "[%(asctime)s] [%(levelname)s | %(module)s] %(message)s",
-                "datefmt": "%B %d, %Y %H:%M:%S %Z",
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "default",
-            },
-            "file": {
-                "class": "logging.FileHandler",
-                "filename": "userport.log",
-                "formatter": "default",
-            },
-        },
-        "root": {"level": "DEBUG", "handlers": ["console", "file"]},
-    }
-)
+
+def setup_logging():
+    """Setup logging for the app based on environemnt.
+
+    In cloud, we want to use GCP Cloud Logging because it has a different handler.
+    """
+    flask_env = os.environ["FLASK_ENV"]
+    if flask_env == "dev":
+        # Local Logging configuration for the Flask app.
+        dictConfig(
+            {
+                "version": 1,
+                "formatters": {
+                    "default": {
+                        "format": "[%(asctime)s] [%(levelname)s | %(module)s] %(message)s",
+                        "datefmt": "%B %d, %Y %H:%M:%S %Z",
+                    },
+                },
+                "handlers": {
+                    "console": {
+                        "class": "logging.StreamHandler",
+                        "formatter": "default",
+                    },
+                    "file": {
+                        "class": "logging.FileHandler",
+                        "filename": "userport.log",
+                        "formatter": "default",
+                    },
+                },
+                "root": {"level": "INFO", "handlers": ["console", "file"]},
+            }
+        )
+    elif flask_env == "production":
+        # Google Cloud Logging will setup Root Logger with the appropriate handler.
+        # Reference: https://cloud.google.com/logging/docs/setup/python#write_logs_with_the_standard_python_logging_handler.
+        # Cannot run locally since permissions not setup to write Logs to Cloud Logging resource.
+
+        import google.cloud.logging
+        # Instantiates a client
+        client = google.cloud.logging.Client()
+        # Retrieves a Cloud Logging handler based on the environment
+        # you're running in and integrates the handler with the
+        # Python logging module. By default this captures all logs
+        # at INFO level and higher
+        client.setup_logging()
+    else:
+        raise ValueError(
+            f"Invalid flask env: {flask_env} value, cannot setup logging")
 
 
 def celery_init_app(app: Flask) -> Celery:
@@ -62,11 +86,15 @@ def load_env_vars():
 
 
 def create_app():
+    # First Env variables must be loaded so that rest of the app works.
+    load_env_vars()
+
+    # Setup logging according to the right environment.
+    setup_logging()
+
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
-
-    load_env_vars()
-    # Loads all env variables prefixed with FLASK_ into app.config automatically.
+    # Loads all env variables prefixed with FLASK_ into Flask object app.config automatically.
     # Env variables loaded include those from [1].env and [2].env.dev or .env.production based on which env is configured.
     # Reference: https://flask.palletsprojects.com/en/3.0.x/config/.
     app.config.from_prefixed_env()
