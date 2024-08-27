@@ -48,6 +48,7 @@ firebase-admin==6.5.0
 fireworks-ai==0.14.0
 flask==3.0.3
 flatbuffers==24.3.25
+flower==2.0.1
 free-proxy==1.1.1
 frozenlist==1.4.1
 fsspec==2024.6.1
@@ -87,6 +88,7 @@ httpx==0.27.0
 httpx-sse==0.4.0
 huggingface-hub==0.23.4
 humanfriendly==10.0
+humanize==4.10.0
 idna==3.7
 importlib-metadata==7.1.0
 importlib-resources==6.4.0
@@ -143,6 +145,7 @@ pandas==2.2.2
 pillow==10.4.0
 playwright==1.43.0
 posthog==3.5.0
+prometheus-client==0.20.0
 prompt-toolkit==3.0.47
 proto-plus==1.24.0
 protobuf==4.25.3
@@ -188,6 +191,7 @@ tld==0.13
 tldextract==5.1.2
 tokenizers==0.19.1
 tomli==2.0.1
+tornado==6.4.1
 tqdm==4.66.4
 trio==0.26.0
 trio-websocket==0.11.1
