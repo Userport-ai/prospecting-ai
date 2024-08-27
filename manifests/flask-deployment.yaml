@@ -16,14 +16,7 @@ spec:
     spec:
       containers:
       - name: flask-api
-        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.9
-        env:
-        - name: FLASK_CELERY__broker_url
-          # Referencing the Redis Service.
-          value: "redis://redis-service"
-          # Referencing the Redis Service.
-        - name: FLASK_CELERY__result_backend
-          value: "redis://redis-service"
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.10
         resources:
           limits:
             cpu: 1000m

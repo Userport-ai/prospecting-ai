@@ -89,9 +89,9 @@ Purge unacked tasks in Celery Task queue: `celery -A app.make_celery purge`
 
 Retry management in Celery Task example: https://stackoverflow.com/questions/67968018/how-to-execute-some-code-at-last-retry-of-a-celery-task
 
-Gunicorn server: `gunicorn -b localhost:5000 -c "./app/gunicorn.conf.py" "app:create_app()"`
+Create Flower Web app to monitor Celery: `celery -A app.make_celery flower --conf="./app/flowerconfig.py" --port=8080`
 
-Gcloud authentication: `gcloud auth login`
+Gunicorn server: `gunicorn -b localhost:5000 -c "./app/gunicorn.conf.py" "app:create_app()"`
 
 ## Docker Commands
 
@@ -108,6 +108,9 @@ Docker CMD for running Celery Worker: `CMD ["celery", "-A", "app.make_celery wor
 Get list of local images: `docker image list`
 
 Tag a local image with a new name (usually before push to registry): `docker tag <local image name or image ID> <new image name>`
+
+Gcloud authentication (needed to do Docker pushes, use kubectl commands etc.): `gcloud auth login`
+Push an image to GCP Artifact registry: `docker push <new image name with registry path>`
 
 Delete unused Docker images locally: `docker system prune -a` 
 
@@ -129,6 +132,16 @@ Use `kubectl apply -f manifests/flask-deployment.yaml,manifests/celery-worker-de
 Get deployment name in GKE: `kubectl get deployments`
 
 Get detailed information about GKE deployment: `kubectl describe deployment <deployment name>`
+
+Rollback deployment: `kubectl rollout undo deployment/<deployment name>`
+
+Replace a deployment resource (sometimes K8s does not pick up changes correctly): `kubectl replace -f <deployment file>`
+
+Delete a pod: `kubectl delete pod <pod name>`
+
+Delete a service: `kubectl delete service <service name>`
+
+Delete a deployment: `kubectl delete deployment <service name>`
 
 ## Updating Deployments
 
