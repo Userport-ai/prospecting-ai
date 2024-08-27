@@ -169,6 +169,20 @@ Get all pods deployed: `kubectl get pods`
 
 Get log from chosen pod: `kubectl logs <Pod Name>`
 
+Describe deployment details: `kubectl describe deployment <deployment name>`
+
+Get current ingress details: `kubectl get ingress`
+
+Check the status of Google Managed SSL Certificate Provisioning Status (takes around 30 mins to provision): `kubectl describe managedcertificate <Managed certificate name>`
+
+Delete managed Certificate instructions: `kubectl delete -f <manifest file of manged cert>`
+
+Delete External Static IP address for load balancer (hope we don't need to do this): `gcloud compute addresses delete <Static IP Name>`
+
 Stackoverflow links to help debug architecture related issues:
 1. https://stackoverflow.com/questions/77766805/aws-batch-run-ecr-repository-error-exec-usr-local-bin-python3-exec-format-err
 2. Layer already exists: https://stackoverflow.com/questions/48188268/docker-push-seems-not-to-update-image-layer-already-exists. I saw this problem too that prevented the app from running in the Cloud even after it was built for amd64 locally. Somehow the Cloud image was caching some layers that decided the platform of the image and that never changed even though I pushed new amd64 images multiple times. The solution I used was to delete the entire repository of the remote registry and start over with a fresh repository. Then my image upload resulted in a successful container run. This post talks about how maybe a fix to this problem may be to retag the new image, maybe we will try it out in the future.
+
+## Gcloud commands
+
+List In Use static external IP addresses: `gcloud compute addresses list`
