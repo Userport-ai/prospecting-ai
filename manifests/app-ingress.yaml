@@ -15,7 +15,19 @@ metadata:
     kubernetes.io/ingress.allow-http: "false"
 spec:
   rules:
-  - http:
+  - host: "flower.userport.ai"
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: flower-service
+            port:
+              number: 80
+  # TODO: Add userport.ai and www.userport.ai domains once website is ready.
+  - host: "app.userport.ai"
+    http:
       paths:
       - path: /*
         pathType: ImplementationSpecific

@@ -1,29 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: celery-worker
+  name: flower
   labels:
-    name: celery-worker
+    name: flower
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: celery-worker
+      app: flower
   template:
     metadata:
       labels:
-        app: celery-worker
+        app: flower
     spec:
       containers:
-      - name: celery-worker
+      - name: flower
         image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.11
-        # Command to run Celery worker.
+        # Command to run Flower.
         command: ["celery"]
-        args: ["-A", "app.make_celery", "worker", "--loglevel=INFO"]
+        args: ["-A", "app.make_celery", "flower", "--conf=./app/flowerconfig.py", "--port=5000"]
         resources:
           limits:
-            cpu: 1000m
+            cpu: 400m
           requests:
-            cpu: 250m
+            cpu: 100m
         ports:
         - containerPort: 5000

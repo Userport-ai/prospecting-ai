@@ -126,8 +126,8 @@ To get the default context that kubctl connects to: `kubectl config current-cont
 
 Create a GKE deployment: `kubectl apply -f <deployment file>`
 
-Deploy backend and celery worker at the same version to be safe.
-Use `kubectl apply -f manifests/flask-deployment.yaml,manifests/celery-worker-deployment.yaml`
+Deploy backend, celery worker and Flower at the same version to be safe.
+Use `kubectl apply -f manifests/flask-deployment.yaml,manifests/celery-worker-deployment.yaml,manifests/flower-deployment.yaml`
 
 Get deployment name in GKE: `kubectl get deployments`
 

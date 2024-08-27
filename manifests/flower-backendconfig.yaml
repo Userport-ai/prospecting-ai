@@ -1,0 +1,14 @@
+# References: [1] https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks
+# and [2] https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#direct_health.
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: flower-backendconfig
+spec:
+  healthCheck:
+    checkIntervalSec: 15
+    # Should match container port of serving pod.
+    port: 5000
+    type: HTTP
+    # Endpoint should be implemented on Flower server.
+    requestPath: /healthcheck

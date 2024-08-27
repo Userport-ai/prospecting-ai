@@ -9,8 +9,9 @@ WORKDIR /flask_app
 # flask_app/app/ in local directory gets mapped to flask_app/app in container.
 COPY api/flask_app/app ./app
 COPY api/flask_app/requirements.txt ./requirements.txt
-COPY api/flask_app/.env api/flask_app/.env.production ./
 RUN pip install -r ./requirements.txt
+# We don't want Docker to rebuild the whole app when there are only changes to env variables.
+COPY api/flask_app/.env api/flask_app/.env.production ./
 
 ARG GIT_COMMIT
 ENV FLASK_ENV=production
