@@ -33,6 +33,18 @@ import EnteredLeadSuccess, {
 import VerifyEmail from "./verify-email";
 import { loggedInLoader } from "./logged-in";
 import WelcomePage from "./welcome-page";
+import { isLocalEnv } from "./helper-functions";
+
+// Enables mocking only for local env, disabled in production and test.
+async function enableMocking() {
+  if (!isLocalEnv()) {
+    return;
+  }
+  const { worker } = await import("./mocks/browser");
+  //  `worker.start()` returns a Promise that resolves
+  // once the Service Worker is up and ready to intercept requests.
+  return worker.start();
+}
 
 function AppRoutes() {
   const authContext = useContext(AuthContext);
@@ -117,16 +129,18 @@ function AppRoutes() {
   return <RouterProvider router={router(authContext)} />;
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(
-  <React.StrictMode>
-    <Root>
-      <AppRoutes />
-    </Root>
-  </React.StrictMode>
-);
+enableMocking().then(() => {
+  const root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(
+    <React.StrictMode>
+      <Root>
+        <AppRoutes />
+      </Root>
+    </React.StrictMode>
+  );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
+  // If you want to start measuring performance in your app, pass a function
+  // to log results (for example: reportWebVitals(console.log))
+  // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+  reportWebVitals();
+});

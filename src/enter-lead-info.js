@@ -42,7 +42,6 @@ export const enterLeadAction = (authContext) => {
       },
     });
     const result = await response.json();
-    // const result = { status: "success" };
     if (result.status === "error") {
       // Throw error so it can be caught by component.
       console.log("Got error when creating lead research report: ", result);

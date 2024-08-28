@@ -1,5 +1,10 @@
 // Module with just helper functions used by the App.
 
+// Returns true if app is running locally and false if it is deployed (in React terminology: production).
+export function isLocalEnv() {
+  return process.env.NODE_ENV === "development";
+}
+
 // Takes User object returned by server (NOT Firebase) and returns true if user is still onboarding and false otherwise.
 export function isUserOnboarding(userFromServer) {
   const userState = userFromServer.state;

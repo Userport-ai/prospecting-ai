@@ -3,8 +3,6 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Flex, Typography, Button, Card, Tabs, Empty, Skeleton } from "antd";
 import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 import { useContext, useState } from "react";
-import { reportWithSelectedTemplate } from "./lead-report-with-template-data";
-import { reportWithNoTemplate } from "./lead-report-no-template-data";
 import SelectTemplateModal from "./select-template-modal";
 import { AuthContext } from "./root";
 import {
@@ -442,12 +440,10 @@ export const leadResearchReportLoader = (authContext) => {
       return null;
     }
     const idToken = await user.getIdToken();
-    // const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
-    //   headers: { Authorization: "Bearer " + idToken },
-    // });
-    // const result = await response.json();
-    const result = await reportWithSelectedTemplate;
-    // const result = await reportWithNoTemplate;
+    const response = await fetch("/api/v1/lead-research-reports/" + params.id, {
+      headers: { Authorization: "Bearer " + idToken },
+    });
+    const result = await response.json();
     if (result.status === "error") {
       console.log("Error getting lead report: ", result);
       throw result;

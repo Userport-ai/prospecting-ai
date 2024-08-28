@@ -3,10 +3,6 @@ import { Button, Skeleton, Modal, Typography } from "antd";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import TemplateCard from "./template-card";
-import {
-  exampleTemplateResponse,
-  noTemplatesResponse,
-} from "./create-template-message-data";
 import { useLoaderData, redirect, useNavigation } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
@@ -32,8 +28,6 @@ export const templateMessagesLoader = (authContext) => {
       headers: { Authorization: "Bearer " + idToken },
     });
     const result = await response.json();
-    // const result = exampleTemplateResponse;
-    // const result = noTemplatesResponse;
     if (result.status === "error") {
       throw result;
     }

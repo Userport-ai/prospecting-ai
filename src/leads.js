@@ -1,11 +1,6 @@
 import "./leads.css";
 import { Button, Modal, Skeleton } from "antd";
 import LeadsTable from "./leads-table";
-import {
-  emptyLeadsResult,
-  leadsInProgressResult,
-  leadsResult,
-} from "./leads-table-data";
 import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "./root";
@@ -25,9 +20,6 @@ async function listLeads(user) {
     headers: { Authorization: "Bearer " + idToken },
   });
   const result = await response.json();
-  // const result = await emptyLeadsResult;
-  // const result = await leadsResult;
-  // const result = await leadsInProgressResult;
   if (result.status === "error") {
     throw result;
   }
