@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY ./src ./src
-COPY .env ./
+COPY .env.production ./
 COPY ./public ./public
 RUN yarn install
 RUN yarn build
