@@ -64,7 +64,9 @@ function Login() {
       <Header id="login-header"></Header>
       <Content id="login-content">
         <div id="login-content-container">
-          <h1 id="company-title">Userport</h1>
+          <div id="company-logo-container">
+            <img src="/combination_mark_primary.png" />
+          </div>
           <h3 id="company-tag-line">Personalize Outreach using AI</h3>
           <p id="login-or-signup-text">Login or Sign Up</p>
           <div id="firebase-auth-container"></div>

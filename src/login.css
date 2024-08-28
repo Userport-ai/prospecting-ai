@@ -20,15 +20,23 @@
   align-items: center;
 }
 
-#login-content-container #company-title {
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 4rem;
-  text-shadow: 0.5px 0.5px var(--primary);
+#login-content-container #company-logo-container {
+  /* Adjust height of container and width of image to tweak logo size. */
+  height: 13rem;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#login-content-container #company-logo-container img {
+  /* Adjust width of image and height of container to tweak logo size. */
+  width: 80%;
+  object-fit: cover;
 }
 
 #login-content-container #company-tag-line {
   margin-top: 1rem;
+  font-size: 2rem;
   color: var(--primary);
   font-weight: 600;
 }
@@ -37,7 +45,7 @@
   margin-top: 2rem;
   color: var(--seondary);
   font-size: medium;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 #login-content-container #firebase-auth-container {

@@ -1,12 +1,11 @@
 import "./app-header.css";
-import { Layout, Menu, Typography } from "antd";
+import { Layout, Menu } from "antd";
 import { UserOutlined, SettingOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "./root";
 
 const { Header } = Layout;
-const { Title } = Typography;
 const templates_key = "templates";
 const leads_key = "leads";
 const account_key = "account";
@@ -45,8 +44,11 @@ function AppHeader() {
   const navigate = useNavigate();
   return (
     <Header id="nav-header">
-      <div id="nav-logo-title">
-        <Title level={3}>Userport</Title>
+      <div id="nav-logo-container">
+        <img
+          src="/combination_mark_complementary.png"
+          onClick={() => navigate("/leads")}
+        />
       </div>
       <Menu
         id="nav-menu"
