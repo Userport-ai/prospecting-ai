@@ -43,7 +43,7 @@
   },
   "proxy": "http://localhost:5000",
   "devDependencies": {
-    "msw": "^2.3.0"
+    "msw": "^2.3.1"
   },
   "msw": {
     "workerDirectory": [

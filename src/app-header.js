@@ -47,6 +47,7 @@ function AppHeader() {
       <div id="nav-logo-container">
         <img
           src="/combination_mark_complementary.png"
+          alt="userport-complementary-logo"
           onClick={() => navigate("/leads")}
         />
       </div>

@@ -65,7 +65,10 @@ function Login() {
       <Content id="login-content">
         <div id="login-content-container">
           <div id="company-logo-container">
-            <img src="/combination_mark_primary.png" />
+            <img
+              src="/combination_mark_primary.png"
+              alt="userport-combination-mark"
+            />
           </div>
           <h3 id="company-tag-line">Personalize Outreach using AI</h3>
           <p id="login-or-signup-text">Login or Sign Up</p>

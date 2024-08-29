@@ -8,8 +8,8 @@ COPY package.json package-lock.json ./
 COPY ./src ./src
 COPY .env.production ./
 COPY ./public ./public
-RUN yarn install
-RUN yarn build
+RUN npm install
+RUN npm run build
 
 # Build step #2: build an nginx container
 FROM --platform=linux/amd64 nginx:stable-alpine
