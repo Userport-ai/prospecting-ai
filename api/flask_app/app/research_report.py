@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 from app.utils import Utils
 from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
-from app.search_engine_workflow import SearchEngineWorkflow
+from app.search_engine_workflow import SearchEngineWorkflow, SearchRequest
 from app.web_page_scraper import WebPageScraper, PageContentInfo
 from app.outreach_template import OutreachTemplateMatcher
 from app.personalization import Personalization
@@ -102,42 +102,82 @@ class Researcher:
         company_name = research_report.company_name
         person_name: str = research_report.person_name
         role_title: str = research_report.person_role_title
+        # TODO: Fetch from the database.
+        existing_urls: List[str] = []
 
-        search_queries: List[str] = self.get_search_queries(
-            company_name=company_name, person_name=person_name, role_title=role_title)
+        # Queries to consider = ["recent LinkedIn posts", "recent product launches", "recent thoughts on the industry",
+        #    "recent articles or blogs", "recent interviews or podcasts",
+        #    "recent events or conferences attended",  "recent funding announcements",
+        #    "recent leadership changes", "recent announcements made"]
+        search_request = SearchRequest(
+            person_name=person_name,
+            company_name=company_name,
+            person_role_title=role_title,
+            existing_urls=existing_urls,
+            query_configs=[
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="product launches",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="LinkedIn Posts",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="blogs",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="interviews or podcasts",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="personal recognitions",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent achievements",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="thoughts on the industry",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="recent talks or events or conferences attended",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="funding announcements",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="important newss",
+                    num_results=10,
+                ),
+            ],
+        )
 
         # Get search results and update them in the database.
         search_results_map: Dict[str, List[str]] = self.search_engine_workflow.get_search_results(
-            search_queries=search_queries, max_results_per_query=50)
+            search_request=search_request)
 
-        unique_urls: Set[str] = set()
-        for query in search_results_map:
-            unique_urls = unique_urls.union(set(search_results_map[query]))
-
-        logger.info(
-            f"Got {len(unique_urls)} search results for all the queries.")
         setFields = {
             "search_results_map": search_results_map,
             "status": LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED,
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
-        logger.info(
-            f"Wrote {len(unique_urls)} search results to the database.")
-
-    def get_search_queries(self, company_name: str, person_name: str, role_title: str) -> List[str]:
-        """Returns list of search queries to be used to search for Web results."""
-        # queries = ["recent LinkedIn posts", "recent product launches", "recent thoughts on the industry",
-        #            "recent articles or blogs", "recent interviews or podcasts",
-        #            "recent conferences or events attended",  "recent funding announcements",
-        #            "recent leadership changes", "recent announcements made"]
-        queries = ["recent LinkedIn posts",
-                   "recent product launches", "recent articles or blogs"]
-        search_prefix = f"{company_name} {person_name} {role_title} "
-        final_queries = []
-        for q in queries:
-            final_queries.append(search_prefix + q)
-        return final_queries
 
     def process_content_in_search_urls(self, lead_research_report_id: str):
         """Process URLs stored in search results map and store the results in the database."""
