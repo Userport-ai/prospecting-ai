@@ -1,7 +1,8 @@
 import logging
-from typing import Optional, List, Dict, Set, Tuple
+from typing import Optional, List, Dict, Set
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from itertools import chain
 from app.utils import Utils
 from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
@@ -31,10 +32,7 @@ class Researcher:
 
     def __init__(self, database: Database) -> None:
         self.database = database
-        self.search_engine_workflow = SearchEngineWorkflow(
-            database=database, max_search_results_per_query=15)
-        # List of URLs that have failed to process.
-        self.failed_urls: List[Tuple[str, str]] = []
+        self.search_engine_workflow = SearchEngineWorkflow()
         self.outreach_template_matcher = OutreachTemplateMatcher(
             database=database)
         self.personalization = Personalization(database=database)
@@ -102,8 +100,8 @@ class Researcher:
         company_name = research_report.company_name
         person_name: str = research_report.person_name
         role_title: str = research_report.person_role_title
-        # TODO: Fetch from the database.
-        existing_urls: List[str] = []
+        existing_urls: List[str] = list(chain.from_iterable(
+            research_report.search_results_map.values()))
 
         # Queries to consider = ["recent LinkedIn posts", "recent product launches", "recent thoughts on the industry",
         #    "recent articles or blogs", "recent interviews or podcasts",
@@ -184,27 +182,44 @@ class Researcher:
         research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
 
+        content_parsing_failed_urls: List[str] = []
         for search_query in research_report.search_results_map:
             for url in research_report.search_results_map[search_query]:
                 try:
                     self.process_content(
                         url=url, search_query=search_query, research_report=research_report)
                 except Exception as e:
-                    logger.exception(
-                        f"Failed to search content from search URL: {url} with error: {e}")
-                    self.failed_urls.append((url, e))
+                    logger.warning(
+                        f"Failed to process content from search URL: {url} with error: {e}")
+                    content_parsing_failed_urls.put(url)
 
-        if len(self.failed_urls) > 0:
-            setFields = {
-                "status": LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE}
-            self.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
-                                                      setFields=setFields)
-            raise ValueError(
-                f"There are Failed URLs: {len(self.failed_urls)} that need to be retried.")
+        # Retry URLs that failed process up to a certain number of times.
+        # Sometimes failures can be intermittent, so better to retry whenver possible.
+        max_retry_count = 2
+        for retry_count in range(max_retry_count):
+            temp_list = content_parsing_failed_urls.copy()
+            while not temp_list:
+                try:
+                    self.process_content(
+                        url=url, search_query=search_query, research_report=research_report)
+                    # Remove from failed URLs list.
+                    content_parsing_failed_urls.remove(url)
+                except Exception as e:
+                    logger.warning(
+                        f"During retry count {retry_count}: failed to process content from search URL: {url} with error: {e}")
+
+        # Update status and failed URLs in database.
+        setFields = {
+            "status": LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE,
+            "content_parsing_failed_urls": content_parsing_failed_urls,
+        }
+        self.database.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
 
     def process_content(self, url: str, search_query: str, research_report: LeadResearchReport):
         """Fetch content from given URL, process it and store it in the database."""
         # If this URL has already been indexed, skip processing.
+        # TODO: Add secondary indexing to url field for this query to become faster.
         if self.database.get_content_details_by_url(url=url):
             logger.info(
                 f"Web URL: {url} already indexed in the database, skip processing again.")

@@ -235,7 +235,7 @@ def create_lead_report():
     try:
         lead_research_report = rp.create(
             user_id=user_id, person_linkedin_url=person_linkedin_url)
-        fetch_search_results_in_background.delay(
+        fetch_lead_info_orchestrator.delay(
             lead_research_report_id=lead_research_report.id)
 
         logger.info(
@@ -683,137 +683,168 @@ def delete_outreach_email_template(outreach_email_template_id: str):
 def debug():
     # Only used for debugging locally, do not call in production.
     report_id = request.args.get("lead_report_id")
-    # process_search_results_in_background.delay(
-    #     lead_research_report_id=report_id)
-    # aggregate_report_in_background.delay(lead_research_report_id=report_id)
-    # choose_outreach_email_template_in_background.delay(
-    #     lead_research_report_id=report_id)
-    generate_personalized_emails_in_background.delay(
-        lead_research_report_id=report_id)
+    fetch_lead_info_orchestrator.delay(
+        lead_research_report_id="66ab9633a3bb9048bc1a0be5")
     return {"status": "ok"}
 
 
-@shared_task(acks_late=True)
-def fetch_search_results_in_background(lead_research_report_id: str):
-    """Start research in background Celery Task."""
-    logger.info(
-        f"Fetching search results for report ID: {lead_research_report_id}")
+def shared_task_exception_handler(shared_task_obj, database: Database, lead_research_report_id: str, e: Exception, task_name: str, status_before_failure: LeadResearchReport.Status):
+    """Helper to handle the exception that occured in given shared task instance."""
+    # We retry 3 times at max, so 4 times in total.
+    max_retries = 3
 
-    r = Researcher(database=Database())
+    if shared_task_obj.request.retries >= max_retries:
+        # Done with retries, go to the next step.
+        logger.exception(
+            f"Retries exhausted for request: {task_name} with report ID: {lead_research_report_id} with error: {e}")
+        # Done with retries, update status as failed and register last status.
+        setFields = {
+            "status": LeadResearchReport.Status.FAILED_WITH_ERRORS,
+            "status_before_failure": status_before_failure,
+        }
+        database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
+                                             setFields=setFields)
+        raise ValueError(
+            f"Retries exhaused for request: {task_name} with report ID: {lead_research_report_id} with error: {e}")
+
+    # Retry after delay.
+    retry_interval_seconds: int = 10
+    logger.exception(
+        f"Error in {task_name} for report ID: {lead_research_report_id} with retry count: {shared_task_obj.request.retries}, error details: {e}")
+    raise shared_task_obj.retry(
+        exc=e, max_retries=max_retries, countdown=retry_interval_seconds)
+
+
+@shared_task(bind=True, acks_late=True)
+def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
+    """Main Orchestrator that routes the given report to the correct Celery task."""
+    database = Database()
+
+    report_status: LeadResearchReport.Status = None
     try:
-        r.fetch_search_results(lead_research_report_id=lead_research_report_id)
+        report: LeadResearchReport = database.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id, projection={"status": 1, "status_before_failure": 1})
+        report_status: LeadResearchReport.Status = report.status if report.status != LeadResearchReport.Status.FAILED_WITH_ERRORS else report.status_before_failure
+        logger.info(f"Current report status: {report_status}")
+
+        if report_status == LeadResearchReport.Status.BASIC_PROFILE_FETCHED:
+            logger.info(
+                f"Basic profile fetched for {lead_research_report_id}, fetch search results next.")
+            fetch_search_results_in_background.delay(
+                lead_research_report_id=lead_research_report_id)
+        elif report_status == LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED:
+            logger.info(
+                f"Fetched search results for {lead_research_report_id}, process content in search results next.")
+            process_content_in_search_results_in_background.delay(
+                lead_research_report_id=lead_research_report_id)
+        elif report_status == LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE:
+            logger.info(
+                f"Processed content in search results for {lead_research_report_id}, aggregate report results next.")
+            aggregate_report_in_background.delay(
+                lead_research_report_id=lead_research_report_id)
+        elif report_status == LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE:
+            logger.info(
+                f"Lead Report aggregation complete for {lead_research_report_id}, select email template next.")
+            choose_outreach_email_template_in_background.delay(
+                lead_research_report_id=lead_research_report_id)
+        elif report_status == LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE:
+            logger.info(
+                f"Outreach Email template selected for {lead_research_report_id}, personalize emails next.")
+            generate_personalized_emails_in_background.delay(
+                lead_research_report_id=lead_research_report_id)
+        elif report_status == LeadResearchReport.Status.COMPLETE:
+            logger.info(
+                f"Lead research complete for {lead_research_report_id}, nothing more to do here.")
+
     except Exception as e:
-        logger.exception(f"Ran into search results error: {e}")
-        return
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
+                                      e=e, task_name="fetch_lead_info_orchestrator", status_before_failure=report_status)
 
-    logger.info(
-        f"Done fetching search results for report ID: {lead_research_report_id}")
 
-    # Now enqueue task to fetch content details.
-    process_content_in_search_results_in_background.delay(
-        lead_research_report_id=lead_research_report_id)
+@shared_task(bind=True, acks_late=True)
+def fetch_search_results_in_background(self, lead_research_report_id: str):
+    """Fetch search results for given lead in background."""
+    database = Database()
+    try:
+        r = Researcher(database=database)
+        r.fetch_search_results(lead_research_report_id=lead_research_report_id)
+        logger.info(
+            f"Done fetching search results for report ID: {lead_research_report_id}")
+
+        # Process search URLs contents next.
+        process_content_in_search_results_in_background.delay(
+            lead_research_report_id=lead_research_report_id)
+    except Exception as e:
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
+                                      e=e, task_name="fetch_search_results", status_before_failure=LeadResearchReport.Status.BASIC_PROFILE_FETCHED)
 
 
 @shared_task(bind=True, acks_late=True)
 def process_content_in_search_results_in_background(self, lead_research_report_id: str):
-    max_retries = 2
-    r = Researcher(database=Database())
+    """Processes URLs in search results in background."""
+    database = Database()
     try:
+        r = Researcher(database=database)
         r.process_content_in_search_urls(
             lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Finished processing search ULRs for report: {lead_research_report_id}")
 
-        # Create Research report.
+        # Aggregate Report next.
         aggregate_report_in_background.delay(
             lead_research_report_id=lead_research_report_id)
     except Exception as e:
-        logger.exception(
-            f"Error in processing search URLs for report: {lead_research_report_id} with retry count: {self.request.retries} details: {e}")
-
-        if self.request.retries >= max_retries:
-            # Done with retries, go to the next step.
-            logger.info(
-                "Done with retrying search results, moving to the next step.")
-            aggregate_report_in_background.delay(
-                lead_research_report_id=lead_research_report_id)
-            return
-
-        # Retry after 5 seconds.
-        raise self.retry(exc=e, max_retries=max_retries, countdown=5)
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+                                      task_name="process_content_in_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
 @shared_task(bind=True, acks_late=True)
 def aggregate_report_in_background(self, lead_research_report_id: str):
-    max_retries = 2
-    r = Researcher(database=Database())
+    """Create a research report in background."""
+    database = Database()
     try:
+        r = Researcher(database=database)
         r.aggregate(lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Aggregation of research report complete for report ID: {lead_research_report_id}")
 
-        # Select email outreach template.
+        # Select email outreach template next.
         choose_outreach_email_template_in_background.delay(
             lead_research_report_id=lead_research_report_id)
     except Exception as e:
-        logger.exception(
-            f"Error in aggregating research report: {lead_research_report_id} with details: {e}")
-        if self.request.retries >= max_retries:
-            # Done with retries, mark task as failed.
-            setFields = {
-                "status": LeadResearchReport.Status.FAILED_WITH_ERRORS}
-            r.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
-                                                   setFields=setFields)
-
-        # Retry after 5 seconds.
-        raise self.retry(exc=e, max_retries=max_retries, countdown=5)
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
+                                      e=e, task_name="aggregate_report", status_before_failure=LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE)
 
 
 @shared_task(bind=True, acks_late=True)
 def choose_outreach_email_template_in_background(self, lead_research_report_id: str):
-    max_retries = 2
-    r = Researcher(database=Database())
+    """Selects outreach tempalte in background."""
+    database = Database()
     try:
+        r = Researcher(database=database)
         r.choose_outreach_email_template(
             lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Outreach template Selection complete in background for report ID: {lead_research_report_id}")
 
-        # Generate personalized emails.
+        # Generate personalized emails next.
         generate_personalized_emails_in_background.delay(
             lead_research_report_id=lead_research_report_id)
     except Exception as e:
-        logger.exception(
-            f"Error in Choosing Outreach Email template for research report: {lead_research_report_id} with details: {e}")
-        if self.request.retries >= max_retries:
-            # Done with retries, mark task as failed.
-            setFields = {
-                "status": LeadResearchReport.Status.FAILED_WITH_ERRORS}
-            r.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
-                                                   setFields=setFields)
-
-        # Retry after 5 seconds.
-        raise self.retry(exc=e, max_retries=max_retries, countdown=5)
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+                                      task_name="choose_outreach_email_template", status_before_failure=LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE)
 
 
 @shared_task(bind=True, acks_late=True)
 def generate_personalized_emails_in_background(self, lead_research_report_id: str):
-    max_retries = 2
-    r = Researcher(database=Database())
+    """Generates personalized emails in the background."""
+    database = Database()
     try:
+        r = Researcher(database=database)
         r.generate_personalized_emails(
             lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Personalized email generation complete in background for report ID: {lead_research_report_id}")
     except Exception as e:
-        logger.exception(
-            f"Error in generating personalized emails for research report: {lead_research_report_id} with details: {e}")
-        if self.request.retries >= max_retries:
-            # Done with retries, mark task as failed.
-            setFields = {
-                "status": LeadResearchReport.Status.FAILED_WITH_ERRORS}
-            r.database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
-                                                   setFields=setFields)
-
-        # Retry after 5 seconds.
-        raise self.retry(exc=e, max_retries=max_retries, countdown=5)
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+                                      task_name="generate_personalized_emails", status_before_failure=LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE)

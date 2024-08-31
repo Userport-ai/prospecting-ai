@@ -394,6 +394,8 @@ class LeadResearchReport(BaseModel):
         default=None, description="Role title of person at company.")
     status: Optional[Status] = Field(
         default=None, description="Status of the report creation at given point in time.")
+    status_before_failure: Optional[Status] = Field(
+        default=None, description="Last status before report creation failed. It is set only if current status is failed_with_errors.")
     company_headcount: Optional[int] = Field(
         default=None, description="Company Headcount during document creation.")
     company_industry_categories: Optional[List[str]] = Field(
@@ -404,6 +406,10 @@ class LeadResearchReport(BaseModel):
     # Store search results.
     search_results_map: Optional[Dict[str, List[str]]] = Field(
         default=None, description="Search result links grouped by search query.")
+
+    # Search Result URLs whose contents failed to be parsed by the web scraper.
+    content_parsing_failed_urls: Optional[List[str]] = Field(
+        default=None, description="Search Result URLs whose contents failed to be parsed by the web scraper.")
 
     # Report Details fields.
     report_creation_date_readable_str: Optional[str] = Field(

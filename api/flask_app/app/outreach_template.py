@@ -24,9 +24,6 @@ class OutreachTemplateMatcher:
         """Matches and returns the chosen outreach email template for given lead."""
         lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
-        if lead_research_report.status != LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE:
-            raise ValueError(
-                f"Expected report status to be: {LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE}, got: {lead_research_report.status}")
         user_id: str = lead_research_report.user_id
         person_profile_id: str = lead_research_report.person_profile_id
 

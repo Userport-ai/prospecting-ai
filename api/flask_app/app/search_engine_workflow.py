@@ -7,7 +7,6 @@ import requests
 import tldextract
 from typing import List, Dict, Set, Optional
 from enum import Enum
-from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
 from pydantic import BaseModel, Field, field_validator
 
@@ -90,9 +89,7 @@ class SearchEngineWorkflow:
 
     GOOGLE_CUSTOM_SEARCH_ENDPOINT = "https://www.googleapis.com/customsearch/v1"
 
-    def __init__(self, database: Database, max_search_results_per_query: int = 20) -> None:
-        self.database = database
-        self.max_search_results_per_query = max_search_results_per_query
+    def __init__(self) -> None:
         self.blocklist_domains = set(
             ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com", "bloomberg.com", "zoominfo.com", "clay.com"])
 
@@ -241,7 +238,7 @@ if __name__ == "__main__":
     person_profile_id = '66a70cc8ff3944ed08fe4f1c'
     company_profile_id = '66a7a6b5066fac22c378bd75'
 
-    wf = SearchEngineWorkflow(database=Database())
+    wf = SearchEngineWorkflow()
     # wf.run(person_profile_id=person_profile_id,
     #        company_profile_id=company_profile_id)
 
