@@ -4,6 +4,7 @@ import random
 import gzip
 import requests
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from langchain_core.prompts import PromptTemplate
 from typing import List, Dict, Optional, Tuple
 from markdownify import markdownify
@@ -102,9 +103,9 @@ class PageContentInfo(BaseModel):
         default=None, description="Names of key persons extracted from the content.")
     key_organizations: Optional[List[str]] = Field(
         default=None, description="Names of key organizations extracted from the content.")
-    requesting_user_contact: bool = Field(
+    requesting_user_contact: Optional[bool] = Field(
         default=False, description="Whether page is requesting user contact information in exchange for access to talk, webinar, white paper or case study.")
-    focus_on_company: bool = Field(
+    focus_on_company: Optional[bool] = Field(
         default=False, description="Whether the content is focused on Company.")
     category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
@@ -157,8 +158,6 @@ class ContentFinalSummary(BaseModel):
     """Final summary and key persons information extracted from page content. Do not use for LLM structured output extraction."""
     detailed_summary: str = Field(...,
                                   description="Detailed Summary of the page content.")
-    concise_summary: str = Field(...,
-                                 description="Concise Summary of the page content.")
     key_persons: List[str] = Field(
         default=[], description="Key persons extracted from page content.")
     key_organizations: List[str] = Field(
@@ -286,26 +285,91 @@ class WebPageScraper:
             page_structure: PageStructure = self.get_page_structure(
                 doc=doc)
 
-            final_summary: ContentFinalSummary = self.fetch_content_final_summary(
-                page_body_chunks=page_structure.body_chunks)
-
+            # Need high accuray so GPT-4O model.
             author_and_publish_date: ContentAuthorAndPublishDate = self.fetch_author_and_date(
                 page_structure=page_structure)
 
+            # Need high accuray so GPT-4O model.
             publish_date: Optional[datetime] = self.convert_to_datetime(
                 parsed_date=author_and_publish_date.publish_date)
+
+            # If document is older than 1 year from todays date, skip it since it may be too old for relevance.
+            publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=12)
+            if publish_date == None or publish_date < publish_cutoff_date:
+                # Exit early.
+                logger.info(
+                    f"Content too stale or unknown with publish date: {publish_date} in URL: {self.url}: {company_name}, skipping remaining computation.")
+                tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
+                                          completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+                logger.info(f"Tokens used: {tokens_used}")
+                return PageContentInfo(
+                    url=self.url,
+                    page_structure=page_structure,
+                    linkedin_post_details=None,
+                    type=None,
+                    type_reason=None,
+                    author=author_and_publish_date.author,
+                    publish_date=publish_date,
+                    detailed_summary=None,
+                    concise_summary=None,
+                    key_persons=None,
+                    key_organizations=None,
+                    requesting_user_contact=None,
+                    focus_on_company=None,
+                    category=None,
+                    category_reason=None,
+                    num_linkedin_reactions=None,
+                    num_linkedin_comments=None,
+                    openai_usage=tokens_used
+                )
+
+            final_summary: ContentFinalSummary = self.fetch_content_final_summary(
+                page_body_chunks=page_structure.body_chunks)
+
+            # Need high accuray so GPT-4O model.
+            related_to_company: bool = self.is_page_related_to_company(
+                company_name=company_name, detailed_summary=final_summary.detailed_summary)
+            if not related_to_company:
+                # Exit early to save remaining computation cost and time.
+                logger.info(
+                    f"Content not related to company: {company_name} in URL: {self.url}, skipping remaining computation.")
+                tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
+                                          completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+                logger.info(f"Tokens used: {tokens_used}")
+                return PageContentInfo(
+                    url=self.url,
+                    page_structure=page_structure,
+                    linkedin_post_details=None,
+                    type=None,
+                    type_reason=None,
+                    author=None,
+                    publish_date=publish_date,
+                    detailed_summary=final_summary.detailed_summary,
+                    concise_summary=None,
+                    key_persons=final_summary.key_persons,
+                    key_organizations=final_summary.key_organizations,
+                    requesting_user_contact=None,
+                    focus_on_company=related_to_company,
+                    category=None,
+                    category_reason=None,
+                    num_linkedin_reactions=None,
+                    num_linkedin_comments=None,
+                    openai_usage=tokens_used
+                )
+
+            # Compute concise summary of the detailed summary.
+            concise_summary: str = self.fetch_concise_summary(
+                detailed_summary=final_summary.detailed_summary)
 
             type: ContentType = self.fetch_content_type(
                 page_body_chunks=page_structure.body_chunks)
 
+            # Need high accuray so GPT-4O model.
             category: ContentCategory = self.fetch_content_category(
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
             requesting_user_contact: bool = self.is_page_requesting_user_contact(
                 page_structure=page_structure)
-
-            related_to_company: bool = self.is_page_related_to_company(
-                company_name=company_name, detailed_summary=final_summary.detailed_summary)
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
@@ -320,7 +384,7 @@ class WebPageScraper:
                 author=author_and_publish_date.author,
                 publish_date=publish_date,
                 detailed_summary=final_summary.detailed_summary,
-                concise_summary=final_summary.concise_summary,
+                concise_summary=concise_summary,
                 key_persons=final_summary.key_persons,
                 key_organizations=final_summary.key_organizations,
                 requesting_user_contact=requesting_user_contact,
@@ -341,13 +405,75 @@ class WebPageScraper:
             post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
                 post_body=page_structure.body)
 
+            # If post is older than 1 year from todays date, skip it may be too old for relevance.
+            publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=12)
+            if post_details.publish_date == None or post_details.publish_date < publish_cutoff_date:
+                # Exit early.
+                logger.info(
+                    f"LinkedIn Post too stale or unknown with publish date: {post_details.publish_date} in URL: {self.url}: {company_name}, skipping remaining computation.")
+                tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
+                                          completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+                logger.info(f"Tokens used: {tokens_used}")
+                return PageContentInfo(
+                    url=self.url,
+                    page_structure=page_structure,
+                    linkedin_post_details=post_details,
+                    type=ContentTypeEnum.LINKEDIN_POST,
+                    type_reason=None,
+                    author=post_details.author_name,
+                    publish_date=post_details.publish_date,
+                    detailed_summary=None,
+                    concise_summary=None,
+                    key_persons=None,
+                    key_organizations=None,
+                    requesting_user_contact=False,
+                    focus_on_company=None,
+                    category=None,
+                    category_reason=None,
+                    num_linkedin_reactions=post_details.num_reactions,
+                    num_linkedin_comments=post_details.num_comments,
+                    openai_usage=tokens_used
+                )
+
+            # Need high accuracy (better reasoning) since limited text in a LinkedIn post, so use GPT-4O model.
             final_summary: ContentFinalSummary = self.fetch_post_final_summary(
                 post_details=post_details)
-            category: ContentCategory = self.fetch_content_category(
-                company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
+            # Need high accuray so GPT-4O model.
             related_to_company: bool = self.is_page_related_to_company(
                 company_name=company_name, detailed_summary=final_summary.detailed_summary)
+
+            if not related_to_company:
+                # Exit early to save remaining computation cost and time.
+                logger.info(
+                    f"LinkedIn post: {self.url} not related to company: {company_name}, skipping remaining computation.")
+                tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
+                                          completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+                logger.info(f"Tokens used: {tokens_used}")
+                return PageContentInfo(
+                    url=self.url,
+                    page_structure=page_structure,
+                    linkedin_post_details=post_details,
+                    type=ContentTypeEnum.LINKEDIN_POST,
+                    type_reason=None,
+                    author=post_details.author_name,
+                    publish_date=post_details.publish_date,
+                    detailed_summary=final_summary.detailed_summary,
+                    concise_summary=None,
+                    key_persons=final_summary.key_persons,
+                    key_organizations=final_summary.key_organizations,
+                    requesting_user_contact=False,
+                    focus_on_company=related_to_company,
+                    category=None,
+                    category_reason=None,
+                    num_linkedin_reactions=post_details.num_reactions,
+                    num_linkedin_comments=post_details.num_comments,
+                    openai_usage=tokens_used
+                )
+
+            # Need high accuray so GPT-4O model.
+            category: ContentCategory = self.fetch_content_category(
+                company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
@@ -362,7 +488,8 @@ class WebPageScraper:
                 author=post_details.author_name,
                 publish_date=post_details.publish_date,
                 detailed_summary=final_summary.detailed_summary,
-                concise_summary=final_summary.concise_summary,
+                # Concise summary is always the same as detailed summary for LinkedIn posts.
+                concise_summary=final_summary.detailed_summary,
                 key_persons=final_summary.key_persons,
                 key_organizations=final_summary.key_organizations,
                 requesting_user_contact=False,
@@ -382,7 +509,7 @@ class WebPageScraper:
             if detailed_summary:
                 logger.info("Found summary in database")
                 logger.info(f"Summary: {detailed_summary}\n")
-                return ContentFinalSummary(detailed_summary=detailed_summary, concise_summary="", key_persons=[], key_organizations=[])
+                return ContentFinalSummary(detailed_summary=detailed_summary, key_persons=[], key_organizations=[])
 
         # Do not change this prompt before testing, results may get worse.
         post_or_repost_str: str = "Type: post"
@@ -444,6 +571,7 @@ class WebPageScraper:
             # Add repost template to post template.
             post_template = post_template + repost_template
 
+        # Max retries = 2 which is already built in per https://python.langchain.com/v0.2/api_reference/openai/chat_models/langchain_openai.chat_models.base.ChatOpenAI.html#langchain_openai.chat_models.base.ChatOpenAI.max_retries.
         llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(
             PostSummary)
         prompt = PromptTemplate.from_template(post_template)
@@ -456,8 +584,7 @@ class WebPageScraper:
             # Write summary to database.
             self.create_detailed_summary_in_db(summary=result.detailed_summary)
 
-        # Concise summary is always the same as detailed summary for LinkedIn posts.
-        return ContentFinalSummary(detailed_summary=result.detailed_summary, concise_summary=result.detailed_summary, key_persons=result.key_persons, key_organizations=result.key_organizations)
+        return ContentFinalSummary(detailed_summary=result.detailed_summary, key_persons=result.key_persons, key_organizations=result.key_organizations)
 
     def fetch_content_final_summary(self, page_body_chunks: List[Document]) -> ContentFinalSummary:
         """Returns final summary of content from page body using an iterative algorithm."""
@@ -467,7 +594,7 @@ class WebPageScraper:
             if detailed_summary:
                 logger.info("Found summary in database")
                 logger.info(f"\nSummary: {detailed_summary}\n")
-                return ContentFinalSummary(detailed_summary=detailed_summary, concise_summary="", key_persons=[], key_organizations=[])
+                return ContentFinalSummary(detailed_summary=detailed_summary, key_persons=[], key_organizations=[])
 
         # Do not change this prompt before testing, results may get worse.
         summary_prompt_template = (
@@ -482,7 +609,7 @@ class WebPageScraper:
             "New Passage:\n"
             "{new_passage}\n"
         )
-        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(
             ContentConciseSummary)
         prompt = PromptTemplate.from_template(summary_prompt_template)
         detailed_summary: str = ""
@@ -502,15 +629,11 @@ class WebPageScraper:
         logger.info(f"Key persons: {key_persons}\n")
         logger.info(f"Key organizations: {key_organizations}\n")
 
-        # Compute concise summary of the detailed summary.
-        concise_summary: str = self.fetch_concise_summary(
-            detailed_summary=detailed_summary)
-
         if self.dev_mode:
             # Write summary to database.
             self.create_detailed_summary_in_db(summary=detailed_summary)
 
-        return ContentFinalSummary(detailed_summary=detailed_summary, concise_summary=concise_summary, key_persons=key_persons, key_organizations=key_organizations)
+        return ContentFinalSummary(detailed_summary=detailed_summary, key_persons=key_persons, key_organizations=key_organizations)
 
     def fetch_concise_summary(self, detailed_summary: str) -> str:
         """Returns concise summary from given detailed summary."""
@@ -583,7 +706,7 @@ class WebPageScraper:
         content: str = "".join(
             [doc.page_content for doc in page_body_chunks])
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentType)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentType)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         content = (
@@ -725,7 +848,7 @@ class WebPageScraper:
 
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(IsRequestingUserContact)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(IsRequestingUserContact)
         prompt = PromptTemplate.from_template(prompt_template)
         if len(page_structure.body_chunks) == 0:
             raise ValueError(
@@ -828,23 +951,27 @@ class WebPageScraper:
         """Splits given web page document into header, body, footer and body chunk contents and returns it."""
         page_header, remaining_md_page = self.get_page_header(doc=doc)
 
-        # Fetch page footer.
+        # Fetch page footer from remaining page.
         opeani_temperature: float = 0
         page_footer: Optional[str] = None
         page_body: str = remaining_md_page
-        # Try max 5 times to fetch footer.
-        for _ in range(0, 5):
+        # Try max 2 times to fetch footer.
+        for _ in range(0, 2):
             footer_result = self.fetch_page_footer(
                 page_without_header=remaining_md_page, openai_temperature=opeani_temperature)
             if footer_result.footer_first_sentence is None:
                 # Use random value between 0 and 1 for new temperature and try again.
                 opeani_temperature = random.random()
+                logger.info(
+                    f"Footer identification failed, retry finding footer for doc: {self.url}")
                 continue
 
             index = remaining_md_page.find(footer_result.footer_first_sentence)
             if index == -1:
                 # Use random value between 0 and 1 for new temperature and try again.
                 opeani_temperature = random.random()
+                logger.info(
+                    f"First sentence of footer missing, retry finding footer for doc: {self.url}")
                 continue
 
             page_footer = remaining_md_page[index:]
@@ -911,8 +1038,9 @@ class WebPageScraper:
             "{chunk}"
         )
         prompt = PromptTemplate.from_template(prompt_template)
+        # TODO: Iterate to see how well footer extraction works and then finally decide the right mdoel.
         llm = ChatOpenAI(
-            temperature=openai_temperature, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(PageFooterResult)
+            temperature=openai_temperature, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(PageFooterResult)
         chain = prompt | llm
 
         try:
@@ -1130,6 +1258,9 @@ class WebPageScraper:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(".env.dev")
     # url = "https://lilianweng.github.io/posts/2023-06-23-agent/"
     # Migrated to new struct below.
     # url = "https://plaid.com/blog/year-in-review-2023/"
@@ -1153,7 +1284,7 @@ if __name__ == "__main__":
     # Migrated to new struct below.
     # url = "https://www.forbes.com/sites/adrianbridgwater/2022/08/10/cloudbees-ceo-making-honey-in-the-software-delivery-hive/"
     # url = "https://www.cloudbees.com/newsroom/cloudbees-appoints-raj-sarkar-as-chief-marketing-officer"
-    url = "https://www.linkedin.com/posts/rajsarkar_forrestertei-totaleconomicimpact-teistudy-activity-7181275932207271938-S2lc/"
+    # url = "https://www.linkedin.com/posts/rajsarkar_forrestertei-totaleconomicimpact-teistudy-activity-7181275932207271938-S2lc/"
     # url = "https://www.linkedin.com/posts/a2kapur_macro-activity-7150910641900244992-0B5E"
     # Pulse can be scraped the same way as any web page. See below. It should work well.
     # url = "https://www.linkedin.com/pulse/culture-eats-strategy-breakfast-raj-sarkar"
@@ -1206,29 +1337,46 @@ if __name__ == "__main__":
     # url = "https://www.businessinsider.com/plaids-ceo-discusses-building-controls-around-customer-data-2020-2"
     # url = "https://www.linkedin.com/posts/zperret_2024-fintech-predictions-with-zach-perret-activity-7155603572825427969-ThEB"
 
-    # person_name = "Zachary Perret"
+    # url = "https://plaid.com/blog/plaid-cra/"
+    # url = "https://lattice.com/topics/hris"
+    # url = "https://www.linkedin.com/posts/heysharad_after-nearly-6-years-since-i-founded-and-activity-7113532318316675073-_TPB?trk=public_profile_like_view"
+    # url = "https://plaid.com/customer-stories/capital-on-tap/"
+    # url = "https://www.reddit.com/r/teslamotors/comments/18wt1kq/new_porsche_taycan_crushes_tesla_model_s_plaids/"
+    url = "https://plaid.com/customer-stories/coinbase/"
+
+    person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
     # person_name = "Al Cook"
-    # company_name = "Plaid"
+    company_name = "Plaid"
     # person_name = "Anuj Kapur"
-    person_name = "Raj Sarkar"
-    company_name = "Cloudbees"
-    graph = WebPageScraper(url=url, dev_mode=True)
+    # person_name = "Raj Sarkar"
+    # company_name = "Cloudbees"
+    import time
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    graph = WebPageScraper(url=url, dev_mode=False)
+    start_time = time.time()
+    content_info: PageContentInfo = graph.fetch_page_content_info(
+        doc=graph.fetch_page(), company_name=company_name, person_name=person_name)
+    logging.info(f"\n\nTime taken: {time.time() - start_time} seconds")
+    # with open("example_linkedin_info/parsed_page_info.json", "w") as f:
+    #     f.write(json.dumps(content_info.dict(), indent=4))
+
     # graph.delete_detailed_summary_from_db()
     # logger.info(graph.page_structure.body)
     # graph.is_page_requesting_user_contact(graph.page_structure)
     # final_summary = graph.fetch_content_final_summary(
     #     page_body_chunks=graph.page_structure.body_chunks)
 
-    post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
-        post_body=graph.page_structure.body)
-    final_summary = graph.fetch_post_final_summary(post_details=post_details)
+    # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
+    #     post_body=graph.page_structure.body)
+    # final_summary = graph.fetch_post_final_summary(post_details=post_details)
 
-    graph.fetch_content_category(
-        company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
+    # graph.fetch_content_category(
+    #     company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
-    print("related to company: ", graph.is_page_related_to_company(
-        company_name=company_name, detailed_summary=final_summary.detailed_summary))
+    # print("related to company: ", graph.is_page_related_to_company(
+    #     company_name=company_name, detailed_summary=final_summary.detailed_summary))
     # print("focus on person: ", graph.is_page_focused_on_person(
     #     person_name=person_name, detailed_summary=final_summary.detailed_summary))
 

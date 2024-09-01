@@ -279,9 +279,9 @@ class ContentDetails(BaseModel):
         default=None, description="Names of key persons extracted from the content.")
     key_organizations: Optional[List[str]] = Field(
         default=None, description="Names of key organizations extracted from the content.")
-    requesting_user_contact: bool = Field(
+    requesting_user_contact: Optional[bool] = Field(
         default=False, description="Whether the page is requesting user contact information in exchange for access to white paper, case study, webinar etc. Always False for LinkedIn posts.")
-    focus_on_company: bool = Field(
+    focus_on_company: Optional[bool] = Field(
         default=False, description="Whether the content is related to the Company.")
     num_linkedin_reactions: Optional[int] = Field(
         default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post content and None otherwise.")
