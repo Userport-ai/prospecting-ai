@@ -106,8 +106,6 @@ class PageContentInfo(BaseModel):
         default=False, description="Whether page is requesting user contact information in exchange for access to talk, webinar, white paper or case study.")
     focus_on_company: bool = Field(
         default=False, description="Whether the content is focused on Company.")
-    focus_on_person: bool = Field(
-        default=False, description="Whether the content is focused on Person.")
     category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
     category_reason: Optional[str] = Field(
@@ -327,7 +325,6 @@ class WebPageScraper:
                 key_organizations=final_summary.key_organizations,
                 requesting_user_contact=requesting_user_contact,
                 focus_on_company=related_to_company,
-                focus_on_person=False,
                 category=category.enum_value,
                 category_reason=category.reason,
                 num_linkedin_reactions=None,
@@ -370,7 +367,6 @@ class WebPageScraper:
                 key_organizations=final_summary.key_organizations,
                 requesting_user_contact=False,
                 focus_on_company=related_to_company,
-                focus_on_person=False,
                 category=category.enum_value,
                 category_reason=category.reason,
                 num_linkedin_reactions=post_details.num_reactions,

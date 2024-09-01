@@ -283,9 +283,6 @@ class ContentDetails(BaseModel):
         default=False, description="Whether the page is requesting user contact information in exchange for access to white paper, case study, webinar etc. Always False for LinkedIn posts.")
     focus_on_company: bool = Field(
         default=False, description="Whether the content is related to the Company.")
-    # Deprecated since it's not a super useful field.
-    focus_on_person: bool = Field(
-        default=False, description="Whether the content is focused on Person.")
     num_linkedin_reactions: Optional[int] = Field(
         default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post content and None otherwise.")
     num_linkedin_comments: Optional[int] = Field(

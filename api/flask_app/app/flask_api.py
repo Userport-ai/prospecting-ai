@@ -788,7 +788,7 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
         r.process_content_in_search_urls(
             lead_research_report_id=lead_research_report_id)
         logger.info(
-            f"Finished processing search ULRs for report: {lead_research_report_id}")
+            f"Finished processing search URLs for report: {lead_research_report_id}")
 
         # Aggregate Report next.
         aggregate_report_in_background.delay(

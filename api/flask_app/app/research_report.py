@@ -100,8 +100,9 @@ class Researcher:
         company_name = research_report.company_name
         person_name: str = research_report.person_name
         role_title: str = research_report.person_role_title
-        existing_urls: List[str] = list(chain.from_iterable(
-            research_report.search_results_map.values()))
+        existing_search_results_map = research_report.search_results_map
+        existing_urls: List[str] = list(
+            chain.from_iterable(existing_search_results_map.values()))
 
         # Queries to consider = ["recent LinkedIn posts", "recent product launches", "recent thoughts on the industry",
         #    "recent articles or blogs", "recent interviews or podcasts",
@@ -170,8 +171,20 @@ class Researcher:
         search_results_map: Dict[str, List[str]] = self.search_engine_workflow.get_search_results(
             search_request=search_request)
 
+        # Merge new results with existing results.
+        updated_search_results_map = existing_search_results_map.copy()
+        for result_query in search_results_map:
+            if result_query in updated_search_results_map:
+                # Append new URLs
+                updated_search_results_map[result_query].extend(
+                    search_results_map[result_query])
+            else:
+                # Create new entry in updated_search_result.
+                updated_search_results_map[result_query] = search_results_map[result_query].copy(
+                )
+
         setFields = {
-            "search_results_map": search_results_map,
+            "search_results_map": updated_search_results_map,
             "status": LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED,
         }
         self.database.update_lead_research_report(
@@ -182,7 +195,7 @@ class Researcher:
         research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
 
-        content_parsing_failed_urls: List[str] = []
+        content_parsing_failed_urls: Set[str] = set()
         for search_query in research_report.search_results_map:
             for url in research_report.search_results_map[search_query]:
                 try:
@@ -191,13 +204,13 @@ class Researcher:
                 except Exception as e:
                     logger.warning(
                         f"Failed to process content from search URL: {url} with error: {e}")
-                    content_parsing_failed_urls.put(url)
+                    content_parsing_failed_urls.add(url)
 
         # Retry URLs that failed process up to a certain number of times.
         # Sometimes failures can be intermittent, so better to retry whenver possible.
         max_retry_count = 2
         for retry_count in range(max_retry_count):
-            temp_list = content_parsing_failed_urls.copy()
+            temp_list = list(content_parsing_failed_urls)
             while not temp_list:
                 try:
                     self.process_content(
@@ -211,7 +224,7 @@ class Researcher:
         # Update status and failed URLs in database.
         setFields = {
             "status": LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE,
-            "content_parsing_failed_urls": content_parsing_failed_urls,
+            "content_parsing_failed_urls": list(content_parsing_failed_urls),
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
@@ -294,7 +307,6 @@ class Researcher:
             key_organizations=page_content_info.key_organizations,
             requesting_user_contact=page_content_info.requesting_user_contact,
             focus_on_company=page_content_info.focus_on_company,
-            focus_on_person=page_content_info.focus_on_person,
             num_linkedin_reactions=page_content_info.num_linkedin_reactions,
             num_linkedin_comments=page_content_info.num_linkedin_comments,
             openai_tokens_used=page_content_info.openai_usage.convert_to_model()
