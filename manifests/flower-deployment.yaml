@@ -22,8 +22,8 @@ spec:
         args: ["-A", "app.make_celery", "flower", "--conf=./app/flowerconfig.py", "--port=5000"]
         resources:
           limits:
-            cpu: 400m
+            cpu: 200m
           requests:
-            cpu: 100m
+            cpu: 50m
         ports:
         - containerPort: 5000
