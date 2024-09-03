@@ -82,10 +82,6 @@ def login_required(f):
 
 @bp.route('/v1/dbz')
 def get_db_check():
-    """
-    This is required in production for Health Check of server.
-    Reference: https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks.
-    """
     try:
         db = Database()
         db.test_connection()
@@ -132,6 +128,7 @@ class GetUserResponse(BaseModel):
 def get_user():
     db = Database()
     user_id: str = g.user["uid"]
+    logger.info(f"Fetch info for user with ID: {user_id}")
 
     try:
         user = db.get_or_create_user(
@@ -522,6 +519,9 @@ class GetOutreachEmailTemplateResponse(BaseModel):
 def get_outreach_email_template(outreach_email_template_id: str):
     """Get Outreach Email template with given ID."""
     db = Database()
+    user_id: str = g.user["uid"]
+    logger.info(
+        f"Got request to fetch outreach email template with ID: {outreach_email_template_id} for user ID: {user_id}")
 
     try:
         outreach_email_template: OutreachEmailTemplate = db.get_outreach_email_template(
@@ -563,6 +563,8 @@ def list_outreach_email_templates():
     """List Outreach Email templates created by the user."""
     db = Database()
     user_id: str = g.user["uid"]
+    logger.info(
+        f"Got request to list outreach email templates for user ID: {user_id}")
 
     try:
         projection = {

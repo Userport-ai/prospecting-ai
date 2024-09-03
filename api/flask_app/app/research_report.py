@@ -102,7 +102,7 @@ class Researcher:
         role_title: str = research_report.person_role_title
         existing_search_results_map = research_report.search_results_map
         existing_urls: List[str] = list(
-            chain.from_iterable(existing_search_results_map.values()))
+            chain.from_iterable(existing_search_results_map.values())) if existing_search_results_map else []
 
         # Queries to consider = ["recent LinkedIn posts", "recent product launches", "recent thoughts on the industry",
         #    "recent articles or blogs", "recent interviews or podcasts",
