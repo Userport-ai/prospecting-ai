@@ -100,7 +100,8 @@ class Researcher:
         company_name = research_report.company_name
         person_name: str = research_report.person_name
         role_title: str = research_report.person_role_title
-        existing_search_results_map = research_report.search_results_map
+        existing_search_results_map: Optional[Dict[str,
+                                                   List[str]]] = research_report.search_results_map
         existing_urls: List[str] = list(
             chain.from_iterable(existing_search_results_map.values())) if existing_search_results_map else []
 
@@ -167,7 +168,8 @@ class Researcher:
             search_request=search_request)
 
         # Merge new results with existing results.
-        updated_search_results_map = existing_search_results_map.copy()
+        updated_search_results_map = existing_search_results_map.copy(
+        ) if existing_search_results_map else {}
         for result_query in search_results_map:
             if result_query in updated_search_results_map:
                 # Append new URLs
