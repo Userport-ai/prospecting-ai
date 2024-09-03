@@ -190,50 +190,51 @@ class Researcher:
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
 
-    def process_content_in_search_urls(self, lead_research_report_id: str):
-        """Process URLs stored in search results map and store the results in the database."""
+    def process_content_in_search_urls(self, lead_research_report_id: str, search_results_batch: List[List[str]], task_num: int) -> List[str]:
+        """Process URLs stored in given search results batch in a research report and return URLs that failed to process."""
         research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
 
-        content_parsing_failed_urls: Set[str] = set()
-        for search_query in research_report.search_results_map:
-            for url in research_report.search_results_map[search_query]:
-                try:
-                    self.process_content(
-                        url=url, search_query=search_query, research_report=research_report)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to process content from search URL: {url} with error: {e}")
-                    content_parsing_failed_urls.add(url)
+        content_parsing_failed_results: List[List[str]] = []
+        for search_result in search_results_batch:
+            search_query, url = search_result
+            try:
+                logger.info(
+                    f"Start processing search URL: {url} in task num: {task_num}")
+                self.process_content(
+                    url=url, search_query=search_query, research_report=research_report)
+                logger.info(
+                    f"Completed processing for search URL: {url} in task num: {task_num}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to process content from search URL: {url} with error: {e}")
+                content_parsing_failed_results.append(search_result)
 
-        # Retry URLs that failed process up to a certain number of times.
+        logger.info(
+            f"Trying {len(content_parsing_failed_results)} failed URLs now for task num: {task_num}.")
+        # Retry URLs that failed to process one more time.
         # Sometimes failures can be intermittent, so better to retry whenver possible.
-        max_retry_count = 2
-        for retry_count in range(max_retry_count):
-            temp_list = list(content_parsing_failed_urls)
-            while not temp_list:
-                try:
-                    self.process_content(
-                        url=url, search_query=search_query, research_report=research_report)
-                    # Remove from failed URLs list.
-                    content_parsing_failed_urls.remove(url)
-                except Exception as e:
-                    logger.warning(
-                        f"During retry count {retry_count}: failed to process content from search URL: {url} with error: {e}")
+        final_failed_urls: List[str] = []
+        for failed_url_result in content_parsing_failed_results:
+            failed_query, failed_url = failed_url_result
+            try:
+                logger.info(
+                    f"Start processing failed search URL: {failed_url} in task num: {task_num}")
+                self.process_content(
+                    url=failed_url, search_query=failed_query, research_report=research_report)
+                logger.info(
+                    f"Completed processing for failed search URL: {failed_url} in task num: {task_num}")
+            except Exception as e:
+                logger.warning(
+                    f"During retry: failed to process content from search URL: {url} with error: {e}")
+                final_failed_urls.append(failed_url)
 
-        # Update status and failed URLs in database.
-        setFields = {
-            "status": LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE,
-            "content_parsing_failed_urls": list(content_parsing_failed_urls),
-        }
-        self.database.update_lead_research_report(
-            lead_research_report_id=lead_research_report_id, setFields=setFields)
+        return final_failed_urls
 
     def process_content(self, url: str, search_query: str, research_report: LeadResearchReport):
         """Fetch content from given URL, process it and store it in the database."""
-        # If this URL has already been indexed, skip processing.
-        # TODO: Add secondary indexing to url field for this query to become faster.
-        if self.database.get_content_details_by_url(url=url):
+        # If this URL has already been indexed for this company, skip processing.
+        if self.database.get_content_details_by_url(url=url, company_profile_id=research_report.company_profile_id):
             logger.info(
                 f"Web URL: {url} already indexed in the database, skip processing again.")
             return
@@ -295,6 +296,7 @@ class Researcher:
             person_role_title=research_report.person_role_title,
             person_profile_id=research_report.person_profile_id,
             company_profile_id=research_report.company_profile_id,
+            processing_status=page_content_info.processing_status,
             type=page_content_info.type,
             type_reason=page_content_info.type_reason,
             author=page_content_info.author,

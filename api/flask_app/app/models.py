@@ -232,6 +232,10 @@ class ContentDetails(BaseModel):
 
     In the future, we can add more workflows if needed.
     """
+    class ProcessingStatus(str, Enum):
+        FAILED_MISSING_PUBLISH_DATE = "failed_missing_publish_date"
+        FAILED_UNRELATED_TO_COMPANY = "failed_unrelated_to_company"
+        COMPLETE = "complete"
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for web search result.")
@@ -259,6 +263,8 @@ class ContentDetails(BaseModel):
         default=None, description="Reference ID to the Company Profile that is stored in the database.")
 
     # Content related fields below.
+    processing_status: Optional[ProcessingStatus] = Field(
+        default=None, description="Processing status of the content.")
     type: Optional[ContentTypeEnum] = Field(
         default=None, description="Type of content (Interview, podcast, blog, article, LinkedIn post etc.).")
     type_reason: Optional[str] = Field(

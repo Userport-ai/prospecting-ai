@@ -92,6 +92,8 @@ class SearchEngineWorkflow:
     def __init__(self) -> None:
         self.blocklist_domains = set(
             ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com", "bloomberg.com", "zoominfo.com", "clay.com"])
+        # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
+        self.HTTP_REQUEST_TIMEOUT_SECONDS = 5
 
     def get_search_results(self, search_request: SearchRequest) -> Dict[str, List[str]]:
         """Returns search results as a dictionary mapping each search query to a list of URLs for the given request."""
@@ -157,7 +159,7 @@ class SearchEngineWorkflow:
                 "safe": "active",
             }
             response_dict = requests.get(
-                SearchEngineWorkflow.GOOGLE_CUSTOM_SEARCH_ENDPOINT, params=params).json()
+                SearchEngineWorkflow.GOOGLE_CUSTOM_SEARCH_ENDPOINT, params=params, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS).json()
             search_response = GoogleCustomSearchResponse(**response_dict)
 
             if not search_response.queries.nextPage:

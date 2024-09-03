@@ -1,9 +1,10 @@
 from flask import Blueprint, request, jsonify, g, Response
 import logging
 import time
+from itertools import chain
 from enum import Enum
-from typing import Optional, List
-from celery import shared_task
+from typing import Optional, List, Dict
+from celery import shared_task, group, chord
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
@@ -683,7 +684,9 @@ def delete_outreach_email_template(outreach_email_template_id: str):
 def debug():
     # Only used for debugging locally, do not call in production.
     report_id = request.args.get("lead_report_id")
-    fetch_lead_info_orchestrator.delay(
+    # fetch_lead_info_orchestrator.delay(
+    #     lead_research_report_id="66ab9633a3bb9048bc1a0be5")
+    process_content_in_search_results_in_background.delay(
         lead_research_report_id="66ab9633a3bb9048bc1a0be5")
     return {"status": "ok"}
 
@@ -784,18 +787,89 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
     """Processes URLs in search results in background."""
     database = Database()
     try:
-        r = Researcher(database=database)
-        r.process_content_in_search_urls(
+        research_report: LeadResearchReport = database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
-        logger.info(
-            f"Finished processing search URLs for report: {lead_research_report_id}")
+        search_results_map: Dict[str, List[str]
+                                 ] = research_report.search_results_map
+        search_results_list: List[List[str]] = []
+        for search_query in search_results_map:
+            urls: List[str] = search_results_map[search_query]
+            for url in urls:
+                search_results_list.append([search_query, url])
 
-        # Aggregate Report next.
-        aggregate_report_in_background.delay(
-            lead_research_report_id=lead_research_report_id)
+        # Split search URLs into batches depending on the number of concurrent processes in a worker.
+        # Note: This concurrency value must match the concurreny passed during app intialization.
+        # TODO: Make this read the concurrency value from the celery start command line argument.
+        concurrency = 8
+        total_urls_to_process = len(search_results_list)
+        batch_size = int(total_urls_to_process/concurrency) + \
+            (0 if total_urls_to_process % concurrency == 0 else 1)
+        logger.info(
+            f"Using {concurrency} workers which will each handle at max {batch_size} URLs to split total {total_urls_to_process} Search URLs for processing for lead report: {lead_research_report_id}.")
+        batches = []
+        for i in range(concurrency):
+            start_idx = i*batch_size
+            end_idx = start_idx + batch_size
+            batches.append(search_results_list[start_idx: end_idx])
+
+        logger.info(f"Num batches: {len(batches)}")
+        logger.info(f"batching nums: {[len(b) for b in batches]}")
+
+        parallel_workers = [process_content_in_search_results_batch_in_background.s(
+            num, lead_research_report_id, batch) for num, batch in enumerate(batches)]
+        aggregation_work = aggregate_processed_search_results_in_background.s(
+            lead_research_report_id)
+
+        # Start processing.
+        chord(parallel_workers)(aggregation_work)
+
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name="process_content_in_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
+
+
+@shared_task(bind=True, acks_late=True, ignore_result=False)
+def process_content_in_search_results_batch_in_background(self, batch_num: int, lead_research_report_id: str, search_results_batch: List[List[str]]):
+    """Process batch of given Search Result URLs and returns a list of URLs that failed to process."""
+    logger.info(
+        f"Got {search_results_batch} search URLs to process for lead report: {lead_research_report_id} in batch number: {batch_num}")
+    database = Database()
+    try:
+        r = Researcher(database=database)
+        failed_urls: List[str] = r.process_content_in_search_urls(
+            lead_research_report_id=lead_research_report_id, search_results_batch=search_results_batch, task_num=batch_num)
+        logger.info(
+            f"Completed search URLs processing for lead report: {lead_research_report_id} in batch number: {batch_num}")
+        return failed_urls
+    except Exception as e:
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+                                      task_name=f"process_content_in_search_results_batch_{batch_num}", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
+
+
+@shared_task(bind=True, acks_late=True)
+def aggregate_processed_search_results_in_background(self, failed_urls_list: List[List[str]], lead_research_report_id: str):
+    """Aggregate processing of search results from each worker task that worked on a batch."""
+    database = Database()
+
+    try:
+        # Update status and failed URLs in database.
+        flattened_urls_list = list(chain.from_iterable(failed_urls_list))
+        setFields = {
+            "status": LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE,
+            "content_parsing_failed_urls": flattened_urls_list,
+        }
+        database.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
+
+        logger.info(
+            f"Completed processing search results for lead report: {lead_research_report_id}")
+
+        # Aggregate Report next.
+        # aggregate_report_in_background.delay(
+        #     lead_research_report_id=lead_research_report_id)
+    except Exception as e:
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+                                      task_name=f"aggregate_processed_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
 @shared_task(bind=True, acks_late=True)

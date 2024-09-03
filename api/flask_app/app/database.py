@@ -253,10 +253,11 @@ class Database:
             return None
         return CompanyProfile(**data_dict)
 
-    def get_content_details_by_url(self, url: str) -> Optional[ContentDetails]:
+    def get_content_details_by_url(self, url: str, company_profile_id: str) -> Optional[ContentDetails]:
         """Returns Content details for given url. Returns None if not found."""
         collection = self.get_content_details_collection()
-        data_dict = collection.find_one({"url": url})
+        data_dict = collection.find_one(
+            {"url": url, "company_profile_id": company_profile_id})
         if not data_dict:
             return None
         return ContentDetails(**data_dict)
@@ -373,28 +374,39 @@ class Database:
             raise ValueError(
                 f"Failed to delete document with ID: {outreach_email_template_id}, deleted {result.deleted_count} docs.")
 
-    def delete_all_content_details(self):
+    def delete_all_content_details(self, find_filter: Dict = {}, delete_confirm: bool = False):
         """Deletes all content details and associated web pages and LinkedIn posts."""
         content_collection = self.get_content_details_collection()
 
         content_ids = []
         linkedin_ids = []
         web_page_ids = []
-        cursor = content_collection.find({})
+        cursor = content_collection.find(find_filter)
         for content_detail in cursor:
             content_ids.append(content_detail['_id'])
-            linkedin_ids.append(content_detail['linkedin_post_ref_id'])
-            web_page_ids.append(content_detail['web_page_ref_id'])
+            if content_detail['linkedin_post_ref_id']:
+                linkedin_ids.append(content_detail['linkedin_post_ref_id'])
+            if content_detail['web_page_ref_id']:
+                web_page_ids.append(content_detail['web_page_ref_id'])
 
-        post_collection = self._get_linkedin_posts_collection()
-        post_collection.delete_many(
-            {'_id': {'$in': [ObjectId(lid) for lid in linkedin_ids]}})
+        print(
+            f"Will be deleting {len(linkedin_ids)} linkedin posts and {len(web_page_ids)} web page references and content posts: {len(content_ids)}")
 
-        web_pages_collection = self._get_web_pages_collection()
-        web_pages_collection.delete_many(
-            {'_id': {'$in': [ObjectId(lid) for lid in web_page_ids]}})
+        if not delete_confirm:
+            raise ValueError(
+                "Cannot delete content without delete_confirm permission")
 
-        content_collection.delete_many({'_id': {'$in': content_ids}})
+        if len(linkedin_ids):
+            self._get_linkedin_posts_collection().delete_many(
+                {'_id': {'$in': [ObjectId(lid) for lid in linkedin_ids]}})
+
+        if len(web_page_ids):
+            self._get_web_pages_collection().delete_many(
+                {'_id': {'$in': [ObjectId(lid) for lid in web_page_ids]}})
+
+        if len(content_ids):
+            content_collection.delete_many({'_id': {'$in': content_ids}})
+        print("Deletion complete")
 
     def migrate_docs(self, collection: Collection, filter: Dict, update: Dict):
         """Internal method to migrate many documents in given collection with given updates.
@@ -409,6 +421,9 @@ class Database:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(".env.dev")
 
     db = Database()
     # content_details_id = '66a88a0fa052ee77579340a0'
@@ -425,7 +440,12 @@ if __name__ == "__main__":
 
     # db.migrate_docs(
     #     collection=db._get_lead_research_report_collection(), filter={"personalized_emails._id": ObjectId("66baecd4914935040bcf629d")}, update=update)
-    print("done")
+    # print("done")
+    delete_filter = {
+        "creation_date": {"$gt": Utils.create_utc_datetime(31, 8, 2024)}
+    }
+    db.delete_all_content_details(
+        find_filter=delete_filter, delete_confirm=False)
 
     # db.insert_personalized_emails(lead_research_report_id="", personalized_emails=[
     #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="hello"),

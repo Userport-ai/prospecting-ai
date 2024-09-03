@@ -78,6 +78,8 @@ class LinkedInScraper:
         self.PILOTERR_API_KEY = os.environ["PILOTERR_API_KEY"]
         self.PROXYCURL_API_KEY = os.environ["PROXYCURL_API_KEY"]
         self.dev_mode = dev_mode
+        # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
+        self.HTTP_REQUEST_TIMEOUT_SECONDS = 10
 
     def index(self, url: str):
         if not self.dev_mode:
@@ -114,7 +116,7 @@ class LinkedInScraper:
         params = LinkedInScraper._get_piloterr_query_params(query=post_id)
         try:
             response = requests.get(
-                LinkedInScraper.PILOTERR_POST_ENDPOINT, headers=headers, params=params)
+                LinkedInScraper.PILOTERR_POST_ENDPOINT, headers=headers, params=params, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
         except Exception as e:
             raise ValueError(
                 f"Failed to fetch LinkedIn post from Piloterr due to error: {e}")
@@ -562,7 +564,7 @@ class LinkedInScraper:
 
         try:
             response = requests.get(
-                LinkedInScraper.PROXYCURL_PERSON_PROFILE_ENDPOINT, headers=headers, params=params)
+                LinkedInScraper.PROXYCURL_PERSON_PROFILE_ENDPOINT, headers=headers, params=params, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
         except Exception as e:
             raise ValueError(
                 f"Failed to fetch Person profile from Proxycurl: {e}")
@@ -610,7 +612,7 @@ class LinkedInScraper:
         response = None
         try:
             response = requests.get(
-                LinkedInScraper.PROXYCURL_COMPANY_PROFILE_ENDPOINT, headers=headers, params=params)
+                LinkedInScraper.PROXYCURL_COMPANY_PROFILE_ENDPOINT, headers=headers, params=params, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
         except Exception as e:
             raise ValueError(
                 f"Failed to fetch Company profile: {profile_url} from Proxycurl: {e}")

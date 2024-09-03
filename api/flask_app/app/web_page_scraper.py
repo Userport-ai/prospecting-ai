@@ -3,6 +3,7 @@ import logging
 import random
 import gzip
 import requests
+from bs4 import BeautifulSoup, Tag
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from langchain_core.prompts import PromptTemplate
@@ -16,7 +17,7 @@ from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 from app.utils import Utils
-from app.models import ContentTypeEnum, ContentCategoryEnum, OpenAITokenUsage
+from app.models import ContentTypeEnum, ContentCategoryEnum, OpenAITokenUsage, ContentDetails
 from app.linkedin_scraper import LinkedInScraper, LinkedInPostDetails
 
 logger = logging.getLogger()
@@ -84,6 +85,8 @@ class PageContentInfo(BaseModel):
     url: Optional[str] = Field(default=None, description="URL of the page.")
     page_structure: Optional[PageStructure] = Field(
         default=None, description="Stores page structure.")
+    processing_status: Optional[ContentDetails.ProcessingStatus] = Field(
+        default=None, description="Processing status of this page")
     linkedin_post_details: Optional[LinkedInPostDetails] = Field(
         default=None, description="Linkedin post details, set to None for other web pages.")
 
@@ -233,6 +236,13 @@ class WebPageScraper:
         self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
         self.OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
         self.OPENAI_GPT_4O_MINI_MODEL = os.environ["OPENAI_GPT_4O_MINI_MODEL"]
+        self.OPENAI_REQUEST_TIMEOUT_SECONDS = 20
+
+        # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
+        self.HTTP_REQUEST_TIMEOUT_SECONDS = 5
+
+        # Maximum number of chunks allowed in a page of size 4096.
+        self.PAGE_MAX_CHUNKS = 15
 
         self.dev_mode = dev_mode
         self.all_user_agents = self.load_all_user_agents()
@@ -264,7 +274,7 @@ class WebPageScraper:
             if self.is_valid_linkedin_post(url=self.url):
                 page_structure = self.get_linkedin_post_structure(doc=doc)
             else:
-                page_structure = self.get_page_structure(doc=doc)
+                page_structure = self.get_page_structure()
             self.page_structure = self.create_page_structure_in_db(
                 page_structure=page_structure)
 
@@ -282,8 +292,7 @@ class WebPageScraper:
         """Fetches content information from General web page (not a LinkedIn post)."""
         logger.info(f"Fetching content from general page: {self.url}")
         with get_openai_callback() as cb:
-            page_structure: PageStructure = self.get_page_structure(
-                doc=doc)
+            page_structure: PageStructure = self.get_page_structure()
 
             # Need high accuray so GPT-4O model.
             author_and_publish_date: ContentAuthorAndPublishDate = self.fetch_author_and_date(
@@ -305,6 +314,7 @@ class WebPageScraper:
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
+                    processing_status=ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE,
                     linkedin_post_details=None,
                     type=None,
                     type_reason=None,
@@ -339,6 +349,7 @@ class WebPageScraper:
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
+                    processing_status=ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY,
                     linkedin_post_details=None,
                     type=None,
                     type_reason=None,
@@ -378,6 +389,7 @@ class WebPageScraper:
             return PageContentInfo(
                 url=self.url,
                 page_structure=page_structure,
+                processing_status=ContentDetails.ProcessingStatus.COMPLETE,
                 linkedin_post_details=None,
                 type=type.enum_value,
                 type_reason=type.reason,
@@ -417,6 +429,7 @@ class WebPageScraper:
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
+                    processing_status=ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE,
                     linkedin_post_details=post_details,
                     type=ContentTypeEnum.LINKEDIN_POST,
                     type_reason=None,
@@ -453,6 +466,7 @@ class WebPageScraper:
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
+                    processing_status=ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY,
                     linkedin_post_details=post_details,
                     type=ContentTypeEnum.LINKEDIN_POST,
                     type_reason=None,
@@ -482,6 +496,7 @@ class WebPageScraper:
             return PageContentInfo(
                 url=self.url,
                 page_structure=page_structure,
+                processing_status=ContentDetails.ProcessingStatus.COMPLETE,
                 linkedin_post_details=post_details,
                 type=ContentTypeEnum.LINKEDIN_POST,
                 type_reason=None,
@@ -572,7 +587,7 @@ class WebPageScraper:
             post_template = post_template + repost_template
 
         # Max retries = 2 which is already built in per https://python.langchain.com/v0.2/api_reference/openai/chat_models/langchain_openai.chat_models.base.ChatOpenAI.html#langchain_openai.chat_models.base.ChatOpenAI.max_retries.
-        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(
             PostSummary)
         prompt = PromptTemplate.from_template(post_template)
         chain = prompt | llm
@@ -609,7 +624,7 @@ class WebPageScraper:
             "New Passage:\n"
             "{new_passage}\n"
         )
-        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(
             ContentConciseSummary)
         prompt = PromptTemplate.from_template(summary_prompt_template)
         detailed_summary: str = ""
@@ -625,9 +640,12 @@ class WebPageScraper:
             key_persons += result.key_persons
             key_organizations += result.key_organizations
 
-        logger.info(f"Detailed Summary of content: {detailed_summary}\n")
-        logger.info(f"Key persons: {key_persons}\n")
-        logger.info(f"Key organizations: {key_organizations}\n")
+        logger.info(
+            f"Detailed Summary of content (length: {len(detailed_summary)}): {detailed_summary[:100]}...\n")
+        logger.info(
+            f"Key persons (length: {len(key_persons)}): {key_persons[:3]}...\n")
+        logger.info(
+            f"Key organizations (length: {len(key_organizations)}): {key_organizations[:3]}...\n")
 
         if self.dev_mode:
             # Write summary to database.
@@ -645,7 +663,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS)
         chain = prompt | llm
 
         return chain.invoke(detailed_summary).content
@@ -662,7 +680,7 @@ class WebPageScraper:
         )
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS)
         prompt = PromptTemplate.from_template(prompt_template)
 
         # We will fetch author and publish date details from the page header + first page body chunk.
@@ -706,7 +724,7 @@ class WebPageScraper:
         content: str = "".join(
             [doc.page_content for doc in page_body_chunks])
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentType)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(ContentType)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         content = (
@@ -733,7 +751,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentCategory)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(ContentCategory)
         chain = prompt | llm
 
         # Be very careful making changes to this prompt, it may result in worse results.
@@ -798,7 +816,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentAuthorAndPublishDate)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(ContentAuthorAndPublishDate)
         chain = prompt | llm
         return chain.invoke(text)
 
@@ -820,7 +838,7 @@ class WebPageScraper:
         )
         prompt = PromptTemplate.from_template(prompt_template)
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(ContentDate)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(ContentDate)
         chain = prompt | llm
         result: ContentDate = chain.invoke(parsed_date)
 
@@ -848,7 +866,7 @@ class WebPageScraper:
 
         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(IsRequestingUserContact)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(IsRequestingUserContact)
         prompt = PromptTemplate.from_template(prompt_template)
         if len(page_structure.body_chunks) == 0:
             raise ValueError(
@@ -878,7 +896,7 @@ class WebPageScraper:
 
          # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(FocusOnCompany)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(FocusOnCompany)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         result: FocusOnCompany = chain.invoke(
@@ -902,7 +920,7 @@ class WebPageScraper:
 
          # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(FocusOnPerson)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(FocusOnPerson)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         result: FocusOnPerson = chain.invoke(
@@ -913,20 +931,32 @@ class WebPageScraper:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
         try:
             headers = {"User-Agent": random.choice(self.all_user_agents)}
-            response = requests.get(url=self.url, headers=headers)
+            response = requests.get(
+                url=self.url, headers=headers, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
         except Exception as e:
             raise ValueError(
-                f"ScrapePageGraph: HTTP error when fetching url: {self.url}, details: {e}")
+                f"HTTP error when fetching url: {self.url}, details: {e}")
 
         if response.status_code != 200:
+            if response.status_code == 403:
+                raise ValueError(
+                    f"Permission denied trying to fetch: {self.url}")
+
             raise ValueError(
                 f"Got non 200 response when fetching: {self.url}, code: {response.status_code}, text: {response.text}")
         if "text/html" not in response.headers["Content-Type"]:
             raise ValueError(
                 f"Invalid response content type: {response.headers}")
 
+        logger.info(f"HTTP page fetch success for URL: {self.url}")
+
         # Heading style argument is passed in to ensure we get '#' formatted headings.
         md = markdownify(response.text, heading_style="ATX")
+
+        # Store page HTML and markdown to extract header, page body and footer related information later.
+        self.page_html: str = response.text
+        self.page_md: str = md
+
         return Document(page_content=md)
 
     def load_all_user_agents(self) -> List[str]:
@@ -943,45 +973,118 @@ class WebPageScraper:
             chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap, add_start_index=True
         )
         chunks = text_splitter.split_documents([doc])
+        if len(chunks) >= self.PAGE_MAX_CHUNKS:
+            raise ValueError(
+                f"Page is too large with: {len(chunks)} chunks for url: {self.url}")
+
         logger.info(
             f"Created: {len(chunks)} chunks when splitting: {self.url} using chunk size: {self.chunk_size}")
         return chunks
 
-    def get_page_structure(self, doc: Document) -> PageStructure:
+    def get_page_structure(self) -> PageStructure:
         """Splits given web page document into header, body, footer and body chunk contents and returns it."""
-        page_header, remaining_md_page = self.get_page_header(doc=doc)
-
-        # Fetch page footer from remaining page.
-        opeani_temperature: float = 0
-        page_footer: Optional[str] = None
-        page_body: str = remaining_md_page
-        # Try max 2 times to fetch footer.
-        for _ in range(0, 2):
-            footer_result = self.fetch_page_footer(
-                page_without_header=remaining_md_page, openai_temperature=opeani_temperature)
-            if footer_result.footer_first_sentence is None:
-                # Use random value between 0 and 1 for new temperature and try again.
-                opeani_temperature = random.random()
-                logger.info(
-                    f"Footer identification failed, retry finding footer for doc: {self.url}")
-                continue
-
-            index = remaining_md_page.find(footer_result.footer_first_sentence)
-            if index == -1:
-                # Use random value between 0 and 1 for new temperature and try again.
-                opeani_temperature = random.random()
-                logger.info(
-                    f"First sentence of footer missing, retry finding footer for doc: {self.url}")
-                continue
-
-            page_footer = remaining_md_page[index:]
-            page_body = remaining_md_page[:index]
-            break
+        page_header, page_body, page_footer = self.get_header_page_body_and_footer_text_from_html()
 
         # Split page body into chunks.
         body_chunks: List[Document] = self.split_into_chunks(
             doc=Document(page_content=page_body))
         return PageStructure(header=page_header, body=page_body, footer=page_footer, body_chunks=body_chunks)
+
+    def get_header_page_body_and_footer_text_from_html(self) -> List[str]:
+        """Returns Header, Page Body and Footer text from given Page text HTML.
+
+        If footer is not found, will return only header and body.
+        """
+        soup = BeautifulSoup(self.page_html, "html.parser")
+        MARKDOWN_HEADING_STYLE = "ATX"
+
+        # Compute header tag first.
+        header_tag: Tag = None
+        for level in range(1, 7):
+            header_tag = soup.find(f"h{level}")
+            if header_tag:
+                break
+
+        if not header_tag:
+            raise ValueError(
+                f"Error could not find heading tag in page: {self.url}")
+
+        # Now compute footer.
+        footer_tag: Tag = None
+        if "techcrunch" in self.url:
+            # Custom logic for Techcrunch since it has unrelated news along with main article in the body (and not footer).
+            # <h3 id=h-more-techcrunch>More Techcrunch</h3>
+            footer_tag = soup.find("h3", id="h-more-techcrunch")
+            if not footer_tag:
+                logger.error(
+                    f"Techcrunch heading Tag attribute did not work for URL: {self.url}!")
+
+        if not footer_tag:
+            # Find tag named "footer".
+            footer_tag = soup.find("footer")
+
+        if not footer_tag:
+            # Find tag with attributes class and id that have "footer" string in them.
+            logger.info(
+                f"Footer tag does not exist, trying other attrs for url: {self.url}")
+
+            def has_footer_in_class_or_id(tag):
+                if tag.has_attr("class"):
+                    joined_str = " ".join(tag.attrs["class"])
+                    return "footer" in joined_str
+                if tag.has_attr("id"):
+                    return "footer" in tag.attrs["id"]
+                return False
+
+            footer_tag = soup.find(has_footer_in_class_or_id)
+
+        def get_tag_position(cur_tag: Tag, soup,  magic_words: str) -> int:
+            # Find position of header or footer tag in the string using a hack.
+            # Reference: https://stackoverflow.com/questions/48230684/extract-original-string-position-from-beautifulsoup-element.
+            # WARNING: This will muatate soup object so be careful with the magic words.
+            # cur_tag.insert(0, magic_words)
+            cur_tag.insert_before(magic_words)
+            index = str(soup).find(magic_words)
+            if index == -1:
+                raise ValueError(
+                    f"Magic words: {magic_words} didn't work to find tag in {self.url}")
+            return index
+
+        header_magic_words = "Userport Header Magic Words"
+        header_index: int = get_tag_position(
+            cur_tag=header_tag, soup=soup, magic_words=header_magic_words)
+
+        if not footer_tag:
+            logger.info(
+                f"Footer not found in page HTML of url: {self.url}")
+            header_md = markdownify(
+                str(soup)[:header_index], heading_style=MARKDOWN_HEADING_STYLE)
+            page_body_md = markdownify(
+                str(soup)[header_index + len(header_magic_words):], heading_style=MARKDOWN_HEADING_STYLE)
+            return [header_md, page_body_md, None]
+
+        footer_magic_words = "Userport Footer Magic Words"
+        footer_index: int = get_tag_position(
+            cur_tag=footer_tag, soup=soup, magic_words=footer_magic_words)
+
+        header_body_md = markdownify(
+            str(soup)[:header_index], heading_style=MARKDOWN_HEADING_STYLE)
+        page_body_md = markdownify(
+            str(soup)[header_index + len(header_magic_words):footer_index], heading_style=MARKDOWN_HEADING_STYLE)
+        footer_md = markdownify(
+            str(soup)[footer_index+len(footer_magic_words):], heading_style=MARKDOWN_HEADING_STYLE)
+
+        # Uncomment for debugging.
+        # print("HEADER BODY MD: ", header_body_md[-500:])
+        # print("\n\n------------------------------\n\n")
+        # print("BODY md START: ", page_body_md[:500])
+        # print("\n\n------------------------------\n\n")
+        # print("BODY md END: ", page_body_md[-1000:])
+        # print("\n\n------------------------------\n\n")
+        # print("FOOTER START: ", footer_md[:500])
+        logger.info(
+            f"Found Header, Body and Footer successfully from HTML for URL: {self.url}")
+        return [header_body_md, page_body_md, footer_md]
 
     def get_linkedin_post_structure(self, doc: Document) -> PageStructure:
         """Splits web page representing a linkedin post into header, body and footer elements."""
@@ -992,7 +1095,7 @@ class WebPageScraper:
         footer_index: int = remaining_post.find(footer_start)
         if footer_index == -1:
             raise ValueError(
-                f"Could not find footer start: {footer_start} in LinkedIn post: {remaining_post}")
+                f"Could not find footer start for: {footer_start} for URL:{self.url} in LinkedIn post: {remaining_post}")
         post_body = remaining_post[:footer_index]
         post_footer = remaining_post[footer_index:]
 
@@ -1013,7 +1116,7 @@ class WebPageScraper:
 
         if not heading_line:
             raise ValueError(
-                f"Could not find Heading (1-7) in Markdown page: {markdown_page[:1000]}")
+                f"Could not find Heading (1-7) for URL: {self.url} Markdown page: {markdown_page[:1000]}")
 
         page_header: Optional[str] = None
         remaining_md_page: str = markdown_page
@@ -1040,7 +1143,7 @@ class WebPageScraper:
         prompt = PromptTemplate.from_template(prompt_template)
         # TODO: Iterate to see how well footer extraction works and then finally decide the right mdoel.
         llm = ChatOpenAI(
-            temperature=openai_temperature, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY).with_structured_output(PageFooterResult)
+            temperature=openai_temperature, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(PageFooterResult)
         chain = prompt | llm
 
         try:
@@ -1337,12 +1440,21 @@ if __name__ == "__main__":
     # url = "https://www.businessinsider.com/plaids-ceo-discusses-building-controls-around-customer-data-2020-2"
     # url = "https://www.linkedin.com/posts/zperret_2024-fintech-predictions-with-zach-perret-activity-7155603572825427969-ThEB"
 
-    # url = "https://plaid.com/blog/plaid-cra/"
+    url = "https://plaid.com/blog/plaid-cra/"
+    # url = "https://us.money2020.com/agenda/past-speakers"
+    # url = "https://www.prnewswire.com/news-releases/alkami-and-plaid-partner-to-provide-financial-institutions-with-direct-access-to-plaid-via-the-financial-data-exchange-aligned-fdx-api-core-exchange-301982434.html"
+    # url = "https://www.fintechnexus.com/plaid-launches-new-product-cash-flow-underwriting-mainstream/"
+    # url = "https://www.treasuryprime.com/blog/money-20-20-cheatsheet-fintechs"
+    # url = "https://plaid.com/blog/"
+    # url = "https://www.lennysnewsletter.com/p/how-to-win-your-first-10-b2b-customers"
+    # url = "https://fintechmagazine.com/articles/top-10-fintechs-to-watch-in-2024"
     # url = "https://lattice.com/topics/hris"
     # url = "https://www.linkedin.com/posts/heysharad_after-nearly-6-years-since-i-founded-and-activity-7113532318316675073-_TPB?trk=public_profile_like_view"
     # url = "https://plaid.com/customer-stories/capital-on-tap/"
     # url = "https://www.reddit.com/r/teslamotors/comments/18wt1kq/new_porsche_taycan_crushes_tesla_model_s_plaids/"
-    url = "https://plaid.com/customer-stories/coinbase/"
+    # url = "https://plaid.com/customer-stories/coinbase/"
+    # REALLY LARGE PAGE.
+    # url = "https://plaid.com/legal/"
 
     person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
@@ -1351,64 +1463,20 @@ if __name__ == "__main__":
     # person_name = "Anuj Kapur"
     # person_name = "Raj Sarkar"
     # company_name = "Cloudbees"
+
     import time
     import logging
     logging.basicConfig(level=logging.INFO)
+
     graph = WebPageScraper(url=url, dev_mode=False)
     start_time = time.time()
-    content_info: PageContentInfo = graph.fetch_page_content_info(
-        doc=graph.fetch_page(), company_name=company_name, person_name=person_name)
-    logging.info(f"\n\nTime taken: {time.time() - start_time} seconds")
+    doc = graph.fetch_page()
+    print("total time taken: ", time.time()-start_time)
+    # start_time = time.time()
+    # content_info: PageContentInfo = graph.fetch_page_content_info(
+    #     doc=doc, company_name=company_name, person_name=person_name)
+    # logging.info(f"\n\nTime taken: {time.time() - start_time} seconds")
     # with open("example_linkedin_info/parsed_page_info.json", "w") as f:
     #     f.write(json.dumps(content_info.dict(), indent=4))
 
-    # graph.delete_detailed_summary_from_db()
-    # logger.info(graph.page_structure.body)
-    # graph.is_page_requesting_user_contact(graph.page_structure)
-    # final_summary = graph.fetch_content_final_summary(
-    #     page_body_chunks=graph.page_structure.body_chunks)
-
-    # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
-    #     post_body=graph.page_structure.body)
-    # final_summary = graph.fetch_post_final_summary(post_details=post_details)
-
-    # graph.fetch_content_category(
-    #     company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
-
-    # print("related to company: ", graph.is_page_related_to_company(
-    #     company_name=company_name, detailed_summary=final_summary.detailed_summary))
-    # print("focus on person: ", graph.is_page_focused_on_person(
-    #     person_name=person_name, detailed_summary=final_summary.detailed_summary))
-
-    # graph.delete_page_structure_from_db()
-    # graph.fetch_author_and_date(page_structure=graph.page_structure)
-    # logger.info("footer: ", graph.page_structure.footer[:100])
-    # logger.info(graph.convert_to_datetime(parsed_date='2023'))
-    # graph.fetch_page_content_info(
-    #     company_name=company_name, person_name=person_name)
-    # post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
-    #     post_body=graph.page_structure.body)
-    # graph.fetch_post_final_summary(post_details=post_details)
-    # doc = graph.page_structure.to_doc()
-    # graph.fetch_content_info_from_linkedin_post(
-    #     company_name=company_name, person_name=person_name, doc=doc)
-    # print("Size of page in MB: ", graph.page_structure.get_size_mb(), " MB")
-
-    # file_path = "example_linkedin_info/webpage_markdown.txt"
-    # file_path = "example_linkedin_info/scraped_linkedin_repost_body.txt"
-    # file_path = "example_linkedin_info/scraped_linkedin_post_body.txt"
-    # with open(file_path, "w") as f:
-    # f.write(graph.page_structure.to_str())
-
-    # print(graph.page_structure.body)
-    # graph.delete_summary_from_db()
-    # graph.delete_all_docs_from_db()
-
-    # final_summary = graph.fetch_content_final_summary(
-    #     page_body_chunks=graph.page_structure.body_chunks)
-    # print("concise summary: ", graph.fetch_concise_summary(
-    #     detailed_summary=final_summary.detailed_summary))
-    # graph.fetch_content_type(page_body_chunks=graph.page_structure.body_chunks)
-    # graph.fetch_content_category(
-    #     company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
-    # print(graph.fetch_page_content_info(company_name=company_name, person_name=person_name))
+    # graph.get_header_page_body_and_footer_text_from_html()
