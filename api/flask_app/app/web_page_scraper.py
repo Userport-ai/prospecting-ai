@@ -290,7 +290,7 @@ class WebPageScraper:
 
     def fetch_content_info_from_general_page(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
         """Fetches content information from General web page (not a LinkedIn post)."""
-        logger.info(f"Fetching content from general page: {self.url}")
+        logger.info(f"Fetching content from general page for URL: {self.url}")
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_page_structure()
 
@@ -310,7 +310,8 @@ class WebPageScraper:
                     f"Content too stale or unknown with publish date: {publish_date} in URL: {self.url}: {company_name}, skipping remaining computation.")
                 tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-                logger.info(f"Tokens used: {tokens_used}")
+                logger.info(
+                    f"Tokens used for URL: {self.url} is: {tokens_used}")
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
@@ -342,10 +343,11 @@ class WebPageScraper:
             if not related_to_company:
                 # Exit early to save remaining computation cost and time.
                 logger.info(
-                    f"Content not related to company: {company_name} in URL: {self.url}, skipping remaining computation.")
+                    f"Content not related to company: {company_name} for URL: {self.url}, skipping remaining computation.")
                 tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-                logger.info(f"Tokens used: {tokens_used}")
+                logger.info(
+                    f"Tokens used for URL: {self.url} is: {tokens_used}")
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
@@ -385,7 +387,8 @@ class WebPageScraper:
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-            logger.info(f"Tokens used: {tokens_used}")
+            logger.info(
+                f"Success: Tokens used for URL: {self.url} is: {tokens_used}")
 
             return PageContentInfo(
                 url=self.url,
@@ -417,16 +420,19 @@ class WebPageScraper:
                 doc=doc)
             post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
                 post_body=page_structure.body)
+            logger.info(
+                f"Successfully extracted LinkedIn post details for URL: {self.url}")
 
             # If post is older than 1 year from todays date, skip it may be too old for relevance.
             publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=12)
             if post_details.publish_date == None or post_details.publish_date < publish_cutoff_date:
                 # Exit early.
                 logger.info(
-                    f"LinkedIn Post too stale or unknown with publish date: {post_details.publish_date} in URL: {self.url}: {company_name}, skipping remaining computation.")
+                    f"LinkedIn Post too stale or unknown with publish date: {post_details.publish_date} for URL: {self.url}: {company_name}, skipping remaining computation.")
                 tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-                logger.info(f"Tokens used: {tokens_used}")
+                logger.info(
+                    f"Tokens used for URL: {self.url} is: {tokens_used}")
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
@@ -463,7 +469,8 @@ class WebPageScraper:
                     f"LinkedIn post: {self.url} not related to company: {company_name}, skipping remaining computation.")
                 tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-                logger.info(f"Tokens used: {tokens_used}")
+                logger.info(
+                    f"Tokens used for LinkedIn post URL: {self.URL} is: {tokens_used}")
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
@@ -492,7 +499,8 @@ class WebPageScraper:
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-            logger.info(f"Tokens used: {tokens_used}")
+            logger.info(
+                f"Success: Tokens used for LinkedIn post URL: {self.url} is: {tokens_used}")
 
             return PageContentInfo(
                 url=self.url,
@@ -594,7 +602,8 @@ class WebPageScraper:
         chain = prompt | llm
         result: PostSummary = chain.invoke({'post_url': post_details.url})
 
-        logger.info(f"LinkedIn Post Summary: {result.detailed_summary}\n")
+        logger.info(
+            f"Detailed Summary for LinkedIn Post with URL: {self.url} with length: {len(result.detailed_summary)}: {result.detailed_summary[:100]}...\n")
 
         if self.dev_mode:
             # Write summary to database.
@@ -642,11 +651,11 @@ class WebPageScraper:
             key_organizations += result.key_organizations
 
         logger.info(
-            f"Detailed Summary of content (length: {len(detailed_summary)}): {detailed_summary[:100]}...\n")
+            f"Detailed Summary for URL: {self.url} of content (length: {len(detailed_summary)}): {detailed_summary[:100]}...\n")
         logger.info(
-            f"Key persons (length: {len(key_persons)}): {key_persons[:3]}...\n")
+            f"Key persons for URL: {self.url} (length: {len(key_persons)}): {key_persons[:3]}...\n")
         logger.info(
-            f"Key organizations (length: {len(key_organizations)}): {key_organizations[:3]}...\n")
+            f"Key organizations for URL: {self.url} (length: {len(key_organizations)}): {key_organizations[:3]}...\n")
 
         if self.dev_mode:
             # Write summary to database.
@@ -667,7 +676,10 @@ class WebPageScraper:
             temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS)
         chain = prompt | llm
 
-        return chain.invoke(detailed_summary).content
+        concise_summary: str = chain.invoke(detailed_summary).content
+        logger.info(
+            f"Got concise summary for URL: {self.url} with length: {len(concise_summary)}: {concise_summary[:100]}...")
+        return concise_summary
 
     def fetch_author_and_date(self, page_structure: PageStructure) -> ContentAuthorAndPublishDate:
         """Fetches content details like author and publish date from the web page."""
@@ -698,7 +710,8 @@ class WebPageScraper:
         # For some reason, using structured output in the first LLM call doesn't work. We need to
         # route the text answer from the first call to extract the structured output.
         content_details = self.parse_llm_output(text=result.content)
-        logger.info(f"Content Author and Publish date: {content_details}")
+        logger.info(
+            f"Content Author and Publish date for URL: {self.url}: {content_details}")
         return content_details
 
     def fetch_content_type(self, page_body_chunks: List[Document]) -> ContentType:
@@ -735,7 +748,7 @@ class WebPageScraper:
         )
         result = chain.invoke(content)
 
-        logger.info(f"Content type: {result}")
+        logger.info(f"Content type for URL: {self.url} is: {result}")
         return result
 
     def fetch_content_category(self, company_name: str, person_name: str, detailed_summary: str) -> ContentCategory:
@@ -801,7 +814,8 @@ class WebPageScraper:
         result = chain.invoke(
             {"question": question, "context": detailed_summary})
 
-        logger.info(f"Content Category result: {result}")
+        logger.info(
+            f"Content Category result for URL: {self.url} is: {result}")
         return result
 
     def parse_llm_output(self, text: str) -> ContentAuthorAndPublishDate:
@@ -847,6 +861,7 @@ class WebPageScraper:
         day: int = result.day if result.day else 1
         month: int = result.month if result.month else 1
         year: int = result.year if result.year else datetime.now().year
+        logger.info(f"Converted to datetime succesfully for URL: {self.url}")
         return Utils.create_utc_datetime(day=day, month=month, year=year)
 
     def is_page_requesting_user_contact(self, page_structure: PageStructure) -> bool:
@@ -871,13 +886,15 @@ class WebPageScraper:
         prompt = PromptTemplate.from_template(prompt_template)
         if len(page_structure.body_chunks) == 0:
             raise ValueError(
-                f"Expected non zero body chunks, got: {page_structure}")
+                f"Expected non zero body chunks for URL: {self.url}, got: {page_structure}")
         page_text = page_structure.body_chunks[0].page_content
 
         chain = prompt | llm
         result: IsRequestingUserContact = chain.invoke(
             {"page_text": page_text})
 
+        logger.info(
+            f"Is page requesting user contact for URL: {self.url} is: {result}")
         return result.is_requesting_user_contact
 
     def is_page_related_to_company(self, company_name: str, detailed_summary: str) -> bool:
@@ -903,7 +920,8 @@ class WebPageScraper:
         result: FocusOnCompany = chain.invoke(
             {"page_text": detailed_summary})
 
-        logger.info(f"result of relation: {result}")
+        logger.info(
+            f"Is Page related to company for URL: {self.url} is: {result}")
         return result.about_company
 
     def is_page_focused_on_person(self, person_name: str, detailed_summary: str) -> bool:
@@ -947,7 +965,7 @@ class WebPageScraper:
                 f"Got non 200 response when fetching: {self.url}, code: {response.status_code}, text: {response.text}")
         if "text/html" not in response.headers["Content-Type"]:
             raise ValueError(
-                f"Invalid response content type: {response.headers}")
+                f"Invalid response content type: {response.headers} for URL: {self.url}")
 
         logger.info(f"HTTP page fetch success for URL: {self.url}")
 
@@ -979,7 +997,7 @@ class WebPageScraper:
                 f"Page is too large with: {len(chunks)} chunks for url: {self.url}")
 
         logger.info(
-            f"Created: {len(chunks)} chunks when splitting: {self.url} using chunk size: {self.chunk_size}")
+            f"Created: {len(chunks)} chunks when splitting URL: {self.url} using chunk size: {self.chunk_size}")
         return chunks
 
     def get_page_structure(self) -> PageStructure:
@@ -1056,7 +1074,7 @@ class WebPageScraper:
             cur_tag=header_tag, soup=soup, magic_words=header_magic_words)
 
         if not footer_tag:
-            logger.info(
+            logger.warning(
                 f"Footer not found in page HTML of url: {self.url}")
             header_md = markdownify(
                 str(soup)[:header_index], heading_style=MARKDOWN_HEADING_STYLE)
@@ -1096,10 +1114,12 @@ class WebPageScraper:
         footer_index: int = remaining_post.find(footer_start)
         if footer_index == -1:
             raise ValueError(
-                f"Could not find footer start for: {footer_start} for URL:{self.url} in LinkedIn post: {remaining_post}")
+                f"Could not find footer start for: {footer_start} for URL: {self.url} in LinkedIn post: {remaining_post}")
         post_body = remaining_post[:footer_index]
         post_footer = remaining_post[footer_index:]
 
+        logger.info(
+            f"Got Page structure from LinkedIn post with URL: {self.url}")
         # Unlike a regular web page, we can skip splitting the body into chunks since a LinkedIn post is usually small in size.
         return PageStructure(header=post_header, body=post_body, footer=post_footer)
 
@@ -1125,7 +1145,7 @@ class WebPageScraper:
             index = markdown_page.find(heading_line)
             if index == -1:
                 raise ValueError(
-                    f"Could not find heading line: {heading_line} in markdown page: {markdown_page[:1000]}")
+                    f"Could not find heading line: {heading_line} for URL: {self.url} in markdown page: {markdown_page[:1000]}")
             page_header = markdown_page[:index]
             remaining_md_page = markdown_page[index:]
 
@@ -1151,7 +1171,8 @@ class WebPageScraper:
             # We assume that page without header can fit within the token size of GPT40 which is 128K tokens for most pages.
             return chain.invoke({"chunk": page_without_header})
         except Exception as e:
-            raise ValueError(f"Error in fetching page footer: {e}")
+            raise ValueError(
+                f"Error in fetching page footer for URL: {self.url} with error: {e}")
 
     def get_retriever(self,  k: int = 5) -> VectorStoreRetriever:
         """Return retriever from given database for known URL."""
