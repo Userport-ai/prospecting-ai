@@ -4,7 +4,7 @@ import time
 from itertools import chain
 from enum import Enum
 from typing import Optional, List, Dict
-from celery import shared_task, group, chord
+from celery import shared_task, chord
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
@@ -686,7 +686,9 @@ def debug():
     report_id = request.args.get("lead_report_id")
     # fetch_lead_info_orchestrator.delay(
     #     lead_research_report_id="66ab9633a3bb9048bc1a0be5")
-    process_content_in_search_results_in_background.delay(
+    # process_content_in_search_results_in_background.delay(
+    #     lead_research_report_id="66ab9633a3bb9048bc1a0be5")
+    aggregate_report_in_background.delay(
         lead_research_report_id="66ab9633a3bb9048bc1a0be5")
     return {"status": "ok"}
 
@@ -721,6 +723,8 @@ def shared_task_exception_handler(shared_task_obj, database: Database, lead_rese
 @shared_task(bind=True, acks_late=True)
 def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
     """Main Orchestrator that routes the given report to the correct Celery task."""
+    logger.info(
+        f"Orchestrator called for lead report ID: {lead_research_report_id}")
     database = Database()
 
     report_status: LeadResearchReport.Status = None
@@ -767,12 +771,14 @@ def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
 @shared_task(bind=True, acks_late=True)
 def fetch_search_results_in_background(self, lead_research_report_id: str):
     """Fetch search results for given lead in background."""
+    logger.info(
+        f"Start fetching search URLs for lead report ID: {lead_research_report_id}")
     database = Database()
     try:
         r = Researcher(database=database)
         r.fetch_search_results(lead_research_report_id=lead_research_report_id)
         logger.info(
-            f"Done fetching search results for report ID: {lead_research_report_id}")
+            f"Completed fetching search results for lead report ID: {lead_research_report_id}")
 
         # Process search URLs contents next.
         process_content_in_search_results_in_background.delay(
@@ -785,6 +791,8 @@ def fetch_search_results_in_background(self, lead_research_report_id: str):
 @shared_task(bind=True, acks_late=True)
 def process_content_in_search_results_in_background(self, lead_research_report_id: str):
     """Processes URLs in search results in background."""
+    logger.info(
+        f"Start processing search URLs to process for lead report: {lead_research_report_id}")
     database = Database()
     try:
         research_report: LeadResearchReport = database.get_lead_research_report(
@@ -849,8 +857,9 @@ def process_content_in_search_results_batch_in_background(self, batch_num: int, 
 @shared_task(bind=True, acks_late=True)
 def aggregate_processed_search_results_in_background(self, failed_urls_list: List[List[str]], lead_research_report_id: str):
     """Aggregate processing of search results from each worker task that worked on a batch."""
+    logger.info(
+        f"Start aggregating search results for lead report ID: {lead_research_report_id}")
     database = Database()
-
     try:
         # Update status and failed URLs in database.
         flattened_urls_list = list(chain.from_iterable(failed_urls_list))
@@ -862,11 +871,11 @@ def aggregate_processed_search_results_in_background(self, failed_urls_list: Lis
             lead_research_report_id=lead_research_report_id, setFields=setFields)
 
         logger.info(
-            f"Completed processing search results for lead report: {lead_research_report_id}")
+            f"Completed aggregation of processed search results for lead report ID: {lead_research_report_id}")
 
         # Aggregate Report next.
-        # aggregate_report_in_background.delay(
-        #     lead_research_report_id=lead_research_report_id)
+        aggregate_report_in_background.delay(
+            lead_research_report_id=lead_research_report_id)
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name=f"aggregate_processed_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
@@ -875,12 +884,14 @@ def aggregate_processed_search_results_in_background(self, failed_urls_list: Lis
 @shared_task(bind=True, acks_late=True)
 def aggregate_report_in_background(self, lead_research_report_id: str):
     """Create a research report in background."""
+    logger.info(
+        f"Start lead research report aggregation for report ID: {lead_research_report_id}")
     database = Database()
     try:
         r = Researcher(database=database)
         r.aggregate(lead_research_report_id=lead_research_report_id)
         logger.info(
-            f"Aggregation of research report complete for report ID: {lead_research_report_id}")
+            f"Completed aggregation of research report complete for report ID: {lead_research_report_id}")
 
         # Select email outreach template next.
         choose_outreach_email_template_in_background.delay(
@@ -893,6 +904,8 @@ def aggregate_report_in_background(self, lead_research_report_id: str):
 @shared_task(bind=True, acks_late=True)
 def choose_outreach_email_template_in_background(self, lead_research_report_id: str):
     """Selects outreach tempalte in background."""
+    logger.info(
+        f"Start eamil outreach template selection for report ID: {lead_research_report_id}")
     database = Database()
     try:
         r = Researcher(database=database)
@@ -912,6 +925,8 @@ def choose_outreach_email_template_in_background(self, lead_research_report_id: 
 @shared_task(bind=True, acks_late=True)
 def generate_personalized_emails_in_background(self, lead_research_report_id: str):
     """Generates personalized emails in the background."""
+    logger.info(
+        f"Create personalized outreach templates selection for report ID: {lead_research_report_id}")
     database = Database()
     try:
         r = Researcher(database=database)

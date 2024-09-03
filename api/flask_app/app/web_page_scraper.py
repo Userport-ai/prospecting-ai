@@ -372,6 +372,7 @@ class WebPageScraper:
             concise_summary: str = self.fetch_concise_summary(
                 detailed_summary=final_summary.detailed_summary)
 
+            # We could remove this computation if not providing enough value for users. Will definitely save some cost.
             type: ContentType = self.fetch_content_type(
                 page_body_chunks=page_structure.body_chunks)
 

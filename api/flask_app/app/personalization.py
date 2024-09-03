@@ -47,7 +47,7 @@ class Personalization:
         referenced_highlights: List[LeadResearchReport.ReportDetail.Highlight] = self.get_best_highlights(
             all_highlights=all_highlights)
         logger.info(
-            f"Got {referenced_highlights} reference highlights IDs for email personalization.")
+            f"Got {len(referenced_highlights)} reference highlights IDs for email personalization.")
 
         chosen_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = lead_research_report.chosen_outreach_email_template
         email_template_message: Optional[str] = None

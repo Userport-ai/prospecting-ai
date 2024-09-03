@@ -159,11 +159,6 @@ class Researcher:
                     suffix_query="funding announcements",
                     num_results=10,
                 ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="important newss",
-                    num_results=10,
-                ),
             ],
         )
 
@@ -236,7 +231,7 @@ class Researcher:
         # If this URL has already been indexed for this company, skip processing.
         if self.database.get_content_details_by_url(url=url, company_profile_id=research_report.company_profile_id):
             logger.info(
-                f"Web URL: {url} already indexed in the database, skip processing again.")
+                f"Web URL: {url} already indexed in the database for report: {research_report.id}, skip processing again.")
             return
 
         # Fetch page and then process content.
@@ -355,7 +350,7 @@ class Researcher:
 
         stage_match_category = {
             "$match": {
-                "category": {"$ne": ContentCategoryEnum.NONE_OF_THE_ABOVE.value}
+                "category": {"$nin": [None, ContentCategoryEnum.NONE_OF_THE_ABOVE.value]}
             }
         }
 
