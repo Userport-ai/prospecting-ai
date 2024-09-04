@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, Annotated, List, Tuple, Dict
 from deprecated import deprecated
 from pydantic.functional_validators import BeforeValidator
@@ -6,6 +7,8 @@ from datetime import datetime
 from app.utils import Utils
 from enum import Enum
 import re
+
+logger = logging.getLogger()
 
 # Represents an ObjectId field in the database.
 # It will be represented as a `str` on the model so that it can be serialized to JSON.
@@ -873,13 +876,33 @@ class PersonProfile(BaseModel):
 
     def get_company_and_role_title(self) -> Tuple[str, str]:
         """Returns current company and role title (at company) in that order for given person."""
+        # Currently, we will assume that the first element in the experiences array that has end date None is the current employment.
+        current_employment: Optional[PersonProfile.Experience] = None
+        for exp in self.experiences:
+            if exp.ends_at == None:
+                # Current employment.
+                current_employment = exp
+                break
+        if current_employment and current_employment.title and current_employment.company:
+            return (current_employment.company, current_employment.title)
+
+        raise ValueError(
+            f"Failed to get current company and role title: Atleast one of Current Employment, Company name or Role title in: {current_employment} is None in Person Profile: {self}")
+
+    def deprecated_get_company_and_role_title(self) -> Tuple[str, str]:
+        # This is a rather unreliable way to check Role Title and Company.
+        # ProxyCurl often returns occupation field to be the same as profile headline which is different from
+        # what their API says, hence unreliable.
+        # Profiles for which this failed include: https://www.linkedin.com/in/bhavishaggarwal/, https://www.linkedin.com/in/profilevamsikrishna/ and
+        # https://www.linkedin.com/in/hemesh-singh-65441a133/. They all had different formats.
         match = re.search("(.+) at (.+)", self.occupation)
-        if not match:
-            raise ValueError(
-                f"Person Profile occupation not in expected formar: {self}")
-        role_title: str = match.group(1)
-        company_name: str = match.group(2)
-        return (company_name, role_title)
+        if match:
+            role_title: str = match.group(1)
+            company_name: str = match.group(2)
+            return (company_name, role_title)
+
+        raise ValueError(
+            f"Person Profile Occupation not in expected format for: {self}")
 
     def get_company_linkedin_url(self, company_name: str) -> str:
         """Returns company LinkedIn URL from person's experiences for given company name."""
@@ -1018,7 +1041,8 @@ class CompanyProfile(BaseModel):
         default=None, description="Website of the company.")
     industry: Optional[str] = Field(
         default=None, description="Industry that the company operates under. Exhaustive list can be found in https://drive.google.com/file/d/12yvYLuru7CRv3wKOIkHs5Ldocz31gJSS/view.")
-    company_size: Optional[List[int]] = Field(
+    # Optional[int] because companies like Microsoft have size array: [some large number, null] indicating no upper bound lol.
+    company_size: Optional[List[Optional[int]]] = Field(
         default=None, description="Sequenced range of headcount (min count, max count)", min_length=2, max_length=2)
     company_size_on_linkedin: Optional[int] = Field(
         default=None, description="Size of the company as indicated on LinkedIn.")

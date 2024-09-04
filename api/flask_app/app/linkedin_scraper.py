@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import logging
 import requests
 import urllib.parse
 from enum import Enum
@@ -15,6 +16,8 @@ from langchain_openai import OpenAIEmbeddings
 # from pydantic import BaseModel, Field
 # Can't use pydantic base model because cant embed this class in model class inherting from langchain base model.
 from langchain_core.pydantic_v1 import BaseModel, Field
+
+logger = logging.getLogger()
 
 
 class LinkedInPostDetails(BaseModel):
@@ -80,6 +83,8 @@ class LinkedInScraper:
         self.dev_mode = dev_mode
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 10
+        # Per suggestion here: https://nubela.co/proxycurl/docs#proxycurl-overview-timeouts-and-api-response-time.
+        self.HTTP_PROXYCURL_REQUEST_TIMEOUT_SECONDS = 60
 
     def index(self, url: str):
         if not self.dev_mode:
@@ -90,10 +95,11 @@ class LinkedInScraper:
                          embedding_function=OpenAIEmbeddings(model=LinkedInScraper.OPENAI_EMBEDDING_MODEL, api_key=os.environ["OPENAI_USERPORT_API_KEY"]))
         post: Optional[LinkedInPostOld] = self.get_linkedin_post_from_db()
         if post:
-            print("LinkedIn Post found in Db")
+            logger.info("LinkedIn Post found in Db")
             self.post = post
         else:
-            print("Fetching LinkedIn Post from API and writing it to db.")
+            logger.info(
+                "Fetching LinkedIn Post from API and writing it to db.")
             self.post = self.fetch_linkedin_post(post_url=url)
             self.create_linkedin_post_in_db(post=self.post)
 
@@ -564,10 +570,10 @@ class LinkedInScraper:
 
         try:
             response = requests.get(
-                LinkedInScraper.PROXYCURL_PERSON_PROFILE_ENDPOINT, headers=headers, params=params, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
+                LinkedInScraper.PROXYCURL_PERSON_PROFILE_ENDPOINT, headers=headers, params=params, timeout=self.HTTP_PROXYCURL_REQUEST_TIMEOUT_SECONDS)
         except Exception as e:
             raise ValueError(
-                f"Failed to fetch Person profile from Proxycurl: {e}")
+                f"Failed to fetch Person profile from Proxycurl with error: {e}")
 
         status_code = response.status_code
         if status_code != 200:
@@ -584,10 +590,14 @@ class LinkedInScraper:
             raise ValueError(
                 f"Failed to get JSON response when fetching Person Profile for url: {profile_url}")
 
-        # Populate LinkedIn profile URL field in the response.
-        profile = PersonProfile(**data)
-        profile.linkedin_url = profile_url
-        return profile
+        try:
+            # Populate LinkedIn profile URL field in the response.
+            profile = PersonProfile(**data)
+            profile.linkedin_url = profile_url
+            return profile
+        except Exception as e:
+            raise ValueError(
+                f"Failed to convert API response data: {data} to PersonProfile with error: {e}")
 
     def fetch_company_profile(self, profile_url: str) -> Optional[PersonProfile]:
         """Fetches and returns LinkedIn Profile information of a given Company from URL. Returns None if company not found.
@@ -612,10 +622,10 @@ class LinkedInScraper:
         response = None
         try:
             response = requests.get(
-                LinkedInScraper.PROXYCURL_COMPANY_PROFILE_ENDPOINT, headers=headers, params=params, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
+                LinkedInScraper.PROXYCURL_COMPANY_PROFILE_ENDPOINT, headers=headers, params=params, timeout=self.HTTP_PROXYCURL_REQUEST_TIMEOUT_SECONDS)
         except Exception as e:
             raise ValueError(
-                f"Failed to fetch Company profile: {profile_url} from Proxycurl: {e}")
+                f"Failed to fetch Company profile: {profile_url} from Proxycurl with error: {e}")
 
         status_code = response.status_code
         if status_code != 200:
@@ -633,9 +643,13 @@ class LinkedInScraper:
             raise ValueError(
                 f"Failed to get JSON response when fetching Person Profile for url: {profile_url}")
 
-        profile = CompanyProfile(**data)
-        profile.linkedin_url = profile_url
-        return profile
+        try:
+            profile = CompanyProfile(**data)
+            profile.linkedin_url = profile_url
+            return profile
+        except Exception as e:
+            raise ValueError(
+                f"Failed to convert API response data: {data} to CompanyProfile with error: {e}")
 
     @staticmethod
     def _get_post_id(post_url: str) -> str:
@@ -760,4 +774,5 @@ if __name__ == "__main__":
 
     # profile_url = "https://www.linkedin.com/company/plaid-"
     profile_url = "https://www.linkedin.com/company/stripe/"
-    LinkedInScraper().fetch_company_profile(profile_url=profile_url)
+    # LinkedInScraper().fetch_company_profile(profile_url=profile_url)
+    LinkedInScraper().fetch_person_profile()
