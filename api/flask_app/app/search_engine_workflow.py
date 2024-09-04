@@ -80,8 +80,8 @@ class GoogleCustomSearchResponse(BaseModel):
             default=None, description="Title of the search result page.")
 
     queries: QueriesObject = Field()
-    items: List[SearchResult] = Field(...,
-                                      description="List of search result Items.")
+    items: Optional[List[SearchResult]] = Field(
+        default=None, description="List of search result Items.It is None when there are no search results returned from the query.")
 
 
 class SearchEngineWorkflow:
@@ -120,10 +120,12 @@ class SearchEngineWorkflow:
             # Fetch search results from API call.
             result_urls: List[str] = self.api_search(
                 search_query=search_query, num_results=num_results, exact_terms=exact_terms, skip_urls=already_fetched_urls)
+            print("result urls: ", result_urls)
             already_fetched_urls = already_fetched_urls.union(set(result_urls))
 
             search_results_map[search_query] = result_urls
 
+        print("search results map: ", search_results_map)
         return search_results_map
 
     def api_search(self, search_query: str, num_results: int, exact_terms: str, skip_urls: Set[str]) -> List[str]:
@@ -158,13 +160,27 @@ class SearchEngineWorkflow:
                 "exactTerms": exact_terms,
                 "safe": "active",
             }
-            response_dict = requests.get(
-                SearchEngineWorkflow.GOOGLE_CUSTOM_SEARCH_ENDPOINT, params=params, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS).json()
-            search_response = GoogleCustomSearchResponse(**response_dict)
+            response_dict = None
+            try:
+                response_dict = requests.get(
+                    SearchEngineWorkflow.GOOGLE_CUSTOM_SEARCH_ENDPOINT, params=params, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS).json()
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to get Google Custom Search API results for query: {search_query} with error: {e}")
 
-            if not search_response.queries.nextPage:
-                # No more search results avaiable, exit.
+            search_response: GoogleCustomSearchResponse = None
+            try:
+                search_response = GoogleCustomSearchResponse(**response_dict)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to deserialize Google Custom Search API response dict: {response_dict} to GoogleCustomSearchResponse with error: {e}")
+
+            if not search_response.items:
+                # No results returned, break from loop.
+                logger.warning(
+                    f"No search results returned by Google Custom Search API for search query: {search_query}")
                 break
+
             for search_result in search_response.items:
                 url = search_result.link
                 if LinkedInScraper.is_valid_profile_or_company_url(url=url):
@@ -180,6 +196,10 @@ class SearchEngineWorkflow:
 
                 # We assume the result URLs for the same query across pages is deduplicated by Google.
                 result_urls.append(url)
+
+            if not search_response.queries.nextPage:
+                # No more search results avaiable in next page, exit early from the loop.
+                break
 
         logger.info(
             f"Search for query: {search_query} complete. Wanted: {num_results} results, Got: {len(result_urls)}")
@@ -236,6 +256,9 @@ if __name__ == "__main__":
     load_dotenv()
     load_dotenv(".env.dev")
 
+    import logging
+    logging.basicConfig(level=logging.INFO)
+
     # Zach perret Profile ID.
     person_profile_id = '66a70cc8ff3944ed08fe4f1c'
     company_profile_id = '66a7a6b5066fac22c378bd75'
@@ -260,36 +283,41 @@ if __name__ == "__main__":
         existing_urls = json.loads(f.read())
 
     search_request = SearchRequest(
-        person_name="Zachary Perret",
-        company_name="Plaid",
-        person_role_title="CEO & Cofounder",
-        existing_urls=existing_urls,
+        person_name="Aashna Shroff",
+        company_name="Toddle - Your Teaching Partner",
+        person_role_title="Product - Toddle AI",
+        existing_urls=[],
         query_configs=[
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                 suffix_query="product launches",
                 num_results=10,
             ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                suffix_query="LinkedIn Posts",
-                num_results=20,
-            ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="recent achievements",
-                num_results=10,
-            ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="recent recognitions",
-                num_results=10,
-            ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                suffix_query="thoughts on the industry",
-                num_results=20,
-            ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="LinkedIn Posts",
+            #     num_results=20,
+            # ),
+            # SearchRequest.QueryConfig(
+            #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #         suffix_query="blogs",
+            #         num_results=10,
+            # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+            #     suffix_query="recent achievements",
+            #     num_results=10,
+            # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+            #     suffix_query="recent recognitions",
+            #     num_results=10,
+            # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="thoughts on the industry",
+            #     num_results=20,
+            # ),
         ],
     )
     results = wf.get_search_results(search_request=search_request)

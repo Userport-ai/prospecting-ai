@@ -165,6 +165,16 @@ class Researcher:
                     suffix_query="recent news",
                     num_results=10,
                 ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent partnerships",
+                    num_results=10,
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent leadership hires",
+                    num_results=10,
+                ),
             ],
         )
 

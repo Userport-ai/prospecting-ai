@@ -32,7 +32,7 @@ class OutreachTemplateMatcher:
         if len(email_templates) == 0:
             # No existing email templates added by user.
             error_message = f"Failed to find closest email template: No existing email templates found for User with ID: {user_id}"
-            logger.exception(error_message)
+            logger.warning(error_message)
             # We are allowing for no templates.
             # raise ValueError(error_message)
             return None
@@ -74,18 +74,20 @@ class OutreachTemplateMatcher:
         chain = prompt | llm
         result: MatchedPersona = chain.invoke(
             {"person_profile_markdown": person_profile_markdown})
-        if not result.matched_persona_id:
+        if not result.matched_persona_id or result.matched_persona_id == "None":
+            # Sometimes LLMs screw up and set the value to string 'None' instead of Python None.
             logger.warning(
                 f"None of the emails templates matched with for Person profile ID: {person_profile.id} for user ID: {email_templates[0].user_id}")
             return LeadResearchReport.ChosenOutreachEmailTemplate(id=None, reason=result.reason, message=None, creation_date=Utils.create_utc_time_now())
 
-        logger.info(f"Chosen template per LLM: {result}")
+        logger.info(
+            f"Chosen template per LLM: {result} for person profile ID: {person_profile.id}")
 
         chosen_templates: OutreachEmailTemplate = list(filter(
             lambda template: template.id == result.matched_persona_id, email_templates))
         if len(chosen_templates) != 1:
             raise ValueError(
-                f"Expected to find 1 Email template with ID: {result.matched_persona_id}, found: {chosen_templates}")
+                f"Expected to find 1 Email template with ID: {result.matched_persona_id}, found: {chosen_templates} for person profile ID: {person_profile.id}")
         chosen_email_template: OutreachEmailTemplate = chosen_templates[0]
 
         return LeadResearchReport.ChosenOutreachEmailTemplate(
