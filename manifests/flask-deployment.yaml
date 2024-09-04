@@ -16,12 +16,14 @@ spec:
     spec:
       containers:
       - name: flask-api
-        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.16
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.17
         resources:
           limits:
-            cpu: 400m
+            cpu: 1000m
+            memory: "2Gi"
           requests:
-            cpu: 200m
+            cpu: 500m
+            memory: "1Gi"
         ports:
         - containerPort: 5000
 
