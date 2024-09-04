@@ -135,11 +135,11 @@ class Researcher:
                     suffix_query="interviews or podcasts",
                     num_results=10,
                 ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                    suffix_query="personal recognitions",
-                    num_results=10,
-                ),
+                # SearchRequest.QueryConfig(
+                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                #     suffix_query="personal recognitions",
+                #     num_results=10,
+                # ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                     suffix_query="recent achievements",
@@ -150,14 +150,19 @@ class Researcher:
                     suffix_query="thoughts on the industry",
                     num_results=10,
                 ),
+                # SearchRequest.QueryConfig(
+                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                #     suffix_query="recent talks or events or conferences attended",
+                #     num_results=10,
+                # ),
                 SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                    suffix_query="recent talks or events or conferences attended",
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="funding announcements",
                     num_results=10,
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="funding announcements",
+                    suffix_query="recent news",
                     num_results=10,
                 ),
             ],
@@ -223,7 +228,7 @@ class Researcher:
                     f"Completed processing for failed search URL: {failed_url} in task num: {task_num}")
             except Exception as e:
                 logger.warning(
-                    f"During retry: failed to process content from search URL: {url} with error: {e}")
+                    f"During retry: failed to process content from search URL: {failed_url} with error: {e}")
                 final_failed_urls.append(failed_url)
 
         return final_failed_urls
@@ -454,7 +459,8 @@ class Researcher:
         # Update lead research report.
         setFields = {
             "status": LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE,
-            "chosen_outreach_email_template": chosen_outreach_email_template.model_dump(),
+            # We are allowing templates to be None.
+            "chosen_outreach_email_template": chosen_outreach_email_template.model_dump() if chosen_outreach_email_template else None,
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)

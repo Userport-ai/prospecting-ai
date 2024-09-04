@@ -33,7 +33,9 @@ class OutreachTemplateMatcher:
             # No existing email templates added by user.
             error_message = f"Failed to find closest email template: No existing email templates found for User with ID: {user_id}"
             logger.exception(error_message)
-            raise ValueError(error_message)
+            # We are allowing for no templates.
+            # raise ValueError(error_message)
+            return None
 
         person_profile: PersonProfile = self.database.get_person_profile(
             person_profile_id=person_profile_id)

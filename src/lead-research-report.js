@@ -38,7 +38,10 @@ function PersonalizedEmails({
     personalized_email,
     chosen_outreach_email_template
   ) {
-    if (chosen_outreach_email_template.id === null) {
+    if (
+      chosen_outreach_email_template === null ||
+      chosen_outreach_email_template.id === null
+    ) {
       // No template chosen, return only email opener.
       return personalized_email.email_opener;
     }
@@ -161,7 +164,10 @@ function SelectedEmailTemplate({
   }
 
   var selectedTemplateView = null;
-  if (chosen_outreach_email_template.id === null) {
+  if (
+    chosen_outreach_email_template === null ||
+    chosen_outreach_email_template.id === null
+  ) {
     // No template was chosen, return empty data.
     selectedTemplateView = (
       <div id="no-template-selected">

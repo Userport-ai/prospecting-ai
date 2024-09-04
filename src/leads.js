@@ -85,14 +85,15 @@ function Leads() {
 
   // Handle Add Lead button click by user.
   function handleAddLeadClick() {
-    if (userHasNotCreatedTemplate(userFromServer.state)) {
-      // Prompt the user that they need to create a template first.
-      Modal.error({
-        title: "Template not created yet",
-        content: "Please create template for the persona first.",
-      });
-      return;
-    }
+    // TODO: Let's see if we should remove this completely.
+    // if (userHasNotCreatedTemplate(userFromServer.state)) {
+    //   // Prompt the user that they need to create a template first.
+    //   Modal.error({
+    //     title: "Template not created yet",
+    //     content: "Please create template for the persona first.",
+    //   });
+    //   return;
+    // }
 
     var nextPage = "/leads/create";
     if (userHasNotCreatedLead(userFromServer.state)) {

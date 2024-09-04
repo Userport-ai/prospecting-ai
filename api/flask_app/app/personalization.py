@@ -51,11 +51,11 @@ class Personalization:
 
         chosen_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = lead_research_report.chosen_outreach_email_template
         email_template_message: Optional[str] = None
-        if chosen_email_template.id:
-            email_template_message = chosen_email_template.message
-        else:
+        if chosen_email_template == None or chosen_email_template.id == None:
             logger.info(
                 f"No Email template matched for Lead report: {lead_research_report_id} and user ID: {lead_research_report.user_id}")
+        else:
+            email_template_message = chosen_email_template.message
 
         generated_personalized_emails: List[LeadResearchReport.PersonalizedEmail] = [
         ]
