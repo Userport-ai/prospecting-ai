@@ -44,6 +44,8 @@ def setup_logging():
         # Cannot run locally since permissions not setup to write Logs to Cloud Logging resource.
 
         import google.cloud.logging
+        from google.cloud.logging.handlers import CloudLoggingHandler, StructuredLogHandler
+        import logging
         # Instantiates a client
         client = google.cloud.logging.Client()
         # Retrieves a Cloud Logging handler based on the environment
@@ -51,6 +53,14 @@ def setup_logging():
         # Python logging module. By default this captures all logs
         # at INFO level and higher
         client.setup_logging()
+        # Using https://stackoverflow.com/questions/48078051/duplicate-log-entries-with-google-cloud-stackdriver-logging-of-python-code-on-ku
+        # to solve duplicate logging problem seen in Cloud Logs.
+        root_logger = logging.getLogger()
+        # Use the GCP handler ONLY in order to prevent logs from getting written to STDERR
+        root_logger.handlers = [handler
+                                for handler in root_logger.handlers
+                                if isinstance(handler, (CloudLoggingHandler, StructuredLogHandler))]
+
     else:
         raise ValueError(
             f"Invalid flask env: {flask_env} value, cannot setup logging")
