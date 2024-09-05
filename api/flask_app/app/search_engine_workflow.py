@@ -91,9 +91,9 @@ class SearchEngineWorkflow:
 
     def __init__(self) -> None:
         self.blocklist_domains = set(
-            ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com", "bloomberg.com", "zoominfo.com", "clay.com"])
+            ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com", "bloomberg.com", "zoominfo.com", "clay.com", "leadiq.com", "internshala.com", "rocketreach.co", "ambitionbox.com", "iimjobs.com", "freshersnow.com"])
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
-        self.HTTP_REQUEST_TIMEOUT_SECONDS = 5
+        self.HTTP_REQUEST_TIMEOUT_SECONDS = 20
 
     def get_search_results(self, search_request: SearchRequest) -> Dict[str, List[str]]:
         """Returns search results as a dictionary mapping each search query to a list of URLs for the given request."""
@@ -120,12 +120,10 @@ class SearchEngineWorkflow:
             # Fetch search results from API call.
             result_urls: List[str] = self.api_search(
                 search_query=search_query, num_results=num_results, exact_terms=exact_terms, skip_urls=already_fetched_urls)
-            print("result urls: ", result_urls)
             already_fetched_urls = already_fetched_urls.union(set(result_urls))
 
             search_results_map[search_query] = result_urls
 
-        print("search results map: ", search_results_map)
         return search_results_map
 
     def api_search(self, search_query: str, num_results: int, exact_terms: str, skip_urls: Set[str]) -> List[str]:
@@ -283,26 +281,31 @@ if __name__ == "__main__":
         existing_urls = json.loads(f.read())
 
     search_request = SearchRequest(
-        person_name="Aashna Shroff",
-        company_name="Toddle - Your Teaching Partner",
-        person_role_title="Product - Toddle AI",
+        person_name="Bhavish Aggarwal",
+        company_name="Olacabs.com",
+        person_role_title="Co-Founder & CEO",
         existing_urls=[],
         query_configs=[
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="product launches",
-                num_results=10,
-            ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+            #     suffix_query="product launches",
+            #     num_results=10,
+            # ),
+            # SearchRequest.QueryConfig(
+            #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+            #         suffix_query="funding announcements",
+            #         num_results=10,
+            # ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
             #     suffix_query="LinkedIn Posts",
             #     num_results=20,
             # ),
-            # SearchRequest.QueryConfig(
-            #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-            #         suffix_query="blogs",
-            #         num_results=10,
-            # ),
+            SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="blogs",
+                    num_results=20,
+            ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="recent achievements",
@@ -321,5 +324,5 @@ if __name__ == "__main__":
         ],
     )
     results = wf.get_search_results(search_request=search_request)
-    with open("example_linkedin_info/google_custom_search_results/se_test_0.json", "w") as f:
+    with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
         f.write(json.dumps(results, indent=4))

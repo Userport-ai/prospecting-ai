@@ -691,28 +691,38 @@ class WebPageScraper:
             "Web Page Text:\n"
             "{page_text}"
         )
-        # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
-        llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS)
-        prompt = PromptTemplate.from_template(prompt_template)
 
-        # We will fetch author and publish date details from the page header + first page body chunk.
-        # Usually web pages have this information at the top so this algorithm should work well in most cases.
-        page_text = ""
-        if page_structure.header:
-            page_text += page_structure.header
-        page_text += page_structure.body_chunks[0].page_content
+        for attempt_num in range(2):
+            # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
+            temperature: float = 0 if attempt_num == 0 else 0.5
+            llm = ChatOpenAI(
+                temperature=temperature, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS)
+            prompt = PromptTemplate.from_template(prompt_template)
 
-        chain = prompt | llm
-        result = chain.invoke({"page_text": page_text})
+            # We will fetch author and publish date details from the page header + first page body chunk.
+            # Usually web pages have this information at the top so this algorithm should work well in most cases.
+            page_text = ""
+            window_size: int = 1000
+            if page_structure.header:
+                # Usually the publish text is very close to the end of the header if it exists.
+                page_text += page_structure.header[-window_size:]
+            page_text += page_structure.body_chunks[0].page_content[:window_size]
 
-        # Now using the string response from LLM, parse it for author and date information.
-        # For some reason, using structured output in the first LLM call doesn't work. We need to
-        # route the text answer from the first call to extract the structured output.
-        content_details = self.parse_llm_output(text=result.content)
-        logger.info(
-            f"Content Author and Publish date for URL: {self.url}: {content_details}")
-        return content_details
+            chain = prompt | llm
+            result = chain.invoke({"page_text": page_text})
+
+            # Now using the string response from LLM, parse it for author and date information.
+            # For some reason, using structured output in the first LLM call doesn't work. We need to
+            # route the text answer from the first call to extract the structured output.
+            content_details: ContentAuthorAndPublishDate = self.parse_llm_output(
+                text=result.content)
+            logger.info(
+                f"Content Author and Publish date for URL: {self.url}: {content_details}")
+            if content_details.publish_date == None or content_details.publish_date == "None":
+                logger.warning(
+                    f"Got None publish date for content with URL: {self.url}, content details: {content_details} and attempt number: {attempt_num}")
+                continue
+            return content_details
 
     def fetch_content_type(self, page_body_chunks: List[Document]) -> ContentType:
         """Fetches content type (podcast, interview, article, blog post etc.) using Page body."""
@@ -1462,10 +1472,10 @@ if __name__ == "__main__":
     # url = "https://www.businessinsider.com/plaids-ceo-discusses-building-controls-around-customer-data-2020-2"
     # url = "https://www.linkedin.com/posts/zperret_2024-fintech-predictions-with-zach-perret-activity-7155603572825427969-ThEB"
 
-    url = "https://plaid.com/blog/plaid-cra/"
+    # url = "https://plaid.com/blog/plaid-cra/"
     # url = "https://us.money2020.com/agenda/past-speakers"
     # url = "https://www.prnewswire.com/news-releases/alkami-and-plaid-partner-to-provide-financial-institutions-with-direct-access-to-plaid-via-the-financial-data-exchange-aligned-fdx-api-core-exchange-301982434.html"
-    # url = "https://www.fintechnexus.com/plaid-launches-new-product-cash-flow-underwriting-mainstream/"
+    url = "https://www.fintechnexus.com/plaid-launches-new-product-cash-flow-underwriting-mainstream/"
     # url = "https://www.treasuryprime.com/blog/money-20-20-cheatsheet-fintechs"
     # url = "https://plaid.com/blog/"
     # url = "https://www.lennysnewsletter.com/p/how-to-win-your-first-10-b2b-customers"
@@ -1477,26 +1487,31 @@ if __name__ == "__main__":
     # url = "https://plaid.com/customer-stories/coinbase/"
     # REALLY LARGE PAGE.
     # url = "https://plaid.com/legal/"
+    # url = "https://www.livemint.com/market/ipo/ola-ipo-bumpy-road-or-a-smooth-ride-ahead-for-investors-11703304354128.html"
+    # url = "https://indianexpress.com/article/trending/trending-in-india/ola-bhavish-aggarwal-gender-pronouns-viral-post-9310997/"
+    # url = "https://audiencereports.in/bhavish-aggarwal-pioneering/"
 
-    person_name = "Zachary Perret"
+    # person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
     # person_name = "Al Cook"
-    company_name = "Plaid"
+    # company_name = "Plaid"
     # person_name = "Anuj Kapur"
     # person_name = "Raj Sarkar"
     # company_name = "Cloudbees"
+    person_name = "Bhavish Aggarwal"
+    company_name = "Olacabs.com"
 
     import time
     import logging
     logging.basicConfig(level=logging.INFO)
 
     graph = WebPageScraper(url=url, dev_mode=False)
-    start_time = time.time()
-    doc = graph.fetch_page()
-    print("total time taken: ", time.time()-start_time)
     # start_time = time.time()
-    # content_info: PageContentInfo = graph.fetch_page_content_info(
-    #     doc=doc, company_name=company_name, person_name=person_name)
+    doc = graph.fetch_page()
+    # print("total time taken: ", time.time()-start_time)
+    # start_time = time.time()
+    content_info: PageContentInfo = graph.fetch_page_content_info(
+        doc=doc, company_name=company_name, person_name=person_name)
     # logging.info(f"\n\nTime taken: {time.time() - start_time} seconds")
     # with open("example_linkedin_info/parsed_page_info.json", "w") as f:
     #     f.write(json.dumps(content_info.dict(), indent=4))

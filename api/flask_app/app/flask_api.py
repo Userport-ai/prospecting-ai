@@ -207,8 +207,6 @@ def create_lead_report():
     db = Database()
     user_id: str = g.user["uid"]
 
-    # Create research report.
-    rp = Researcher(database=db)
     person_linkedin_url: str = request.json.get('linkedin_url').strip()
     if not LinkedInScraper.is_valid_profile_url(profile_url=person_linkedin_url):
         raise APIException(
@@ -231,6 +229,8 @@ def create_lead_report():
             status_code=409, message=f"Report already exists for URL: {person_linkedin_url}")
 
     try:
+        # Create research report.
+        rp = Researcher(database=db)
         lead_research_report = rp.create(
             user_id=user_id, person_linkedin_url=person_linkedin_url)
         fetch_lead_info_orchestrator.delay(

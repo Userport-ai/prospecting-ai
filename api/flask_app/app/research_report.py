@@ -44,6 +44,7 @@ class Researcher:
         # Compute person profile ID.
         person_profile: Optional[PersonProfile] = self.database.get_person_profile_by_url(
             person_linkedin_url=person_linkedin_url)
+        # TODO: Fetch profile from API if it is stale (over a couple of months old).
         if not person_profile:
             logger.info(
                 f"Person LinkedIn profile: {person_linkedin_url} NOT found in database.")
@@ -118,22 +119,22 @@ class Researcher:
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                     suffix_query="product launches",
-                    num_results=10,
+                    num_results=20,
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
                     suffix_query="LinkedIn Posts",
-                    num_results=10,
+                    num_results=20,
                 ),
                 SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                    suffix_query="blogs",
-                    num_results=10,
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent blogs or articles",
+                    num_results=20,
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
                     suffix_query="interviews or podcasts",
-                    num_results=10,
+                    num_results=20,
                 ),
                 # SearchRequest.QueryConfig(
                 #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
@@ -143,7 +144,7 @@ class Researcher:
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                     suffix_query="recent achievements",
-                    num_results=10,
+                    num_results=20,
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
@@ -163,7 +164,7 @@ class Researcher:
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                     suffix_query="recent news",
-                    num_results=10,
+                    num_results=20,
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
