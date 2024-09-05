@@ -130,12 +130,12 @@ class Researcher:
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                     suffix_query="recent blogs or articles",
-                    num_results=20,
+                    num_results=10,
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
                     suffix_query="interviews or podcasts",
-                    num_results=20,
+                    num_results=10,
                 ),
                 # SearchRequest.QueryConfig(
                 #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
@@ -161,11 +161,6 @@ class Researcher:
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                     suffix_query="funding announcements",
                     num_results=10,
-                ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="recent news",
-                    num_results=20,
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,

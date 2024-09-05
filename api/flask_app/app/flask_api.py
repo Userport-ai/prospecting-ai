@@ -871,7 +871,7 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
                                       task_name="process_content_in_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
-@shared_task(bind=True, acks_late=True, ignore_result=False, rate_limit="5/m")
+@shared_task(bind=True, acks_late=True, ignore_result=False, rate_limit="1/m")
 def process_content_in_search_results_batch_in_background(self, batch_num: int, lead_research_report_id: str, search_results_batch: List[List[str]]):
     """Process batch of given Search Result URLs and returns a list of URLs that failed to process."""
     logger.info(

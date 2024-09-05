@@ -82,7 +82,7 @@ class LinkedInScraper:
         self.PROXYCURL_API_KEY = os.environ["PROXYCURL_API_KEY"]
         self.dev_mode = dev_mode
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
-        self.HTTP_REQUEST_TIMEOUT_SECONDS = 10
+        self.HTTP_REQUEST_TIMEOUT_SECONDS = 30
         # Per suggestion here: https://nubela.co/proxycurl/docs#proxycurl-overview-timeouts-and-api-response-time.
         self.HTTP_PROXYCURL_REQUEST_TIMEOUT_SECONDS = 60
 

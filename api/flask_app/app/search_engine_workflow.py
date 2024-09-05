@@ -91,9 +91,17 @@ class SearchEngineWorkflow:
 
     def __init__(self) -> None:
         self.blocklist_domains = set(
-            ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com", "bloomberg.com", "zoominfo.com", "clay.com", "leadiq.com", "internshala.com", "rocketreach.co", "ambitionbox.com", "iimjobs.com", "freshersnow.com"])
+            ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com",
+             "bloomberg.com", "zoominfo.com", "clay.com", "leadiq.com", "internshala.com", "rocketreach.co",
+             "ambitionbox.com", "iimjobs.com", "freshersnow.com", "reddit.com", "play.google.com", "community.dynamics.com"])
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 20
+
+        # Loads all user agents.
+        self.all_user_agents = []
+        with gzip.open("app/user_agents.txt.gz", 'rt') as f:
+            for line in f.readlines():
+                self.all_user_agents.append(line.strip())
 
     def get_search_results(self, search_request: SearchRequest) -> Dict[str, List[str]]:
         """Returns search results as a dictionary mapping each search query to a list of URLs for the given request."""
@@ -113,20 +121,17 @@ class SearchEngineWorkflow:
 
             search_query += config.suffix_query
             num_results: int = config.num_results
-            # This is configured so that Google only returns URLs with company name mentioned.
-            # TODO: Test if this is skipping false negatives.
-            exact_terms = company_name
 
             # Fetch search results from API call.
             result_urls: List[str] = self.api_search(
-                search_query=search_query, num_results=num_results, exact_terms=exact_terms, skip_urls=already_fetched_urls)
+                search_query=search_query, num_results=num_results, skip_urls=already_fetched_urls)
             already_fetched_urls = already_fetched_urls.union(set(result_urls))
 
             search_results_map[search_query] = result_urls
 
         return search_results_map
 
-    def api_search(self, search_query: str, num_results: int, exact_terms: str, skip_urls: Set[str]) -> List[str]:
+    def api_search(self, search_query: str, num_results: int, skip_urls: Set[str]) -> List[str]:
         """
         Returns a list of Web Search Result URLs for given search query.
         It does this by repeatedly calling Custom Search API until given number of results are fetched.
@@ -155,7 +160,6 @@ class SearchEngineWorkflow:
                 # Min value: 1, Max value: 10.
                 "num": page_size,
                 "filter": "1",
-                "exactTerms": exact_terms,
                 "safe": "active",
             }
             response_dict = None
@@ -204,23 +208,14 @@ class SearchEngineWorkflow:
         return result_urls
 
     def get_unofficial_google_search_results(self, search_queries: List[str], max_results_per_query: int) -> Dict[str, List[str]]:
-        """Returns search result links for given search query using Google.
-
-        DO NOT use in production unless tested. It may result in 429 errors due to it being an unofficial library.
-        """
-        # Loads all user agents.
-        all_user_agents = []
-        with gzip.open("app/user_agents.txt.gz", 'rt') as f:
-            for line in f.readlines():
-                all_user_agents.append(line.strip())
+        """Returns search result links for given search query using unofficial Google Search Library."""
 
         results = {}
         for query in search_queries:
             results[query] = []
             logger.info(
                 f"Search query: {query}, max results: {max_results_per_query}")
-            for url in search(query, stop=max_results_per_query, user_agent=random.choice(all_user_agents)):
-
+            for url in search(query, stop=max_results_per_query, user_agent=random.choice(self.all_user_agents)):
                 if self.is_blocklist_domain(url=url):
                     logger.info(f"URL: {url} is in block list, so skip it.")
                     continue
@@ -289,23 +284,23 @@ if __name__ == "__main__":
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="product launches",
-            #     num_results=10,
+            #     num_results=20,
             # ),
             # SearchRequest.QueryConfig(
             #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #         suffix_query="funding announcements",
-            #         num_results=10,
-            # ),
-            # SearchRequest.QueryConfig(
-            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-            #     suffix_query="LinkedIn Posts",
-            #     num_results=20,
+            #         num_results=20,
             # ),
             SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                    suffix_query="blogs",
-                    num_results=20,
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                suffix_query="LinkedIn Posts",
+                num_results=20,
             ),
+            # SearchRequest.QueryConfig(
+            #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #         suffix_query="blogs",
+            #         num_results=20,
+            # ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="recent achievements",
@@ -324,5 +319,7 @@ if __name__ == "__main__":
         ],
     )
     results = wf.get_search_results(search_request=search_request)
+    # results = wf.get_unofficial_google_search_results(
+    #     search_queries=["Olacabs.com's recent funding announcements"], max_results_per_query=20)
     with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
         f.write(json.dumps(results, indent=4))
