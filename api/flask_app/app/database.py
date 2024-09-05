@@ -253,11 +253,11 @@ class Database:
             return None
         return CompanyProfile(**data_dict)
 
-    def get_content_details_by_url(self, url: str, company_profile_id: str) -> Optional[ContentDetails]:
-        """Returns Content details for given url. Returns None if not found."""
+    def get_content_details_by_url(self, url: str, company_profile_id: str, processing_status: ContentDetails.ProcessingStatus) -> Optional[ContentDetails]:
+        """Returns Content details for given url and company profile and given processing status. Returns None if not found."""
         collection = self.get_content_details_collection()
         data_dict = collection.find_one(
-            {"url": url, "company_profile_id": company_profile_id})
+            {"url": url, "company_profile_id": company_profile_id, "processing_status": processing_status.value})
         if not data_dict:
             return None
         return ContentDetails(**data_dict)
@@ -272,7 +272,7 @@ class Database:
         return ContentDetails(**data_dict)
 
     def get_lead_research_report(self, lead_research_report_id: str, projection: Optional[Dict[str, int]] = None) -> LeadResearchReport:
-        """Returns Lead Research report for given Report ID."""
+        """Returns Lead Research report for given Report ID. Raises error if report is not found in the database."""
         collection = self._get_lead_research_report_collection()
         data_dict = collection.find_one(
             {"_id": ObjectId(lead_research_report_id)}, projection=projection)
@@ -281,11 +281,11 @@ class Database:
                 f'Lead Research report not found for Id: {lead_research_report_id}')
         return LeadResearchReport(**data_dict)
 
-    def get_lead_research_report_by_url(self, user_id: str, person_linkedin_url: str) -> Optional[LeadResearchReport]:
+    def get_lead_research_report_by_url(self, user_id: str, person_linkedin_url: str,  projection: Optional[Dict[str, int]] = None) -> Optional[LeadResearchReport]:
         """Returns Lead Research report for given person's LinkedIn URL and the user who created the report. If it doesn't exist, returns None."""
         collection = self._get_lead_research_report_collection()
         data_dict = collection.find_one(
-            {"user_id": user_id, "person_linkedin_url": person_linkedin_url})
+            {"user_id": user_id, "person_linkedin_url": person_linkedin_url}, projection=projection)
         if not data_dict:
             return None
         return LeadResearchReport(**data_dict)
@@ -442,10 +442,10 @@ if __name__ == "__main__":
     #     collection=db._get_lead_research_report_collection(), filter={"personalized_emails._id": ObjectId("66baecd4914935040bcf629d")}, update=update)
     # print("done")
     delete_filter = {
-        "creation_date": {"$gt": Utils.create_utc_datetime(31, 8, 2024)}
+        "creation_date": {"$gte": Utils.create_utc_datetime(5, 9, 2024)}
     }
     db.delete_all_content_details(
-        find_filter=delete_filter, delete_confirm=False)
+        find_filter=delete_filter, delete_confirm=True)
 
     # db.insert_personalized_emails(lead_research_report_id="", personalized_emails=[
     #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="hello"),

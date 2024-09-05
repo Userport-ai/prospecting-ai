@@ -37,28 +37,32 @@ class Researcher:
             database=database)
         self.personalization = Personalization(database=database)
 
-    def create(self, user_id: str, person_linkedin_url: str) -> LeadResearchReport:
-        """Creates Research report in the database for given lead's LinkedIn URL and given user and returns the report."""
-        lead_research_report = LeadResearchReport()
+    def enrich_lead_info(self, lead_research_report_id: str) -> str:
+        """Enriches lead report with information such as name, their company, role etc."""
+        research_report: LeadResearchReport = self.database.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id)
 
         # Compute person profile ID.
+        person_profile_id: str = None
+        person_linkedin_url: str = research_report.person_linkedin_url
         person_profile: Optional[PersonProfile] = self.database.get_person_profile_by_url(
             person_linkedin_url=person_linkedin_url)
-        # TODO: Fetch profile from API if it is stale (over a couple of months old).
         if not person_profile:
             logger.info(
                 f"Person LinkedIn profile: {person_linkedin_url} NOT found in database.")
             linkedin_scraper = LinkedInScraper()
             person_profile = linkedin_scraper.fetch_person_profile(
                 profile_url=person_linkedin_url)
-            lead_research_report.person_profile_id = self.database.insert_person_profile(
+            person_profile_id = self.database.insert_person_profile(
                 person_profile=person_profile)
         else:
             logger.info(
                 f"Person LinkedIn profile: {person_linkedin_url} profile found in database.")
-            lead_research_report.person_profile_id = person_profile.id
+            # TODO: Force Fetch profile from API if it is stale (over a couple of months old).
+            person_profile_id = person_profile.id
 
         # Compute company profile ID.
+        company_profile_id: str = None
         company_name, role_title = person_profile.get_company_and_role_title()
         company_linkedin_url = person_profile.get_company_linkedin_url(
             company_name=company_name)
@@ -70,28 +74,25 @@ class Researcher:
             linkedin_scraper = LinkedInScraper()
             company_profile = linkedin_scraper.fetch_company_profile(
                 profile_url=company_linkedin_url)
-            lead_research_report.company_profile_id = self.database.insert_company_profile(
+            company_profile_id = self.database.insert_company_profile(
                 company_profile=company_profile)
         else:
             logger.info(
                 f"Company {company_linkedin_url} profile found in database.")
-            lead_research_report.company_profile_id = company_profile.id
+            company_profile_id = company_profile.id
 
-        # Add to database.
-        lead_research_report.person_linkedin_url = person_linkedin_url
-        lead_research_report.company_name = company_name
-        lead_research_report.person_name = person_profile.full_name
-        lead_research_report.person_role_title = role_title
-        lead_research_report.status = LeadResearchReport.Status.BASIC_PROFILE_FETCHED
-        lead_research_report.company_headcount = company_profile.company_size_on_linkedin
-        lead_research_report.company_industry_categories = company_profile.categories
-        lead_research_report.user_id = user_id
-
-        # Insert to database.
-        id: str = self.database.insert_lead_research_report(
-            lead_research_report=lead_research_report)
-        lead_research_report.id = id
-        return lead_research_report
+        setFields = {
+            "person_profile_id": person_profile_id,
+            "company_profile_id": company_profile_id,
+            "company_name": company_name,
+            "person_name": person_profile.full_name,
+            "person_role_title": role_title,
+            "company_headcount": company_profile.company_size_on_linkedin,
+            "company_industry_categories": company_profile.categories,
+            "status":  LeadResearchReport.Status.BASIC_PROFILE_FETCHED,
+        }
+        self.database.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
 
     def fetch_search_results(self, lead_research_report_id: str):
         """Fetch and store search results for given lead."""
@@ -246,8 +247,8 @@ class Researcher:
 
     def process_content(self, url: str, search_query: str, research_report: LeadResearchReport):
         """Fetch content from given URL, process it and store it in the database."""
-        # If this URL has already been indexed for this company, skip processing.
-        if self.database.get_content_details_by_url(url=url, company_profile_id=research_report.company_profile_id):
+        # If this URL has already been indexed for this company and has been processed successfully, skip processing again.
+        if self.database.get_content_details_by_url(url=url, company_profile_id=research_report.company_profile_id, processing_status=ContentDetails.ProcessingStatus.COMPLETE):
             logger.info(
                 f"Web URL: {url} already indexed in the database for report: {research_report.id}, skip processing again.")
             return

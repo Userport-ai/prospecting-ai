@@ -311,6 +311,7 @@ class LeadResearchReport(BaseModel):
 
     class Status(str, Enum):
         # Fetched basic details about the person and company.
+        NEW = "new"
         BASIC_PROFILE_FETCHED = "basic_profile_fetched"
         URLS_FROM_SEARCH_ENGINE_FETCHED = "urls_from_search_engine_fetched"
         CONTENT_PROCESSING_COMPLETE = "content_processing_complete"

@@ -207,44 +207,49 @@ def create_lead_report():
     db = Database()
     user_id: str = g.user["uid"]
 
-    person_linkedin_url: str = request.json.get('linkedin_url').strip()
+    # Remove any leading and trailing whitespaces and trailing slashes.
+    person_linkedin_url: str = request.json.get(
+        'linkedin_url').strip().rstrip("/")
     if not LinkedInScraper.is_valid_profile_url(profile_url=person_linkedin_url):
         raise APIException(
-            status_code=404, message=f"Invalid URL: {person_linkedin_url}")
+            status_code=404, message=f"Invalid LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}")
 
-    logger.info(f"Got request to start report for URL: {person_linkedin_url}")
+    logger.info(
+        f"Got request from user ID: {user_id} to start report for URL: {person_linkedin_url}")
+
+    lead_research_report: Optional[LeadResearchReport] = None
     try:
-        lead_research_report: Optional[LeadResearchReport] = db.get_lead_research_report_by_url(user_id=user_id,
-                                                                                                person_linkedin_url=person_linkedin_url)
+        lead_research_report = db.get_lead_research_report_by_url(
+            user_id=user_id, person_linkedin_url=person_linkedin_url, projection={"_id": 1})
     except Exception as e:
         logger.exception(
-            f"Failed to fetch Lead Research report for URL: {person_linkedin_url} with error: {e}")
+            f"Failed to fetch Lead Research report for URL: {person_linkedin_url} requested by user ID: {user_id} with error: {e}")
         raise APIException(
             status_code=500, message=f"Failed to create report for LinkedIn URL: {person_linkedin_url}")
 
     if lead_research_report:
         logger.info(
-            f"Research report already exists for LinkedIn URL: {person_linkedin_url}, returning it.")
+            f"Research report already exists with report ID: {lead_research_report.id} for LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}.")
         raise APIException(
-            status_code=409, message=f"Report already exists for URL: {person_linkedin_url}")
+            status_code=409, message=f"Report already exists for URL: {person_linkedin_url} requested by user ID: {user_id}")
 
     try:
-        # Create research report.
-        rp = Researcher(database=db)
-        lead_research_report = rp.create(
-            user_id=user_id, person_linkedin_url=person_linkedin_url)
+        # Create report in the database and continue updating it in the background.
+        lead_research_report = LeadResearchReport(
+            user_id=user_id, person_linkedin_url=person_linkedin_url, status=LeadResearchReport.Status.NEW)
+        lead_research_report_id: str = db.insert_lead_research_report(
+            lead_research_report=lead_research_report)
         fetch_lead_info_orchestrator.delay(
-            lead_research_report_id=lead_research_report.id)
-
+            lead_research_report_id=lead_research_report_id)
         logger.info(
-            f"Created a new lead research report: {lead_research_report.id} for URL: {person_linkedin_url}")
+            f"Created report: {lead_research_report_id} for lead with LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}")
         response = CreateLeadResearchReportResponse(
             status=ResponseStatus.SUCCESS,
         )
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to create report for LinkedIn URL: {person_linkedin_url} with error: {e}")
+            f"Failed to create report for LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id} with error: {e}")
         raise APIException(
             status_code=500, message=f"Failed to create report for LinkedIn URL: {person_linkedin_url}")
 
@@ -736,9 +741,14 @@ def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
         report: LeadResearchReport = database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id, projection={"status": 1, "status_before_failure": 1})
         report_status: LeadResearchReport.Status = report.status if report.status != LeadResearchReport.Status.FAILED_WITH_ERRORS else report.status_before_failure
-        logger.info(f"Current report status: {report_status}")
-
-        if report_status == LeadResearchReport.Status.BASIC_PROFILE_FETCHED:
+        logger.info(
+            f"Current report status: {report_status} for report ID: {lead_research_report_id}")
+        if report_status == LeadResearchReport.Status.NEW:
+            logger.info(
+                f"Report just created with ID: {lead_research_report_id}, enrich lead profile next.")
+            enrich_lead_info_in_background.delay(
+                lead_research_report_id=lead_research_report_id)
+        elif report_status == LeadResearchReport.Status.BASIC_PROFILE_FETCHED:
             logger.info(
                 f"Basic profile fetched for {lead_research_report_id}, fetch search results next.")
             fetch_search_results_in_background.delay(
@@ -770,6 +780,27 @@ def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
                                       e=e, task_name="fetch_lead_info_orchestrator", status_before_failure=report_status)
+
+
+@shared_task(bind=True, acks_late=True)
+def enrich_lead_info_in_background(self, lead_research_report_id: str):
+    """Enrich lead with name, company name, role titles in the given Lead Report."""
+    logger.info(
+        f"Creating lead profile for Lead Research report ID: {lead_research_report_id}")
+    database = Database()
+    try:
+        rp = Researcher(database=database)
+        rp.enrich_lead_info(
+            lead_research_report_id=lead_research_report_id)
+        logger.info(
+            f"Enriched lead successfully in report ID: {lead_research_report_id}.")
+
+        # Fetch Search Results associated with the given leads.
+        fetch_search_results_in_background.delay(
+            lead_research_report_id=lead_research_report_id)
+    except Exception as e:
+        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
+                                      e=e, task_name="enrich_lead_info", status_before_failure=LeadResearchReport.Status.NEW)
 
 
 @shared_task(bind=True, acks_late=True)
