@@ -65,7 +65,7 @@ We want to specify platform as linux/amd64 since we are usually building these i
 
 Building Frontend for GKE Deployment in production: `docker build --platform linux/amd64 -f Dockerfile.frontend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/frontend .`
 
-Building Backend for GKE Deployment in production: `docker build --platform linux/amd64 -f Dockerfile.backend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/backend .`
+Building Backend for GKE Deployment in production: `docker build --platform linux/amd64 -f Dockerfile.backend  -t userport/backend .`
 
 Docker CMD for running Flask server: `CMD ["gunicorn","--bind", "0.0.0.0:5000", "app:create_app"]`
 

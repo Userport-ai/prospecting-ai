@@ -13,10 +13,8 @@ RUN pip install -r ./requirements.txt
 COPY api/flask_app/app ./app
 COPY api/flask_app/.env api/flask_app/.env.production ./
 
-ARG GIT_COMMIT
 ENV FLASK_ENV=production
 LABEL "env"=production
-LABEL "git_commit"=$GIT_COMMIT
 
 EXPOSE 5000
 # We should be able to specify this command in Kuberneter Mainfest file as well. Let's test 
