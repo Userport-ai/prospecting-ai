@@ -93,7 +93,8 @@ class SearchEngineWorkflow:
         self.blocklist_domains = set(
             ["crunchbase.com", "youtube.com", "twitter.com", "x.com", "facebook.com", "quora.com",
              "bloomberg.com", "zoominfo.com", "clay.com", "leadiq.com", "internshala.com", "rocketreach.co",
-             "ambitionbox.com", "iimjobs.com", "freshersnow.com", "reddit.com", "play.google.com", "community.dynamics.com"])
+             "ambitionbox.com", "iimjobs.com", "freshersnow.com", "reddit.com", "play.google.com", "community.dynamics.com"
+             "researchgate.net"])
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 20
 

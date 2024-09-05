@@ -690,15 +690,11 @@ def delete_outreach_email_template(outreach_email_template_id: str):
 @bp.route('/v1/debug', methods=['GET'])
 def debug():
     # Only used for debugging locally, do not call in production.
-    report_id = request.args.get("lead_report_id")
-    # fetch_lead_info_orchestrator.delay(
-    #     lead_research_report_id="66ab9633a3bb9048bc1a0be5")
-    # process_content_in_search_results_in_background.delay(
-    #     lead_research_report_id="66ab9633a3bb9048bc1a0be5")
-    # aggregate_report_in_background.delay(
-    #     lead_research_report_id="66ab9633a3bb9048bc1a0be5")
-    choose_outreach_email_template_in_background.delay(
-        report_id)
+    report_id = request.args.get("report_id")
+    logger.info(f"Debug request got report ID: {report_id}")
+    fetch_lead_info_orchestrator.delay(
+        lead_research_report_id=report_id)
+    logger.info(f"Started orchestrator in debug request for report ID: {report_id}")
     return {"status": "ok"}
 
 
