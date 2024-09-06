@@ -152,3 +152,9 @@ Stackoverflow links to help debug architecture related issues:
 ## Gcloud commands
 
 List In Use static external IP addresses: `gcloud compute addresses list`
+
+## Production Debugging
+
+Send debug request: `curl https://app.userport.ai/api/v1/debug/<report ID>`
+
+Delete report: `curl -X "DELETE" https://app.userport.ai/api/v1/admin/delete/<report ID>`

@@ -718,7 +718,7 @@ class WebPageScraper:
                 text=result.content)
             logger.info(
                 f"Content Author and Publish date for URL: {self.url}: {content_details}")
-            if content_details.publish_date == None or content_details.publish_date == "None":
+            if content_details == None or content_details.publish_date == None or content_details.publish_date == "None":
                 logger.warning(
                     f"Got None publish date for content with URL: {self.url}, content details: {content_details} and attempt number: {attempt_num}")
                 continue
@@ -1475,7 +1475,7 @@ if __name__ == "__main__":
     # url = "https://plaid.com/blog/plaid-cra/"
     # url = "https://us.money2020.com/agenda/past-speakers"
     # url = "https://www.prnewswire.com/news-releases/alkami-and-plaid-partner-to-provide-financial-institutions-with-direct-access-to-plaid-via-the-financial-data-exchange-aligned-fdx-api-core-exchange-301982434.html"
-    url = "https://www.fintechnexus.com/plaid-launches-new-product-cash-flow-underwriting-mainstream/"
+    # url = "https://www.fintechnexus.com/plaid-launches-new-product-cash-flow-underwriting-mainstream/"
     # url = "https://www.treasuryprime.com/blog/money-20-20-cheatsheet-fintechs"
     # url = "https://plaid.com/blog/"
     # url = "https://www.lennysnewsletter.com/p/how-to-win-your-first-10-b2b-customers"
@@ -1490,6 +1490,8 @@ if __name__ == "__main__":
     # url = "https://www.livemint.com/market/ipo/ola-ipo-bumpy-road-or-a-smooth-ride-ahead-for-investors-11703304354128.html"
     # url = "https://indianexpress.com/article/trending/trending-in-india/ola-bhavish-aggarwal-gender-pronouns-viral-post-9310997/"
     # url = "https://audiencereports.in/bhavish-aggarwal-pioneering/"
+
+    url = "https://www.linkedin.com/in/satya-mohanty/recent-activity/all/"
 
     # person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
@@ -1508,10 +1510,11 @@ if __name__ == "__main__":
     graph = WebPageScraper(url=url, dev_mode=False)
     # start_time = time.time()
     doc = graph.fetch_page()
+
     # print("total time taken: ", time.time()-start_time)
     # start_time = time.time()
-    content_info: PageContentInfo = graph.fetch_page_content_info(
-        doc=doc, company_name=company_name, person_name=person_name)
+    # content_info: PageContentInfo = graph.fetch_page_content_info(
+    #     doc=doc, company_name=company_name, person_name=person_name)
     # logging.info(f"\n\nTime taken: {time.time() - start_time} seconds")
     # with open("example_linkedin_info/parsed_page_info.json", "w") as f:
     #     f.write(json.dumps(content_info.dict(), indent=4))

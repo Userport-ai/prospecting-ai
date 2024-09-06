@@ -8,7 +8,7 @@ from celery import shared_task, chord
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
-from app.models import LeadResearchReport, OutreachEmailTemplate, User
+from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails
 from app.research_report import Researcher
 from app.linkedin_scraper import LinkedInScraper
 from firebase_admin import auth
@@ -348,6 +348,9 @@ def list_leads():
     user_id: str = g.user["uid"]
     start_time = time.time()
     try:
+        filter = {
+            "user_id": user_id,
+        }
         projection = {
             "person_linkedin_url": 1,
             "person_name": 1,
@@ -358,7 +361,7 @@ def list_leads():
             "company_industry_categories": 1,
         }
         lead_research_reports: List[LeadResearchReport] = db.list_lead_research_reports(
-            user_id=user_id, projection=projection)
+            filter=filter, projection=projection)
         logger.info(
             f"Got {len(lead_research_reports)} reports from the database")
         user = db.get_or_create_user(user_id=user_id,
@@ -673,8 +676,8 @@ def delete_outreach_email_template(outreach_email_template_id: str):
     db = Database()
 
     try:
-        db.delete_outreach_email_templates(
-            outreach_email_template_id=outreach_email_template_id)
+        db.delete_one_object_id(db.get_outreach_email_template_collection(
+        ), id_to_delete=outreach_email_template_id)
         logger.info(
             f"Deleted Outreach Email template ID {outreach_email_template_id} successfully")
         response = DeleteOutreachTemplateResponse(
@@ -687,15 +690,75 @@ def delete_outreach_email_template(outreach_email_template_id: str):
             status_code=500, message="Internal Error when deleting Outreach Email template")
 
 
-@bp.route('/v1/debug', methods=['GET'])
-def debug():
-    # Only used for debugging locally, do not call in production.
-    report_id = request.args.get("report_id")
+@bp.get('/v1/debug/<string:report_id>')
+def admin_debug(report_id: str):
     logger.info(f"Debug request got report ID: {report_id}")
     fetch_lead_info_orchestrator.delay(
         lead_research_report_id=report_id)
-    logger.info(f"Started orchestrator in debug request for report ID: {report_id}")
-    return {"status": "ok"}
+    logger.info(
+        f"Started orchestrator in debug request for report ID: {report_id}")
+    return Response("ok\n")
+
+
+@bp.delete('/v1/admin/delete/<string:lead_research_report_id>/<string:confirm_deletion>')
+def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
+    """Admin API to delete lead research report and associated artifacts if any.
+
+    If there are other reports that reference the same company profile as exists in this report,
+    then we will only delete the report.
+    If there are no other such reports, then we will delete all content details that have given
+    company profile and their associated web pages and linkedin posts as well. Finally we will delete the report.
+    """
+    database = Database()
+    report = database.get_lead_research_report(
+        lead_research_report_id=lead_research_report_id, projection={"company_profile_id": 1, "user_id": 1})
+    company_profile_id: str = report.company_profile_id
+    user_id: str = report.user_id
+    reports: List[LeadResearchReport] = database.list_lead_research_reports(
+        filter={"company_profile_id": company_profile_id, "user_id": {"$ne": user_id}}, projection={"_id": 1})
+    if len(reports) > 0:
+        logger.info(
+            f"Found other reports: {[report.id for report in reports]} for given company profile ID: {company_profile_id} for request with report ID: {lead_research_report_id}.")
+        if confirm_deletion == "confirm_deletion":
+            # Delete lead report ID and exit.
+            database.delete_one_object_id(collection=database.get_lead_research_report_collection(
+            ), id_to_delete=lead_research_report_id)
+            logger.info(
+                f"Deletion complete. Stats deleted 1 lead report with ID: {lead_research_report_id}")
+        return Response("done\n")
+
+    logger.info(
+        f"No other reports found for company profile ID: {company_profile_id} for given report ID: {lead_research_report_id}, will delete all associated artifacts.")
+    content_details_list: List[ContentDetails] = database.list_content_details(
+        filter={"company_profile_id": company_profile_id}, projection={"linkedin_post_ref_id": 1, "web_page_ref_id": 1})
+
+    linkedin_ids_list: List[str] = []
+    web_page_ids_list: List[str] = []
+    for cd in content_details_list:
+        if cd.linkedin_post_ref_id:
+            linkedin_ids_list.append(cd.linkedin_post_ref_id)
+        if cd.web_page_ref_id:
+            web_page_ids_list.append(cd.web_page_ref_id)
+
+    content_details_ids_list: List[str] = [
+        str(cd.id) for cd in content_details_list]
+
+    logger.info(f"Got: {len(content_details_ids_list)} content details docs, {len(linkedin_ids_list)} linkedin post docs, {len(web_page_ids_list)} web page docs and 1 Lead Report with ID: {lead_research_report_id}")
+
+    if confirm_deletion == "confirm_deletion":
+        # Delete content.
+        database.delete_object_ids(collection=database.get_linkedin_posts_collection(
+        ), ids_to_delete=linkedin_ids_list)
+        database.delete_object_ids(
+            collection=database.get_web_pages_collection(), ids_to_delete=web_page_ids_list)
+        database.delete_object_ids(
+            collection=database.get_content_details_collection(), ids_to_delete=content_details_ids_list)
+        database.delete_one_object_id(collection=database.get_lead_research_report_collection(
+        ), id_to_delete=lead_research_report_id)
+
+        logger.info(
+            f"Deletion complete. Stats: {len(content_details_ids_list)} content details docs, {len(linkedin_ids_list)} linkedin post docs, {len(web_page_ids_list)} web page docs and 1 Lead Report with ID: {lead_research_report_id}")
+    return Response("done\n")
 
 
 def shared_task_exception_handler(shared_task_obj, database: Database, lead_research_report_id: str, e: Exception, task_name: str, status_before_failure: LeadResearchReport.Status):

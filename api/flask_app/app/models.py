@@ -234,6 +234,9 @@ class ContentDetails(BaseModel):
     3. Calling specific APIs like Crunchbase, NYSE for information about the company.
 
     In the future, we can add more workflows if needed.
+
+    Content is created when searching for a given lead in a given company.
+    Technically it can be shared among multiple leads within the same company when generate lead research reports.
     """
     class ProcessingStatus(str, Enum):
         FAILED_MISSING_PUBLISH_DATE = "failed_missing_publish_date"
@@ -249,7 +252,7 @@ class ContentDetails(BaseModel):
 
     # Metadata associated with the content.
     search_engine_query: Optional[str] = Field(
-        ..., description="Search engine query that resulted in this URL.")
+        default=None, description="Search engine query that resulted in this URL.")
     person_name: Optional[str] = Field(
         default=None, description="Full name of person. Populated only when the workflow was explicitly searching for person information and None when searching for only company information.")
     company_name: Optional[str] = Field(
@@ -1063,45 +1066,6 @@ class CompanyProfile(BaseModel):
         default=None, description="Funding data for given company.")
     categories: Optional[List[str]] = Field(
         default=None, description="This attribute is fetched from the company's Crunchbase profile. Values for this attribute are free-form text, and there is no exhaustive list of categories. Consider the categories attribute as \"hints\" regarding the products or services offered by the company.")
-
-
-class WebPageInfo(BaseModel):
-    """Stores web page information."""
-    id: Optional[PyObjectId] = Field(
-        alias="_id", default=None, description="MongoDB generated unique identifier for Web page Info.")
-    header: Optional[str] = Field(
-        default=None, description="Header of the page in Markdown formatted text, None if no header exists.")
-    body: str = Field(...,
-                      description="Body of the page in Markdown formatted text.")
-    footer: Optional[str] = Field(
-        default=None, description="Footer of the page in Markdown formatted text, None if it does not exist.")
-    body_chunks: Optional[List[str]] = Field(
-        default=None, description="List of markdown formatted chunks that the page body is divided into.")
-
-    def to_str(self) -> str:
-        """Returns string representation of page structure."""
-        str_repr = ""
-        if self.header:
-            str_repr += f"Header\n=================\n{self.header}\n"
-        str_repr += f"Body\n=================\n{self.body}\n"
-        if self.footer:
-            str_repr += f"Footer\n=================\n{self.footer}\n"
-        return str_repr
-
-    def to_doc(self) -> str:
-        """Returns document string."""
-        doc: str = ""
-        if self.header:
-            doc += self.header
-        doc += self.body
-        if self.footer:
-            doc += self.footer
-        return doc
-
-    def get_size_mb(self) -> float:
-        """Returns size of given page in megabytes."""
-        page_text: str = self.to_doc()
-        return len(page_text.encode("utf-8"))/(1024.0 * 1024.0)
 
 
 class LinkedInPost(BaseModel):

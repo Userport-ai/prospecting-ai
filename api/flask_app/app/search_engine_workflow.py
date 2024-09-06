@@ -277,9 +277,9 @@ if __name__ == "__main__":
         existing_urls = json.loads(f.read())
 
     search_request = SearchRequest(
-        person_name="Bhavish Aggarwal",
-        company_name="Olacabs.com",
-        person_role_title="Co-Founder & CEO",
+        person_name="Aakarshan Chawla",
+        company_name="Rippling",
+        person_role_title="Director, Sales",
         existing_urls=[],
         query_configs=[
             # SearchRequest.QueryConfig(
@@ -292,9 +292,14 @@ if __name__ == "__main__":
             #         suffix_query="funding announcements",
             #         num_results=20,
             # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="LinkedIn Posts",
+            #     num_results=20,
+            # ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                suffix_query="LinkedIn Posts",
+                suffix_query="pain points or challenges",
                 num_results=20,
             ),
             # SearchRequest.QueryConfig(
@@ -319,8 +324,8 @@ if __name__ == "__main__":
             # ),
         ],
     )
-    results = wf.get_search_results(search_request=search_request)
-    # results = wf.get_unofficial_google_search_results(
-    #     search_queries=["Olacabs.com's recent funding announcements"], max_results_per_query=20)
+    # results = wf.get_search_results(search_request=search_request)
+    results = wf.get_unofficial_google_search_results(
+        search_queries=["Aakarshan Chawla's challenges at Rippling"], max_results_per_query=20)
     with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
         f.write(json.dumps(results, indent=4))

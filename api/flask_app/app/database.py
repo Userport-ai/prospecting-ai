@@ -55,11 +55,11 @@ class Database:
         """Returns Company Profiles collection."""
         return self.db['company_profiles']
 
-    def _get_linkedin_posts_collection(self) -> Collection:
+    def get_linkedin_posts_collection(self) -> Collection:
         """Returns LinkedIn posts collection."""
         return self.db['linkedin_posts']
 
-    def _get_web_pages_collection(self) -> Collection:
+    def get_web_pages_collection(self) -> Collection:
         """Returns Web Page collection."""
         return self.db['web_pages']
 
@@ -67,11 +67,11 @@ class Database:
         """Returns content details collection."""
         return self.db['content_details']
 
-    def _get_lead_research_report_collection(self) -> Collection:
+    def get_lead_research_report_collection(self) -> Collection:
         """Returns Lead Research Report collection."""
         return self.db['lead_research_reports']
 
-    def _get_outreach_email_template_collection(self) -> Collection:
+    def get_outreach_email_template_collection(self) -> Collection:
         """Returns Outreach Email Templates collection."""
         return self.db['outreach_email_templates']
 
@@ -120,7 +120,7 @@ class Database:
                 f"LinkedInPost instance cannot have an Id before db insertion: {linkedin_post}")
         linkedin_post.creation_date = Utils.create_utc_time_now()
 
-        collection = self._get_linkedin_posts_collection()
+        collection = self.get_linkedin_posts_collection()
         result = collection.insert_one(
             linkedin_post.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
@@ -132,7 +132,7 @@ class Database:
                 f"WebPage instance cannot have an Id before db insertion: {web_page}")
         web_page.creation_date = Utils.create_utc_time_now()
 
-        collection = self._get_web_pages_collection()
+        collection = self.get_web_pages_collection()
         result = collection.insert_one(
             web_page.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
@@ -156,7 +156,7 @@ class Database:
                 f"Lead Research report instance cannot have an Id before db insertion: {lead_research_report}")
         lead_research_report.creation_date = Utils.create_utc_time_now()
 
-        collection = self._get_lead_research_report_collection()
+        collection = self.get_lead_research_report_collection()
         result = collection.insert_one(
             lead_research_report.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
@@ -174,7 +174,7 @@ class Database:
         outreach_email_template.last_updated_date = current_time
         outreach_email_template.last_updated_date_readable_str = current_time_readable_str
 
-        collection = self._get_outreach_email_template_collection()
+        collection = self.get_outreach_email_template_collection()
         result = collection.insert_one(
             outreach_email_template.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
@@ -271,9 +271,21 @@ class Database:
                 f'Content Details not found for Id: {content_details_id}')
         return ContentDetails(**data_dict)
 
+    def list_content_details(self, filter: Dict, projection: Optional[Dict[str, int]] = None) -> List[ContentDetails]:
+        """Returns Content Details with given filter. Returns only fields specified in the projection dictionary."""
+        collection = self.get_content_details_collection()
+        cursor = collection.find(filter, projection).sort(
+            [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
+        )
+        content_details_list: List[ContentDetails] = []
+        for content_details_dict in cursor:
+            content_details_list.append(
+                ContentDetails(**content_details_dict))
+        return content_details_list
+
     def get_lead_research_report(self, lead_research_report_id: str, projection: Optional[Dict[str, int]] = None) -> LeadResearchReport:
         """Returns Lead Research report for given Report ID. Raises error if report is not found in the database."""
-        collection = self._get_lead_research_report_collection()
+        collection = self.get_lead_research_report_collection()
         data_dict = collection.find_one(
             {"_id": ObjectId(lead_research_report_id)}, projection=projection)
         if not data_dict:
@@ -283,29 +295,18 @@ class Database:
 
     def get_lead_research_report_by_url(self, user_id: str, person_linkedin_url: str,  projection: Optional[Dict[str, int]] = None) -> Optional[LeadResearchReport]:
         """Returns Lead Research report for given person's LinkedIn URL and the user who created the report. If it doesn't exist, returns None."""
-        collection = self._get_lead_research_report_collection()
+        collection = self.get_lead_research_report_collection()
         data_dict = collection.find_one(
             {"user_id": user_id, "person_linkedin_url": person_linkedin_url}, projection=projection)
         if not data_dict:
             return None
         return LeadResearchReport(**data_dict)
 
-    def get_outreach_email_template(self, outreach_email_template_id: str, projection: Optional[Dict[str, int]] = None) -> OutreachEmailTemplate:
-        """Returns Outreach Email Template for given Template ID."""
-        collection = self._get_outreach_email_template_collection()
-        data_dict = collection.find_one(
-            {"_id": ObjectId(outreach_email_template_id)}, projection=projection)
-        if not data_dict:
-            raise ValueError(
-                f'Outreach Email Template not found for Id: {outreach_email_template_id}')
-        return OutreachEmailTemplate(**data_dict)
-
-    def list_lead_research_reports(self, user_id: str, projection: Optional[Dict[str, int]] = None) -> List[LeadResearchReport]:
-        """Returns Lead Research reports created by given user. Returns only fields specified in the projection dictionary."""
-        collection = self._get_lead_research_report_collection()
-        # TODO: Update filter to pass in user and organization as fields to filter on.
+    def list_lead_research_reports(self, filter: Dict, projection: Optional[Dict[str, int]] = None) -> List[LeadResearchReport]:
+        """Returns Lead Research reports with given filter. Returns only fields specified in the projection dictionary."""
+        collection = self.get_lead_research_report_collection()
         # TODO: Add pagination using skip() as well.
-        cursor = collection.find({"user_id": user_id}, projection).sort(
+        cursor = collection.find(filter, projection).sort(
             [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
         )
         lead_research_reports: List[LeadResearchReport] = []
@@ -314,9 +315,19 @@ class Database:
                 LeadResearchReport(**research_report_dict))
         return lead_research_reports
 
+    def get_outreach_email_template(self, outreach_email_template_id: str, projection: Optional[Dict[str, int]] = None) -> OutreachEmailTemplate:
+        """Returns Outreach Email Template for given Template ID."""
+        collection = self.get_outreach_email_template_collection()
+        data_dict = collection.find_one(
+            {"_id": ObjectId(outreach_email_template_id)}, projection=projection)
+        if not data_dict:
+            raise ValueError(
+                f'Outreach Email Template not found for Id: {outreach_email_template_id}')
+        return OutreachEmailTemplate(**data_dict)
+
     def list_outreach_email_templates(self, user_id: str, projection: Optional[Dict[str, int]] = None) -> List[OutreachEmailTemplate]:
         """Returns Outreach Emails created by given user. Returns only fields specified in the projection dictionary."""
-        collection = self._get_outreach_email_template_collection()
+        collection = self.get_outreach_email_template_collection()
         cursor = collection.find({"user_id": user_id}, projection).sort(
             [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
         )
@@ -340,7 +351,7 @@ class Database:
 
     def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
         """Updates fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
-        collection = self._get_lead_research_report_collection()
+        collection = self.get_lead_research_report_collection()
         if "last_updated_date" not in setFields:
             setFields["last_updated_date"] = Utils.create_utc_time_now()
 
@@ -352,7 +363,7 @@ class Database:
 
     def update_outreach_email_template(self, outreach_email_template_id: str, setFields: Dict[str, str]):
         """Updates fields for given Outreach Email Template ID. Assumes that fields are existing fields in the OutreachEmailTemplate Document model."""
-        collection = self._get_outreach_email_template_collection()
+        collection = self.get_outreach_email_template_collection()
         if "last_updated_date" not in setFields:
             time_now: datetime = Utils.create_utc_time_now()
             setFields["last_updated_date"] = time_now
@@ -367,15 +378,36 @@ class Database:
 
     def delete_outreach_email_templates(self, outreach_email_template_id: str):
         """Deletes outreach email template with given ID."""
-        collection = self._get_outreach_email_template_collection()
+        collection = self.get_outreach_email_template_collection()
         result = collection.delete_one(
             {"_id": ObjectId(outreach_email_template_id)})
         if result.deleted_count != 1:
             raise ValueError(
                 f"Failed to delete document with ID: {outreach_email_template_id}, deleted {result.deleted_count} docs.")
 
-    def delete_all_content_details(self, find_filter: Dict = {}, delete_confirm: bool = False):
+    def delete_one_object_id(self, collection: Collection, id_to_delete: str):
+        """Deletes given Object ID from given collection. If 1 doc is not deleted, an error is thrown."""
+        result = collection.delete_one(
+            {"_id": ObjectId(id_to_delete)})
+        if result.deleted_count != 0 and result.deleted_count != 1:
+            raise ValueError(
+                f"Expected to delete 1 doc with ID: {id_to_delete} in collection: {collection.name}, deleted {result.deleted_count} docs.")
+
+    def delete_object_ids(self, collection: Collection, ids_to_delete: List[str]):
+        """Deletes given list of object IDs from given collection. If the exact number is not deleted, an error is thrown."""
+        if len(ids_to_delete) == 0:
+            return
+        result = collection.delete_many(
+            filter={"_id": {"$in": [ObjectId(id) for id in ids_to_delete]}})
+        if result.deleted_count != 0 and result.deleted_count != len(ids_to_delete):
+            raise ValueError(
+                f"Expected to delete {len(ids_to_delete)} docs in collection: {collection.name} namely: {ids_to_delete}: but deleted only {result.deleted_count} docs.")
+
+    def delete_all_content_details(self, find_filter: Dict, delete_confirm: bool = False):
         """Deletes all content details and associated web pages and LinkedIn posts."""
+        if find_filter == {}:
+            raise ValueError("Find filter cannot be empty dictionary!")
+
         content_collection = self.get_content_details_collection()
 
         content_ids = []
@@ -397,11 +429,11 @@ class Database:
                 "Cannot delete content without delete_confirm permission")
 
         if len(linkedin_ids):
-            self._get_linkedin_posts_collection().delete_many(
+            self.get_linkedin_posts_collection().delete_many(
                 {'_id': {'$in': [ObjectId(lid) for lid in linkedin_ids]}})
 
         if len(web_page_ids):
-            self._get_web_pages_collection().delete_many(
+            self.get_web_pages_collection().delete_many(
                 {'_id': {'$in': [ObjectId(lid) for lid in web_page_ids]}})
 
         if len(content_ids):
