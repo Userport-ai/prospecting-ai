@@ -22,14 +22,20 @@ class SearchRequest(BaseModel):
             COMPANY_ROLE_LEAD_POSSESSION = 1
             COMPANY_POSSESSION = 2
 
+        class Method(str, Enum):
+            GOOGLE_CUSTOM_SEARCH_API = 1
+            UNOFFICIAL_GOOGLE_SEARCH_LIBRARY = 2
+
         prefix_format: PrefixFormat = Field(
             ..., description="Format company name, person name and role title to be used for the query's prefix string in the final query.")
+        methods: List[Method] = Field(...,
+                                      description="The search methods to use to fetch results. If more than, we will search and append results from each method.")
         suffix_query: str = Field(
             ..., description="Query provided by used that will be appended to the prefix formatted string above.")
-        num_results: int = Field(
-            ..., description="Number of search results to lookup for given query. Cannot exceed 100.")
+        num_results_per_method: int = Field(
+            ..., description="Number of search results to lookup for given query per method. Cannot exceed 100.")
 
-        @field_validator('num_results', mode='before')
+        @field_validator('num_results_per_method', mode='before')
         @classmethod
         def validate_num_results(cls, v):
             if v < 1 or v > 100:
@@ -121,13 +127,19 @@ class SearchEngineWorkflow:
                 search_query += f"{company_name}'s "
 
             search_query += config.suffix_query
-            num_results: int = config.num_results
+            num_results: int = config.num_results_per_method
 
-            # Fetch search results from API call.
-            result_urls: List[str] = self.api_search(
-                search_query=search_query, num_results=num_results, skip_urls=already_fetched_urls)
+            # Fetch search results.
+            result_urls: List[str] = []
+            for search_method in config.methods:
+                if search_method == SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API:
+                    result_urls.extend(self.api_search(
+                        search_query=search_query, num_results=num_results, skip_urls=already_fetched_urls))
+                else:
+                    result_urls.extend(self.get_unofficial_google_search_results(
+                        search_query=search_query, num_results=num_results, skip_urls=already_fetched_urls))
+
             already_fetched_urls = already_fetched_urls.union(set(result_urls))
-
             search_results_map[search_query] = result_urls
 
         return search_results_map
@@ -140,7 +152,8 @@ class SearchEngineWorkflow:
 
         API reference: https://developers.google.com/custom-search/v1/reference/rest/v1/cse/list.
         """
-        logger.info(f"Fetching search results for query: {search_query}")
+        logger.info(
+            f"Fetching Google Customer search results for query: {search_query}")
         # This is the max page size per documentation.
 
         page_size: int = 10
@@ -186,15 +199,7 @@ class SearchEngineWorkflow:
 
             for search_result in search_response.items:
                 url = search_result.link
-                if LinkedInScraper.is_valid_profile_or_company_url(url=url):
-                    # This is a person's profile or Company About page on LinkedIn, skip it.
-                    continue
-                if self.is_blocklist_domain(url=url):
-                    # Although blocklisted domains are already updated in the Programmable Search Engine console,
-                    # we also manually skip them in the filtered results to be safe.
-                    continue
-                if url in skip_urls:
-                    # User has asked to skip this URL.
+                if not self.is_valid_search_url(url=url, skip_urls=skip_urls):
                     continue
 
                 # We assume the result URLs for the same query across pages is deduplicated by Google.
@@ -205,32 +210,38 @@ class SearchEngineWorkflow:
                 break
 
         logger.info(
-            f"Search for query: {search_query} complete. Wanted: {num_results} results, Got: {len(result_urls)}")
+            f"Google Custom Search Results for query: {search_query} complete. Wanted: {num_results} results, Got: {len(result_urls)}")
         return result_urls
 
-    def get_unofficial_google_search_results(self, search_queries: List[str], max_results_per_query: int) -> Dict[str, List[str]]:
+    def get_unofficial_google_search_results(self, search_query: str, num_results: int, skip_urls: Set[str]) -> List[str]:
         """Returns search result links for given search query using unofficial Google Search Library."""
+        logger.info(
+            f"Fetching Unofficial Google search results for query: {search_query}")
+        result_urls: List[str] = []
+        logger.info(
+            f"Search query: {search_query}, max results: {num_results}")
+        # TODO: Upgrade to new library and handle exceptions.
+        for url in search(search_query, stop=num_results, user_agent=random.choice(self.all_user_agents)):
+            if not self.is_valid_search_url(url=url, skip_urls=skip_urls):
+                continue
+            result_urls.append(url)
+        logger.info(
+            f"Unofficial Google Search Results for query: {search_query} complete. Wanted: {num_results} results, Got: {len(result_urls)}")
+        return result_urls
 
-        results = {}
-        for query in search_queries:
-            results[query] = []
-            logger.info(
-                f"Search query: {query}, max results: {max_results_per_query}")
-            for url in search(query, stop=max_results_per_query, user_agent=random.choice(self.all_user_agents)):
-                if self.is_blocklist_domain(url=url):
-                    logger.info(f"URL: {url} is in block list, so skip it.")
-                    continue
-
-                if LinkedInScraper.is_valid_profile_or_company_url(url=url):
-                    # This is a person's profile or Company About page on LinkedIn, skip it.
-                    logger.info(
-                        f"URL: {url} is a LinkedIn profile or Company, skip parsing it.")
-                    continue
-
-                results[query].append(url)
-                logger.info(f"Added URL: {url} to the result list.")
-
-        return results
+    def is_valid_search_url(self, url: str,  skip_urls: Set[str]) -> bool:
+        """Returns true if this is a valid URL to be added to search results and False otherwise."""
+        if LinkedInScraper.is_valid_profile_or_company_url(url=url):
+            # This is a person's profile or Company About page on LinkedIn, skip it.
+            return False
+        if self.is_blocklist_domain(url=url):
+            # Although blocklisted domains are already updated in the Programmable Search Engine console,
+            # we also manually skip them in the filtered results to be safe.
+            return False
+        if url in skip_urls:
+            # User has asked to skip this URL.
+            return False
+        return True
 
     def is_blocklist_domain(self, url: str) -> bool:
         """Returns true if given URL is part of blocklist domains that should not be scraped and false otherwise."""
@@ -292,16 +303,18 @@ if __name__ == "__main__":
             #         suffix_query="funding announcements",
             #         num_results=20,
             # ),
-            # SearchRequest.QueryConfig(
-            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-            #     suffix_query="LinkedIn Posts",
-            #     num_results=20,
-            # ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                suffix_query="pain points or challenges",
-                num_results=20,
+                methods=[
+                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                suffix_query="recent LinkedIn Posts",
+                num_results_per_method=20,
             ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="pain points or challenges",
+            #     num_results=20,
+            # ),
             # SearchRequest.QueryConfig(
             #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
             #         suffix_query="blogs",
@@ -324,8 +337,6 @@ if __name__ == "__main__":
             # ),
         ],
     )
-    # results = wf.get_search_results(search_request=search_request)
-    results = wf.get_unofficial_google_search_results(
-        search_queries=["Aakarshan Chawla's challenges at Rippling"], max_results_per_query=20)
+    results = wf.get_search_results(search_request=search_request)
     with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
         f.write(json.dumps(results, indent=4))

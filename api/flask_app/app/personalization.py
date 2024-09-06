@@ -32,6 +32,7 @@ class Personalization:
         self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
         self.OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
         self.openai_tokens_used: Optional[OpenAITokenUsage] = None
+        self.OPENAI_REQUEST_TIMEOUT_SECONDS = 20
 
     def generate_personalized_emails(self, lead_research_report_id: str) -> List[LeadResearchReport.PersonalizedEmail]:
         """Generates personalized emails for given lead for the first time and returns the list."""
@@ -180,7 +181,7 @@ class Personalization:
                 default=None, description="Subject Line of the email.")
 
         llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MODEL,
-                         api_key=self.OPENAI_API_KEY).with_structured_output(EmailSubjectLine)
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(EmailSubjectLine)
 
         chain = prompt | llm
         result: EmailSubjectLine = chain.invoke({
@@ -256,7 +257,7 @@ class Personalization:
                 default=None, description="Personalized email opener addressed to the recipient.")
 
         llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MODEL,
-                         api_key=self.OPENAI_API_KEY).with_structured_output(EmailOpener)
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(EmailOpener)
 
         chain = prompt | llm
         result: EmailOpener = chain.invoke({

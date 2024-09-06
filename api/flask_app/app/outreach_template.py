@@ -19,6 +19,7 @@ class OutreachTemplateMatcher:
         # Open AI configurations.
         self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
         self.OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
+        self.OPENAI_REQUEST_TIMEOUT_SECONDS = 20
 
     def match(self, lead_research_report_id: str) -> LeadResearchReport.ChosenOutreachEmailTemplate:
         """Matches and returns the chosen outreach email template for given lead."""
@@ -70,7 +71,7 @@ class OutreachTemplateMatcher:
                 default=None, description="Reason for why a given Persona or None was chosen.")
 
         llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL,
-                         api_key=self.OPENAI_API_KEY).with_structured_output(MatchedPersona)
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(MatchedPersona)
         chain = prompt | llm
         result: MatchedPersona = chain.invoke(
             {"person_profile_markdown": person_profile_markdown})
