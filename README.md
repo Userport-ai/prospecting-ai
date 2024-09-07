@@ -63,7 +63,7 @@ Gunicorn server: `gunicorn -b localhost:5000 -c "./app/gunicorn.conf.py" "app:cr
 
 We want to specify platform as linux/amd64 since we are usually building these images on Mac M1s which by default select linux/arm64 as the target platform and this causes Deployment on Cloud to fail.
 
-Building Frontend for GKE Deployment in production: `docker build --platform linux/amd64 -f Dockerfile.frontend  --build-arg GIT_COMMIT=$(git log -1 --format=%h) -t userport/frontend .`
+Building Frontend for GKE Deployment in production: `docker build --platform linux/amd64 -f Dockerfile.frontend -t userport/frontend .`
 
 Building Backend for GKE Deployment in production: `docker build --platform linux/amd64 -f Dockerfile.backend  -t userport/backend .`
 
