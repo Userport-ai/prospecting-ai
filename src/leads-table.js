@@ -35,6 +35,9 @@ function renderLinkedInProfile(person_name, record, index) {
 }
 
 function renderIndustries(industries, record, index) {
+  if (industries === null) {
+    return <Text></Text>;
+  }
   return <Text>{industries.join(", ")}</Text>;
 }
 
