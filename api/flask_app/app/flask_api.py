@@ -231,7 +231,7 @@ def create_lead_report():
         logger.info(
             f"Research report already exists with report ID: {lead_research_report.id} for LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}.")
         raise APIException(
-            status_code=409, message=f"Report already exists for URL: {person_linkedin_url} requested by user ID: {user_id}")
+            status_code=409, message=f"Report already exists for URL: {person_linkedin_url}, please check in the Leads Table.")
 
     try:
         # Create report in the database and continue updating it in the background.
@@ -279,8 +279,6 @@ def get_lead_report(lead_research_report_id: str):
     user_id: str = g.user["uid"]
 
     try:
-        logger.info(
-            f"Got lead research report ID: {lead_research_report_id}")
         projection = {
             "person_linkedin_url": 1,
             "person_name": 1,
@@ -317,7 +315,7 @@ def get_lead_report(lead_research_report_id: str):
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to read report from database with error: {e}")
+            f"Failed to read report with ID: {lead_research_report_id} from database with error: {e}")
         raise APIException(
             status_code=500, message="Failed to read research report")
 
@@ -362,17 +360,16 @@ def list_leads():
         }
         lead_research_reports: List[LeadResearchReport] = db.list_lead_research_reports(
             filter=filter, projection=projection)
-        logger.info(
-            f"Got {len(lead_research_reports)} reports from the database")
         user = db.get_or_create_user(user_id=user_id,
                                      projection=get_user_state_db_projection())
         response = ListLeadsResponse(
             status=ResponseStatus.SUCCESS, leads=lead_research_reports, user=user)
         logger.info(
-            f"Time taken for fetching leads for user ID: {user_id}: {time.time() - start_time} seconds")
+            f"Fetched {len(lead_research_reports)} from database for user ID: {user_id}. Time taken was: {time.time() - start_time} seconds")
         return response.model_dump()
     except Exception as e:
-        logger.exception(f"Failed to list with error: {e}")
+        logger.exception(
+            f"Failed to list lead research reports for user ID: {user_id} with error: {e}")
         raise APIException(
             status_code=500, message="Failed to list lead research reports.")
 
@@ -399,6 +396,7 @@ class UpdateTemplateInReportResponse(BaseModel):
 def update_template_in_lead_report():
     # Update template in given lead report. This will regenerate personalized emails using this new template.
     db = Database()
+    user_id: str = g.user["uid"]
 
     lead_research_report_id: str = None
     selected_template_id: str = None
@@ -408,12 +406,12 @@ def update_template_in_lead_report():
         selected_template_id: str = request.json.get("selected_template_id")
     except Exception as e:
         logger.exception(
-            f"Failed to select template in lead report for request: {request} with error: {e}")
+            f"Invalid request: {request} to update template for user ID: {user_id} with error: {e}")
         raise APIException(
             status_code=400, message="Invalid request parameters for template selection in lead report.")
 
     logger.info(
-        f"Got template ID: {selected_template_id} update request in lead report ID: {lead_research_report_id}")
+        f"Got request to update report: {lead_research_report_id} with given template ID: {selected_template_id}")
 
     start_time = time.time()
     rp = Researcher(database=db)
@@ -438,20 +436,19 @@ def update_template_in_lead_report():
         }
         lead_research_report: LeadResearchReport = db.get_lead_research_report(
             lead_research_report_id=lead_research_report_id, projection=projection)
-        logger.info(
-            f"Successfully Updated template and emails for Lead Report ID: {lead_research_report_id}")
         response = UpdateTemplateInReportResponse(
             status=ResponseStatus.SUCCESS,
             chosen_outreach_email_template=lead_research_report.chosen_outreach_email_template,
             personalized_emails=lead_research_report.personalized_emails,
         )
         logger.info(
-            f"Time elapsed for updating template and emails for report ID: {lead_research_report_id}: {time.time()-start_time} seconds")
+            f"Successfully updated report: {lead_research_report_id} with template ID: {selected_template_id} and emails. Time elapsed: {time.time()-start_time} seconds")
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to update a new template with ID: {selected_template_id} in lead report: {lead_research_report_id} with error: {e}")
-        raise APIException(status_code=500, message="Failed to select ")
+            f"Failed to update report with ID: {lead_research_report_id} with a new template with ID: {selected_template_id} with error: {e}")
+        raise APIException(
+            status_code=500, message="Failed to select template due to an error.")
 
 
 class CreateOutreachTemplateResponse(BaseModel):
@@ -486,7 +483,7 @@ def create_outreach_email_template():
         message = request.json.get("message")
     except Exception as e:
         logger.exception(
-            f"Failed to fetch input for creating email template for request: {request} with error: {e}")
+            f"Invalid request: {request} to create outreach email template by user ID: {user_id} with error: {e}")
         raise APIException(
             status_code=400, message="Invalid request parameters for template creation")
 
@@ -496,13 +493,13 @@ def create_outreach_email_template():
         template_id: str = db.insert_outreach_email_template(
             outreach_email_template=outreach_email_template)
         logger.info(
-            f"Created email template with ID: {template_id} for role titles: {persona_role_titles}")
+            f"Successfully created outreach email template with ID: {template_id} for user ID: {user_id}")
         response = CreateOutreachTemplateResponse(
             status=ResponseStatus.SUCCESS)
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to create email template for request: {request} with error: {e}")
+            f"Failed to create email template for request: {request} by user: {user_id} with error: {e}")
         raise APIException(
             status_code=500, message="Internal Error when creating email template")
 
@@ -528,9 +525,6 @@ def get_outreach_email_template(outreach_email_template_id: str):
     """Get Outreach Email template with given ID."""
     db = Database()
     user_id: str = g.user["uid"]
-    logger.info(
-        f"Got request to fetch outreach email template with ID: {outreach_email_template_id} for user ID: {user_id}")
-
     try:
         outreach_email_template: OutreachEmailTemplate = db.get_outreach_email_template(
             outreach_email_template_id=outreach_email_template_id)
@@ -543,7 +537,7 @@ def get_outreach_email_template(outreach_email_template_id: str):
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to get Outreach Email template for ID: {outreach_email_template_id} with error: {e}")
+            f"Failed to get Outreach Email template for ID: {outreach_email_template_id} by user ID: {user_id} with error: {e}")
         raise APIException(
             status_code=500, message="Internal Error when fetching Outreach Email template")
 
@@ -571,9 +565,7 @@ def list_outreach_email_templates():
     """List Outreach Email templates created by the user."""
     db = Database()
     user_id: str = g.user["uid"]
-    logger.info(
-        f"Got request to list outreach email templates for user ID: {user_id}")
-
+    start_time = time.time()
     try:
         projection = {
             "name": 1,
@@ -585,16 +577,16 @@ def list_outreach_email_templates():
         }
         outreach_email_templates: List[OutreachEmailTemplate] = db.list_outreach_email_templates(
             user_id=user_id, projection=projection)
-        logger.info(
-            f"Fetched {len(outreach_email_templates)} outreach email templates")
         user = db.get_or_create_user(
             user_id=user_id, projection=get_user_state_db_projection())
         response = ListOutreachEmailTemplatesResponse(
             status=ResponseStatus.SUCCESS, outreach_email_templates=outreach_email_templates, user=user)
+        logger.info(
+            f"Fetched {len(outreach_email_templates)} outreach email templates requested by user ID: {user_id}. Time taken: {time.time() - start_time} seconds.")
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to List outreach email templates with error: {e}")
+            f"Failed to List outreach email templates requested by user: {user_id} with error: {e}")
         raise APIException(
             status_code=500, message="Internal Error when listing outreach email templates")
 
@@ -617,6 +609,7 @@ class UpdateOutreachEmailTemplatesResponse(BaseModel):
 def update_outreach_email_template(outreach_email_template_id: str):
     """Updates Outreach Email template with given ID."""
     db = Database()
+    user_id: str = g.user["uid"]
 
     name: str = None
     persona_role_titles: List[str] = None
@@ -630,10 +623,12 @@ def update_outreach_email_template(outreach_email_template_id: str):
         message = request.json.get("message")
     except Exception as e:
         logger.exception(
-            f"Failed to fetch input for updating email template ID: {outreach_email_template_id} with error: {e}")
+            f"Invalid request: {request} for updating email template ID: {outreach_email_template_id} by user ID: {user_id} with error: {e}")
         raise APIException(
-            status_code=400, message="Invalid request parameters for template updation")
+            status_code=400, message="Invalid request parameters for updating template.")
 
+    logger.info(
+        f"Got update request: {request} to update template ID: {outreach_email_template_id} requested by user ID: {user_id}")
     try:
         setFields = {
             "name": name,
@@ -647,11 +642,11 @@ def update_outreach_email_template(outreach_email_template_id: str):
             status=ResponseStatus.SUCCESS,
         )
         logger.info(
-            f"Updated Outreach Email template for ID: {outreach_email_template_id}")
+            f"Updated Outreach Email template for ID: {outreach_email_template_id} requested by user ID: {user_id}")
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to Update Outreach Email template for ID: {outreach_email_template_id} with error: {e}")
+            f"Failed to Update Outreach Email template: {outreach_email_template_id} requested by user ID: {user_id} with error: {e}")
         raise APIException(
             status_code=500, message="Internal Error when Updating Outreach Email template")
 
@@ -674,18 +669,19 @@ class DeleteOutreachTemplateResponse(BaseModel):
 def delete_outreach_email_template(outreach_email_template_id: str):
     """Delete Outreach Email template with given ID."""
     db = Database()
-
+    user_id: str = g.user["uid"]
+    logger.info(f"Got request to delete template ID: {outreach_email_template_id} by user ID: {user_id}.")
     try:
         db.delete_one_object_id(db.get_outreach_email_template_collection(
         ), id_to_delete=outreach_email_template_id)
         logger.info(
-            f"Deleted Outreach Email template ID {outreach_email_template_id} successfully")
+            f"Successfully deleted Outreach Email template ID: {outreach_email_template_id} requested by user ID: {user_id}.")
         response = DeleteOutreachTemplateResponse(
             status=ResponseStatus.SUCCESS)
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to delete Outreach Email template ID: {outreach_email_template_id} with error: {e}")
+            f"Failed to delete Outreach Email with template ID: {outreach_email_template_id} requested by user ID: {user_id} with error: {e}")
         raise APIException(
             status_code=500, message="Internal Error when deleting Outreach Email template")
 
