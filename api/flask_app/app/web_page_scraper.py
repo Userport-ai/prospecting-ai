@@ -374,10 +374,6 @@ class WebPageScraper:
             concise_summary: str = self.fetch_concise_summary(
                 detailed_summary=final_summary.detailed_summary)
 
-            # We could remove this computation if not providing enough value for users. Will definitely save some cost.
-            type: ContentType = self.fetch_content_type(
-                page_body_chunks=page_structure.body_chunks)
-
             # Need high accuray so GPT-4O model.
             category: ContentCategory = self.fetch_content_category(
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
@@ -395,8 +391,8 @@ class WebPageScraper:
                 page_structure=page_structure,
                 processing_status=ContentDetails.ProcessingStatus.COMPLETE,
                 linkedin_post_details=None,
-                type=type.enum_value,
-                type_reason=type.reason,
+                type=None,
+                type_reason=None,
                 author=author_and_publish_date.author,
                 publish_date=publish_date,
                 detailed_summary=final_summary.detailed_summary,

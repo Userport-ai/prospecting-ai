@@ -670,7 +670,8 @@ def delete_outreach_email_template(outreach_email_template_id: str):
     """Delete Outreach Email template with given ID."""
     db = Database()
     user_id: str = g.user["uid"]
-    logger.info(f"Got request to delete template ID: {outreach_email_template_id} by user ID: {user_id}.")
+    logger.info(
+        f"Got request to delete template ID: {outreach_email_template_id} by user ID: {user_id}.")
     try:
         db.delete_one_object_id(db.get_outreach_email_template_collection(
         ), id_to_delete=outreach_email_template_id)
@@ -926,7 +927,7 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
                                       task_name="process_content_in_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
-@shared_task(bind=True, acks_late=True, ignore_result=False, rate_limit="1/m")
+@shared_task(bind=True, acks_late=True, ignore_result=False, rate_limit="5/m")
 def process_content_in_search_results_batch_in_background(self, batch_num: int, lead_research_report_id: str, search_results_batch: List[List[str]]):
     """Process batch of given Search Result URLs and returns a list of URLs that failed to process."""
     logger.info(

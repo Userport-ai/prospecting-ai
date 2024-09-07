@@ -107,90 +107,12 @@ class Researcher:
         existing_urls: List[str] = list(
             chain.from_iterable(existing_search_results_map.values())) if existing_search_results_map else []
 
-        # Queries to consider = ["recent LinkedIn posts", "recent product launches", "recent thoughts on the industry",
-        #    "recent articles or blogs", "recent interviews or podcasts",
-        #    "recent events or conferences attended",  "recent funding announcements",
-        #    "recent leadership changes", "recent announcements made"]
         search_request = SearchRequest(
             person_name=person_name,
             company_name=company_name,
             person_role_title=role_title,
             existing_urls=existing_urls,
-            query_configs=[
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="product launches",
-                    num_results_per_method=10,
-                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                    suffix_query="recent LinkedIn Posts",
-                    num_results_per_method=20,
-                    methods=[
-                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="recent blogs or articles",
-                    num_results_per_method=10,
-                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                    suffix_query="interviews or podcasts",
-                    num_results_per_method=10,
-                    methods=[
-                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                # SearchRequest.QueryConfig(
-                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                #     suffix_query="personal recognitions",
-                #     num_results=10,
-                # ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="recent achievements",
-                    num_results_per_method=10,
-                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                    suffix_query="thoughts on the industry",
-                    num_results_per_method=10,
-                    methods=[
-                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                # SearchRequest.QueryConfig(
-                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                #     suffix_query="recent talks or events or conferences attended",
-                #     num_results=10,
-                # ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="funding announcements",
-                    num_results_per_method=5,
-                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="recent partnerships",
-                    num_results_per_method=5,
-                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="recent leadership hires",
-                    num_results_per_method=5,
-                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-            ],
+            query_configs=self._get_query_configs(exhaustive_search=False),
         )
 
         # Get search results and update them in the database.
@@ -216,6 +138,93 @@ class Researcher:
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
+
+    def _get_query_configs(self, exhaustive_search: bool) -> List[SearchRequest.QueryConfig]:
+        """Return query configs used for searching the web depending type of searcg requested by the user."""
+        # Queries to consider = ["recent LinkedIn posts", "recent product launches", "recent thoughts on the industry",
+        #    "recent articles or blogs", "personal recognitions", "recent interviews or podcasts",
+        #    "recent talks or events or conferences attended",  "recent funding announcements",
+        #    "recent leadership changes", "recent announcements made"]
+        # The most important configs that are required for every search.
+        base_search_configs = [
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                suffix_query="product launches",
+                num_results_per_method=10,
+                methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            ),
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                suffix_query="recent achievements",
+                num_results_per_method=10,
+                methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            ),
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                suffix_query="recent LinkedIn Posts",
+                num_results_per_method=20,
+                methods=[
+                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            ),
+        ]
+        if exhaustive_search:
+            base_search_configs.extend([
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent blogs or articles",
+                    num_results_per_method=10,
+                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="funding announcements",
+                    num_results_per_method=5,
+                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent partnerships",
+                    num_results_per_method=5,
+                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent leadership hires",
+                    num_results_per_method=5,
+                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="interviews or podcasts",
+                    num_results_per_method=10,
+                    methods=[
+                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                # SearchRequest.QueryConfig(
+                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                #     suffix_query="thoughts on the industry",
+                #     num_results_per_method=10,
+                #     methods=[
+                #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                # ),
+                # SearchRequest.QueryConfig(
+                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                #     suffix_query="personal recognitions",
+                #     num_results=10,
+                # ),
+                # SearchRequest.QueryConfig(
+                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                #     suffix_query="recent talks or events or conferences attended",
+                #     num_results=10,
+                # ),
+            ])
+        return base_search_configs
 
     def process_content_in_search_urls(self, lead_research_report_id: str, search_results_batch: List[List[str]], task_num: int) -> List[str]:
         """Process URLs stored in given search results batch in a research report and return URLs that failed to process."""
@@ -544,6 +553,9 @@ class Researcher:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(".env.dev")
     # Zach perret Profile ID.
     person_url = "https://www.linkedin.com/in/zperret"
     # person_profile_id = '66a70cc8ff3944ed08fe4f1c'
@@ -552,4 +564,4 @@ if __name__ == "__main__":
     rp = Researcher(database=Database())
     # logger.info(
     #     f"Got {len(search_results)} search results for all the queries.")
-    rp.aggregate(lead_research_report_id="66ab9633a3bb9048bc1a0be5")
+    # rp.aggregate(lead_research_report_id="66ab9633a3bb9048bc1a0be5")
