@@ -234,6 +234,12 @@ class SearchEngineWorkflow:
         if LinkedInScraper.is_valid_profile_or_company_url(url=url):
             # This is a person's profile or Company About page on LinkedIn, skip it.
             return False
+        if LinkedInScraper.is_public_directory_url(url=url):
+            # Public directory URL, do not parse.
+            return False
+        if url.endswith(".pdf"):
+            # We don't want to parse PDFs for now, skip.
+            return False
         if self.is_blocklist_domain(url=url):
             # Although blocklisted domains are already updated in the Programmable Search Engine console,
             # we also manually skip them in the filtered results to be safe.
@@ -288,9 +294,11 @@ if __name__ == "__main__":
         existing_urls = json.loads(f.read())
 
     search_request = SearchRequest(
-        person_name="Aakarshan Chawla",
-        company_name="Rippling",
-        person_role_title="Director, Sales",
+        person_name="Ishita Khurana",
+        # company_name="",
+        # person_role_title="",
+        company_name="LambdaTest",
+        person_role_title="Senior Sales Development Representative",
         existing_urls=[],
         query_configs=[
             # SearchRequest.QueryConfig(
@@ -307,7 +315,7 @@ if __name__ == "__main__":
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
                 methods=[
                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                suffix_query="recent LinkedIn Posts",
+                suffix_query="recent LinkedIn posts",
                 num_results_per_method=20,
             ),
             # SearchRequest.QueryConfig(

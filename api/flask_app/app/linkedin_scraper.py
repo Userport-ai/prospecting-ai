@@ -690,6 +690,10 @@ class LinkedInScraper:
         """Returns true if valid Profile or Company URL."""
         return "linkedin.com/in/" in url or "linkedin.com/company/" in url
 
+    def is_public_directory_url(url: str) -> bool:
+        """Returns true if URL is a public directory URL like: https://www.linkedin.com/pub/dir/Ishita/Khurana and false otherwise."""
+        return "linkedin.com/pub/dir/" in url
+
     @staticmethod
     def _get_piloterr_query_params(query: str) -> Dict:
         """Returns standard params for given query string for Piloterr's APIs."""

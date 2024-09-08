@@ -238,6 +238,10 @@ class WebPageScraper:
         self.OPENAI_GPT_4O_MINI_MODEL = os.environ["OPENAI_GPT_4O_MINI_MODEL"]
         self.OPENAI_REQUEST_TIMEOUT_SECONDS = 20
 
+        # Proxy configuration.
+        self.PROXY_HTTP_URL = f'http://{os.environ["BRIGHT_DATA_PROXY_AUTH"]}@{os.environ["BRIGHT_DATA_PROXY_HOST"]}'
+        self.PROXY_HTTPS_URL = f'https://{os.environ["BRIGHT_DATA_PROXY_AUTH"]}@{os.environ["BRIGHT_DATA_PROXY_HOST"]}'
+
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 5
 
@@ -956,8 +960,12 @@ class WebPageScraper:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
         try:
             headers = {"User-Agent": random.choice(self.all_user_agents)}
+            proxies = {
+                "http": self.PROXY_HTTP_URL,
+                "https": self.PROXY_HTTPS_URL,
+            }
             response = requests.get(
-                url=self.url, headers=headers, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
+                url=self.url, headers=headers, proxies=proxies, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
         except Exception as e:
             raise ValueError(
                 f"HTTP error when fetching url: {self.url}, details: {e}")
@@ -1436,7 +1444,7 @@ if __name__ == "__main__":
     # url = "https://plaid.com/2023-fintech-predictions-whitepaper/"
 
     # SITES that don't allow scraping without Proxy.
-    # url = "https://www.saastr.com/the-plaid-journey-with-co-founder-and-ceo-zach-perret-pod-561-video/"
+    url = "https://www.saastr.com/the-plaid-journey-with-co-founder-and-ceo-zach-perret-pod-561-video/"
     # url = "https://www.crunchbase.com/person/zach-perret"
 
     # These two LinkedIn reposts have a little different structures so our strict state based extraction algoirthm breaks. We have since fixed it.
@@ -1487,7 +1495,7 @@ if __name__ == "__main__":
     # url = "https://indianexpress.com/article/trending/trending-in-india/ola-bhavish-aggarwal-gender-pronouns-viral-post-9310997/"
     # url = "https://audiencereports.in/bhavish-aggarwal-pioneering/"
 
-    url = "https://www.linkedin.com/in/satya-mohanty/recent-activity/all/"
+    # url = "https://www.linkedin.com/in/satya-mohanty/recent-activity/all/"
 
     # person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
