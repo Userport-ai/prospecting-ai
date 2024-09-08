@@ -238,9 +238,13 @@ class WebPageScraper:
         self.OPENAI_GPT_4O_MINI_MODEL = os.environ["OPENAI_GPT_4O_MINI_MODEL"]
         self.OPENAI_REQUEST_TIMEOUT_SECONDS = 20
 
-        # Proxy configuration.
-        self.PROXY_HTTP_URL = f'http://{os.environ["BRIGHT_DATA_PROXY_AUTH"]}@{os.environ["BRIGHT_DATA_PROXY_HOST"]}'
-        self.PROXY_HTTPS_URL = f'https://{os.environ["BRIGHT_DATA_PROXY_AUTH"]}@{os.environ["BRIGHT_DATA_PROXY_HOST"]}'
+        # Proxy configuration. Currently configured only in prod to save costs.
+        self.HTTP_REQUEST_PROXIES = None
+        if os.getenv("BRIGHT_DATA_HTTP_PROXY_URL") and os.getenv("BRIGHT_DATA_HTTPS_PROXY_URL"):
+            self.HTTP_REQUEST_PROXIES = {
+                "http": os.environ["BRIGHT_DATA_HTTP_PROXY_URL"],
+                "https": os.environ["BRIGHT_DATA_HTTPS_PROXY_URL"]
+            }
 
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 5
@@ -960,12 +964,8 @@ class WebPageScraper:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
         try:
             headers = {"User-Agent": random.choice(self.all_user_agents)}
-            proxies = {
-                "http": self.PROXY_HTTP_URL,
-                "https": self.PROXY_HTTPS_URL,
-            }
             response = requests.get(
-                url=self.url, headers=headers, proxies=proxies, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
+                url=self.url, headers=headers, proxies=self.HTTP_REQUEST_PROXIES, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
         except Exception as e:
             raise ValueError(
                 f"HTTP error when fetching url: {self.url}, details: {e}")

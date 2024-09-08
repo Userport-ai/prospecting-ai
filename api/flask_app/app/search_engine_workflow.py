@@ -1,4 +1,3 @@
-from googlesearch import search
 import logging
 import os
 import random
@@ -8,6 +7,7 @@ import tldextract
 from typing import List, Dict, Set, Optional
 from enum import Enum
 from app.linkedin_scraper import LinkedInScraper
+from googlesearch import search
 from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger()
@@ -84,6 +84,8 @@ class GoogleCustomSearchResponse(BaseModel):
             default=None, description="URL of the search result.")
         title: Optional[str] = Field(
             default=None, description="Title of the search result page.")
+        snippet: Optional[str] = Field(
+            default=None, description="Snippet from Search result page.")
 
     queries: QueriesObject = Field()
     items: Optional[List[SearchResult]] = Field(
@@ -104,11 +106,8 @@ class SearchEngineWorkflow:
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 20
 
-        # Loads all user agents.
-        self.all_user_agents = []
-        with gzip.open("app/user_agents.txt.gz", 'rt') as f:
-            for line in f.readlines():
-                self.all_user_agents.append(line.strip())
+        # Currently only set in Prod env to save costs.
+        self.SERP_PROXY_URL = os.getenv("BRIGHT_DATA_SERP_PROXY_URL")
 
     def get_search_results(self, search_request: SearchRequest) -> Dict[str, List[str]]:
         """Returns search results as a dictionary mapping each search query to a list of URLs for the given request."""
@@ -199,6 +198,8 @@ class SearchEngineWorkflow:
 
             for search_result in search_response.items:
                 url = search_result.link
+                logger.info(
+                    f"\nURL: {url}, Title: {search_result.title}, Snippet: {search_result.snippet}\n")
                 if not self.is_valid_search_url(url=url, skip_urls=skip_urls):
                     continue
 
@@ -219,12 +220,13 @@ class SearchEngineWorkflow:
             f"Fetching Unofficial Google search results for query: {search_query}")
         result_urls: List[str] = []
         logger.info(
-            f"Search query: {search_query}, max results: {num_results}")
-        # TODO: Upgrade to new library and handle exceptions.
-        for url in search(search_query, stop=num_results, user_agent=random.choice(self.all_user_agents)):
-            if not self.is_valid_search_url(url=url, skip_urls=skip_urls):
+            f"Search query: {search_query}, num results: {num_results}")
+        for search_result in search(search_query, num_results=num_results, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS, proxy=self.SERP_PROXY_URL, ssl_verify=False, sleep_interval=2, advanced=True):
+            logger.info(
+                f"\nURL: {search_result.url}, Title: {search_result.title}, Description: {search_result.description}\n")
+            if not self.is_valid_search_url(url=search_result.url, skip_urls=skip_urls):
                 continue
-            result_urls.append(url)
+            result_urls.append(search_result.url)
         logger.info(
             f"Unofficial Google Search Results for query: {search_query} complete. Wanted: {num_results} results, Got: {len(result_urls)}")
         return result_urls
@@ -294,17 +296,17 @@ if __name__ == "__main__":
         existing_urls = json.loads(f.read())
 
     search_request = SearchRequest(
-        person_name="Ishita Khurana",
-        # company_name="",
-        # person_role_title="",
-        company_name="LambdaTest",
-        person_role_title="Senior Sales Development Representative",
+        person_name="Zachary Perret",
+        company_name="Plaid",
+        person_role_title="CEO & Cofounder",
         existing_urls=[],
         query_configs=[
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="product launches",
-            #     num_results=20,
+            #     num_results_per_method=30,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
             # ),
             # SearchRequest.QueryConfig(
             #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
@@ -346,5 +348,5 @@ if __name__ == "__main__":
         ],
     )
     results = wf.get_search_results(search_request=search_request)
-    with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
-        f.write(json.dumps(results, indent=4))
+    # with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
+    #     f.write(json.dumps(results, indent=4))
