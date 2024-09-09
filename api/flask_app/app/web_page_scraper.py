@@ -299,6 +299,7 @@ class WebPageScraper:
     def fetch_content_info_from_general_page(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
         """Fetches content information from General web page (not a LinkedIn post)."""
         logger.info(f"Fetching content from general page for URL: {self.url}")
+        cur_cost_in_usd: float = 0
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_page_structure()
 
@@ -306,16 +307,28 @@ class WebPageScraper:
             author_and_publish_date: ContentAuthorAndPublishDate = self.fetch_author_and_date(
                 page_structure=page_structure)
 
+            logger.info(
+                f"\nfetch_author_and_date cost: {cb.total_cost - cur_cost_in_usd}")
+            cur_cost_in_usd = cb.total_cost
+
             # Need high accuray so GPT-4O model.
-            publish_date: Optional[datetime] = self.convert_to_datetime(
-                parsed_date=author_and_publish_date.publish_date)
+            publish_date: Optional[datetime] = None
+            if author_and_publish_date.publish_date:
+                publish_date = self.convert_to_datetime(
+                    parsed_date=author_and_publish_date.publish_date)
+                logger.info(
+                    f"\nConvert to datetime cost: {cb.total_cost - cur_cost_in_usd}")
+                cur_cost_in_usd = cb.total_cost
+            else:
+                logger.info(
+                    f"LLM could not find publish date in URL: {self.url}")
 
             # If document is older than 1 year from todays date, skip it since it may be too old for relevance.
             publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=12)
             if publish_date == None or publish_date < publish_cutoff_date:
                 # Exit early.
                 logger.info(
-                    f"Content too stale or unknown with publish date: {publish_date} in URL: {self.url}: {company_name}, skipping remaining computation.")
+                    f"Content too stale or unknown with publish date: {publish_date} in URL: {self.url}, skipping remaining computation.")
                 tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
                 logger.info(
@@ -345,9 +358,18 @@ class WebPageScraper:
             final_summary: ContentFinalSummary = self.fetch_content_final_summary(
                 page_body_chunks=page_structure.body_chunks)
 
+            logger.info(
+                f"\nFinal summary cost: {cb.total_cost - cur_cost_in_usd}")
+            cur_cost_in_usd = cb.total_cost
+
             # Need high accuray so GPT-4O model.
             related_to_company: bool = self.is_page_related_to_company(
                 company_name=company_name, detailed_summary=final_summary.detailed_summary)
+
+            logger.info(
+                f"\nRelated to company cost: {cb.total_cost - cur_cost_in_usd}")
+            cur_cost_in_usd = cb.total_cost
+
             if not related_to_company:
                 # Exit early to save remaining computation cost and time.
                 logger.info(
@@ -382,12 +404,24 @@ class WebPageScraper:
             concise_summary: str = self.fetch_concise_summary(
                 detailed_summary=final_summary.detailed_summary)
 
+            logger.info(
+                f"\nConcise summary cost: {cb.total_cost - cur_cost_in_usd}")
+            cur_cost_in_usd = cb.total_cost
+
             # Need high accuray so GPT-4O model.
             category: ContentCategory = self.fetch_content_category(
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
+            logger.info(
+                f"\nContent Category cost: {cb.total_cost - cur_cost_in_usd}")
+            cur_cost_in_usd = cb.total_cost
+
             requesting_user_contact: bool = self.is_page_requesting_user_contact(
                 page_structure=page_structure)
+
+            logger.info(
+                f"\nUser contact cost: {cb.total_cost - cur_cost_in_usd}")
+            cur_cost_in_usd = cb.total_cost
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
@@ -710,7 +744,7 @@ class WebPageScraper:
             if page_structure.header:
                 # Usually the publish text is very close to the end of the header if it exists.
                 page_text += page_structure.header[-window_size:]
-            page_text += page_structure.body_chunks[0].page_content[:window_size]
+            page_text += page_structure.body_chunks[0].page_content
 
             chain = prompt | llm
             result = chain.invoke({"page_text": page_text})
@@ -1444,7 +1478,7 @@ if __name__ == "__main__":
     # url = "https://plaid.com/2023-fintech-predictions-whitepaper/"
 
     # SITES that don't allow scraping without Proxy.
-    url = "https://www.saastr.com/the-plaid-journey-with-co-founder-and-ceo-zach-perret-pod-561-video/"
+    # url = "https://www.saastr.com/the-plaid-journey-with-co-founder-and-ceo-zach-perret-pod-561-video/"
     # url = "https://www.crunchbase.com/person/zach-perret"
 
     # These two LinkedIn reposts have a little different structures so our strict state based extraction algoirthm breaks. We have since fixed it.
@@ -1495,17 +1529,18 @@ if __name__ == "__main__":
     # url = "https://indianexpress.com/article/trending/trending-in-india/ola-bhavish-aggarwal-gender-pronouns-viral-post-9310997/"
     # url = "https://audiencereports.in/bhavish-aggarwal-pioneering/"
 
-    # url = "https://www.linkedin.com/in/satya-mohanty/recent-activity/all/"
+    # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
+    url = "https://www.lithic.com/blog/talking-plaids-technological-choices-and-the-rise-of-american-open-finance-with-zach-perret"
 
-    # person_name = "Zachary Perret"
+    person_name = "Zachary Perret"
     # person_name = "Jean-Denis Graze"
     # person_name = "Al Cook"
-    # company_name = "Plaid"
+    company_name = "Plaid"
     # person_name = "Anuj Kapur"
     # person_name = "Raj Sarkar"
     # company_name = "Cloudbees"
-    person_name = "Bhavish Aggarwal"
-    company_name = "Olacabs.com"
+    # person_name = "Bhavish Aggarwal"
+    # company_name = "Olacabs.com"
 
     import time
     import logging
@@ -1517,8 +1552,8 @@ if __name__ == "__main__":
 
     # print("total time taken: ", time.time()-start_time)
     # start_time = time.time()
-    # content_info: PageContentInfo = graph.fetch_page_content_info(
-    #     doc=doc, company_name=company_name, person_name=person_name)
+    content_info: PageContentInfo = graph.fetch_page_content_info(
+        doc=doc, company_name=company_name, person_name=person_name)
     # logging.info(f"\n\nTime taken: {time.time() - start_time} seconds")
     # with open("example_linkedin_info/parsed_page_info.json", "w") as f:
     #     f.write(json.dumps(content_info.dict(), indent=4))
