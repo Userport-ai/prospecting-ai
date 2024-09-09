@@ -137,24 +137,24 @@ class Researcher:
         #    "recent leadership changes", "recent announcements made"]
         # The most important configs that are required for every search.
         base_search_configs = [
-            # SearchRequest.QueryConfig(
-            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-            #     suffix_query="product launches",
-            #     num_results_per_method=10,
-            #     methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-            #                  SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-            # ),
-            # SearchRequest.QueryConfig(
-            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-            #     suffix_query="recent achievements",
-            #     num_results_per_method=10,
-            #     methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-            #                  SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-            # ),
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                suffix_query="product launches",
+                num_results_per_method=20,
+                methods=[
+                    SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+            ),
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                suffix_query="recent achievements",
+                num_results_per_method=10,
+                methods=[
+                    SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+            ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
                 suffix_query="recent LinkedIn Posts",
-                num_results_per_method=2,
+                num_results_per_method=10,
                 methods=[
                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
             ),
@@ -224,13 +224,12 @@ class Researcher:
         content_parsing_failed_results: List[LeadResearchReport.WebSearchResults.Result] = [
         ]
         for search_result in search_results_batch:
-            search_query: str = search_result.query
             url: str = search_result.url
             try:
                 logger.info(
                     f"Start processing search URL: {url} in task num: {task_num}")
                 self.process_content(
-                    url=url, search_query=search_query, research_report=research_report)
+                    search_result=search_result, research_report=research_report)
                 logger.info(
                     f"Completed processing for search URL: {url} in task num: {task_num}")
             except Exception as e:
@@ -238,19 +237,22 @@ class Researcher:
                     f"Failed to process content from search URL: {url} with error: {e}")
                 content_parsing_failed_results.append(search_result)
 
+        if len(content_parsing_failed_results) == 0:
+            # Nothing to do.
+            return []
+
         logger.info(
             f"Trying {len(content_parsing_failed_results)} failed URLs now for task num: {task_num}.")
         # Retry URLs that failed to process one more time.
         # Sometimes failures can be intermittent, so better to retry whenver possible.
         final_failed_urls: List[str] = []
         for failed_url_result in content_parsing_failed_results:
-            failed_query: str = failed_url_result.query
             failed_url: str = failed_url_result.url
             try:
                 logger.info(
                     f"Start processing failed search URL: {failed_url} in task num: {task_num}")
                 self.process_content(
-                    url=failed_url, search_query=failed_query, research_report=research_report)
+                    search_result=search_result, research_report=research_report)
                 logger.info(
                     f"Completed processing for failed search URL: {failed_url} in task num: {task_num}")
             except Exception as e:
@@ -260,16 +262,17 @@ class Researcher:
 
         return final_failed_urls
 
-    def process_content(self, url: str, search_query: str, research_report: LeadResearchReport):
+    def process_content(self, search_result: LeadResearchReport.WebSearchResults.Result, research_report: LeadResearchReport):
         """Fetch content from given URL, process it and store it in the database."""
         # If this URL has already been indexed for this company and has been processed successfully, skip processing again.
-        if self.database.get_content_details_by_url(url=url, company_profile_id=research_report.company_profile_id, processing_status=ContentDetails.ProcessingStatus.COMPLETE):
+        if self.database.get_content_details_by_url(url=search_result.url, company_profile_id=research_report.company_profile_id, processing_status=ContentDetails.ProcessingStatus.COMPLETE):
             logger.info(
-                f"Web URL: {url} already indexed in the database for report: {research_report.id}, skip processing again.")
+                f"Web URL: {search_result.url} already indexed in the database for report: {research_report.id}, skip processing again.")
             return
 
         # Fetch page and then process content.
-        page_scraper = WebPageScraper(url=url)
+        page_scraper = WebPageScraper(
+            url=search_result.url, title=search_result.title, snippet=search_result.snippet)
 
         doc = page_scraper.fetch_page()
 
@@ -319,7 +322,7 @@ class Researcher:
 
         content_details = ContentDetails(
             url=page_content_info.url,
-            search_engine_query=search_query,
+            search_engine_query=search_result.query,
             person_name=research_report.person_name,
             company_name=research_report.company_name,
             person_role_title=research_report.person_role_title,

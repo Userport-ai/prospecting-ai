@@ -227,8 +227,10 @@ class WebPageScraper:
     SPLIT_INDEX = "split_index"
     SUMMARY = "summary"
 
-    def __init__(self,  url: str,  chunk_size: int = 4096, chunk_overlap: int = 200, dev_mode: bool = False) -> None:
+    def __init__(self, url: str, title: Optional[str] = None, snippet: Optional[str] = None,  chunk_size: int = 4096, chunk_overlap: int = 200, dev_mode: bool = False) -> None:
         self.url = url
+        self.page_title: Optional[str] = title
+        self.page_snippet: Optional[str] = snippet
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
@@ -294,41 +296,51 @@ class WebPageScraper:
         if self.is_valid_linkedin_post(url=self.url):
             return self.fetch_content_info_from_linkedin_post(company_name=company_name, person_name=person_name, doc=doc)
 
-        return self.fetch_content_info_from_general_page(company_name=company_name, person_name=person_name, doc=doc)
+        return self.fetch_content_info_from_general_page(company_name=company_name, person_name=person_name)
 
-    def fetch_content_info_from_general_page(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
+    def fetch_content_info_from_general_page(self, company_name: str, person_name: str) -> PageContentInfo:
         """Fetches content information from General web page (not a LinkedIn post)."""
         logger.info(f"Fetching content from general page for URL: {self.url}")
         cur_cost_in_usd: float = 0
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_page_structure()
 
-            # Need high accuray so GPT-4O model.
-            author_and_publish_date: ContentAuthorAndPublishDate = self.fetch_author_and_date(
-                page_structure=page_structure)
-
+            # Try fetching page publish date from Snippet first, if None, then fetch from page content as backup.
+            publish_date: Optional[datetime] = self.fetch_publish_date_from_snippet(
+            )
+            author: Optional[str] = None
             logger.info(
-                f"\nfetch_author_and_date cost: {cb.total_cost - cur_cost_in_usd}")
-            cur_cost_in_usd = cb.total_cost
+                f"Publish date from Snippet cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
 
-            # Need high accuray so GPT-4O model.
-            publish_date: Optional[datetime] = None
-            if author_and_publish_date.publish_date:
-                publish_date = self.convert_to_datetime(
-                    parsed_date=author_and_publish_date.publish_date)
+            if not publish_date:
+                # Need high accuray so GPT-4O model.
+                author_and_publish_date: ContentAuthorAndPublishDate = self.fetch_author_and_date(
+                    page_structure=page_structure)
+
+                if author_and_publish_date.author:
+                    author = author_and_publish_date.author
+
                 logger.info(
-                    f"\nConvert to datetime cost: {cb.total_cost - cur_cost_in_usd}")
+                    f"Fetch author and date cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
                 cur_cost_in_usd = cb.total_cost
-            else:
-                logger.info(
-                    f"LLM could not find publish date in URL: {self.url}")
+
+                # Need high accuray so GPT-4O model.
+                if author_and_publish_date.publish_date:
+                    publish_date = self.convert_to_datetime(
+                        parsed_date=author_and_publish_date.publish_date)
+                    logger.info(
+                        f"Convert to datetime cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
+                    cur_cost_in_usd = cb.total_cost
+                else:
+                    logger.info(
+                        f"LLM could not find publish date in the fetch_author_and_publish_date method in URL: {self.url}")
 
             # If document is older than 1 year from todays date, skip it since it may be too old for relevance.
             publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=12)
             if publish_date == None or publish_date < publish_cutoff_date:
                 # Exit early.
                 logger.info(
-                    f"Content too stale or unknown with publish date: {publish_date} in URL: {self.url}, skipping remaining computation.")
+                    f"Publish date is stale or Unknown with value: {publish_date} for URL: {self.url}, skipping remaining computation.")
                 tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
                 logger.info(
@@ -340,7 +352,7 @@ class WebPageScraper:
                     linkedin_post_details=None,
                     type=None,
                     type_reason=None,
-                    author=author_and_publish_date.author,
+                    author=author,
                     publish_date=publish_date,
                     detailed_summary=None,
                     concise_summary=None,
@@ -359,7 +371,7 @@ class WebPageScraper:
                 page_body_chunks=page_structure.body_chunks)
 
             logger.info(
-                f"\nFinal summary cost: {cb.total_cost - cur_cost_in_usd}")
+                f"Detailed summary cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
             cur_cost_in_usd = cb.total_cost
 
             # Need high accuray so GPT-4O model.
@@ -367,7 +379,7 @@ class WebPageScraper:
                 company_name=company_name, detailed_summary=final_summary.detailed_summary)
 
             logger.info(
-                f"\nRelated to company cost: {cb.total_cost - cur_cost_in_usd}")
+                f"Related to company cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
             cur_cost_in_usd = cb.total_cost
 
             if not related_to_company:
@@ -405,7 +417,7 @@ class WebPageScraper:
                 detailed_summary=final_summary.detailed_summary)
 
             logger.info(
-                f"\nConcise summary cost: {cb.total_cost - cur_cost_in_usd}")
+                f"Concise summary cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
             cur_cost_in_usd = cb.total_cost
 
             # Need high accuray so GPT-4O model.
@@ -413,14 +425,14 @@ class WebPageScraper:
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
 
             logger.info(
-                f"\nContent Category cost: {cb.total_cost - cur_cost_in_usd}")
+                f"Content Category cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
             cur_cost_in_usd = cb.total_cost
 
             requesting_user_contact: bool = self.is_page_requesting_user_contact(
                 page_structure=page_structure)
 
             logger.info(
-                f"\nUser contact cost: {cb.total_cost - cur_cost_in_usd}")
+                f"User contact cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
             cur_cost_in_usd = cb.total_cost
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
@@ -435,7 +447,7 @@ class WebPageScraper:
                 linkedin_post_details=None,
                 type=None,
                 type_reason=None,
-                author=author_and_publish_date.author,
+                author=author,
                 publish_date=publish_date,
                 detailed_summary=final_summary.detailed_summary,
                 concise_summary=concise_summary,
@@ -453,6 +465,7 @@ class WebPageScraper:
     def fetch_content_info_from_linkedin_post(self, company_name: str, person_name: str, doc: Document) -> PageContentInfo:
         """Fetches content information from LinkedIn post web page."""
         logger.info(f"Fetching content from LinkedIn post: {self.url}")
+        cur_cost_in_usd: float = 0
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_linkedin_post_structure(
                 doc=doc)
@@ -467,7 +480,7 @@ class WebPageScraper:
             if post_details.publish_date == None or post_details.publish_date < publish_cutoff_date:
                 # Exit early.
                 logger.info(
-                    f"LinkedIn Post too stale or unknown with publish date: {post_details.publish_date} for URL: {self.url}: {company_name}, skipping remaining computation.")
+                    f"LinkedIn Post publish date is too stale or unknown with value: {post_details.publish_date} for URL: {self.url}: {company_name}, skipping remaining computation.")
                 tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
                 logger.info(
@@ -497,10 +510,17 @@ class WebPageScraper:
             # Need high accuracy (better reasoning) since limited text in a LinkedIn post, so use GPT-4O model.
             final_summary: ContentFinalSummary = self.fetch_post_final_summary(
                 post_details=post_details)
+            logger.info(
+                f"LinkedIn post Detailed Summary cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
+            cur_cost_in_usd = cb.total_cost
 
             # Need high accuray so GPT-4O model.
             related_to_company: bool = self.is_page_related_to_company(
                 company_name=company_name, detailed_summary=final_summary.detailed_summary)
+
+            logger.info(
+                f"LinkedIn Post Related to company cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
+            cur_cost_in_usd = cb.total_cost
 
             if not related_to_company:
                 # Exit early to save remaining computation cost and time.
@@ -535,6 +555,9 @@ class WebPageScraper:
             # Need high accuray so GPT-4O model.
             category: ContentCategory = self.fetch_content_category(
                 company_name=company_name, person_name=person_name, detailed_summary=final_summary.detailed_summary)
+            logger.info(
+                f"LinkedIn Post Content Category cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
+            cur_cost_in_usd = cb.total_cost
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
@@ -720,8 +743,58 @@ class WebPageScraper:
             f"Got concise summary for URL: {self.url} with length: {len(concise_summary)}: {concise_summary[:100]}...")
         return concise_summary
 
+    def fetch_publish_date_from_snippet(self) -> Optional[datetime]:
+        """Fetches publish date from Page Snippet if it exists and returns it as a datetime object. Returns None if date is not found.
+
+        This only applies to Snippets that have one of the following formats returned by Google Custom Search API:
+        [1] 'Jun 24, 2024 ... ... swiggy s fy24 revenue up 24 quick commerce unit economics improve prosus · Swiggy launches new initiative to tackle staffing challenges in restaurants.'
+        [2] '3 days ago ... Swiggy stated that the Incognito Mode is also ideal for discreet purchases, such as personal wellness products on Swiggy Instamart, as this feature ensures that ...'
+
+        If the snippet is not of the following format, None is returned immediately.
+        """
+        if not self.page_snippet:
+            logger.info(
+                f"Cannot get publish date since Page Snippet not found for URL: {self.url} and page title: {self.page_title}, fetch from page body instead.")
+            return None
+
+        snippet_pattern = r'(.*?)(\s\.\.\.\s)'
+        import re
+        match_result = re.match(snippet_pattern, self.page_snippet)
+        if not match_result:
+            logger.info(
+                f"Snippet does not have publish date per expected format in URL: {self.url} with snippet text: {self.page_snippet}")
+            return None
+
+        date_str: str = match_result[1]
+        # Check if date format is of type: 3 days ago, 1 day ago, 2 months ago etc.
+        # We process this format directly using regex without needing LLMs.
+        days_ago_pattern = r'\s*(\d+)\s(?:day|days|month|months|year|years)\sago'
+        match_result = re.match(days_ago_pattern, date_str)
+        if match_result:
+            delta_number = int(match_result[1])
+            time_now = Utils.create_utc_time_now()
+            relative_time = None
+            if "day" in date_str:
+                relative_time = relativedelta(days=delta_number)
+            elif "month" in date_str:
+                relative_time = relativedelta(months=delta_number)
+            elif "year" in date_str:
+                relative_time = relativedelta(years=delta_number)
+            dt = time_now - relative_time
+            logger.info(
+                f"Got Publish date: {dt} successfully from Snippet: {self.page_snippet} for URL: {self.url}")
+            return dt
+
+        dt = self.convert_to_datetime(parsed_date=date_str)
+        logger.info(
+            f"Got Publish date: {dt} succesfully for Snippet: {self.page_snippet} for URL: {self.url}")
+        return dt
+
     def fetch_author_and_date(self, page_structure: PageStructure) -> ContentAuthorAndPublishDate:
-        """Fetches content details like author and publish date from the web page."""
+        """Fetches content details like author and publish date from the web page.
+
+        TODO: Remove fetching author since its not needed right now. We can save some cost.
+        """
         # Do not change this prompt before testing, results may get worse.
         prompt_template = (
             "You are a smart web page analyzer. A part of the text from a web page is given below.\n"
@@ -886,11 +959,10 @@ class WebPageScraper:
 
     def convert_to_datetime(self, parsed_date: Optional[str]) -> Optional[datetime]:
         """Converts given parsed date (from web page) to datetime object in UTC timezone."""
-        if not parsed_date:
-            return None
-
-        # Sometimes the LLM sets parsed_date to 'None' string. Handle that case here.
-        if parsed_date == 'None':
+        if not parsed_date or parsed_date == 'None':
+            # Sometimes the LLM sets parsed_date to 'None' string. Handle that case here.
+            logger.warning(
+                f"Received None parsed_date: {parsed_date} as input to conver_to_datetime for URL: {self.url}")
             return None
 
         prompt_template = (
@@ -910,7 +982,6 @@ class WebPageScraper:
         day: int = result.day if result.day else 1
         month: int = result.month if result.month else 1
         year: int = result.year if result.year else datetime.now().year
-        logger.info(f"Converted to datetime succesfully for URL: {self.url}")
         return Utils.create_utc_datetime(day=day, month=month, year=year)
 
     def is_page_requesting_user_contact(self, page_structure: PageStructure) -> bool:
@@ -1543,20 +1614,18 @@ if __name__ == "__main__":
     # person_name = "Bhavish Aggarwal"
     # company_name = "Olacabs.com"
 
-    import time
     import logging
     logging.basicConfig(level=logging.INFO)
 
-    graph = WebPageScraper(url=url, dev_mode=False)
-    # start_time = time.time()
+    snippet = "5 Dec 2023 ... Swiggy stated that the Incognito Mode is also ideal for discreet purchases, such as personal wellness products on Swiggy Instamart, as this feature ensures that ..."
+    graph = WebPageScraper(url=url, title=None,
+                           snippet=snippet, dev_mode=False)
     doc = graph.fetch_page()
-
-    # print("total time taken: ", time.time()-start_time)
-    # start_time = time.time()
     content_info: PageContentInfo = graph.fetch_page_content_info(
         doc=doc, company_name=company_name, person_name=person_name)
-    # logging.info(f"\n\nTime taken: {time.time() - start_time} seconds")
     # with open("example_linkedin_info/parsed_page_info.json", "w") as f:
     #     f.write(json.dumps(content_info.dict(), indent=4))
 
-    # graph.get_header_page_body_and_footer_text_from_html()
+    # snippet = "3 days ago ... Swiggy stated that the Incognito Mode is also ideal for discreet purchases, such as personal wellness products on Swiggy Instamart, as this feature ensures that ..."
+    # graph = WebPageScraper(url="", title=None, snippet=snippet)
+    # graph.fetch_publish_date_from_snippet()
