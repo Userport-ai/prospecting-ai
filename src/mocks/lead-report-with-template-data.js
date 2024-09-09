@@ -15,6 +15,7 @@ export const reportWithSelectedTemplate = {
     company_industry_categories: null,
     user_id: null,
     search_results_map: null,
+    web_search_results: null,
     report_creation_date_readable_str: "04 August, 2024",
     report_publish_cutoff_date: null,
     report_publish_cutoff_date_readable_str: "04 August, 2023",
