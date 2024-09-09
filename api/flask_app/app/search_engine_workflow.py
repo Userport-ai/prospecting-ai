@@ -298,7 +298,7 @@ if __name__ == "__main__":
     search_request = SearchRequest(
         person_name="Zachary Perret",
         company_name="Plaid",
-        person_role_title="CEO & Cofounder",
+        person_role_title="Cofounder/CEO",
         existing_urls=[],
         query_configs=[
             # SearchRequest.QueryConfig(
@@ -313,38 +313,47 @@ if __name__ == "__main__":
             #         suffix_query="funding announcements",
             #         num_results=20,
             # ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                methods=[
-                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                suffix_query="recent LinkedIn posts",
-                num_results_per_method=20,
-            ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            #     suffix_query="recent LinkedIn posts",
+            #     num_results_per_method=20,
+            # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="pain points or challenges",
-            #     num_results=20,
+            #     num_results_per_method=20,
+            #     methods=[
+            #          SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
             # ),
             # SearchRequest.QueryConfig(
             #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
             #         suffix_query="blogs",
-            #         num_results=20,
+            #         num_results_per_method=20,
+            #         methods=[
+            #          SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+
             # ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="recent achievements",
-            #     num_results=10,
+            #     num_results_per_method=30,
+            #     methods=[
+            #          SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
             # ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="recent recognitions",
             #     num_results=10,
             # ),
-            # SearchRequest.QueryConfig(
-            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-            #     suffix_query="thoughts on the industry",
-            #     num_results=20,
-            # ),
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                suffix_query="thoughts on the industry",
+                num_results_per_method=20,
+                    methods=[
+                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            ),
         ],
     )
     results = wf.get_search_results(search_request=search_request)
