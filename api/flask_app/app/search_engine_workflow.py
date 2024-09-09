@@ -1,14 +1,13 @@
 import logging
 import os
-import random
-import gzip
 import requests
 import tldextract
-from typing import List, Dict, Set, Optional
+from typing import List, Set, Optional
 from enum import Enum
 from app.linkedin_scraper import LinkedInScraper
 from googlesearch import search
 from pydantic import BaseModel, Field, field_validator
+from app.models import LeadResearchReport
 
 logger = logging.getLogger()
 
@@ -109,14 +108,15 @@ class SearchEngineWorkflow:
         # Currently only set in Prod env to save costs.
         self.SERP_PROXY_URL = os.getenv("BRIGHT_DATA_SERP_PROXY_URL")
 
-    def get_search_results(self, search_request: SearchRequest) -> Dict[str, List[str]]:
+    def get_search_results(self, search_request: SearchRequest) -> LeadResearchReport.WebSearchResults:
         """Returns search results as a dictionary mapping each search query to a list of URLs for the given request."""
         person_name: str = search_request.person_name
         company_name: str = search_request.company_name
         person_role_title: str = search_request.person_role_title
 
         already_fetched_urls: Set[str] = set(search_request.existing_urls)
-        search_results_map: Dict[str, List[str]] = {}
+        # Fetch search results.
+        results: List[LeadResearchReport.WebSearchResults.Result] = []
         for config in search_request.query_configs:
             # Construct search query.
             search_query: str = ""
@@ -128,22 +128,21 @@ class SearchEngineWorkflow:
             search_query += config.suffix_query
             num_results: int = config.num_results_per_method
 
-            # Fetch search results.
-            result_urls: List[str] = []
             for search_method in config.methods:
                 if search_method == SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API:
-                    result_urls.extend(self.api_search(
+                    results.extend(self.api_search(
                         search_query=search_query, num_results=num_results, skip_urls=already_fetched_urls))
                 else:
-                    result_urls.extend(self.get_unofficial_google_search_results(
+                    results.extend(self.get_unofficial_google_search_results(
                         search_query=search_query, num_results=num_results, skip_urls=already_fetched_urls))
 
-            already_fetched_urls = already_fetched_urls.union(set(result_urls))
-            search_results_map[search_query] = result_urls
+            already_fetched_urls = already_fetched_urls.union(
+                set([r.url for r in results]))
 
-        return search_results_map
+        num_results: int = len(results)
+        return LeadResearchReport.WebSearchResults(num_results=num_results, results=results)
 
-    def api_search(self, search_query: str, num_results: int, skip_urls: Set[str]) -> List[str]:
+    def api_search(self, search_query: str, num_results: int, skip_urls: Set[str]) -> List[LeadResearchReport.WebSearchResults.Result]:
         """
         Returns a list of Web Search Result URLs for given search query.
         It does this by repeatedly calling Custom Search API until given number of results are fetched.
@@ -158,7 +157,8 @@ class SearchEngineWorkflow:
         page_size: int = 10
         num_pages = int(num_results/page_size) + \
             (0 if num_results % page_size == 0 else 1)
-        result_urls: List[str] = []
+        web_search_results: List[LeadResearchReport.WebSearchResults.Result] = [
+        ]
         for page_num in range(num_pages):
             start = page_num*page_size + 1
             params = {
@@ -197,28 +197,31 @@ class SearchEngineWorkflow:
                 break
 
             for search_result in search_response.items:
-                url = search_result.link
                 logger.info(
-                    f"\nURL: {url}, Title: {search_result.title}, Snippet: {search_result.snippet}\n")
-                if not self.is_valid_search_url(url=url, skip_urls=skip_urls):
+                    f"\nURL: {search_result.link}, Title: {search_result.title}, Snippet: {search_result.snippet}\n")
+
+                if not self.is_valid_search_url(url=search_result.link, skip_urls=skip_urls):
                     continue
 
                 # We assume the result URLs for the same query across pages is deduplicated by Google.
-                result_urls.append(url)
+                single_result = LeadResearchReport.WebSearchResults.Result(
+                    query=search_query, url=search_result.link, title=search_result.title, snippet=search_result.snippet)
+                web_search_results.append(single_result)
 
             if not search_response.queries.nextPage:
                 # No more search results avaiable in next page, exit early from the loop.
                 break
 
         logger.info(
-            f"Google Custom Search Results for query: {search_query} complete. Wanted: {num_results} results, Got: {len(result_urls)}")
-        return result_urls
+            f"Google Custom Search Results for query: {search_query} complete. Wanted: {num_results} results, Got: {len(web_search_results)}")
+        return web_search_results
 
-    def get_unofficial_google_search_results(self, search_query: str, num_results: int, skip_urls: Set[str]) -> List[str]:
+    def get_unofficial_google_search_results(self, search_query: str, num_results: int, skip_urls: Set[str]) -> List[LeadResearchReport.WebSearchResults.Result]:
         """Returns search result links for given search query using unofficial Google Search Library."""
         logger.info(
             f"Fetching Unofficial Google search results for query: {search_query}")
-        result_urls: List[str] = []
+        web_search_results: List[LeadResearchReport.WebSearchResults.Result] = [
+        ]
         logger.info(
             f"Search query: {search_query}, num results: {num_results}")
         for search_result in search(search_query, num_results=num_results, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS, proxy=self.SERP_PROXY_URL, ssl_verify=False, sleep_interval=2, advanced=True):
@@ -226,10 +229,12 @@ class SearchEngineWorkflow:
                 f"\nURL: {search_result.url}, Title: {search_result.title}, Description: {search_result.description}\n")
             if not self.is_valid_search_url(url=search_result.url, skip_urls=skip_urls):
                 continue
-            result_urls.append(search_result.url)
+            single_result = LeadResearchReport.WebSearchResults.Result(
+                query=search_query, url=search_result.url, title=search_result.title, snippet=search_result.description)
+            web_search_results.append(single_result)
         logger.info(
-            f"Unofficial Google Search Results for query: {search_query} complete. Wanted: {num_results} results, Got: {len(result_urls)}")
-        return result_urls
+            f"Unofficial Google Search Results for query: {search_query} complete. Wanted: {num_results} results, Got: {len(web_search_results)}")
+        return web_search_results
 
     def is_valid_search_url(self, url: str,  skip_urls: Set[str]) -> bool:
         """Returns true if this is a valid URL to be added to search results and False otherwise."""
@@ -296,30 +301,30 @@ if __name__ == "__main__":
         existing_urls = json.loads(f.read())
 
     search_request = SearchRequest(
-        person_name="Zachary Perret",
-        company_name="Plaid",
+        person_name="Harsha",
+        company_name="Swiggy",
         person_role_title="Cofounder/CEO",
         existing_urls=[],
         query_configs=[
-            # SearchRequest.QueryConfig(
-            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-            #     suffix_query="product launches",
-            #     num_results_per_method=30,
-            #     methods=[
-            #         SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
-            # ),
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                suffix_query="product launches",
+                num_results_per_method=20,
+                methods=[
+                    SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+            ),
             # SearchRequest.QueryConfig(
             #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #         suffix_query="funding announcements",
             #         num_results=20,
             # ),
-            # SearchRequest.QueryConfig(
-            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-            #     methods=[
-            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-            #     suffix_query="recent LinkedIn posts",
-            #     num_results_per_method=20,
-            # ),
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                methods=[
+                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                suffix_query="recent LinkedIn posts",
+                num_results_per_method=20,
+            ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="pain points or challenges",
@@ -328,11 +333,11 @@ if __name__ == "__main__":
             #          SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
             # ),
             # SearchRequest.QueryConfig(
-            #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-            #         suffix_query="blogs",
-            #         num_results_per_method=20,
-            #         methods=[
-            #          SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="blogs",
+            #     num_results_per_method=20,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
 
             # ),
             # SearchRequest.QueryConfig(
@@ -347,15 +352,15 @@ if __name__ == "__main__":
             #     suffix_query="recent recognitions",
             #     num_results=10,
             # ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                suffix_query="thoughts on the industry",
-                num_results_per_method=20,
-                    methods=[
-                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-            ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="thoughts on the industry",
+            #     num_results_per_method=20,
+            #         methods=[
+            #          SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            # ),
         ],
     )
     results = wf.get_search_results(search_request=search_request)
-    # with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
-    #     f.write(json.dumps(results, indent=4))
+    with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
+        f.write(results.model_dump_json(indent=4))

@@ -461,8 +461,9 @@ class WebPageScraper:
             logger.info(
                 f"Successfully extracted LinkedIn post details for URL: {self.url}")
 
-            # If post is older than 1 year from todays date, skip it may be too old for relevance.
-            publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=12)
+            # If post is older than 1 year and 3 months from todays date, skip it may be too old for relevance.
+            # We add 3 months extra because it might be someone's work anniversary which we can still celebrate 1 year and 3 months later.
+            publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=15)
             if post_details.publish_date == None or post_details.publish_date < publish_cutoff_date:
                 # Exit early.
                 logger.info(

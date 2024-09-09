@@ -2,7 +2,6 @@ import logging
 from typing import Optional, List, Dict, Set
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from itertools import chain
 from app.utils import Utils
 from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
@@ -102,10 +101,9 @@ class Researcher:
         company_name = research_report.company_name
         person_name: str = research_report.person_name
         role_title: str = research_report.person_role_title
-        existing_search_results_map: Optional[Dict[str,
-                                                   List[str]]] = research_report.search_results_map
-        existing_urls: List[str] = list(
-            chain.from_iterable(existing_search_results_map.values())) if existing_search_results_map else []
+        existing_web_search_results: Optional[LeadResearchReport.WebSearchResults] = research_report.web_search_results
+        existing_urls: List[str] = [
+            r.url for r in existing_web_search_results.results] if existing_web_search_results else []
 
         search_request = SearchRequest(
             person_name=person_name,
@@ -114,26 +112,18 @@ class Researcher:
             existing_urls=existing_urls,
             query_configs=self._get_query_configs(exhaustive_search=False),
         )
-
         # Get search results and update them in the database.
-        search_results_map: Dict[str, List[str]] = self.search_engine_workflow.get_search_results(
+        web_search_results: LeadResearchReport.WebSearchResults = self.search_engine_workflow.get_search_results(
             search_request=search_request)
 
-        # Merge new results with existing results.
-        updated_search_results_map = existing_search_results_map.copy(
-        ) if existing_search_results_map else {}
-        for result_query in search_results_map:
-            if result_query in updated_search_results_map:
-                # Append new URLs
-                updated_search_results_map[result_query].extend(
-                    search_results_map[result_query])
-            else:
-                # Create new entry in updated_search_result.
-                updated_search_results_map[result_query] = search_results_map[result_query].copy(
-                )
+        # Merge new results with existing results if any.
+        if existing_web_search_results and existing_web_search_results.results:
+            web_search_results.results.extend(
+                existing_web_search_results.results)
+            web_search_results.num_results = len(web_search_results.results)
 
         setFields = {
-            "search_results_map": updated_search_results_map,
+            "web_search_results": web_search_results.model_dump(),
             "status": LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED,
         }
         self.database.update_lead_research_report(
@@ -147,24 +137,24 @@ class Researcher:
         #    "recent leadership changes", "recent announcements made"]
         # The most important configs that are required for every search.
         base_search_configs = [
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="product launches",
-                num_results_per_method=10,
-                methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-            ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="recent achievements",
-                num_results_per_method=10,
-                methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-            ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+            #     suffix_query="product launches",
+            #     num_results_per_method=10,
+            #     methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+            #                  SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+            #     suffix_query="recent achievements",
+            #     num_results_per_method=10,
+            #     methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+            #                  SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            # ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
                 suffix_query="recent LinkedIn Posts",
-                num_results_per_method=20,
+                num_results_per_method=2,
                 methods=[
                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
             ),
@@ -226,14 +216,16 @@ class Researcher:
             ])
         return base_search_configs
 
-    def process_content_in_search_urls(self, lead_research_report_id: str, search_results_batch: List[List[str]], task_num: int) -> List[str]:
+    def process_content_in_search_urls(self, lead_research_report_id: str, search_results_batch: List[LeadResearchReport.WebSearchResults.Result], task_num: int) -> List[str]:
         """Process URLs stored in given search results batch in a research report and return URLs that failed to process."""
         research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
 
-        content_parsing_failed_results: List[List[str]] = []
+        content_parsing_failed_results: List[LeadResearchReport.WebSearchResults.Result] = [
+        ]
         for search_result in search_results_batch:
-            search_query, url = search_result
+            search_query: str = search_result.query
+            url: str = search_result.url
             try:
                 logger.info(
                     f"Start processing search URL: {url} in task num: {task_num}")
@@ -252,7 +244,8 @@ class Researcher:
         # Sometimes failures can be intermittent, so better to retry whenver possible.
         final_failed_urls: List[str] = []
         for failed_url_result in content_parsing_failed_results:
-            failed_query, failed_url = failed_url_result
+            failed_query: str = failed_url_result.query
+            failed_url: str = failed_url_result.url
             try:
                 logger.info(
                     f"Start processing failed search URL: {failed_url} in task num: {task_num}")
@@ -373,8 +366,8 @@ class Researcher:
 
         time_now: datetime = Utils.create_utc_time_now()
 
-        # Only filter documents from recent months.
-        report_publish_cutoff_date = time_now - relativedelta(months=12)
+        # Only filter documents from recent months. We use 15 since LinkedIn posts are configured to be at max 15 months old.
+        report_publish_cutoff_date = time_now - relativedelta(months=15)
 
         stage_match_person_and_company = {
             "$match": {

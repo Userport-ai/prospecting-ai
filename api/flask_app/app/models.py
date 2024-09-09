@@ -323,6 +323,23 @@ class LeadResearchReport(BaseModel):
         COMPLETE = "complete"
         FAILED_WITH_ERRORS = "failed_with_errors"
 
+    class WebSearchResults(BaseModel):
+        """Container for search results from processing information from the Web about Lead and their company."""
+        class Result(BaseModel):
+            query: Optional[str] = Field(default=None,
+                                         description="Search query associated with the Result.")
+            url: Optional[str] = Field(
+                default=None, description="URL of the search result.")
+            title: Optional[str] = Field(
+                default=None, description="Title of the search result page.")
+            snippet: Optional[str] = Field(
+                default=None, description="Snippet from Search result page that the search engine returned. Useful for understanding if the result is relevant or not.")
+
+        num_results: Optional[int] = Field(default=None,
+                                           description="Total number of search results returned.")
+        results: Optional[List[Result]] = Field(default=None,
+                                                description="List of search results returned.")
+
     class ReportDetail(BaseModel):
         """Details associated with the report."""
         class Highlight(BaseModel):
@@ -415,7 +432,9 @@ class LeadResearchReport(BaseModel):
 
     # Store search results.
     search_results_map: Optional[Dict[str, List[str]]] = Field(
-        default=None, description="Search result links grouped by search query.")
+        default=None, description="[Deprecated: Use web_search_results instead]Search result links grouped by search query.")
+    web_search_results: Optional[WebSearchResults] = Field(
+        default=None, description="Web search results for given lead and their company.")
 
     # Search Result URLs whose contents failed to be parsed by the web scraper.
     content_parsing_failed_urls: Optional[List[str]] = Field(

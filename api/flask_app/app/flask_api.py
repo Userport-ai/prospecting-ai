@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, g, Response
 import logging
 import time
+import json
 from itertools import chain
 from enum import Enum
 from typing import Optional, List, Dict
@@ -888,34 +889,30 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
     try:
         research_report: LeadResearchReport = database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
-        search_results_map: Dict[str, List[str]
-                                 ] = research_report.search_results_map
-        search_results_list: List[List[str]] = []
-        for search_query in search_results_map:
-            urls: List[str] = search_results_map[search_query]
-            for url in urls:
-                search_results_list.append([search_query, url])
+        search_results_list: List[LeadResearchReport.WebSearchResults.Result] = research_report.web_search_results.results
+        total_urls_to_process: int = research_report.web_search_results.num_results
 
         # Split search URLs into batches depending on the number of concurrent processes in a worker.
         # Note: This concurrency value must match the concurreny passed during app intialization.
         # TODO: Make this read the concurrency value from the celery start command line argument.
         concurrency = 8
-        total_urls_to_process = len(search_results_list)
         batch_size = int(total_urls_to_process/concurrency) + \
             (0 if total_urls_to_process % concurrency == 0 else 1)
         logger.info(
-            f"Using {concurrency} workers which will each handle at max {batch_size} URLs to split total {total_urls_to_process} Search URLs for processing for lead report: {lead_research_report_id}.")
-        batches = []
+            f"Splitting a total of {total_urls_to_process} Search URLs using {concurrency} workers which will each handle at max {batch_size} URLs for processing for lead report: {lead_research_report_id}.")
+        batches: List[LeadResearchReport.WebSearchResults.Result] = []
         for i in range(concurrency):
             start_idx = i*batch_size
             end_idx = start_idx + batch_size
             batches.append(search_results_list[start_idx: end_idx])
+            if end_idx >= total_urls_to_process:
+                break
 
         logger.info(f"Num batches: {len(batches)}")
         logger.info(f"batching nums: {[len(b) for b in batches]}")
 
         parallel_workers = [process_content_in_search_results_batch_in_background.s(
-            num, lead_research_report_id, batch) for num, batch in enumerate(batches)]
+            num, lead_research_report_id, [r.model_dump_json() for r in batch]) for num, batch in enumerate(batches)]
         aggregation_work = aggregate_processed_search_results_in_background.s(
             lead_research_report_id)
 
@@ -928,8 +925,14 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
 
 
 @shared_task(bind=True, acks_late=True, ignore_result=False, rate_limit="5/m")
-def process_content_in_search_results_batch_in_background(self, batch_num: int, lead_research_report_id: str, search_results_batch: List[List[str]]):
+def process_content_in_search_results_batch_in_background(self, batch_num: int, lead_research_report_id: str, search_results_batch_json: List[str]):
     """Process batch of given Search Result URLs and returns a list of URLs that failed to process."""
+    search_results_batch = []
+    for r_json in search_results_batch_json:
+        search_result = LeadResearchReport.WebSearchResults.Result(
+            **json.loads(r_json))
+        search_results_batch.append(search_result)
+
     logger.info(
         f"Got {search_results_batch} search URLs to process for lead report: {lead_research_report_id} in batch number: {batch_num}")
     database = Database()
@@ -996,7 +999,7 @@ def aggregate_report_in_background(self, lead_research_report_id: str):
 def choose_outreach_email_template_in_background(self, lead_research_report_id: str):
     """Selects outreach tempalte in background."""
     logger.info(
-        f"Start eamil outreach template selection for report ID: {lead_research_report_id}")
+        f"Start email outreach template selection for report ID: {lead_research_report_id}")
     database = Database()
     try:
         r = Researcher(database=database)
