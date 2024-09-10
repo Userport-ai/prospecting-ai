@@ -366,7 +366,7 @@ class LeadResearchReport(BaseModel):
         highlights: Optional[List[Highlight]] = Field(
             default=None, description="List of Highlights associated with given category.")
 
-    class OutreachEmailTemplate(BaseModel):
+    class ChosenOutreachEmailTemplate(BaseModel):
         """Outreach Template chosen for this Lead. If ID is None, then none of the existing templates were chosen at that time."""
         id: Optional[PyObjectId] = Field(
             default=None, description="ID of the selected OutreachEmailTemplate. Set to None if none of the templates created by the user were selected.")
@@ -451,7 +451,7 @@ class LeadResearchReport(BaseModel):
         default=None, description="Report details associated with the lead.")
 
     # Chosen Outreach Email template.
-    chosen_outreach_email_template: Optional[OutreachEmailTemplate] = Field(
+    chosen_outreach_email_template: Optional[ChosenOutreachEmailTemplate] = Field(
         default=None, description="Outreach Email template that matches this Lead's profile.")
 
     # Outreach fields.
