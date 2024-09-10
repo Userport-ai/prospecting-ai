@@ -483,7 +483,7 @@ class Researcher:
 
     def choose_outreach_email_template(self, lead_research_report_id: str):
         """Choose Email template for the lead based on their persona."""
-        chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = self.outreach_template_matcher.match(
+        chosen_outreach_email_template: LeadResearchReport.OutreachEmailTemplate = self.outreach_template_matcher.match(
             lead_research_report_id=lead_research_report_id)
 
         # Update lead research report.
@@ -523,7 +523,7 @@ class Researcher:
         lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
 
-        chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = OutreachTemplateMatcher.from_outreach_template(
+        chosen_outreach_email_template: LeadResearchReport.OutreachEmailTemplate = OutreachTemplateMatcher.from_outreach_template(
             outreach_email_template=outreach_email_template)
         regenned_personalized_emails: List[LeadResearchReport.PersonalizedEmail] = self.personalization.regenerate_personalized_emails(
             lead_research_report=lead_research_report, chosen_outreach_email_template=chosen_outreach_email_template)

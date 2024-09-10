@@ -379,7 +379,7 @@ class UpdateTemplateInReportResponse(BaseModel):
     """API response after updateing template and personalized emails in Lead Research Report."""
     status: ResponseStatus = Field(...,
                                    description="Status (success) of the response.")
-    chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = Field(
+    chosen_outreach_email_template: LeadResearchReport.OutreachEmailTemplate = Field(
         ..., description="Updated outreach email template.")
     personalized_emails: List[LeadResearchReport.PersonalizedEmail] = Field(
         ..., description="Updated personalized emails.")

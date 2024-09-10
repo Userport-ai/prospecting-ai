@@ -50,7 +50,7 @@ class Personalization:
         logger.info(
             f"Got {len(referenced_highlights)} reference highlights IDs for email personalization for research report ID: {lead_research_report_id}.")
 
-        chosen_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = lead_research_report.chosen_outreach_email_template
+        chosen_email_template: LeadResearchReport.OutreachEmailTemplate = lead_research_report.chosen_outreach_email_template
         email_template_message: Optional[str] = None
         if chosen_email_template == None or chosen_email_template.id == None:
             logger.info(
@@ -73,7 +73,7 @@ class Personalization:
 
         return generated_personalized_emails
 
-    def regenerate_personalized_emails(self, lead_research_report: LeadResearchReport, chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate) -> List[LeadResearchReport.PersonalizedEmail]:
+    def regenerate_personalized_emails(self, lead_research_report: LeadResearchReport, chosen_outreach_email_template: LeadResearchReport.OutreachEmailTemplate) -> List[LeadResearchReport.PersonalizedEmail]:
         """Regenerates personalized emails using given outreach template and returns them. Assumes that personalized emails already exist in the report."""
         if len(lead_research_report.personalized_emails) == 0:
             raise ValueError(

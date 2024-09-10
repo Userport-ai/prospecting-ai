@@ -21,7 +21,7 @@ class OutreachTemplateMatcher:
         self.OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
         self.OPENAI_REQUEST_TIMEOUT_SECONDS = 20
 
-    def match(self, lead_research_report_id: str) -> LeadResearchReport.ChosenOutreachEmailTemplate:
+    def match(self, lead_research_report_id: str) -> LeadResearchReport.OutreachEmailTemplate:
         """Matches and returns the chosen outreach email template for given lead."""
         lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
@@ -43,7 +43,7 @@ class OutreachTemplateMatcher:
         return self.closest_template(
             email_templates=email_templates, person_profile=person_profile)
 
-    def closest_template(self, email_templates: List[OutreachEmailTemplate], person_profile: PersonProfile) -> LeadResearchReport.ChosenOutreachEmailTemplate:
+    def closest_template(self, email_templates: List[OutreachEmailTemplate], person_profile: PersonProfile) -> LeadResearchReport.OutreachEmailTemplate:
         """Returns the chosen template that most closely matches the lead's profile."""
         person_profile_markdown: str = person_profile.to_markdown()
 
@@ -79,7 +79,7 @@ class OutreachTemplateMatcher:
             # Sometimes LLMs screw up and set the value to string 'None' instead of Python None.
             logger.warning(
                 f"None of the emails templates matched with for Person profile ID: {person_profile.id} for user ID: {email_templates[0].user_id}")
-            return LeadResearchReport.ChosenOutreachEmailTemplate(id=None, reason=result.reason, message=None, creation_date=Utils.create_utc_time_now())
+            return LeadResearchReport.OutreachEmailTemplate(id=None, reason=result.reason, message=None, creation_date=Utils.create_utc_time_now())
 
         logger.info(
             f"Chosen template per LLM: {result} for person profile ID: {person_profile.id}")
@@ -91,7 +91,7 @@ class OutreachTemplateMatcher:
                 f"Expected to find 1 Email template with ID: {result.matched_persona_id}, found: {chosen_templates} for person profile ID: {person_profile.id}")
         chosen_email_template: OutreachEmailTemplate = chosen_templates[0]
 
-        return LeadResearchReport.ChosenOutreachEmailTemplate(
+        return LeadResearchReport.OutreachEmailTemplate(
             id=result.matched_persona_id,
             name=chosen_email_template.name,
             creation_date=Utils.create_utc_time_now(),
@@ -100,9 +100,9 @@ class OutreachTemplateMatcher:
         )
 
     @staticmethod
-    def from_outreach_template(outreach_email_template: OutreachEmailTemplate) -> LeadResearchReport.ChosenOutreachEmailTemplate:
+    def from_outreach_template(outreach_email_template: OutreachEmailTemplate) -> LeadResearchReport.OutreachEmailTemplate:
         """Helper to return Lead report template from given outreach template."""
-        return LeadResearchReport.ChosenOutreachEmailTemplate(
+        return LeadResearchReport.OutreachEmailTemplate(
             id=outreach_email_template.id,
             name=outreach_email_template.name,
             creation_date=Utils.create_utc_time_now(),
