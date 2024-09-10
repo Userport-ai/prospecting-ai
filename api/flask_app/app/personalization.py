@@ -48,13 +48,13 @@ class Personalization:
         referenced_highlights: List[LeadResearchReport.ReportDetail.Highlight] = self.get_best_highlights(
             all_highlights=all_highlights)
         logger.info(
-            f"Got {len(referenced_highlights)} reference highlights IDs for email personalization.")
+            f"Got {len(referenced_highlights)} reference highlights IDs for email personalization for research report ID: {lead_research_report_id}.")
 
         chosen_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = lead_research_report.chosen_outreach_email_template
         email_template_message: Optional[str] = None
         if chosen_email_template == None or chosen_email_template.id == None:
             logger.info(
-                f"No Email template matched for Lead report: {lead_research_report_id} and user ID: {lead_research_report.user_id}")
+                f"No Email template matched for Lead report ID: {lead_research_report_id} and user ID: {lead_research_report.user_id}")
         else:
             email_template_message = chosen_email_template.message
 
@@ -110,8 +110,6 @@ class Personalization:
             highlight=highlight, lead_research_report=lead_research_report, email_template_message=email_template_message)
         email_opener: str = self.generate_email_opener(highlight=highlight, lead_research_report=lead_research_report,
                                                        email_template_message=email_template_message, email_subject_line=email_subject_line)
-        logger.info(f"Email Subject Line: {email_subject_line}")
-        logger.info(f"Email Opener: {email_opener}\n\n")
         return LeadResearchReport.PersonalizedEmail(
             # IDs, creation and update dates will be generated when inserting into the database.
             highlight_id=highlight.id,
