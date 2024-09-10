@@ -835,6 +835,7 @@ class WebPageScraper:
                     f"Got None publish date for content with URL: {self.url}, content details: {content_details} and attempt number: {attempt_num}")
                 continue
             return content_details
+        return ContentAuthorAndPublishDate(author=None, publish_date=None)
 
     def fetch_content_type(self, page_body_chunks: List[Document]) -> ContentType:
         """Fetches content type (podcast, interview, article, blog post etc.) using Page body."""

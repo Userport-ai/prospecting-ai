@@ -54,16 +54,11 @@ class OpenAITokenUsage(BaseModel):
                                      description="Total cost of tokens used.")
 
     def add_tokens(self, another: "OpenAITokenUsage") -> "OpenAITokenUsage":
-        """Add and return tokens from another instance of OpenAITokenUsage class."""
-        return OpenAITokenUsage(
-            url=self.url,
-            highlight_ids=self.highlight_ids,
-            operation_tag=self.operation_tag,
-            prompt_tokens=self.prompt_tokens + another.prompt_tokens,
-            completion_tokens=self.completion_tokens + another.completion_tokens,
-            total_tokens=self.total_tokens + another.total_tokens,
-            total_cost_in_usd=self.total_cost_in_usd + another.total_cost_in_usd,
-        )
+        """Add tokens from another instance of OpenAITokenUsage to this instance."""
+        self.prompt_tokens += another.prompt_tokens
+        self.completion_tokens += another.completion_tokens
+        self.total_tokens += another.total_tokens
+        self.total_cost_in_usd += another.total_cost_in_usd
 
 
 class WebPage(BaseModel):
@@ -319,6 +314,7 @@ class LeadResearchReport(BaseModel):
         URLS_FROM_SEARCH_ENGINE_FETCHED = "urls_from_search_engine_fetched"
         CONTENT_PROCESSING_COMPLETE = "content_processing_complete"
         RECENT_NEWS_AGGREGATION_COMPLETE = "recent_news_aggregation_complete"
+        # Deprecated: Remove this status once we know its not in any db field.
         EMAIL_TEMPLATE_SELECTION_COMPLETE = "email_template_selection_complete"
         COMPLETE = "complete"
         FAILED_WITH_ERRORS = "failed_with_errors"
@@ -376,6 +372,7 @@ class LeadResearchReport(BaseModel):
             default=None, description="Name of the temmplate selected.")
         message: Optional[str] = Field(
             default=None, description="Message template used for outreach to role titles above.")
+        # Deprecated. Remove once we verify that deserialized from db works without it as well.
         reason: Optional[str] = Field(
             default=None, description="Reason why this template or None was selected.")
 
@@ -396,10 +393,20 @@ class LeadResearchReport(BaseModel):
             default=None, description="The IDs of the Highlight that was referenced to generate this personalized email.")
         highlight_url: Optional[str] = Field(
             default=None, description="The source URL which was used to create the highlight.")
+        template: Optional["LeadResearchReport.ChosenOutreachEmailTemplate"] = Field(
+                default=None, description="Current Template associated with the email, it can be changed by user selection from the UI. Can be None as well.")
         email_subject_line: Optional[str] = Field(
             default=None, description="Generated subject Line of the email.")
         email_opener: Optional[str] = Field(
             default=None, description="1-2 line opener of the email referencing the highlights mentioned above.")
+
+    class PersonalizedOutreachMessages(BaseModel):
+        """Personalized messages generated for a given lead. It can contain different types of messages depending on the outreach channel (email, linkedin, text etc.)"""
+        personalized_emails: Optional[List["LeadResearchReport.PersonalizedEmail"]] = Field(
+            default=None, description="List of personalized emails associated with given lead.")
+
+        total_tokens_used: Optional[OpenAITokenUsage] = Field(
+            default=None, description="Total Open AI tokens used in the entire workflow to create personalized messages for given lead.")
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
@@ -451,14 +458,20 @@ class LeadResearchReport(BaseModel):
         default=None, description="Report details associated with the lead.")
 
     # Chosen Outreach Email template.
+    # Deprecated: Use personalized_outreach_messages instead.
     chosen_outreach_email_template: Optional[ChosenOutreachEmailTemplate] = Field(
         default=None, description="Outreach Email template that matches this Lead's profile.")
 
     # Outreach fields.
+    # Deprecated: Use personalized_outreach_messages instead.
     personalized_emails: Optional[List[PersonalizedEmail]] = Field(
         default=None, description="List of Personalized emails that will be used for outreach.")
     personalized_emails_tokens_used: Optional[OpenAITokenUsage] = Field(
         default=None, description="Total Open AI tokens used in generating personalized emails.")
+
+    # New field to store all outreach messages and related info.
+    personalized_outreach_messages: Optional[PersonalizedOutreachMessages] = Field(
+        default=None, description="Store all the different kinds of personalized messages generated for outreach.")
 
     # Methods.
     def get_all_highlights(self):

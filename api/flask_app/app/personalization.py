@@ -1,6 +1,8 @@
 import os
 import logging
 from itertools import chain
+from datetime import datetime
+from bson.objectid import ObjectId
 from typing import List, Optional
 from app.database import Database
 from app.models import LeadResearchReport, ContentCategoryEnum, OpenAITokenUsage
@@ -34,11 +36,8 @@ class Personalization:
         self.openai_tokens_used: Optional[OpenAITokenUsage] = None
         self.OPENAI_REQUEST_TIMEOUT_SECONDS = 20
 
-    def generate_personalized_emails(self, lead_research_report_id: str) -> List[LeadResearchReport.PersonalizedEmail]:
-        """Generates personalized emails for given lead for the first time and returns the list."""
-        lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
-            lead_research_report_id=lead_research_report_id)
-
+    def generate_personalized_emails(self, email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate], lead_research_report: LeadResearchReport) -> List[LeadResearchReport.PersonalizedEmail]:
+        """Generates personalized emails for given outreach email template message (can be None, that's allowed) for given lead and returns the list."""
         all_highlights: List[LeadResearchReport.ReportDetail.Highlight] = lead_research_report.get_all_highlights()
         if len(all_highlights) == 0:
             raise ValueError(
@@ -48,33 +47,36 @@ class Personalization:
         referenced_highlights: List[LeadResearchReport.ReportDetail.Highlight] = self.get_best_highlights(
             all_highlights=all_highlights)
         logger.info(
-            f"Got {len(referenced_highlights)} reference highlights IDs for email personalization for research report ID: {lead_research_report_id}.")
+            f"Got {len(referenced_highlights)} reference highlights IDs for email personalization for research report ID: {lead_research_report.id}.")
 
-        chosen_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = lead_research_report.chosen_outreach_email_template
-        email_template_message: Optional[str] = None
-        if chosen_email_template == None or chosen_email_template.id == None:
+        if email_template == None:
             logger.info(
-                f"No Email template matched for Lead report ID: {lead_research_report_id} and user ID: {lead_research_report.user_id}")
-        else:
-            email_template_message = chosen_email_template.message
+                f"No Email Template found for Lead report ID: {lead_research_report.id}")
 
         generated_personalized_emails: List[LeadResearchReport.PersonalizedEmail] = [
         ]
         with get_openai_callback() as cb:
+            current_time: datetime = Utils.create_utc_time_now()
             for highlight in referenced_highlights:
                 new_email = self.get_personalized_email_from_highlight_and_template(
-                    highlight=highlight, email_template_message=email_template_message, lead_research_report=lead_research_report)
+                    highlight=highlight, email_template=email_template, lead_research_report=lead_research_report, creation_date=current_time)
                 generated_personalized_emails.append(new_email)
 
             self.openai_tokens_used = OpenAITokenUsage(highlight_ids=[highlight.id for highlight in referenced_highlights], operation_tag=Personalization.OPERATION_TAG_NAME,
                                                        prompt_tokens=cb.prompt_tokens, completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
             logger.info(
-                f"Total tokens used in email personalization for report ID: {lead_research_report_id} is : {self.openai_tokens_used}")
+                f"Total tokens used in email personalization for report ID: {lead_research_report.id} is : {self.openai_tokens_used}")
+
+        logger.info(
+            f"Created {len(generated_personalized_emails)} personalized emails for lead report ID: {lead_research_report.id}")
 
         return generated_personalized_emails
 
     def regenerate_personalized_emails(self, lead_research_report: LeadResearchReport, chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate) -> List[LeadResearchReport.PersonalizedEmail]:
-        """Regenerates personalized emails using given outreach template and returns them. Assumes that personalized emails already exist in the report."""
+        """Regenerates personalized emails using given outreach template and returns them. Assumes that personalized emails already exist in the report.
+
+        TODO: Update this method since its no longer valid.
+        """
         if len(lead_research_report.personalized_emails) == 0:
             raise ValueError(
                 f"Failed to regenerate emails: Expected personalized emails to exist in report: {lead_research_report.id} but they don't.")
@@ -94,7 +96,7 @@ class Personalization:
                     raise ValueError(
                         f"Expected 1 highlight for lead report ID: {lead_research_report_id} and highlight ID: {personalized_email.highlight_id}, got: {got_highlights}")
                 new_email = self.get_personalized_email_from_highlight_and_template(
-                    highlight=got_highlights[0], email_template_message=email_template_message, lead_research_report=lead_research_report)
+                    highlight=got_highlights[0], email_template=email_template_message, lead_research_report=lead_research_report)
                 regenerated_emails.append(new_email)
 
             self.openai_tokens_used = OpenAITokenUsage(highlight_ids=[email.highlight_id for email in lead_research_report.personalized_emails], operation_tag=Personalization.OPERATION_TAG_NAME,
@@ -104,16 +106,24 @@ class Personalization:
 
         return regenerated_emails
 
-    def get_personalized_email_from_highlight_and_template(self, highlight: LeadResearchReport.ReportDetail.Highlight,  email_template_message: Optional[str], lead_research_report: LeadResearchReport) -> LeadResearchReport.PersonalizedEmail:
-        """Returns a single personalized for given highlight and email template/"""
+    def get_personalized_email_from_highlight_and_template(self, highlight: LeadResearchReport.ReportDetail.Highlight, email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate], lead_research_report: LeadResearchReport, creation_date: datetime) -> LeadResearchReport.PersonalizedEmail:
+        """Returns a single personalized for given highlight and email template."""
+        email_template_message: Optional[str] = email_template.message if email_template else None
         email_subject_line: str = self.generate_email_subject_line(
             highlight=highlight, lead_research_report=lead_research_report, email_template_message=email_template_message)
         email_opener: str = self.generate_email_opener(highlight=highlight, lead_research_report=lead_research_report,
                                                        email_template_message=email_template_message, email_subject_line=email_subject_line)
         return LeadResearchReport.PersonalizedEmail(
-            # IDs, creation and update dates will be generated when inserting into the database.
+            _id=ObjectId(),
+            creation_date=creation_date,
+            creation_date_readable_str=Utils.to_human_readable_date_str(
+                creation_date),
+            last_updated_date=creation_date,
+            last_updated_date_readable_str=Utils.to_human_readable_date_str(
+                creation_date),
             highlight_id=highlight.id,
             highlight_url=highlight.url,
+            template=email_template,
             email_subject_line=email_subject_line,
             email_opener=email_opener,
         )
@@ -268,7 +278,7 @@ class Personalization:
         })
         return result.email_opener
 
-    def get_best_highlights(self, all_highlights: List[LeadResearchReport.ReportDetail.Highlight], k: int = 5) -> List[LeadResearchReport.ReportDetail.Highlight]:
+    def get_best_highlights(self, all_highlights: List[LeadResearchReport.ReportDetail.Highlight], k: int = 3) -> List[LeadResearchReport.ReportDetail.Highlight]:
         """Selectes up to k highlights that will provide best outreach messages and returns them.
 
         Each highlight is from a different category.
@@ -334,11 +344,8 @@ class Personalization:
                 result_highlights.append(highlight)
         return result_highlights
 
-    def get_tokens_used(self) -> OpenAITokenUsage:
-        """Returns tokens used so far in personalization. Throws exception if personalized workflow is not run yet."""
-        if not self.openai_tokens_used:
-            raise ValueError(
-                f"Personalization Workflow not run yet, not tokens used!")
+    def get_tokens_used(self) -> Optional[OpenAITokenUsage]:
+        """Returns tokens used so far in personalization. Can return None value if no calls to LLMs were made yet."""
         return self.openai_tokens_used
 
 
@@ -355,5 +362,3 @@ if __name__ == "__main__":
     #     lead_research_report_id=lead_research_report_id)
     # pz.generate_email_subject_line(
     #     highlight=lead_research_report.details[0].highlights[0], lead_research_report=lead_research_report, email_template_message=None)
-    # pz.generate_email_opener(
-    #     highlight=lead_research_report.details[0].highlights[0], lead_research_report=lead_research_report, email_template_message=lead_research_report.chosen_outreach_email_template.message, email_subject_line="hello subject line")

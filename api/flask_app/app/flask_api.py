@@ -301,6 +301,20 @@ def get_lead_report(lead_research_report_id: str):
                 "email_subject_line": 1,
                 "email_opener": 1,
             },
+            "personalized_outreach_messages": {
+                "personalized_emails": {
+                    "_id": 1,
+                    "highlight_id": 1,
+                    "highlight_url": 1,
+                    "email_subject_line": 1,
+                    "email_opener": 1,
+                    "template": {
+                        "id": 1,
+                        "name": 1,
+                        "message": 1,
+                    },
+                },
+            }
         }
         lead_research_report: LeadResearchReport = db.get_lead_research_report(
             lead_research_report_id=lead_research_report_id, projection=projection)
@@ -394,8 +408,9 @@ class UpdateTemplateInReportResponse(BaseModel):
 
 @bp.post('/v1/lead-research-reports/template')
 @login_required
-def update_template_in_lead_report():
-    # Update template in given lead report. This will regenerate personalized emails using this new template.
+def add_template_in_lead_report():
+    # Add a new template in given lead report. This will create a new template object and
+    # TODO: This method is deprecated. Update this method for the new flow decided.
     db = Database()
     user_id: str = g.user["uid"]
 
@@ -712,6 +727,7 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
         lead_research_report_id=lead_research_report_id, projection={"company_profile_id": 1, "user_id": 1})
     company_profile_id: str = report.company_profile_id
     user_id: str = report.user_id
+    # TODO: Bug in this filter. It doesn't return the correct reports.
     reports: List[LeadResearchReport] = database.list_lead_research_reports(
         filter={"company_profile_id": company_profile_id, "user_id": {"$ne": user_id}}, projection={"_id": 1})
     if len(reports) > 0:
@@ -823,12 +839,7 @@ def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
         elif report_status == LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE:
             logger.info(
                 f"Lead Report aggregation complete for {lead_research_report_id}, select email template next.")
-            choose_outreach_email_template_in_background.delay(
-                lead_research_report_id=lead_research_report_id)
-        elif report_status == LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE:
-            logger.info(
-                f"Outreach Email template selected for {lead_research_report_id}, personalize emails next.")
-            generate_personalized_emails_in_background.delay(
+            choose_template_and_create_emails_in_background.delay(
                 lead_research_report_id=lead_research_report_id)
         elif report_status == LeadResearchReport.Status.COMPLETE:
             logger.info(
@@ -988,7 +999,7 @@ def aggregate_report_in_background(self, lead_research_report_id: str):
             f"Completed aggregation of research report complete for report ID: {lead_research_report_id}")
 
         # Select email outreach template next.
-        choose_outreach_email_template_in_background.delay(
+        choose_template_and_create_emails_in_background.delay(
             lead_research_report_id=lead_research_report_id)
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
@@ -996,38 +1007,17 @@ def aggregate_report_in_background(self, lead_research_report_id: str):
 
 
 @shared_task(bind=True, acks_late=True)
-def choose_outreach_email_template_in_background(self, lead_research_report_id: str):
-    """Selects outreach tempalte in background."""
+def choose_template_and_create_emails_in_background(self, lead_research_report_id: str):
+    """Selects outreach template and creates personalized emails in background."""
     logger.info(
-        f"Start email outreach template selection for report ID: {lead_research_report_id}")
+        f"Start template selection and email creation for report ID: {lead_research_report_id}")
     database = Database()
     try:
         r = Researcher(database=database)
-        r.choose_outreach_email_template(
+        r.choose_template_and_create_emails(
             lead_research_report_id=lead_research_report_id)
         logger.info(
-            f"Outreach template Selection complete in background for report ID: {lead_research_report_id}")
-
-        # Generate personalized emails next.
-        generate_personalized_emails_in_background.delay(
-            lead_research_report_id=lead_research_report_id)
+            f"Completed outreach template Selection and Email creation complete in background for report ID: {lead_research_report_id}")
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
-                                      task_name="choose_outreach_email_template", status_before_failure=LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE)
-
-
-@shared_task(bind=True, acks_late=True)
-def generate_personalized_emails_in_background(self, lead_research_report_id: str):
-    """Generates personalized emails in the background."""
-    logger.info(
-        f"Create personalized outreach templates selection for report ID: {lead_research_report_id}")
-    database = Database()
-    try:
-        r = Researcher(database=database)
-        r.generate_personalized_emails(
-            lead_research_report_id=lead_research_report_id)
-        logger.info(
-            f"Personalized email generation complete in background for report ID: {lead_research_report_id}")
-    except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
-                                      task_name="generate_personalized_emails", status_before_failure=LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE)
+                                      task_name="choose_template_and_create_emails", status_before_failure=LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE)

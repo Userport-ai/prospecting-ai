@@ -29,6 +29,8 @@ logger = logging.getLogger()
 class Researcher:
     """Helper to create a research report for given person in a company from all relevant data in the database."""
 
+    PERSONALIZED_MESSAGES_OPERATION_TAG_NAME = "personalized_messages"
+
     def __init__(self, database: Database) -> None:
         self.database = database
         self.search_engine_workflow = SearchEngineWorkflow()
@@ -140,7 +142,7 @@ class Researcher:
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                 suffix_query="product launches",
-                num_results_per_method=20,
+                num_results_per_method=10,
                 methods=[
                     SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
             ),
@@ -481,40 +483,51 @@ class Researcher:
 
         logger.info(f"Done with aggregating report: {lead_research_report_id}")
 
-    def choose_outreach_email_template(self, lead_research_report_id: str):
-        """Choose Email template for the lead based on their persona."""
-        chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = self.outreach_template_matcher.match(
+    def choose_template_and_create_emails(self, lead_research_report_id: str):
+        """Chooses Email template for the lead automatically based on their persona using LLM.
+
+        This should only be called when the lead report is being created for the first time.
+        Thereafter, all new templates are manually selected by the user and should not enter this flow.
+        """
+        lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
+        if lead_research_report.personalized_outreach_messages:
+            raise ValueError(
+                f"Choosing outreach email template: Expected personalized_outreach_messages to be None, got non None value for report ID: {lead_research_report_id}")
+        # Total tokens used in choosing template and generating personalized emails.
+        total_tokens_used: Optional[OpenAITokenUsage] = OpenAITokenUsage(
+            operation_tag=Researcher.PERSONALIZED_MESSAGES_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
 
-        # Update lead research report.
-        setFields = {
-            "status": LeadResearchReport.Status.EMAIL_TEMPLATE_SELECTION_COMPLETE,
-            # We are allowing templates to be None.
-            "chosen_outreach_email_template": chosen_outreach_email_template.model_dump() if chosen_outreach_email_template else None,
-        }
-        self.database.update_lead_research_report(
-            lead_research_report_id=lead_research_report_id, setFields=setFields)
-        logger.info(
-            f"Completed Choosing Outreach Email Template for lead report: {lead_research_report_id}")
+        # Select outreach template to use for given lead.
+        chosen_outreach_email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate] = self.outreach_template_matcher.match(
+            lead_research_report=lead_research_report)
+        chosen_outreach_email_template_tokens_used: Optional[OpenAITokenUsage] = self.outreach_template_matcher.get_tokens_used(
+        )
+        if chosen_outreach_email_template_tokens_used:
+            total_tokens_used.add_tokens(
+                chosen_outreach_email_template_tokens_used)
 
-    def generate_personalized_emails(self, lead_research_report_id: str):
-        """Generate personalized emails for lead based on their profile and email templates."""
+        # Create personalized emails from chosen template.
         personalized_emails: List[LeadResearchReport.PersonalizedEmail] = self.personalization.generate_personalized_emails(
-            lead_research_report_id=lead_research_report_id)
-        personalized_emails_tokens_used: OpenAITokenUsage = self.personalization.get_tokens_used()
+            email_template=chosen_outreach_email_template, lead_research_report=lead_research_report)
+        personalized_emails_tokens_used: Optional[OpenAITokenUsage] = self.personalization.get_tokens_used(
+        )
+        if personalized_emails_tokens_used:
+            total_tokens_used.add_tokens(personalized_emails_tokens_used)
+
+        # Create personalized messages using list of generated personalized emails.
+        personalized_outreach_messages = LeadResearchReport.PersonalizedOutreachMessages(
+            personalized_emails=personalized_emails, total_tokens_used=total_tokens_used)
 
         # Update lead research report.
-        personalized_emails_dict_list: List[Dict] = self.database.get_db_ready_personalized_emails(
-            personalized_emails=personalized_emails)
         setFields = {
             "status": LeadResearchReport.Status.COMPLETE,
-            "personalized_emails": personalized_emails_dict_list,
-            "personalized_emails_tokens_used": personalized_emails_tokens_used.model_dump(),
+            "personalized_outreach_messages": personalized_outreach_messages.model_dump(),
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
         logger.info(
-            f"Completed Generating personalized emails for lead report: {lead_research_report_id}")
+            f"Completed Choosing template and creating personalized emails for lead report ID: {lead_research_report_id}")
 
     def update_template_and_regen_emails(self, lead_research_report_id: str, selected_template_id: str):
         """Updates existing lead research report with selected template and regenerates personalized emails using that template."""
@@ -528,9 +541,9 @@ class Researcher:
         regenned_personalized_emails: List[LeadResearchReport.PersonalizedEmail] = self.personalization.regenerate_personalized_emails(
             lead_research_report=lead_research_report, chosen_outreach_email_template=chosen_outreach_email_template)
 
-        # Add email tokens used to existing email tokens object in the report.
+        # Add email tokens used to existing email tokens object (if any) in the report.
         total_tokens_used_so_far: OpenAITokenUsage = lead_research_report.personalized_emails_tokens_used.add_tokens(
-            self.personalization.get_tokens_used())
+            self.personalization.get_tokens_used()) if lead_research_report.personalized_emails_tokens_used else self.personalization.get_tokens_used()
 
         # Update lead research report.
         personalized_emails_dict_list: List[Dict] = self.database.get_db_ready_personalized_emails(

@@ -121,6 +121,7 @@ function PersonalizedEmails({
 }
 
 // The email template selected for given lead.
+// DEPRECATED: Don't delete yet, reuse logic for edit template flow in the near future.
 function SelectedEmailTemplate({
   chosen_outreach_email_template,
   onTemplateSelection,
@@ -238,6 +239,7 @@ function EmailTemplateAndPersonalizedEmails(props) {
   const [templateUpdating, setTemplateUpdating] = useState(false);
 
   //Updates new template in report on selection by user.
+  // DEPRECATED: Use the logic to update template in the new flow in the near future.
   async function updateNewTemplate(templateId) {
     setTemplateUpdating(true);
     const idToken = await user.getIdToken();
@@ -283,10 +285,10 @@ function EmailTemplateAndPersonalizedEmails(props) {
 
   return (
     <>
-      <SelectedEmailTemplate
+      {/* <SelectedEmailTemplate
         chosen_outreach_email_template={chosen_outreach_email_template}
         onTemplateSelection={updateNewTemplate}
-      />
+      /> */}
       <PersonalizedEmails
         chosen_outreach_email_template={chosen_outreach_email_template}
         personalized_emails={personalized_emails}
@@ -516,6 +518,21 @@ function LeadResearchReport() {
     }
   }
 
+  // TODO: Remove the fields chosen_outreach_email_template and personalized_emails
+  // after they have been removed in the backend completely.
+  var chosen_outreach_email_template = report.chosen_outreach_email_template;
+  var personalized_emails = report.personalized_emails;
+  if (chosen_outreach_email_template === null) {
+    if (report.personalized_outreach_messages !== null) {
+      chosen_outreach_email_template =
+        report.personalized_outreach_messages.personalized_emails[0].template;
+    }
+  }
+  if (personalized_emails === null) {
+    personalized_emails =
+      report.personalized_outreach_messages.personalized_emails;
+  }
+
   return (
     <div id="lead-research-report-outer">
       {isUserOnboarding(userFromServer) && (
@@ -538,9 +555,9 @@ function LeadResearchReport() {
                 <EmailTemplateAndPersonalizedEmails
                   lead_research_report_id={report.id}
                   chosen_outreach_email_template={
-                    report.chosen_outreach_email_template
+                    chosen_outreach_email_template
                   }
-                  personalized_emails={report.personalized_emails}
+                  personalized_emails={personalized_emails}
                 />
               ),
             },

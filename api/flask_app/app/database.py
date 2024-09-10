@@ -477,10 +477,24 @@ if __name__ == "__main__":
         "creation_date": {"$gte": Utils.create_utc_datetime(5, 9, 2024)}
     }
     db.delete_all_content_details(
-        find_filter=delete_filter, delete_confirm=True)
+        find_filter=delete_filter, delete_confirm=False)
 
     # db.insert_personalized_emails(lead_research_report_id="", personalized_emails=[
     #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="hello"),
     #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="world"),
     #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="userport"),
     # ])
+
+    # collection = db.get_lead_research_report_collection()
+    # data_dict = collection.find_one(
+    #     {"_id": ObjectId("66e03823aa3050fa413d4244")}, projection=None)
+    # got_list = data_dict["personalized_outreach_messages"]["personalized_emails"]["personalized_emails"][0]
+
+    # import pprint
+    # pprint.pprint(got_list, indent=4)
+
+    # setFields = {
+    #     "personalized_outreach_messages.personalized_emails": got_list,
+    # }
+    # collection.update_one(
+    #     {"_id": ObjectId("66e03823aa3050fa413d4244")}, {"$set": setFields})
