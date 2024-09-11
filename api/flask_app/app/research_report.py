@@ -529,37 +529,6 @@ class Researcher:
         logger.info(
             f"Completed Choosing template and creating personalized emails for lead report ID: {lead_research_report_id}")
 
-    def update_template_and_regen_emails(self, lead_research_report_id: str, selected_template_id: str):
-        """Updates existing lead research report with selected template and regenerates personalized emails using that template."""
-        outreach_email_template: OutreachEmailTemplate = self.database.get_outreach_email_template(
-            outreach_email_template_id=selected_template_id)
-        lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
-            lead_research_report_id=lead_research_report_id)
-
-        chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = OutreachTemplateMatcher.from_outreach_template(
-            outreach_email_template=outreach_email_template)
-        regenned_personalized_emails: List[LeadResearchReport.PersonalizedEmail] = self.personalization.regenerate_personalized_emails(
-            lead_research_report=lead_research_report, chosen_outreach_email_template=chosen_outreach_email_template)
-
-        # Add email tokens used to existing email tokens object (if any) in the report.
-        total_tokens_used_so_far: OpenAITokenUsage = lead_research_report.personalized_emails_tokens_used.add_tokens(
-            self.personalization.get_tokens_used()) if lead_research_report.personalized_emails_tokens_used else self.personalization.get_tokens_used()
-
-        # Update lead research report.
-        personalized_emails_dict_list: List[Dict] = self.database.get_db_ready_personalized_emails(
-            personalized_emails=regenned_personalized_emails)
-        setFields = {
-            "status": LeadResearchReport.Status.COMPLETE,
-            "chosen_outreach_email_template": chosen_outreach_email_template.model_dump(),
-            "personalized_emails": personalized_emails_dict_list,
-            "personalized_emails_tokens_used": total_tokens_used_so_far.model_dump(),
-        }
-        self.database.update_lead_research_report(
-            lead_research_report_id=lead_research_report_id, setFields=setFields)
-
-        logger.info(
-            f"Completed template update and regenning of personalized emails for lead report: {lead_research_report_id}")
-
 
 if __name__ == "__main__":
     from dotenv import load_dotenv

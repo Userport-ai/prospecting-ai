@@ -12,6 +12,7 @@ from app.database import Database
 from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails
 from app.research_report import Researcher
 from app.linkedin_scraper import LinkedInScraper
+from app.utils import Utils
 from firebase_admin import auth
 
 bp = Blueprint('api', __name__, url_prefix='/api')
@@ -303,7 +304,7 @@ def get_lead_report(lead_research_report_id: str):
             },
             "personalized_outreach_messages": {
                 "personalized_emails": {
-                    "_id": 1,
+                    "id": 1,
                     "highlight_id": 1,
                     "highlight_url": 1,
                     "email_subject_line": 1,
@@ -389,14 +390,10 @@ def list_leads():
             status_code=500, message="Failed to list lead research reports.")
 
 
-class UpdateTemplateInReportResponse(BaseModel):
-    """API response after updateing template and personalized emails in Lead Research Report."""
+class UpdateTemplateInPersonalizedEmailResponse(BaseModel):
+    """API response after updateing template in personalized email in Lead Research Report."""
     status: ResponseStatus = Field(...,
                                    description="Status (success) of the response.")
-    chosen_outreach_email_template: LeadResearchReport.ChosenOutreachEmailTemplate = Field(
-        ..., description="Updated outreach email template.")
-    personalized_emails: List[LeadResearchReport.PersonalizedEmail] = Field(
-        ..., description="Updated personalized emails.")
 
     @field_validator('status')
     @classmethod
@@ -406,65 +403,76 @@ class UpdateTemplateInReportResponse(BaseModel):
         return v
 
 
-@bp.post('/v1/lead-research-reports/template')
+@bp.post('/v1/lead-research-reports/personalized-emails')
 @login_required
-def add_template_in_lead_report():
-    # Add a new template in given lead report. This will create a new template object and
-    # TODO: This method is deprecated. Update this method for the new flow decided.
+def update_template_in_personalized_email():
+    # Update given template as the new template for given personalized email. This action is initiated by the user.
+    # The email subject line and opener will not be regenerated on template update.
     db = Database()
     user_id: str = g.user["uid"]
 
     lead_research_report_id: str = None
-    selected_template_id: str = None
+    new_template_id: str = None
+    personalized_email_id: str = None
     try:
         lead_research_report_id: str = request.json.get(
             "lead_research_report_id")
-        selected_template_id: str = request.json.get("selected_template_id")
+        new_template_id: str = request.json.get("new_template_id")
+        personalized_email_id: str = request.json.get("personalized_email_id")
     except Exception as e:
         logger.exception(
-            f"Invalid request: {request} to update template for user ID: {user_id} with error: {e}")
+            f"Invalid request: {request} to update template in personalized email for user ID: {user_id} with error: {e}")
         raise APIException(
-            status_code=400, message="Invalid request parameters for template selection in lead report.")
+            status_code=400, message="Invalid request parameters for update template in personalized email.")
 
     logger.info(
-        f"Got request to update report: {lead_research_report_id} with given template ID: {selected_template_id}")
+        f"Got request to update template ID: {new_template_id} in personalized email ID: {personalized_email_id} in report ID:{lead_research_report_id}")
 
-    start_time = time.time()
-    rp = Researcher(database=db)
     try:
-        rp.update_template_and_regen_emails(
-            lead_research_report_id=lead_research_report_id, selected_template_id=selected_template_id)
+        # Fetch lead report and new template from the database.
+        report = db.get_lead_research_report(lead_research_report_id=lead_research_report_id, projection={
+                                             "personalized_outreach_messages": 1})
+        new_template = db.get_outreach_email_template(
+            outreach_email_template_id=new_template_id)
 
-        # Fetch and return updated email template and personalized emails.
-        projection = {
-            "chosen_outreach_email_template": {
-                "id": 1,
-                "name": 1,
-                "message": 1,
-            },
-            "personalized_emails": {
-                "_id": 1,
-                "highlight_id": 1,
-                "highlight_url": 1,
-                "email_subject_line": 1,
-                "email_opener": 1,
-            },
-        }
-        lead_research_report: LeadResearchReport = db.get_lead_research_report(
-            lead_research_report_id=lead_research_report_id, projection=projection)
-        response = UpdateTemplateInReportResponse(
+        personalized_outreach_messages: LeadResearchReport.PersonalizedOutreachMessages = report.personalized_outreach_messages
+        updated_email_template = False
+        for email in personalized_outreach_messages.personalized_emails:
+            if email.id != personalized_email_id:
+                continue
+
+            # Update new template and update time in matched email.
+            email.template = LeadResearchReport.ChosenOutreachEmailTemplate(
+                id=new_template.id,
+                name=new_template.name,
+                creation_date=new_template.creation_date,
+                message=new_template.message
+            )
+            current_time = Utils.create_utc_time_now()
+            email.last_updated_date = current_time
+            email.last_updated_date_readable_str = Utils.to_human_readable_date_str(
+                current_time)
+            updated_email_template = True
+            break
+
+        if not updated_email_template:
+            raise ValueError(
+                f"Personalized Email ID: {personalized_email_id} not found in personalized outreach messages: {personalized_outreach_messages} in report ID: {lead_research_report_id}")
+
+        # Insert or update in database.
+        db.update_lead_research_report(lead_research_report_id=lead_research_report_id, setFields={
+                                       "personalized_outreach_messages": personalized_outreach_messages.model_dump()})
+        response = UpdateTemplateInPersonalizedEmailResponse(
             status=ResponseStatus.SUCCESS,
-            chosen_outreach_email_template=lead_research_report.chosen_outreach_email_template,
-            personalized_emails=lead_research_report.personalized_emails,
         )
         logger.info(
-            f"Successfully updated report: {lead_research_report_id} with template ID: {selected_template_id} and emails. Time elapsed: {time.time()-start_time} seconds")
+            f"Successfully updated personalized email ID: {personalized_email_id} with template ID: {new_template_id} in report ID: {lead_research_report_id}")
         return response.model_dump()
     except Exception as e:
         logger.exception(
-            f"Failed to update report with ID: {lead_research_report_id} with a new template with ID: {selected_template_id} with error: {e}")
+            f"Failed to update personalized email ID: {personalized_email_id} with a new template with ID: {new_template_id} in report with ID: {lead_research_report_id} with error: {e}")
         raise APIException(
-            status_code=500, message="Failed to select template due to an error.")
+            status_code=500, message="Failed to update template in personalized email due to an error.")
 
 
 class CreateOutreachTemplateResponse(BaseModel):
@@ -705,7 +713,7 @@ def delete_outreach_email_template(outreach_email_template_id: str):
 
 @bp.get('/v1/debug/<string:report_id>')
 def admin_debug(report_id: str):
-    logger.info(f"Debug request got report ID: {report_id}")
+    logger.info(f"Got Debug request for report ID: {report_id}")
     fetch_lead_info_orchestrator.delay(
         lead_research_report_id=report_id)
     logger.info(
@@ -773,6 +781,76 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
         logger.info(
             f"Deletion complete. Stats: {len(content_details_ids_list)} content details docs, {len(linkedin_ids_list)} linkedin post docs, {len(web_page_ids_list)} web page docs and 1 Lead Report with ID: {lead_research_report_id}")
     return Response("done\n")
+
+
+@bp.post('/v1/admin/migration/<string:confirm>')
+def admin_migration(confirm: str):
+    """API to do one time migration of data in production."""
+    logger.info("Got Data migration request")
+
+    # Migrate data from personalized emails and chosen outreach template fields to personalized_outreach_messages field.
+    db = Database()
+    num_migrations = 0
+    for report_dict in db.list_raw_lead_research_reports(filter={}):
+        logger.info(f"Got report ID: {report_dict['_id']}")
+        if "personalized_outreach_messages" in report_dict:
+            # Do nothing since field is already populated.
+            logger.info(
+                f"Skipping report ID: {report_dict['_id']} since field is already populated")
+            continue
+
+        personalized_outreach_messages = LeadResearchReport.PersonalizedOutreachMessages(
+            personalized_emails=[])
+        for email_dict in report_dict["personalized_emails"]:
+            new_email_dict = email_dict.copy()
+            new_email_dict["id"] = email_dict["_id"]
+            del new_email_dict["_id"]
+            if report_dict["chosen_outreach_email_template"]:
+                new_email_dict["template"] = report_dict["chosen_outreach_email_template"].copy(
+                )
+            personalized_outreach_messages.personalized_emails.append(
+                LeadResearchReport.PersonalizedEmail(**new_email_dict))
+        personalized_outreach_messages.total_tokens_used = report_dict[
+            "personalized_emails_tokens_used"]
+
+        if confirm == "confirm":
+            # Update report in database.
+            db.update_lead_research_report(lead_research_report_id=report_dict["_id"], setFields={
+                "personalized_outreach_messages": personalized_outreach_messages.model_dump()})
+            logger.info(
+                f"Migrated data in report ID: {report_dict['_id']} successfully.")
+            num_migrations += 1
+
+    logger.info(f"Finished {num_migrations} migrations in total.")
+    return Response("completed\n")
+
+
+@bp.get('/v1/admin/sanity-check')
+def db_sanity_check():
+    """Sanity check on the database fields."""
+    db = Database()
+    success = True
+    for report in db.list_lead_research_reports(filter={}):
+        if not report.personalized_outreach_messages:
+            success = False
+            logger.error(
+                f"Report ID: {report.id} does not have personalized_messages field set.")
+            break
+        for email in report.personalized_outreach_messages.personalized_emails:
+            if not email.id:
+                success = False
+                logger.error(
+                    f"Email: {email} in report ID: {report.id} does not have ID populated.")
+                break
+            if not email.template and report.chosen_outreach_email_template != None:
+                success = False
+                logger.error(
+                    f"Template not populated in email: {email} in report ID: {report.id} even though template chosen: {report.chosen_outreach_email_template}")
+                break
+
+    if success:
+        logger.info("Sanity check done")
+    return Response("completed\n")
 
 
 def shared_task_exception_handler(shared_task_obj, database: Database, lead_research_report_id: str, e: Exception, task_name: str, status_before_failure: LeadResearchReport.Status):

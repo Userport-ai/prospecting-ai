@@ -19,6 +19,6 @@ export const handlers = [
     return HttpResponse.json(exampleTemplateResponse);
   }),
   http.get("/api/v1/lead-research-reports/*", () => {
-    return HttpResponse.json(reportWithSelectedTemplate);
+    return HttpResponse.json(reportWithNoTemplate);
   }),
 ];

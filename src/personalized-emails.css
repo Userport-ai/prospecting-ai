@@ -85,11 +85,88 @@
   font-weight: 600;
 }
 
-#personalized-emails-container .ant-card .email-template-used {
+#personalized-emails-container .email-template-read-view {
   margin-top: 1rem;
 }
 
-#personalized-emails-container .ant-card .email-template-used .text-label {
+#personalized-emails-container .email-template-read-view .text-label {
   color: var(--primary);
   font-weight: 600;
+}
+
+#personalized-emails-container
+  .email-template-read-view
+  .edit-email-template-icon {
+  margin-left: 1rem;
+}
+
+#personalized-emails-container .email-template-edit-view {
+  margin-top: 2rem;
+  /* border-top: 0.1px solid var(--logo-color); */
+  border: 0.1px solid var(--outline-variant);
+  background-color: var(--surface);
+  padding: 1rem;
+  width: 100%;
+}
+
+#personalized-emails-container .email-template-edit-view .ant-select {
+  margin-top: 2rem;
+  width: 100%;
+}
+
+#personalized-emails-container .email-template-edit-view .message-container {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+#personalized-emails-container .email-template-edit-view .message-text {
+  font-size: 1.5rem;
+  color: var(--secondary);
+  font-weight: 500;
+}
+
+#personalized-emails-container .email-template-edit-view .btn-container {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: row;
+  gap: 2rem;
+}
+
+#personalized-emails-container
+  .email-template-edit-view
+  .btn-container
+  .cancel-btn {
+  border: 1px solid var(--primary);
+}
+
+#personalized-emails-container
+  .email-template-edit-view
+  .btn-container
+  .cancel-btn:hover {
+  color: var(--primary);
+}
+
+#personalized-emails-container
+  .email-template-edit-view
+  .btn-container
+  .update-btn {
+  background-color: var(--primary);
+  color: white;
+}
+
+#personalized-emails-container
+  .email-template-edit-view
+  .btn-container
+  .update-btn:enabled:hover {
+  background-color: var(--hover-color);
+  border: 0;
+}
+
+#personalized-emails-container
+  .email-template-edit-view
+  .btn-container
+  .update-btn:disabled {
+  background-color: gray;
+  color: white;
 }

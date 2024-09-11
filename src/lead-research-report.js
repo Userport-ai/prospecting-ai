@@ -1,9 +1,8 @@
 import "./lead-research-report.css";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { Flex, Typography, Button, Card, Tabs, Empty, Skeleton } from "antd";
+import { Flex, Typography, Button, Card, Tabs, Skeleton } from "antd";
 import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 import { useContext, useState } from "react";
-import SelectTemplateModal from "./select-template-modal";
 import { AuthContext } from "./root";
 import {
   getUserFromServer,
@@ -11,189 +10,11 @@ import {
   stateAfterViewedPersonalizedEmails,
   updateUserStateOnServer,
   userHasNotViewedPersonalizedEmail,
-  addLineBreaks,
 } from "./helper-functions";
 import PersonalizedEmails from "./personalized-emails";
 import OnboardingProgressBar from "./onboarding-progress-bar";
 
 const { Text, Link } = Typography;
-
-// The email template selected for given lead.
-// DEPRECATED: Don't delete yet, reuse logic for edit template flow in the near future.
-function SelectedEmailTemplate({
-  chosen_outreach_email_template,
-  onTemplateSelection,
-}) {
-  const { user } = useContext(AuthContext);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [outreachTemplates, setOutreachTemplates] = useState([]);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
-
-  // Create modal to allow user to select template.
-  async function selectTemplateModal() {
-    // Fetch list of templates created by the given user.
-    setTemplatesLoading(true);
-    const idToken = await user.getIdToken();
-    const response = await fetch("/api/v1/outreach-email-templates", {
-      headers: { Authorization: "Bearer " + idToken },
-    });
-    const result = await response.json();
-    if (result.status === "error") {
-      throw result;
-    }
-    if (result.outreach_email_templates.length === 0) {
-      const error_obj = {
-        message: "No Templates found, please create templates first!",
-        status_code: 400,
-      };
-      throw error_obj;
-    }
-    setOutreachTemplates(result.outreach_email_templates);
-    setTemplatesLoading(false);
-    setModalOpen(true);
-  }
-
-  function onTemplateOk(templateId) {
-    setModalOpen(false);
-    onTemplateSelection(templateId);
-  }
-
-  function onTemplateCancel() {
-    setModalOpen(false);
-  }
-
-  var selectedTemplateView = null;
-  if (
-    chosen_outreach_email_template === null ||
-    chosen_outreach_email_template.id === null
-  ) {
-    // No template was chosen, return empty data.
-    selectedTemplateView = (
-      <div id="no-template-selected">
-        <Empty description={<Text>No Template matched</Text>}>
-          <Button onClick={selectTemplateModal} loading={templatesLoading}>
-            Add a template
-          </Button>
-        </Empty>
-      </div>
-    );
-  } else {
-    // Show selected template.
-    selectedTemplateView = (
-      <>
-        <Button
-          id="change-email-template-btn"
-          onClick={selectTemplateModal}
-          loading={templatesLoading}
-          disabled={templatesLoading}
-        >
-          Change Template
-        </Button>
-        <Card key="selected-template-card-key" id="email-template-card">
-          <div id="template-name-container">
-            <Text className="card-text-label" strong>
-              Name:
-            </Text>
-            <Text className="template-text">
-              {chosen_outreach_email_template.name}
-            </Text>
-          </div>
-          <div id="template-message-container">
-            <Text className="card-text-label" strong>
-              Message
-            </Text>
-            <Text className="template-text">
-              {addLineBreaks(chosen_outreach_email_template.message)}
-            </Text>
-          </div>
-        </Card>
-      </>
-    );
-  }
-
-  return (
-    <div id="selected-email-template-with-title-container">
-      <SelectTemplateModal
-        modalOpen={modalOpen}
-        outreachTemplates={outreachTemplates}
-        onSelect={onTemplateOk}
-        onCancel={onTemplateCancel}
-      />
-      <h1>Selected Email Template</h1>
-      {selectedTemplateView}
-    </div>
-  );
-}
-
-// Represents selected Email Template and Personalized Emails generated for the lead.
-function EmailTemplateAndPersonalizedEmails(props) {
-  const { user } = useContext(AuthContext);
-  const [chosen_outreach_email_template, setOutreachTemplate] = useState(
-    props.chosen_outreach_email_template
-  );
-  const [personalized_emails, setPersonalizedEmails] = useState(
-    props.personalized_emails
-  );
-  const [templateUpdating, setTemplateUpdating] = useState(false);
-
-  //Updates new template in report on selection by user.
-  // DEPRECATED: Use the logic to update template in the new flow in the near future.
-  async function updateNewTemplate(templateId) {
-    setTemplateUpdating(true);
-    const idToken = await user.getIdToken();
-    const response = await fetch("/api/v1/lead-research-reports/template", {
-      method: "POST",
-      body: JSON.stringify({
-        lead_research_report_id: props.lead_research_report_id,
-        selected_template_id: templateId,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + idToken,
-      },
-    });
-    const result = await response.json();
-    if (result.status === "error") {
-      throw result;
-    }
-    setOutreachTemplate(result.chosen_outreach_email_template);
-    setPersonalizedEmails(result.personalized_emails);
-    setTemplateUpdating(false);
-  }
-
-  if (templateUpdating) {
-    // Show skeleton with loading screen while template and emails are updating.
-    return (
-      <>
-        <Flex vertical={false} justify="center">
-          <h3>
-            Updating template and emails. This can take a few minutes, please
-            wait.
-          </h3>
-        </Flex>
-        <Skeleton
-          active
-          paragraph={{
-            rows: 15,
-          }}
-        />
-      </>
-    );
-  }
-
-  return (
-    <>
-      {/* <SelectedEmailTemplate
-        chosen_outreach_email_template={chosen_outreach_email_template}
-        onTemplateSelection={updateNewTemplate}
-      /> */}
-      <PersonalizedEmails
-        chosen_outreach_email_template={chosen_outreach_email_template}
-        personalized_emails={personalized_emails}
-      />
-    </>
-  );
-}
 
 // Represents Highlight from the leads' news.
 function Highlight({ highlight }) {
@@ -416,21 +237,6 @@ function LeadResearchReport() {
     }
   }
 
-  // TODO: Remove the fields chosen_outreach_email_template and personalized_emails
-  // after they have been removed in the backend completely.
-  var chosen_outreach_email_template = report.chosen_outreach_email_template;
-  var personalized_emails = report.personalized_emails;
-  if (chosen_outreach_email_template === null) {
-    if (report.personalized_outreach_messages !== null) {
-      chosen_outreach_email_template =
-        report.personalized_outreach_messages.personalized_emails[0].template;
-    }
-  }
-  if (personalized_emails === null) {
-    personalized_emails =
-      report.personalized_outreach_messages.personalized_emails;
-  }
-
   return (
     <div id="lead-research-report-outer">
       {isUserOnboarding(userFromServer) && (
@@ -450,12 +256,11 @@ function LeadResearchReport() {
               label: <h1>Personalized Emails</h1>,
               key: personalizedEmailsTabKey(),
               children: (
-                <EmailTemplateAndPersonalizedEmails
+                <PersonalizedEmails
                   lead_research_report_id={report.id}
-                  chosen_outreach_email_template={
-                    chosen_outreach_email_template
+                  personalized_emails={
+                    report.personalized_outreach_messages.personalized_emails
                   }
-                  personalized_emails={personalized_emails}
                 />
               ),
             },

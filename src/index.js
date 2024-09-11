@@ -37,7 +37,7 @@ import { isLocalEnv } from "./helper-functions";
 
 // Enables mocking only for local env, disabled in production and test.
 async function enableMocking() {
-  // return;
+  return;
   if (!isLocalEnv()) {
     return;
   }

@@ -179,28 +179,6 @@ class Database:
             outreach_email_template.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
 
-    def get_db_ready_personalized_emails(self, personalized_emails: List[LeadResearchReport.PersonalizedEmail]) -> List[Dict]:
-        """Returns a personalized email list of dictionaries from given input meail list that is populated and ready to be inserted in the database."""
-        creation_date: datetime = Utils.create_utc_time_now()
-        creation_date_readable_str: str = Utils.to_human_readable_date_str(
-            creation_date)
-        last_updated_date = creation_date
-        last_updated_date_readable_str = creation_date_readable_str
-
-        for email in personalized_emails:
-            email.creation_date = creation_date
-            email.creation_date_readable_str = creation_date_readable_str
-            email.last_updated_date = last_updated_date
-            email.last_updated_date_readable_str = last_updated_date_readable_str
-
-        # Convert to list of Python dictionaries and insert ObjectIds manually.
-        personalized_emails_dict_list: List[Dict] = [email.model_dump(
-            exclude=Database._exclude_id()) for email in personalized_emails]
-        for email_dict in personalized_emails_dict_list:
-            email_dict["_id"] = ObjectId()
-
-        return personalized_emails_dict_list
-
     @ contextlib.contextmanager
     def transaction_session(self) -> Generator[ClientSession, None]:
         """Wrapper Context manager around MongoDB client session to skip creating a new instance method for each new type of transacation.
@@ -314,6 +292,18 @@ class Database:
             lead_research_reports.append(
                 LeadResearchReport(**research_report_dict))
         return lead_research_reports
+
+    def list_raw_lead_research_reports(self, filter: Dict, projection: Optional[Dict[str, int]] = None) -> List[LeadResearchReport]:
+        """Returns a list of python dictionaries of Lead Research reports with given filter. Should only be used for migration use cases."""
+        collection = self.get_lead_research_report_collection()
+        # TODO: Add pagination using skip() as well.
+        cursor = collection.find(filter, projection).sort(
+            [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
+        )
+        results: List[Dict] = []
+        for research_report_dict in cursor:
+            results.append(research_report_dict)
+        return results
 
     def get_outreach_email_template(self, outreach_email_template_id: str, projection: Optional[Dict[str, int]] = None) -> OutreachEmailTemplate:
         """Returns Outreach Email Template for given Template ID."""

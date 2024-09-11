@@ -372,14 +372,10 @@ class LeadResearchReport(BaseModel):
             default=None, description="Name of the temmplate selected.")
         message: Optional[str] = Field(
             default=None, description="Message template used for outreach to role titles above.")
-        # Deprecated. Remove once we verify that deserialized from db works without it as well.
-        reason: Optional[str] = Field(
-            default=None, description="Reason why this template or None was selected.")
 
     class PersonalizedEmail(BaseModel):
         """Personalized Email addressed to a given lead in the lead research report. Uses chosen template if it exists else generates email without template."""
-        id: Optional[PyObjectId] = Field(
-            alias="_id", default=None, description="MongoDB generated unique identifier for Personalized Email.")
+        id: Optional[PyObjectId] = Field(default=None, description="ID for Personalized Email created by the Application (not MongoDB).")
         creation_date: Optional[datetime] = Field(
             default=None, description="Date in UTC timezone when this document was inserted in the database.")
         creation_date_readable_str: Optional[str] = Field(
