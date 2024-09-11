@@ -82,3 +82,15 @@ export async function getUserFromServer(idToken) {
   }
   return result.user;
 }
+
+// Replace newlines with HTML break tags.
+export function addLineBreaks(text) {
+  return text.split("\n").map((substr) => {
+    return (
+      <>
+        {substr}
+        <br />
+      </>
+    );
+  });
+}
