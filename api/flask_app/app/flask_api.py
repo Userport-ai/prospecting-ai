@@ -798,6 +798,11 @@ def admin_migration(confirm: str):
             logger.info(
                 f"Skipping report ID: {report_dict['_id']} since field is already populated")
             continue
+        if not report_dict["personalized_emails"]:
+            # Do nothing since this report has failed and hasn't reached personalized emails part yet.
+            logger.info(
+                f"Skippping report ID: {report_dict['_id']} since personalized_emails not generated yet.")
+            continue
 
         personalized_outreach_messages = LeadResearchReport.PersonalizedOutreachMessages(
             personalized_emails=[])

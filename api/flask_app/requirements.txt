@@ -52,7 +52,6 @@ flower==2.0.1
 free-proxy==1.1.1
 frozenlist==1.4.1
 fsspec==2024.6.1
-google==3.0.0
 google-ai-generativelanguage==0.6.4
 google-api-core==2.19.1
 google-api-python-client==2.136.0
