@@ -46,13 +46,12 @@ function TemplateEditMode({
     setUpdateLoading(true);
     const idToken = await user.getIdToken();
     const response = await fetch(
-      "/api/v1/lead-research-reports/personalized-emails",
+      "/api/v1/lead-research-reports/personalized-emails/" + emailId,
       {
-        method: "POST",
+        method: "PUT",
         body: JSON.stringify({
           lead_research_report_id: lead_research_report_id,
           new_template_id: selectedTemplateId,
-          personalized_email_id: emailId,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -268,6 +267,10 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
 
 // Represents Personalized Emails to the lead.
 function PersonalizedEmails({ lead_research_report_id, personalized_emails }) {
+  // Sort personalized emails by the most recently updated ones.
+  personalized_emails.sort((e1, e2) => {
+    return new Date(e2.last_updated_date) - new Date(e1.last_updated_date);
+  });
   return (
     <div id="personalized-emails-container">
       {personalized_emails.map((personalized_email) => (

@@ -81,6 +81,10 @@ function LeadResearchReport() {
   const [userFromServer, setUserFromServer] = useState(loaderResponse.user);
   const component_is_loading = useNavigation().state !== "idle";
   const { user } = useContext(AuthContext);
+  const [activeTabKey, setActiveTabKey] = useState(recentNewsTabKey());
+  const [personalizedEmails, setPersonalizedEmails] = useState(
+    report.personalized_outreach_messages.personalized_emails
+  );
 
   if (component_is_loading) {
     return (
@@ -130,6 +134,14 @@ function LeadResearchReport() {
       const gotUserFromServer = await getUserFromServer(idToken);
       setUserFromServer(gotUserFromServer);
     }
+    setActiveTabKey(activeKey);
+  }
+
+  // Handles successful personalized email creation by user.
+  function handleEmailCreation(createdPersonalizedEmail) {
+    // Add personalized email to existing list of personalized emails and switch the tab to personalized emails.
+    setPersonalizedEmails([...personalizedEmails, createdPersonalizedEmail]);
+    setActiveTabKey(personalizedEmailsTabKey());
   }
 
   return (
@@ -141,11 +153,18 @@ function LeadResearchReport() {
         <ReportHeader report={report} />
         <Tabs
           onChange={onActiveTabChange}
+          activeKey={activeTabKey}
           items={[
             {
               label: <h1>Recent News</h1>,
               key: recentNewsTabKey(),
-              children: <RecentNews details={report.details} />,
+              children: (
+                <RecentNews
+                  lead_research_report_id={report.id}
+                  details={report.details}
+                  onEmailCreation={handleEmailCreation}
+                />
+              ),
             },
             {
               label: <h1>Personalized Emails</h1>,
@@ -153,9 +172,7 @@ function LeadResearchReport() {
               children: (
                 <PersonalizedEmails
                   lead_research_report_id={report.id}
-                  personalized_emails={
-                    report.personalized_outreach_messages.personalized_emails
-                  }
+                  personalized_emails={personalizedEmails}
                 />
               ),
             },

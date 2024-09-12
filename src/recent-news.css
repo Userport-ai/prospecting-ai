@@ -34,10 +34,27 @@
   box-shadow: 1px 1px;
 }
 
-#report-details-container .ant-card .card-category {
+#report-details-container .card-category-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+#report-details-container .card-category-container .card-category {
   font-size: 2rem;
   color: var(--surface-tint);
   font-weight: 550;
+}
+
+#report-details-container .card-category-container .personalize-btn {
+  background-color: var(--primary);
+  color: white;
+  font-weight: 600;
+}
+
+#report-details-container .card-category-container .personalize-btn:hover {
+  border: 0;
+  background-color: var(--hover-color);
 }
 
 #report-details-container .card-citation-link-container {

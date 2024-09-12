@@ -1,17 +1,56 @@
 import "./recent-news.css";
-import { Flex, Button, Card, Typography } from "antd";
-import { useState } from "react";
+import { Flex, Button, Card, Typography, Tooltip } from "antd";
+import { useContext, useState } from "react";
+import { AuthContext } from "./root";
 
 const { Text, Link } = Typography;
 
 // Represents Highlight from the leads' news.
-function Highlight({ highlight }) {
+function Highlight({ lead_research_report_id, highlight, onEmailCreation }) {
+  const [createEmailLoading, setCreateEmailLoading] = useState(false);
+
+  const { user } = useContext(AuthContext);
+  // Handles request by user to personalize a given news item for given lead.
+  async function handlePersonalizeRequest() {
+    setCreateEmailLoading(true);
+    // Call server to create personalization using given highlight.
+    const idToken = await user.getIdToken();
+    const response = await fetch(
+      "/api/v1/lead-research-reports/personalized-emails",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          lead_research_report_id: lead_research_report_id,
+          highlight_id: highlight.id,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + idToken,
+        },
+      }
+    );
+    const result = await response.json();
+    if (result.status === "error") {
+      throw result;
+    }
+    setCreateEmailLoading(false);
+    onEmailCreation(result.personalized_email);
+  }
   return (
     <Card>
-      <div>
+      <div className="card-category-container">
         <Text strong className="card-category">
           {highlight.category_readable_str}
         </Text>
+        <Tooltip title="AI will automatically create a personalized outreach message for your lead using this news item as source.">
+          <Button
+            className="personalize-btn"
+            onClick={handlePersonalizeRequest}
+            loading={createEmailLoading}
+          >
+            Use for outreach
+          </Button>
+        </Tooltip>
       </div>
       <div className="card-citation-link-container">
         <Text className="card-citation-source-label" strong>
@@ -41,8 +80,8 @@ function Highlight({ highlight }) {
   );
 }
 
-// Represents Categories buttons and associated highlights.
-function CategoriesAndHighlights({ details }) {
+// Represents recent news as Categories and associated highlights.
+function RecentNews({ lead_research_report_id, details, onEmailCreation }) {
   var initialSelectedCategories = [];
   if (details.length > 0) {
     initialSelectedCategories = [details[0].category_readable_str];
@@ -65,49 +104,56 @@ function CategoriesAndHighlights({ details }) {
 
   return (
     <>
-      {/* These are the categories */}
-      {details.map((detail) => {
-        let categoryBtnClass = categoriesSelected.includes(
-          detail.category_readable_str
-        )
-          ? "category-btn-selected"
-          : "category-btn";
-        return (
-          <Button
-            key={detail.category}
-            className={categoryBtnClass}
-            type="primary"
-            onClick={(e) => handleCategoryClicked(e.target.innerText)}
-          >
-            {detail.category_readable_str}
-          </Button>
-        );
-      })}
-      {/* These are the highlights from selected categories. */}
-      {categoriesSelected
-        .map(
-          (selectedCategory) =>
-            // Filtered category guaranteed to exist and size 1 since selected categories
-            // are from the same details array.
-            details.filter(
-              (detail) => detail.category_readable_str === selectedCategory
-            )[0]
-        )
-        .flatMap((detail) =>
-          detail.highlights.map((highlight) => (
-            <Highlight key={highlight.id} highlight={highlight} />
-          ))
-        )}
+      <Flex id="report-details-container" vertical={false} wrap gap="large">
+        {/* These are the categories */}
+        {details.map((detail) => {
+          let categoryBtnClass = categoriesSelected.includes(
+            detail.category_readable_str
+          )
+            ? "category-btn-selected"
+            : "category-btn";
+          return (
+            <Button
+              key={detail.category}
+              className={categoryBtnClass}
+              type="primary"
+              onClick={(e) => handleCategoryClicked(e.target.innerText)}
+            >
+              {detail.category_readable_str}
+            </Button>
+          );
+        })}
+        {/* These are the highlights from selected categories. */}
+        {categoriesSelected
+          .map(
+            (selectedCategory) =>
+              // Filtered category guaranteed to exist and size 1 since selected categories
+              // are from the same details array.
+              details.filter(
+                (detail) => detail.category_readable_str === selectedCategory
+              )[0]
+          )
+          .flatMap((detail) =>
+            detail.highlights.map((highlight) => (
+              <Highlight
+                key={highlight.id}
+                lead_research_report_id={lead_research_report_id}
+                highlight={highlight}
+                onEmailCreation={onEmailCreation}
+              />
+            ))
+          )}
+      </Flex>
     </>
   );
 }
 
-function RecentNews({ details }) {
-  return (
-    <Flex id="report-details-container" vertical={false} wrap gap="large">
-      <CategoriesAndHighlights details={details} />
-    </Flex>
-  );
-}
+// function RecentNews({ details }) {
+//   return (
+//     <Flex id="report-details-container" vertical={false} wrap gap="large">
+//       <CategoriesAndHighlights details={details} />
+//     </Flex>
+//   );
+// }
 
 export default RecentNews;

@@ -1,6 +1,5 @@
 import os
 import logging
-from itertools import chain
 from datetime import datetime
 from bson.objectid import ObjectId
 from typing import List, Optional
@@ -56,10 +55,10 @@ class Personalization:
         generated_personalized_emails: List[LeadResearchReport.PersonalizedEmail] = [
         ]
         with get_openai_callback() as cb:
-            current_time: datetime = Utils.create_utc_time_now()
+            creation_date: datetime = Utils.create_utc_time_now()
             for highlight in referenced_highlights:
-                new_email = self.get_personalized_email_from_highlight_and_template(
-                    highlight=highlight, email_template=email_template, lead_research_report=lead_research_report, creation_date=current_time)
+                new_email = self._create_personalized_email_helper(
+                    highlight=highlight, email_template=email_template, lead_research_report=lead_research_report, creation_date=creation_date)
                 generated_personalized_emails.append(new_email)
 
             self.openai_tokens_used = OpenAITokenUsage(highlight_ids=[highlight.id for highlight in referenced_highlights], operation_tag=Personalization.OPERATION_TAG_NAME,
@@ -72,8 +71,19 @@ class Personalization:
 
         return generated_personalized_emails
 
-    def get_personalized_email_from_highlight_and_template(self, highlight: LeadResearchReport.ReportDetail.Highlight, email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate], lead_research_report: LeadResearchReport, creation_date: datetime) -> LeadResearchReport.PersonalizedEmail:
-        """Returns a single personalized for given highlight and email template."""
+    def create_personalized_email(self, highlight: LeadResearchReport.ReportDetail.Highlight, email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate], lead_research_report: LeadResearchReport) -> LeadResearchReport.PersonalizedEmail:
+        """Creates a personalized email for given highlight and email template for given report."""
+        creation_date = Utils.create_utc_time_now()
+        created_email: LeadResearchReport.PersonalizedEmail = None
+        with get_openai_callback() as cb:
+            created_email = self._create_personalized_email_helper(
+                highlight=highlight, email_template=email_template, lead_research_report=lead_research_report, creation_date=creation_date)
+            self.openai_tokens_used = OpenAITokenUsage(highlight_ids=[highlight.id], operation_tag=Personalization.OPERATION_TAG_NAME,
+                                                       prompt_tokens=cb.prompt_tokens, completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+        return created_email
+
+    def _create_personalized_email_helper(self, highlight: LeadResearchReport.ReportDetail.Highlight, email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate], lead_research_report: LeadResearchReport, creation_date: datetime) -> LeadResearchReport.PersonalizedEmail:
+        """Helper method to create a personalized email for given highlight and email template for given report."""
         email_template_message: Optional[str] = email_template.message if email_template else None
         email_subject_line: str = self.generate_email_subject_line(
             highlight=highlight, lead_research_report=lead_research_report, email_template_message=email_template_message)
@@ -94,7 +104,7 @@ class Personalization:
             email_opener=email_opener,
         )
 
-    def generate_email_subject_line(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport, email_template_message: Optional[str]):
+    def generate_email_subject_line(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport, email_template_message: Optional[str]) -> Optional[str]:
         """Generates Personalized email subject line for lead using given highlight and Lead research report.
 
         If email template is provided it is used in determining the email subject line. If not, only information from lead research report and highlight are used.
@@ -168,7 +178,7 @@ class Personalization:
         })
         return result.subject_line
 
-    def generate_email_opener(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport, email_template_message: Optional[str], email_subject_line: str):
+    def generate_email_opener(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport, email_template_message: Optional[str], email_subject_line: str) -> Optional[str]:
         """Generates Personalized email opener for lead using given highlight and email subject line.
 
         If email template is provided it is used in determining the email subject line. If not, only information from lead research report, highlight and email subject line are used.

@@ -9,9 +9,10 @@ from celery import shared_task, chord
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
-from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails
+from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails, OpenAITokenUsage
 from app.research_report import Researcher
 from app.linkedin_scraper import LinkedInScraper
+from app.personalization import Personalization
 from app.utils import Utils
 from firebase_admin import auth
 
@@ -293,6 +294,7 @@ def get_lead_report(lead_research_report_id: str):
             "personalized_outreach_messages": {
                 "personalized_emails": {
                     "id": 1,
+                    "last_updated_date": 1,
                     "highlight_id": 1,
                     "highlight_url": 1,
                     "email_subject_line": 1,
@@ -391,22 +393,20 @@ class UpdateTemplateInPersonalizedEmailResponse(BaseModel):
         return v
 
 
-@bp.post('/v1/lead-research-reports/personalized-emails')
+@bp.put('/v1/lead-research-reports/personalized-emails/<string:personalized_email_id>')
 @login_required
-def update_template_in_personalized_email():
-    # Update given template as the new template for given personalized email. This action is initiated by the user.
-    # The email subject line and opener will not be regenerated on template update.
+def update_template_in_personalized_email(personalized_email_id: str):
+    """Update given template as the new template for given personalized email. This action is initiated by the user.
+    The email subject line and opener will not be regenerated on template update."""
     db = Database()
     user_id: str = g.user["uid"]
 
     lead_research_report_id: str = None
     new_template_id: str = None
-    personalized_email_id: str = None
     try:
         lead_research_report_id: str = request.json.get(
             "lead_research_report_id")
         new_template_id: str = request.json.get("new_template_id")
-        personalized_email_id: str = request.json.get("personalized_email_id")
     except Exception as e:
         logger.exception(
             f"Invalid request: {request} to update template in personalized email for user ID: {user_id} with error: {e}")
@@ -461,6 +461,107 @@ def update_template_in_personalized_email():
             f"Failed to update personalized email ID: {personalized_email_id} with a new template with ID: {new_template_id} in report with ID: {lead_research_report_id} with error: {e}")
         raise APIException(
             status_code=500, message="Failed to update template in personalized email due to an error.")
+
+
+class CreatePersonalizedEmailResponse(BaseModel):
+    """API response for creating personalized email for a given highlight."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+    personalized_email: LeadResearchReport.PersonalizedEmail = Field(
+        ..., description="Created personalized email.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.post('/v1/lead-research-reports/personalized-emails')
+@login_required
+def create_personalized_email():
+    """Creates a personalized outreach email for given highlight in the given lead report."""
+    db = Database()
+    user_id: str = g.user["uid"]
+    logger.info(
+        f"Got request to create personalized email by user ID: {user_id}.")
+
+    lead_research_report_id: str = None
+    highlight_id: str = None
+    try:
+        lead_research_report_id = request.json.get(
+            "lead_research_report_id")
+        highlight_id = request.json.get("highlight_id")
+    except Exception as e:
+        logger.exception(
+            f"Invalid request: {request} to create personalized email for user ID: {user_id} with error: {e}")
+        raise APIException(
+            status_code=400, message="Invalid request parameters to create personalized email.")
+
+    try:
+        # Fetch highlight for given ID from the report.
+        lead_research_report = db.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id)
+        report_details: Optional[List[LeadResearchReport.ReportDetail]
+                                 ] = lead_research_report.details
+        if report_details == None:
+            raise ValueError(
+                f"Report Details is None, expected not None value in report ID: {lead_research_report_id}")
+        highlight: Optional[LeadResearchReport.ReportDetail.Highlight] = None
+        for detail in report_details:
+            for hl in detail.highlights:
+                if hl.id == highlight_id:
+                    highlight = hl
+                    break
+        if not highlight:
+            raise ValueError(
+                f"Could not find Highlight with ID: {highlight_id} in report ID: {lead_research_report_id}")
+
+        # Get template from latest updated personalized email. This is a potential signal that the user found the email useful.
+        # If not, they can always manually switch the template in the UI.
+        personalized_outreach_messages: Optional[LeadResearchReport.PersonalizedOutreachMessages] = lead_research_report.personalized_outreach_messages
+        if not personalized_outreach_messages or not personalized_outreach_messages.personalized_emails or not personalized_outreach_messages.total_tokens_used:
+            raise ValueError(
+                f"Personalized Outreach Messages or personalized emails or tokens is None, expected not None value in report ID: {lead_research_report_id}")
+        personalized_emails: List[LeadResearchReport.PersonalizedEmail] = personalized_outreach_messages.personalized_emails
+        if len(personalized_emails) == 0:
+            raise ValueError(
+                f"Expected personalied emails to be not empty, got empty in report ID: {lead_research_report_id}")
+
+        sorted_emails: List[LeadResearchReport.PersonalizedEmail] = sorted(
+            personalized_emails, key=lambda e: e.last_updated_date, reverse=True)
+        email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate] = None
+        for email in sorted_emails:
+            if email.template:
+                email_template = email.template
+                break
+
+        # Create email.
+        pz = Personalization(database=db)
+        created_email: LeadResearchReport.PersonalizedEmail = pz.create_personalized_email(
+            highlight=highlight, email_template=email_template, lead_research_report=lead_research_report)
+        tokens_used = pz.get_tokens_used()
+
+        # Update created email and tokens in database.
+        personalized_emails.append(created_email)
+        existing_tokens_used: OpenAITokenUsage = personalized_outreach_messages.total_tokens_used
+        existing_tokens_used.add_tokens(tokens_used)
+        setFields = {
+            "personalized_outreach_messages": personalized_outreach_messages.model_dump(),
+        }
+        db.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
+        logger.info(
+            f"Successfully created personalized email for highlight ID: {highlight_id} in lead report ID: {lead_research_report_id} for user ID: {user_id}")
+        response = CreatePersonalizedEmailResponse(
+            status=ResponseStatus.SUCCESS, personalized_email=created_email)
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to create personalized email for report ID: {lead_research_report_id} and highlight ID: {highlight_id} for user ID: {user_id} with error: {e}")
+        raise APIException(
+            status_code=500, message="Failed to create personalized email due to an internal error.")
 
 
 class CreateOutreachTemplateResponse(BaseModel):

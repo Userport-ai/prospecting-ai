@@ -387,7 +387,7 @@ export const reportWithNoTemplate = {
           id: "66baecd4914935040bcf6299",
           creation_date: null,
           creation_date_readable_str: null,
-          last_updated_date: null,
+          last_updated_date: "2023-02-29T13:12:04.594000",
           last_updated_date_readable_str: null,
           highlight_id: null,
           highlight_url:
@@ -402,7 +402,7 @@ export const reportWithNoTemplate = {
           id: "66baecd4914935040bcf629a",
           creation_date: null,
           creation_date_readable_str: null,
-          last_updated_date: null,
+          last_updated_date: "2024-02-29T13:12:04.594000",
           last_updated_date_readable_str: null,
           highlight_id: null,
           highlight_url:
