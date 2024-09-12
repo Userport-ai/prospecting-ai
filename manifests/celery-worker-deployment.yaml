@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: celery-worker
-        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.41
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.42
         # Command to run Celery worker.
         command: ["celery"]
         args: ["-A", "app.make_celery", "worker", "--concurrency=8", "--loglevel=INFO"]
