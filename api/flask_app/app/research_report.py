@@ -499,17 +499,17 @@ class Researcher:
             operation_tag=Researcher.PERSONALIZED_MESSAGES_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
 
         # Select outreach template to use for given lead.
-        chosen_outreach_email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate] = self.outreach_template_matcher.match(
+        selected_email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate] = self.outreach_template_matcher.match(
             lead_research_report=lead_research_report)
-        chosen_outreach_email_template_tokens_used: Optional[OpenAITokenUsage] = self.outreach_template_matcher.get_tokens_used(
+        selected_email_template_tokens_used: Optional[OpenAITokenUsage] = self.outreach_template_matcher.get_tokens_used(
         )
-        if chosen_outreach_email_template_tokens_used:
+        if selected_email_template_tokens_used:
             total_tokens_used.add_tokens(
-                chosen_outreach_email_template_tokens_used)
+                selected_email_template_tokens_used)
 
         # Create personalized emails from chosen template.
         personalized_emails: List[LeadResearchReport.PersonalizedEmail] = self.personalization.generate_personalized_emails(
-            email_template=chosen_outreach_email_template, lead_research_report=lead_research_report)
+            email_template=selected_email_template, lead_research_report=lead_research_report)
         personalized_emails_tokens_used: Optional[OpenAITokenUsage] = self.personalization.get_tokens_used(
         )
         if personalized_emails_tokens_used:

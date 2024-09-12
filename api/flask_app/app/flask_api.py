@@ -290,18 +290,6 @@ def get_lead_report(lead_research_report_id: str):
             "report_creation_date_readable_str": 1,
             "report_publish_cutoff_date_readable_str": 1,
             "details": 1,
-            "chosen_outreach_email_template": {
-                "id": 1,
-                "name": 1,
-                "message": 1,
-            },
-            "personalized_emails": {
-                "_id": 1,
-                "highlight_id": 1,
-                "highlight_url": 1,
-                "email_subject_line": 1,
-                "email_opener": 1,
-            },
             "personalized_outreach_messages": {
                 "personalized_emails": {
                     "id": 1,
@@ -781,81 +769,6 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
         logger.info(
             f"Deletion complete. Stats: {len(content_details_ids_list)} content details docs, {len(linkedin_ids_list)} linkedin post docs, {len(web_page_ids_list)} web page docs and 1 Lead Report with ID: {lead_research_report_id}")
     return Response("done\n")
-
-
-@bp.post('/v1/admin/migration/<string:confirm>')
-def admin_migration(confirm: str):
-    """API to do one time migration of data in production."""
-    logger.info("Got Data migration request")
-
-    # Migrate data from personalized emails and chosen outreach template fields to personalized_outreach_messages field.
-    db = Database()
-    num_migrations = 0
-    for report_dict in db.list_raw_lead_research_reports(filter={}):
-        logger.info(f"Got report ID: {report_dict['_id']}")
-        if "personalized_outreach_messages" in report_dict:
-            # Do nothing since field is already populated.
-            logger.info(
-                f"Skipping report ID: {report_dict['_id']} since field is already populated")
-            continue
-        if not report_dict["personalized_emails"]:
-            # Do nothing since this report has failed and hasn't reached personalized emails part yet.
-            logger.info(
-                f"Skippping report ID: {report_dict['_id']} since personalized_emails not generated yet.")
-            continue
-
-        personalized_outreach_messages = LeadResearchReport.PersonalizedOutreachMessages(
-            personalized_emails=[])
-        for email_dict in report_dict["personalized_emails"]:
-            new_email_dict = email_dict.copy()
-            new_email_dict["id"] = email_dict["_id"]
-            del new_email_dict["_id"]
-            if report_dict["chosen_outreach_email_template"]:
-                new_email_dict["template"] = report_dict["chosen_outreach_email_template"].copy(
-                )
-            personalized_outreach_messages.personalized_emails.append(
-                LeadResearchReport.PersonalizedEmail(**new_email_dict))
-        personalized_outreach_messages.total_tokens_used = report_dict[
-            "personalized_emails_tokens_used"]
-
-        if confirm == "confirm":
-            # Update report in database.
-            db.update_lead_research_report(lead_research_report_id=report_dict["_id"], setFields={
-                "personalized_outreach_messages": personalized_outreach_messages.model_dump()})
-            logger.info(
-                f"Migrated data in report ID: {report_dict['_id']} successfully.")
-            num_migrations += 1
-
-    logger.info(f"Finished {num_migrations} migrations in total.")
-    return Response("completed\n")
-
-
-@bp.get('/v1/admin/sanity-check')
-def db_sanity_check():
-    """Sanity check on the database fields."""
-    db = Database()
-    success = True
-    for report in db.list_lead_research_reports(filter={}):
-        if not report.personalized_outreach_messages:
-            success = False
-            logger.error(
-                f"Report ID: {report.id} does not have personalized_messages field set.")
-            break
-        for email in report.personalized_outreach_messages.personalized_emails:
-            if not email.id:
-                success = False
-                logger.error(
-                    f"Email: {email} in report ID: {report.id} does not have ID populated.")
-                break
-            if not email.template and report.chosen_outreach_email_template != None:
-                success = False
-                logger.error(
-                    f"Template not populated in email: {email} in report ID: {report.id} even though template chosen: {report.chosen_outreach_email_template}")
-                break
-
-    if success:
-        logger.info("Sanity check done")
-    return Response("completed\n")
 
 
 def shared_task_exception_handler(shared_task_obj, database: Database, lead_research_report_id: str, e: Exception, task_name: str, status_before_failure: LeadResearchReport.Status):

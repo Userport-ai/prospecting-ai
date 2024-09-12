@@ -453,27 +453,11 @@ if __name__ == "__main__":
 
     # db.delete_all_content_details()
 
-    # Migration script.
-    # update = {
-    #     "$set": {
-    #         "personalized_emails.$.highlight_id": "66a8e6adbc8a1e4270c9b29f",
-    #     }
-    # }
-
-    # db.migrate_docs(
-    #     collection=db._get_lead_research_report_collection(), filter={"personalized_emails._id": ObjectId("66baecd4914935040bcf629d")}, update=update)
-    # print("done")
     delete_filter = {
         "creation_date": {"$gte": Utils.create_utc_datetime(5, 9, 2024)}
     }
     db.delete_all_content_details(
         find_filter=delete_filter, delete_confirm=False)
-
-    # db.insert_personalized_emails(lead_research_report_id="", personalized_emails=[
-    #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="hello"),
-    #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="world"),
-    #     LeadResearchReport.PersonalizedEmail(id=None, email_opener="userport"),
-    # ])
 
     # collection = db.get_lead_research_report_collection()
     # data_dict = collection.find_one(

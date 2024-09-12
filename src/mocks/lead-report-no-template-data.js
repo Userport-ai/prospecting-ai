@@ -381,9 +381,6 @@ export const reportWithNoTemplate = {
         ],
       },
     ],
-    chosen_outreach_email_template: null,
-    personalized_emails: null,
-    personalized_emails_tokens_used: null,
     personalized_outreach_messages: {
       personalized_emails: [
         {

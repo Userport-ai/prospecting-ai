@@ -453,18 +453,6 @@ class LeadResearchReport(BaseModel):
     details: Optional[List[ReportDetail]] = Field(
         default=None, description="Report details associated with the lead.")
 
-    # Chosen Outreach Email template.
-    # Deprecated: Use personalized_outreach_messages instead.
-    chosen_outreach_email_template: Optional[ChosenOutreachEmailTemplate] = Field(
-        default=None, description="Outreach Email template that matches this Lead's profile.")
-
-    # Outreach fields.
-    # Deprecated: Use personalized_outreach_messages instead.
-    personalized_emails: Optional[List[PersonalizedEmail]] = Field(
-        default=None, description="List of Personalized emails that will be used for outreach.")
-    personalized_emails_tokens_used: Optional[OpenAITokenUsage] = Field(
-        default=None, description="Total Open AI tokens used in generating personalized emails.")
-
     # New field to store all outreach messages and related info.
     personalized_outreach_messages: Optional[PersonalizedOutreachMessages] = Field(
         default=None, description="Store all the different kinds of personalized messages generated for outreach.")
