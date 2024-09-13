@@ -1,5 +1,5 @@
 import "./recent-news.css";
-import { Flex, Button, Card, Typography, Tooltip } from "antd";
+import { Flex, Button, Card, Typography, Tooltip, Modal } from "antd";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
 
@@ -29,9 +29,29 @@ function Highlight({ lead_research_report_id, highlight, onEmailCreation }) {
         },
       }
     );
+    // TODO: Handle non JSON response error.
+    // Hints: response.ok: false and response.status: 400/500 and statusText: error msg.
     const result = await response.json();
     if (result.status === "error") {
-      throw result;
+      // Show error to the user in a Modal.
+      var title = "Error creating email!";
+      var description = result.message;
+      if (result.status_code === 429) {
+        if (result.message.includes("minute")) {
+          title = "Error! Too many requests at once!";
+          description = "Please wait for a few minutes and retry.";
+        } else if (result.message.includes("day")) {
+          title = "Error! Limit exhausted!";
+          description =
+            "Exceeded email creation limit for the day, please try again in 24 hours.";
+        }
+      }
+      Modal.error({
+        title: title,
+        content: description,
+      });
+      setCreateEmailLoading(false);
+      return;
     }
     setCreateEmailLoading(false);
     onEmailCreation(result.personalized_email);

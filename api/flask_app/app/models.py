@@ -16,6 +16,10 @@ logger = logging.getLogger()
 # throw an error.
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
+class UsageTier(str, Enum):
+    """Defines Usage tier for the app."""
+    FREE = "free_tier"
+    ALPHA_TESTERS = "alpha_testers"
 
 class User(BaseModel):
     """Represents a real user who has signed up for the application."""
@@ -37,6 +41,8 @@ class User(BaseModel):
         default=None, description="Date in UTC timezone when this user document was last updated in the database.")
     state: Optional[State] = Field(
         default=None, description="State of user using which we can tailor the frontend of the application. Example: User Onboarding.")
+    usage_tier: Optional[UsageTier] = Field(
+        default=None, description="Usage tier that the user falls under. Rate limits and cost are enforced based on their tier.")
 
 
 class OpenAITokenUsage(BaseModel):
@@ -375,7 +381,8 @@ class LeadResearchReport(BaseModel):
 
     class PersonalizedEmail(BaseModel):
         """Personalized Email addressed to a given lead in the lead research report. Uses chosen template if it exists else generates email without template."""
-        id: Optional[PyObjectId] = Field(default=None, description="ID for Personalized Email created by the Application (not MongoDB).")
+        id: Optional[PyObjectId] = Field(
+            default=None, description="ID for Personalized Email created by the Application (not MongoDB).")
         creation_date: Optional[datetime] = Field(
             default=None, description="Date in UTC timezone when this document was inserted in the database.")
         creation_date_readable_str: Optional[str] = Field(
@@ -390,7 +397,7 @@ class LeadResearchReport(BaseModel):
         highlight_url: Optional[str] = Field(
             default=None, description="The source URL which was used to create the highlight.")
         template: Optional["LeadResearchReport.ChosenOutreachEmailTemplate"] = Field(
-                default=None, description="Current Template associated with the email, it can be changed by user selection from the UI. Can be None as well.")
+            default=None, description="Current Template associated with the email, it can be changed by user selection from the UI. Can be None as well.")
         email_subject_line: Optional[str] = Field(
             default=None, description="Generated subject Line of the email.")
         email_opener: Optional[str] = Field(

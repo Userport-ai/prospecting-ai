@@ -21,7 +21,8 @@ from app.models import (
     WebPage,
     LeadResearchReport,
     OutreachEmailTemplate,
-    User
+    User,
+    UsageTier
 )
 from typing import List
 
@@ -84,6 +85,8 @@ class Database:
         creation_date: datetime = Utils.create_utc_time_now()
         user.creation_date = creation_date
         user.last_updated_date = creation_date
+        # By default, we assign a new user a free tier.
+        user.usage_tier = UsageTier.FREE
 
         collection = self._get_users_collection()
         collection.insert_one(user.model_dump(by_alias=True))
@@ -248,6 +251,17 @@ class Database:
             raise ValueError(
                 f'Content Details not found for Id: {content_details_id}')
         return ContentDetails(**data_dict)
+
+    def list_users(self, filter: Dict, projection: Optional[Dict[str, int]] = None) -> List[User]:
+        """List users for given filter and projection. It will be """
+        collection = self._get_users_collection()
+        cursor = collection.find(filter, projection).sort(
+            [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
+        )
+        users: List[User] = []
+        for user_dict in cursor:
+            users.append(User(**user_dict))
+        return users
 
     def list_content_details(self, filter: Dict, projection: Optional[Dict[str, int]] = None) -> List[ContentDetails]:
         """Returns Content Details with given filter. Returns only fields specified in the projection dictionary."""

@@ -1,6 +1,7 @@
 import os
 from flask import Flask
 from app import flask_api
+from app.rate_limiter import rate_limiter
 from celery import Celery, Task
 from logging.config import dictConfig
 import firebase_admin
@@ -112,4 +113,5 @@ def create_app():
     firebase_admin.initialize_app()
     app.register_blueprint(flask_api.bp)
     celery_init_app(app)
+    rate_limiter.init_app(app)
     return app

@@ -1,5 +1,5 @@
 import "./enter-lead-info.css";
-import { Typography, Flex, Form, Input, Button, Skeleton } from "antd";
+import { Typography, Flex, Form, Input, Button, Skeleton, Modal } from "antd";
 import BackArrow from "./back-arrow";
 import {
   Form as RouterForm,
@@ -43,7 +43,26 @@ export const enterLeadAction = (authContext) => {
     });
     const result = await response.json();
     if (result.status === "error") {
-      // Throw error so it can be caught by component.
+      // Show rate limit error to the user in a Modal.
+      var title = "Error adding lead!";
+      var description = result.message;
+      if (result.status_code === 429) {
+        if (result.message.includes("minute")) {
+          title = "Error! Too many leads added at once!";
+          description =
+            "Please wait for some of the existing lead reports to finish and then retry.";
+        } else if (result.message.includes("day")) {
+          title = "Error! Limit exhausted!";
+          description =
+            "Exceeded lead creation limit for the day, please try again in 24 hours.";
+        }
+        Modal.error({
+          title: title,
+          content: description,
+        });
+        return null;
+      }
+      // Any other error , throw it so it can be caught by component.
       console.log("Got error when creating lead research report: ", result);
       throw result;
     }

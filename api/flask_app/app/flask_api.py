@@ -4,17 +4,19 @@ import time
 import json
 from itertools import chain
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Optional, List
 from celery import shared_task, chord
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
-from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails, OpenAITokenUsage
+from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails, OpenAITokenUsage, UsageTier
 from app.research_report import Researcher
 from app.linkedin_scraper import LinkedInScraper
 from app.personalization import Personalization
 from app.utils import Utils
+from app.rate_limiter import rate_limiter, get_value
 from firebase_admin import auth
+from flask_limiter import RateLimitExceeded
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -58,6 +60,12 @@ class APIException(Exception):
 @bp.errorhandler(APIException)
 def api_exception(e):
     return jsonify(e.to_dict()), e.status_code
+
+
+@bp.errorhandler(RateLimitExceeded)
+def ratelimit_handler(e: RateLimitExceeded):
+    # Convert 429 error code form rate limiter to Standard API response so UI can show it to the user.
+    return ErrorDetails(status=ResponseStatus.ERROR, status_code=e.code, message=e.description).model_dump(), e.code
 
 
 def login_required(f):
@@ -206,6 +214,7 @@ class CreateLeadResearchReportResponse(BaseModel):
 
 @bp.post('/v1/lead-research-reports')
 @login_required
+@rate_limiter.limit(key_func=lambda: g.user["uid"], limit_value=get_value)
 def create_lead_report():
     db = Database()
     user_id: str = g.user["uid"]
@@ -480,6 +489,7 @@ class CreatePersonalizedEmailResponse(BaseModel):
 
 @bp.post('/v1/lead-research-reports/personalized-emails')
 @login_required
+@rate_limiter.limit(key_func=lambda: g.user["uid"], limit_value=get_value)
 def create_personalized_email():
     """Creates a personalized outreach email for given highlight in the given lead report."""
     db = Database()
@@ -800,7 +810,7 @@ def delete_outreach_email_template(outreach_email_template_id: str):
             status_code=500, message="Internal Error when deleting Outreach Email template")
 
 
-@bp.get('/v1/debug/<string:report_id>')
+@bp.get('/v1/admin/debug/<string:report_id>')
 def admin_debug(report_id: str):
     logger.info(f"Got Debug request for report ID: {report_id}")
     fetch_lead_info_orchestrator.delay(
@@ -871,6 +881,21 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
             f"Deletion complete. Stats: {len(content_details_ids_list)} content details docs, {len(linkedin_ids_list)} linkedin post docs, {len(web_page_ids_list)} web page docs and 1 Lead Report with ID: {lead_research_report_id}")
     return Response("done\n")
 
+
+@bp.post('/v1/admin/migration')
+def admin_migration():
+    logger.info("Got Migration request")
+    db = Database()
+    for user in db.list_users(filter={}):
+        db.update_user(user_id=user.id, setFields={
+                       "usage_tier": UsageTier.ALPHA_TESTERS})
+    logger.info("Successfully completed migration request")
+    return Response("ok\n")
+
+
+#######################
+# Start of Celery Tasks
+#######################
 
 def shared_task_exception_handler(shared_task_obj, database: Database, lead_research_report_id: str, e: Exception, task_name: str, status_before_failure: LeadResearchReport.Status):
     """Helper to handle the exception that occured in given shared task instance."""
