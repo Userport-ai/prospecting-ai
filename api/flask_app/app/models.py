@@ -1,4 +1,3 @@
-import logging
 from typing import Optional, Annotated, List, Tuple, Dict
 from deprecated import deprecated
 from pydantic.functional_validators import BeforeValidator
@@ -8,18 +7,18 @@ from app.utils import Utils
 from enum import Enum
 import re
 
-logger = logging.getLogger()
-
 # Represents an ObjectId field in the database.
 # It will be represented as a `str` on the model so that it can be serialized to JSON.
 # The Before validator will convert ObjectId from DB into string so model validation does not
 # throw an error.
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
+
 class UsageTier(str, Enum):
     """Defines Usage tier for the app."""
     FREE = "free_tier"
     ALPHA_TESTERS = "alpha_testers"
+
 
 class User(BaseModel):
     """Represents a real user who has signed up for the application."""
