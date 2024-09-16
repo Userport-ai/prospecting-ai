@@ -23,7 +23,8 @@ class RateLimitConfig(BaseModel):
             """
             Limit defined based on Usage tier.
 
-            Values are defined using string notation in https://flask-limiter.readthedocs.io/en/stable/configuration.html#rate-limit-string-notation..
+            #rate-limit-string-notation..
+            Values are defined using string notation in https://flask-limiter.readthedocs.io/en/stable/configuration.html
             """
             usage_tier: UsageTier = Field(...,
                                           description="Usage Tier defined by the app.")
@@ -100,8 +101,7 @@ def get_value() -> Optional[str]:
     # Get usage tier of current user.
     db = Database()
     user_id: str = g.user["uid"]
-    user: User = db.get_or_create_user(
-        user_id=user_id, projection={"usage_tier": 1})
+    user: User = db.get_user(user_id=user_id, projection={"usage_tier": 1})
     if not user.usage_tier:
         # This is corrupt state, throw an exception.
         raise Exception(

@@ -76,12 +76,12 @@ class Database:
         """Returns Outreach Email Templates collection."""
         return self.db['outreach_email_templates']
 
-    def _create_new_user(self, user_id: str) -> User:
+    def create_new_user(self, user_id: str, email: str) -> User:
         """Creates a new user in the database and returns created user object.
 
         Private method, should not be called by external clients.
         """
-        user = User(_id=user_id, state=User.State.NEW_USER)
+        user = User(_id=user_id, state=User.State.NEW_USER, email=email)
         creation_date: datetime = Utils.create_utc_time_now()
         user.creation_date = creation_date
         user.last_updated_date = creation_date
@@ -195,18 +195,13 @@ class Database:
             with session.start_transaction():
                 yield session
 
-    def get_or_create_user(self, user_id: str, projection: Optional[Dict[str, int]] = None) -> User:
-        """Returns User for given ID. If the user does not exist, creates one in the database and returns it."""
+    def get_user(self, user_id: str, projection: Optional[Dict[str, int]] = None) -> Optional[User]:
+        """Returns User for given ID. If the user does not exist, returns None."""
         collection = self._get_users_collection()
         data_dict = collection.find_one(
             {"_id": user_id}, projection=projection)
         if not data_dict:
-            logger.info(
-                f"User ID: {user_id} does not exist in database, creating one.")
-            self._create_new_user(user_id=user_id)
-            logger.info(f"Created User with ID: {user_id} in the database.")
-            data_dict = collection.find_one(
-                {"_id": user_id}, projection=projection)
+            return None
         return User(**data_dict)
 
     def get_person_profile(self, person_profile_id: str) -> PersonProfile:

@@ -137,13 +137,26 @@ class GetUserResponse(BaseModel):
 @bp.get('/v1/users')
 @login_required
 def get_user():
+    """
+    Fetch User state from database. If the user does not exist, it will create the user in the database first.
+
+    This is also the method that gets called when the user first signs up on the app.
+    """
     db = Database()
     user_id: str = g.user["uid"]
+    email: str = g.user["email"]
     logger.info(f"Fetch info for user with ID: {user_id}")
 
     try:
-        user = db.get_or_create_user(
+        user: Optional[User] = db.get_user(
             user_id=user_id, projection=get_user_state_db_projection())
+        if not user:
+            logger.info(
+                f"User ID: {user_id} does not exist in database, creating one for this new user.")
+            db.create_new_user(user_id=user_id, email=email)
+            logger.info(f"Created User with ID: {user_id} in the database.")
+            user = db.get_user(user_id=user_id, projection=get_user_state_db_projection())
+
         response = GetUserResponse(status=ResponseStatus.SUCCESS, user=user)
         logger.info(f"Got user for ID: {user_id} from database.")
         return response.model_dump()
@@ -224,7 +237,7 @@ def create_lead_report():
         'linkedin_url').strip().rstrip("/")
     if not LinkedInScraper.is_valid_profile_url(profile_url=person_linkedin_url):
         raise APIException(
-            status_code=404, message=f"Invalid LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}")
+            status_code=404, message=f"Invalid LinkedIn URL: {person_linkedin_url} requested.")
 
     logger.info(
         f"Got request from user ID: {user_id} to start report for URL: {person_linkedin_url}")
@@ -320,8 +333,8 @@ def get_lead_report(lead_research_report_id: str):
             lead_research_report_id=lead_research_report_id, projection=projection)
         logger.info(
             f"Found research report for ID: {lead_research_report_id}")
-        user = db.get_or_create_user(user_id=user_id,
-                                     projection=get_user_state_db_projection())
+        user = db.get_user(
+            user_id=user_id, projection=get_user_state_db_projection())
         response = GetLeadResearchReportResponse(
             status=ResponseStatus.SUCCESS,
             lead_research_report=lead_research_report,
@@ -375,8 +388,8 @@ def list_leads():
         }
         lead_research_reports: List[LeadResearchReport] = db.list_lead_research_reports(
             filter=filter, projection=projection)
-        user = db.get_or_create_user(user_id=user_id,
-                                     projection=get_user_state_db_projection())
+        user = db.get_user(
+            user_id=user_id, projection=get_user_state_db_projection())
         response = ListLeadsResponse(
             status=ResponseStatus.SUCCESS, leads=lead_research_reports, user=user)
         logger.info(
@@ -724,7 +737,7 @@ def list_outreach_email_templates():
         }
         outreach_email_templates: List[OutreachEmailTemplate] = db.list_outreach_email_templates(
             user_id=user_id, projection=projection)
-        user = db.get_or_create_user(
+        user = db.get_user(
             user_id=user_id, projection=get_user_state_db_projection())
         response = ListOutreachEmailTemplatesResponse(
             status=ResponseStatus.SUCCESS, outreach_email_templates=outreach_email_templates, user=user)

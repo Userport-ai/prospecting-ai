@@ -34,6 +34,7 @@ class User(BaseModel):
 
     id: Optional[str] = Field(
         alias="_id", default=None, description="Auth system generated unique identifier for authenticated user.")
+    email: Optional[str] = Field(default=None, description="Email address of the user.")
     creation_date: Optional[datetime] = Field(
         default=None, description="Date in UTC timezone when this user document was inserted in the database.")
     last_updated_date: Optional[datetime] = Field(
