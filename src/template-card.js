@@ -2,11 +2,14 @@ import "./template-card.css";
 import { Card, Flex, Typography, Button } from "antd";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { usePostHog } from "posthog-js/react";
 
 const { Text } = Typography;
 
 function TemplateCard({ templateDetails, onDeleteTemplate }) {
   const navigate = useNavigate();
+  const posthog = usePostHog();
+
   function addLineBreaks(text) {
     return text.split("\n").map((substr) => {
       return (
@@ -23,11 +26,20 @@ function TemplateCard({ templateDetails, onDeleteTemplate }) {
   }
 
   function handleDelete() {
+    // Send event.
+    posthog.capture("delete_template_btn_clicked", {
+      template_id: templateDetails.id,
+    });
     return onDeleteTemplate(templateDetails.id);
   }
 
   function handleEdit() {
     // Navigate to edit page.
+
+    // Send event.
+    posthog.capture("edit_template_btn_clicked", {
+      template_id: templateDetails.id,
+    });
     navigate("/templates/edit/" + templateDetails.id);
   }
 

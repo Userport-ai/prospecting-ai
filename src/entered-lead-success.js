@@ -1,6 +1,7 @@
 import "./entered-lead-success.css";
 import { useLoaderData, useNavigate, useNavigation } from "react-router-dom";
 import { Button, ConfigProvider, Result, Skeleton, Typography } from "antd";
+import { usePostHog } from "posthog-js/react";
 
 const { Text, Link } = Typography;
 
@@ -14,6 +15,7 @@ function EnteredLeadSuccess() {
   const linkedin_url = useLoaderData();
   const navigate = useNavigate();
   const component_is_loading = useNavigation().state !== "idle";
+  const posthog = usePostHog();
 
   if (component_is_loading) {
     return (
@@ -68,10 +70,23 @@ function EnteredLeadSuccess() {
         }
         subTitle={<SubTitle />}
         extra={[
-          <Button type="primary" onClick={() => navigate("/leads")}>
+          <Button
+            type="primary"
+            onClick={() => {
+              // Send event.
+              posthog.capture("back_to_leads_btn_clicked");
+              navigate("/leads");
+            }}
+          >
             Back to Leads table
           </Button>,
-          <Button onClick={() => navigate("/leads/create")}>
+          <Button
+            onClick={() => {
+              // Send event.
+              posthog.capture("add_another_lead_btn_clicked");
+              navigate("/leads/create");
+            }}
+          >
             Add another Lead
           </Button>,
         ]}

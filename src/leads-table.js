@@ -1,5 +1,6 @@
 import "./leads-table.css";
 import { Table, Typography } from "antd";
+import { usePostHog } from "posthog-js/react";
 import { useNavigate } from "react-router-dom";
 
 const { Text, Link } = Typography;
@@ -89,11 +90,17 @@ const columns = [
 
 function LeadsTable({ leads }) {
   const navigate = useNavigate();
+  const posthog = usePostHog();
 
   // Handle user click of a report on a givent able row.
   const handleTableRowClick = (record) => {
     return (e) => {
       if (e.target.classList.contains("research-report-ready") === true) {
+        // Send Event.
+        posthog.capture("report_ready_link_clicked", {
+          report_id: record.id,
+        });
+
         // Navigate to the Research Report link. This will prevent complete page load.
         return navigate("/lead-research-reports/" + record.id);
       }

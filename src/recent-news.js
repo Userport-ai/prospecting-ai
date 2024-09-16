@@ -2,12 +2,14 @@ import "./recent-news.css";
 import { Flex, Button, Card, Typography, Tooltip, Modal } from "antd";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
+import { usePostHog } from "posthog-js/react";
 
 const { Text, Link } = Typography;
 
 // Represents Highlight from the leads' news.
 function Highlight({ lead_research_report_id, highlight, onEmailCreation }) {
   const [createEmailLoading, setCreateEmailLoading] = useState(false);
+  const posthog = usePostHog();
 
   const { user } = useContext(AuthContext);
   // Handles request by user to personalize a given news item for given lead.
@@ -29,6 +31,15 @@ function Highlight({ lead_research_report_id, highlight, onEmailCreation }) {
         },
       }
     );
+    if (!response.ok) {
+      // Send event.
+      posthog.capture("p_email_creation_failed", {
+        highlight_id: highlight.id,
+        report_id: lead_research_report_id,
+        status_code: response.status,
+        status_text: response.statusText,
+      });
+    }
     // TODO: Handle non JSON response error.
     // Hints: response.ok: false and response.status: 400/500 and statusText: error msg.
     const result = await response.json();
@@ -55,6 +66,12 @@ function Highlight({ lead_research_report_id, highlight, onEmailCreation }) {
     }
     setCreateEmailLoading(false);
     onEmailCreation(result.personalized_email);
+
+    // Send event.
+    posthog.capture("p_email_created", {
+      highlight_id: highlight.id,
+      report_id: lead_research_report_id,
+    });
   }
   return (
     <Card>
@@ -80,6 +97,14 @@ function Highlight({ lead_research_report_id, highlight, onEmailCreation }) {
           className="card-citation-link"
           href={highlight.url}
           target="_blank"
+          onClick={() => {
+            // Send event.
+            posthog.capture("highlight_url_clicked", {
+              highlight_url: highlight.url,
+              highlight_id: highlight.id,
+              report_id: lead_research_report_id,
+            });
+          }}
         >
           {highlight.url}
         </Link>
@@ -109,16 +134,29 @@ function RecentNews({ lead_research_report_id, details, onEmailCreation }) {
   const [categoriesSelected, setCategoriesSeleted] = useState(
     initialSelectedCategories
   );
+  const posthog = usePostHog();
 
   function handleCategoryClicked(category) {
     if (categoriesSelected.filter((cat) => cat === category).length === 0) {
       // Category not selected yet, prepend to selection.
       setCategoriesSeleted([category, ...categoriesSelected]);
+
+      // Send event.
+      posthog.capture("recent_news_category_selected", {
+        category: category,
+        report_id: lead_research_report_id,
+      });
     } else {
       // Category already selected, remove it.
       setCategoriesSeleted(
         categoriesSelected.filter((cat) => cat !== category)
       );
+
+      // Send event.
+      posthog.capture("recent_news_category_unselected", {
+        category: category,
+        report_id: lead_research_report_id,
+      });
     }
   }
 
@@ -167,13 +205,5 @@ function RecentNews({ lead_research_report_id, details, onEmailCreation }) {
     </>
   );
 }
-
-// function RecentNews({ details }) {
-//   return (
-//     <Flex id="report-details-container" vertical={false} wrap gap="large">
-//       <CategoriesAndHighlights details={details} />
-//     </Flex>
-//   );
-// }
 
 export default RecentNews;

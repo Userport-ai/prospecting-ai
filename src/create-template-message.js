@@ -13,6 +13,7 @@ import {
   updateUserStateOnServer,
   userHasNotCreatedTemplate,
 } from "./helper-functions";
+import { usePostHog } from "posthog-js/react";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -143,6 +144,7 @@ function CreateOrEditTemplateMessage() {
     ? "Edit Email Template"
     : "Create Email Template";
   const actionButtonText = existingOutreachTemplate ? "Save" : "Create";
+  const posthog = usePostHog();
 
   if (component_is_loading) {
     return (
@@ -246,7 +248,20 @@ function CreateOrEditTemplateMessage() {
                 />
 
                 <div id="btn-container">
-                  <Button type="primary" htmlType="submit">
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    onClick={() => {
+                      // Send event.
+                      if (existingOutreachTemplate === null) {
+                        posthog.capture("create_template_form_submitted");
+                      } else {
+                        posthog.capture("edit_template_form_submitted", {
+                          template_id: existingOutreachTemplate.id,
+                        });
+                      }
+                    }}
+                  >
                     {actionButtonText}
                   </Button>
                 </div>

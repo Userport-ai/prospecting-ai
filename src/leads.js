@@ -10,6 +10,7 @@ import {
   userHasNotCreatedTemplate,
 } from "./helper-functions";
 import OnboardingProgressBar from "./onboarding-progress-bar";
+import { usePostHog } from "posthog-js/react";
 
 // Helper to fetch list of leads created by this user.
 // TODO: Implement pagination.
@@ -47,6 +48,7 @@ function Leads() {
   const loaderResponse = useLoaderData();
   const userFromServer = loaderResponse.user;
   const [leads, setLeads] = useState(loaderResponse.leads);
+  const posthog = usePostHog();
 
   const component_is_loading = useNavigation().state !== "idle";
   const should_poll_periodically = leads.some(
@@ -85,6 +87,8 @@ function Leads() {
 
   // Handle Add Lead button click by user.
   function handleAddLeadClick() {
+    // Send event.
+    posthog.capture("add_lead_btn_clicked");
     // TODO: Let's see if we should remove this completely.
     // if (userHasNotCreatedTemplate(userFromServer.state)) {
     //   // Prompt the user that they need to create a template first.

@@ -4,6 +4,7 @@ import { useContext, useState } from "react";
 import { Button, Layout, Spin, Typography, Alert } from "antd";
 import { AuthContext } from "./root";
 import { Navigate, useNavigate, useNavigation } from "react-router-dom";
+import { usePostHog } from "posthog-js/react";
 
 const { Header } = Layout;
 const { Text } = Typography;
@@ -55,6 +56,7 @@ function VerifyEmail() {
   function ConfirmEmailVerfiied({ onEmailConfirmation }) {
     const [loading, setLoading] = useState(false);
     const [confirmationError, setConfirmationError] = useState(false);
+    const posthog = usePostHog();
 
     // Check if user email has actaully been verified.
     async function handleConfirmClick() {
@@ -67,6 +69,9 @@ function VerifyEmail() {
       if (getAuth().currentUser.emailVerified) {
         setLoading(false);
         onEmailConfirmation();
+
+        // Send Event.
+        posthog.capture("email_verified");
       } else {
         setLoading(false);
         setConfirmationError(true);

@@ -14,6 +14,7 @@ import {
   updateUserStateOnServer,
   userHasNotCreatedLead,
 } from "./helper-functions";
+import { usePostHog } from "posthog-js/react";
 
 const { Title } = Typography;
 
@@ -99,6 +100,13 @@ function EnterLeadInfo() {
   const error = useRouteError();
   const component_is_loading = useNavigation().state !== "idle";
   const firstLeadAddition = userHasNotCreatedLead(useLoaderData());
+  const posthog = usePostHog();
+
+  if (error) {
+    posthog.capture("lead_linkedin_url_add_failed", {
+      error_message: error.message,
+    });
+  }
 
   if (component_is_loading) {
     return (
@@ -141,6 +149,12 @@ function EnterLeadInfo() {
                 type="primary"
                 htmlType="submit"
                 disabled={component_is_loading}
+                onClick={() => {
+                  // Send event.
+                  posthog.capture("lead_linkedin_url_added", {
+                    linkedin_url: inputURL,
+                  });
+                }}
               >
                 Submit
               </Button>

@@ -17,12 +17,14 @@ import {
 } from "@ant-design/icons";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
+import { usePostHog } from "posthog-js/react";
 
 const { Text, Link } = Typography;
 const { TextArea } = Input;
 
 // Helper to update Personalized email by calling the backend server.
 async function updateEmailOnBackend(
+  posthog,
   user,
   lead_research_report_id,
   emailId,
@@ -47,6 +49,18 @@ async function updateEmailOnBackend(
       },
     }
   );
+  if (!response.ok) {
+    // Send event.
+    posthog.capture("p_email_update_failed", {
+      email_id: emailId,
+      template_id: new_template_id,
+      report_id: lead_research_report_id,
+      email_opener: newEmailOpener,
+      email_subject_line: newEmailSubjectLine,
+      status_code: response.status,
+      status_text: response.statusText,
+    });
+  }
   const result = await response.json();
   if (result.status === "error") {
     throw result;
@@ -65,6 +79,7 @@ function TemplateEditMode({
   const { user } = useContext(AuthContext);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [updateLoading, setUpdateLoading] = useState(false);
+  const posthog = usePostHog();
 
   const templateOptions = allTemplates.map((template) => {
     return { label: template.name, value: template.id };
@@ -91,6 +106,7 @@ function TemplateEditMode({
 
     setUpdateLoading(true);
     await updateEmailOnBackend(
+      posthog,
       user,
       lead_research_report_id,
       emailId,
@@ -101,6 +117,13 @@ function TemplateEditMode({
     setUpdateLoading(false);
     const newTemplate = allTemplates.find((t) => t.id === selectedTemplateId);
     onEditSuccess(newTemplate);
+
+    // Send event.
+    posthog.capture("p_email_template_updated", {
+      email_id: emailId,
+      template_id: selectedTemplateId,
+      report_id: lead_research_report_id,
+    });
   }
 
   return (
@@ -244,11 +267,13 @@ function EmailSubjectLine({
   const [curEmailSubjectLine, setCurEmailSubjectLine] =
     useState(emailSubjectLine);
   const [updateLoading, setUpdateLoading] = useState(false);
+  const posthog = usePostHog();
 
   // When user confirms update to email opener. Send update to server.
   async function handleUpdate() {
     setUpdateLoading(true);
     await updateEmailOnBackend(
+      posthog,
       user,
       lead_research_report_id,
       emailId,
@@ -259,6 +284,12 @@ function EmailSubjectLine({
     setUpdateLoading(false);
     setReadOnlyMode(true);
     onEditSuccess(curEmailSubjectLine);
+
+    // Send event.
+    posthog.capture("p_email_subject_edited", {
+      email_id: emailId,
+      report_id: lead_research_report_id,
+    });
   }
 
   if (readOnlyMode) {
@@ -315,11 +346,13 @@ function EmailOpener({
   const origText = emailOpener;
   const [curEmailOpener, setCurEmailOpener] = useState(emailOpener);
   const [updateLoading, setUpdateLoading] = useState(false);
+  const posthog = usePostHog();
 
   // When user confirms update to email opener. Send update to server.
   async function handleUpdate() {
     setUpdateLoading(true);
     await updateEmailOnBackend(
+      posthog,
       user,
       lead_research_report_id,
       emailId,
@@ -330,6 +363,12 @@ function EmailOpener({
     setUpdateLoading(false);
     setReadOnlyMode(true);
     onEditSuccess(curEmailOpener);
+
+    // Send Event.
+    posthog.capture("p_email_opener_edited", {
+      email_id: emailId,
+      report_id: lead_research_report_id,
+    });
   }
 
   if (readOnlyMode) {
@@ -387,6 +426,7 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
     personalized_email.email_opener
   );
   const [messageApi, contextHolder] = message.useMessage();
+  const posthog = usePostHog();
 
   // Handle email subject Line being edited successfully by the user.
   async function handleEmailSubjectLineEdited(newEmailSubjectLine) {
@@ -403,6 +443,12 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
       type: "success",
       content: "Copied Email Subject Line",
       duration: 3,
+    });
+
+    // Send event.
+    posthog.capture("user_p_email_subject_copied", {
+      email_id: personalized_email.id,
+      report_id: lead_research_report_id,
     });
   }
 
@@ -423,6 +469,12 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
       type: "success",
       content: "Copied Email Body",
       duration: 3,
+    });
+
+    // Send event.
+    posthog.capture("user_p_email_body_copied", {
+      email_id: personalized_email.id,
+      report_id: lead_research_report_id,
     });
   }
 

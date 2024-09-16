@@ -4,6 +4,7 @@ import { UserOutlined, SettingOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "./root";
+import { usePostHog } from "posthog-js/react";
 
 const { Header } = Layout;
 const templates_key = "templates";
@@ -42,6 +43,8 @@ function AppHeader() {
     ? templates_key
     : leads_key;
   const navigate = useNavigate();
+  const posthog = usePostHog();
+
   return (
     <Header id="nav-header">
       <div id="nav-logo-container">
@@ -58,8 +61,12 @@ function AppHeader() {
         selectedKeys={[curMenuKey]}
         onClick={(e) => {
           if (e.key === leads_key) {
+            // Send event.
+            posthog.capture("leads_tab_clicked");
             return navigate("/leads");
           } else if (e.key === templates_key) {
+            // Send event.
+            posthog.capture("templates_tab_clicked");
             return navigate("/templates");
           } else if (e.key === logout_key) {
             return handleLogout();

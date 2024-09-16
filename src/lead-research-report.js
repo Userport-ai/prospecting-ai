@@ -14,11 +14,15 @@ import {
 import PersonalizedEmails from "./personalized-emails";
 import OnboardingProgressBar from "./onboarding-progress-bar";
 import RecentNews from "./recent-news";
+import { usePostHog } from "posthog-js/react";
 
 const { Text, Link } = Typography;
 
+// Header of the report.
 function ReportHeader({ report }) {
   const navigate = useNavigate();
+  const posthog = usePostHog();
+
   return (
     <div id="header">
       <div id="back-arrow">
@@ -34,6 +38,12 @@ function ReportHeader({ report }) {
             id="linkedin-url"
             href={report.person_linkedin_url}
             target="_blank"
+            onClick={() => {
+              // Send event.
+              posthog.capture("report_header_linkedin_profile_clicked", {
+                report_id: report.id,
+              });
+            }}
           >
             {report.person_linkedin_url}
           </Link>
@@ -84,6 +94,7 @@ function LeadResearchReport() {
   const [personalizedEmails, setPersonalizedEmails] = useState(
     report.personalized_outreach_messages.personalized_emails
   );
+  const posthog = usePostHog();
 
   if (component_is_loading) {
     return (
@@ -134,6 +145,14 @@ function LeadResearchReport() {
       setUserFromServer(gotUserFromServer);
     }
     setActiveTabKey(activeKey);
+
+    // Send event.
+    const activeTabName =
+      activeKey == recentNewsTabKey() ? "Recent News" : "Personalized Emails";
+    posthog.capture("report_clicked_tab", {
+      tab: activeTabName,
+      report_id: report.id,
+    });
   }
 
   // Handles successful personalized email creation by user.

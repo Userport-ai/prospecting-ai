@@ -11,6 +11,7 @@ import {
   isUserOnboarding,
   userHasNotCreatedTemplate,
 } from "./helper-functions";
+import { usePostHog } from "posthog-js/react";
 
 const { confirm } = Modal;
 const { Text } = Typography;
@@ -109,6 +110,7 @@ function AllTemplates() {
   const userFromServer = loaderResult.user;
   // This is Firebase user object.
   const { user } = useContext(AuthContext);
+  const posthog = usePostHog();
 
   if (component_is_loading) {
     return (
@@ -154,6 +156,9 @@ function AllTemplates() {
       }).toString();
       nextPage += `?${urlParams}`;
     }
+
+    // Send event.
+    posthog.capture("create_template_btn_clicked");
     return navigate(nextPage);
   }
 
