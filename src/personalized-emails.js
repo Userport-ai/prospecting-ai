@@ -1,11 +1,57 @@
 import "./personalized-emails.css";
 import { addLineBreaks } from "./helper-functions";
-import { Card, Typography, Button, Select, message } from "antd";
-import { EditOutlined, CopyOutlined } from "@ant-design/icons";
+import {
+  Card,
+  Typography,
+  Button,
+  Select,
+  message,
+  Input,
+  Tooltip,
+} from "antd";
+import {
+  EditOutlined,
+  CopyOutlined,
+  CheckOutlined,
+  CloseOutlined,
+} from "@ant-design/icons";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
 
 const { Text, Link } = Typography;
+const { TextArea } = Input;
+
+// Helper to update Personalized email by calling the backend server.
+async function updateEmailOnBackend(
+  user,
+  lead_research_report_id,
+  emailId,
+  new_template_id = null,
+  newEmailOpener = null,
+  newEmailSubjectLine = null
+) {
+  const idToken = await user.getIdToken();
+  const response = await fetch(
+    "/api/v1/lead-research-reports/personalized-emails/" + emailId,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        lead_research_report_id: lead_research_report_id,
+        new_template_id: new_template_id,
+        new_email_opener: newEmailOpener,
+        new_email_subject_line: newEmailSubjectLine,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + idToken,
+      },
+    }
+  );
+  const result = await response.json();
+  if (result.status === "error") {
+    throw result;
+  }
+}
 
 // Edit mode of template.
 function TemplateEditMode({
@@ -44,25 +90,14 @@ function TemplateEditMode({
     }
 
     setUpdateLoading(true);
-    const idToken = await user.getIdToken();
-    const response = await fetch(
-      "/api/v1/lead-research-reports/personalized-emails/" + emailId,
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          lead_research_report_id: lead_research_report_id,
-          new_template_id: selectedTemplateId,
-        }),
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + idToken,
-        },
-      }
+    await updateEmailOnBackend(
+      user,
+      lead_research_report_id,
+      emailId,
+      selectedTemplateId,
+      null,
+      null
     );
-    const result = await response.json();
-    if (result.status === "error") {
-      throw result;
-    }
     setUpdateLoading(false);
     const newTemplate = allTemplates.find((t) => t.id === selectedTemplateId);
     onEditSuccess(newTemplate);
@@ -195,18 +230,173 @@ function Template({
   );
 }
 
+// Email Subject Line component that is editable.
+function EmailSubjectLine({
+  lead_research_report_id,
+  emailId,
+  emailSubjectLine,
+  onEditSuccess,
+}) {
+  // Logged in user.
+  const { user } = useContext(AuthContext);
+  const [readOnlyMode, setReadOnlyMode] = useState(true);
+  const origText = emailSubjectLine;
+  const [curEmailSubjectLine, setCurEmailSubjectLine] =
+    useState(emailSubjectLine);
+  const [updateLoading, setUpdateLoading] = useState(false);
+
+  // When user confirms update to email opener. Send update to server.
+  async function handleUpdate() {
+    setUpdateLoading(true);
+    await updateEmailOnBackend(
+      user,
+      lead_research_report_id,
+      emailId,
+      null,
+      null,
+      curEmailSubjectLine
+    );
+    setUpdateLoading(false);
+    setReadOnlyMode(true);
+    onEditSuccess(curEmailSubjectLine);
+  }
+
+  if (readOnlyMode) {
+    return (
+      <>
+        <Text className="email-subject-text">{emailSubjectLine}</Text>
+        <EditOutlined onClick={() => setReadOnlyMode(false)} />
+      </>
+    );
+  }
+
+  return (
+    <div className="edit-subject-container">
+      <Input
+        className="email-subject-text"
+        value={curEmailSubjectLine}
+        onChange={(e) => setCurEmailSubjectLine(e.target.value)}
+        disabled={updateLoading}
+      />
+      <div className="btns-container">
+        <Tooltip title="Cancel">
+          <Button
+            icon={<CloseOutlined />}
+            onClick={() => {
+              setCurEmailSubjectLine(origText);
+              setReadOnlyMode(true);
+            }}
+            disabled={updateLoading}
+          />
+        </Tooltip>
+        <Tooltip title="Update">
+          <Button
+            icon={<CheckOutlined />}
+            onClick={handleUpdate}
+            loading={updateLoading}
+            disabled={updateLoading}
+          />
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
+// Email Opener component that is editable.
+function EmailOpener({
+  lead_research_report_id,
+  emailId,
+  emailOpener,
+  onEditSuccess,
+}) {
+  // Logged in user.
+  const { user } = useContext(AuthContext);
+  const [readOnlyMode, setReadOnlyMode] = useState(true);
+  const origText = emailOpener;
+  const [curEmailOpener, setCurEmailOpener] = useState(emailOpener);
+  const [updateLoading, setUpdateLoading] = useState(false);
+
+  // When user confirms update to email opener. Send update to server.
+  async function handleUpdate() {
+    setUpdateLoading(true);
+    await updateEmailOnBackend(
+      user,
+      lead_research_report_id,
+      emailId,
+      null,
+      curEmailOpener,
+      null
+    );
+    setUpdateLoading(false);
+    setReadOnlyMode(true);
+    onEditSuccess(curEmailOpener);
+  }
+
+  if (readOnlyMode) {
+    return (
+      <>
+        <Text className="email-body-text">{addLineBreaks(curEmailOpener)}</Text>
+        <EditOutlined onClick={() => setReadOnlyMode(false)} />
+      </>
+    );
+  }
+
+  return (
+    <div className="edit-opener-container">
+      <TextArea
+        className="email-body-text"
+        autoSize={true}
+        value={curEmailOpener}
+        onChange={(e) => setCurEmailOpener(e.target.value)}
+        disabled={updateLoading}
+      />
+      <div className="btns-container">
+        <Tooltip title="Cancel">
+          <Button
+            icon={<CloseOutlined />}
+            onClick={() => {
+              setCurEmailOpener(origText);
+              setReadOnlyMode(true);
+            }}
+            disabled={updateLoading}
+          />
+        </Tooltip>
+        <Tooltip title="Update">
+          <Button
+            icon={<CheckOutlined />}
+            onClick={handleUpdate}
+            loading={updateLoading}
+            disabled={updateLoading}
+          />
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
 // A single EmailCard component.
 function EmailCard({ lead_research_report_id, personalized_email }) {
   // Current template used in this email card.
   const [curEmailTemplate, setCurEmailTemplate] = useState(
     personalized_email.template
   );
+  const [emailSubjectLine, setEmailSubjectLine] = useState(
+    personalized_email.email_subject_line
+  );
+  const [emailOpener, setEmailOpener] = useState(
+    personalized_email.email_opener
+  );
   const [messageApi, contextHolder] = message.useMessage();
+
+  // Handle email subject Line being edited successfully by the user.
+  async function handleEmailSubjectLineEdited(newEmailSubjectLine) {
+    setEmailSubjectLine(newEmailSubjectLine);
+  }
 
   // Handler when user copies email subject line.
   async function handleEmailSubjectCopied() {
     // Copy to clipboard.
-    navigator.clipboard.writeText(personalized_email.email_subject_line);
+    navigator.clipboard.writeText(emailSubjectLine);
 
     // Show message to prompt.
     messageApi.open({
@@ -214,6 +404,11 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
       content: "Copied Email Subject Line",
       duration: 3,
     });
+  }
+
+  // Handle email opener being edited successfully by the user.
+  async function handleEmailOpenerEdited(newEmailOpener) {
+    setEmailOpener(newEmailOpener);
   }
 
   // Handler when user copies email body message.
@@ -251,22 +446,31 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
       {contextHolder}
       <div className="email-subject-container">
         <Text className="email-subject-label">Subject</Text>
+        {/* Display Email subject Line. Editable. */}
         <div className="email-subject-text-container">
-          <Text className="email-subject-text">
-            {personalized_email.email_subject_line}
-          </Text>
+          <EmailSubjectLine
+            lead_research_report_id={lead_research_report_id}
+            emailId={personalized_email.id}
+            emailSubjectLine={emailSubjectLine}
+            onEditSuccess={handleEmailSubjectLineEdited}
+          />
           <CopyOutlined onClick={handleEmailSubjectCopied} />
         </div>
       </div>
       <div className="email-body-container">
         <Text className="email-body-label">Body</Text>
         <div className="email-body-text-container">
+          {/* Display Email Opener. Editable. */}
           <div className="email-opener-container">
-            <Text className="email-body-text">
-              {addLineBreaks(personalized_email.email_opener)}
-            </Text>
+            <EmailOpener
+              lead_research_report_id={lead_research_report_id}
+              emailId={personalized_email.id}
+              emailOpener={emailOpener}
+              onEditSuccess={handleEmailOpenerEdited}
+            />
             <CopyOutlined onClick={handleEmailBodyCopied} />
           </div>
+          {/* Display Template. Not editable here, separate button below to edit it. */}
           <Text className="email-body-text">
             {curEmailTemplate && addLineBreaks(curEmailTemplate.message)}
           </Text>

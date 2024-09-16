@@ -415,7 +415,14 @@ def update_template_in_personalized_email(personalized_email_id: str):
     try:
         lead_research_report_id: str = request.json.get(
             "lead_research_report_id")
-        new_template_id: str = request.json.get("new_template_id")
+        new_template_id: Optional[str] = request.json.get("new_template_id")
+        new_email_opener: Optional[str] = request.json.get("new_email_opener")
+        new_email_subject_line: Optional[str] = request.json.get(
+            "new_email_subject_line")
+
+        if new_template_id == None and new_email_opener == None and new_email_subject_line == None:
+            raise ValueError(
+                f"Invalid request parameters, all inputs are None!")
     except Exception as e:
         logger.exception(
             f"Invalid request: {request} to update template in personalized email for user ID: {user_id} with error: {e}")
@@ -423,20 +430,32 @@ def update_template_in_personalized_email(personalized_email_id: str):
             status_code=400, message="Invalid request parameters for update template in personalized email.")
 
     logger.info(
-        f"Got request to update template ID: {new_template_id} in personalized email ID: {personalized_email_id} in report ID:{lead_research_report_id}")
+        f"Got request: {request.json} to update in personalized email ID: {personalized_email_id} in report ID:{lead_research_report_id}")
 
     try:
         # Fetch lead report and new template from the database.
         report = db.get_lead_research_report(lead_research_report_id=lead_research_report_id, projection={
                                              "personalized_outreach_messages": 1})
-        new_template = db.get_outreach_email_template(
-            outreach_email_template_id=new_template_id)
-
         personalized_outreach_messages: LeadResearchReport.PersonalizedOutreachMessages = report.personalized_outreach_messages
-        updated_email_template = False
-        for email in personalized_outreach_messages.personalized_emails:
+
+        # Find reference to email object (that needs update) from within personalized outreach messages object.
+        idx = -1
+        for i, email in enumerate(personalized_outreach_messages.personalized_emails):
             if email.id != personalized_email_id:
                 continue
+            idx = i
+            break
+        if idx == -1:
+            raise ValueError(
+                f"Personalized Email ID: {personalized_email_id} not found in personalized outreach messages: {personalized_outreach_messages} in report ID: {lead_research_report_id}")
+        email: LeadResearchReport.PersonalizedEmail = personalized_outreach_messages.personalized_emails[
+            idx]
+
+        if new_template_id:
+            logger.info(
+                f"Updating template in email ID: {personalized_email_id} in report ID: {lead_research_report_id}")
+            new_template = db.get_outreach_email_template(
+                outreach_email_template_id=new_template_id)
 
             # Update new template and update time in matched email.
             email.template = LeadResearchReport.ChosenOutreachEmailTemplate(
@@ -445,25 +464,30 @@ def update_template_in_personalized_email(personalized_email_id: str):
                 creation_date=new_template.creation_date,
                 message=new_template.message
             )
-            current_time = Utils.create_utc_time_now()
-            email.last_updated_date = current_time
-            email.last_updated_date_readable_str = Utils.to_human_readable_date_str(
-                current_time)
-            updated_email_template = True
-            break
 
-        if not updated_email_template:
-            raise ValueError(
-                f"Personalized Email ID: {personalized_email_id} not found in personalized outreach messages: {personalized_outreach_messages} in report ID: {lead_research_report_id}")
+        if new_email_opener:
+            logger.info(
+                f"Updating email opener in email ID: {personalized_email_id} in report ID: {lead_research_report_id}")
+            email.email_opener = new_email_opener
 
-        # Insert or update in database.
+        if new_email_subject_line:
+            logger.info(
+                f"Updating email subject line in email ID: {personalized_email_id} in report ID: {lead_research_report_id}")
+            email.email_subject_line = new_email_subject_line
+
+        current_time = Utils.create_utc_time_now()
+        email.last_updated_date = current_time
+        email.last_updated_date_readable_str = Utils.to_human_readable_date_str(
+            current_time)
+
+        # Updated object in database.
         db.update_lead_research_report(lead_research_report_id=lead_research_report_id, setFields={
                                        "personalized_outreach_messages": personalized_outreach_messages.model_dump()})
         response = UpdateTemplateInPersonalizedEmailResponse(
             status=ResponseStatus.SUCCESS,
         )
         logger.info(
-            f"Successfully updated personalized email ID: {personalized_email_id} with template ID: {new_template_id} in report ID: {lead_research_report_id}")
+            f"Successfully updated personalized email ID: {personalized_email_id} for request: {request.json} in report ID: {lead_research_report_id}")
         return response.model_dump()
     except Exception as e:
         logger.exception(

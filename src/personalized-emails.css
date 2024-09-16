@@ -35,14 +35,36 @@
   display: flex;
   flex-direction: row;
   justify-content: space-between;
+  align-items: start;
 }
 
 #personalized-emails-container
   .email-subject-text-container
   .email-subject-text {
+  width: 100%;
   font-size: 1.7rem;
   color: var(--secondary);
   font-weight: 500;
+}
+
+#personalized-emails-container .email-subject-text-container .anticon-edit svg {
+  color: var(--hover-color);
+  width: 2.2rem;
+  height: 2.2rem;
+  margin-right: 2rem;
+}
+
+#personalized-emails-container
+  .email-subject-text-container
+  .edit-subject-container {
+  width: 100%;
+}
+
+#personalized-emails-container .edit-subject-container .btns-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: end;
+  gap: 1rem;
 }
 
 #personalized-emails-container .ant-card .email-body-container {
@@ -77,6 +99,24 @@
   font-size: 1.7rem;
   color: var(--secondary);
   font-weight: 500;
+}
+
+/* Edit Icon styling */
+#personalized-emails-container .email-opener-container .anticon-edit svg {
+  color: var(--hover-color);
+  width: 2.2rem;
+  height: 2.2rem;
+}
+
+#personalized-emails-container .email-opener-container .edit-opener-container {
+  width: 100%;
+}
+
+#personalized-emails-container .edit-opener-container .btns-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: end;
+  gap: 1rem;
 }
 
 #personalized-emails-container .ant-card .email-highlight-url-container {
