@@ -60,7 +60,16 @@
 
 #personalized-emails-container .email-body-text-container {
   display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+#personalized-emails-container
+  .email-body-text-container
+  .email-opener-container {
+  display: flex;
   flex-direction: row;
+  align-items: start;
   gap: 2rem;
 }
 

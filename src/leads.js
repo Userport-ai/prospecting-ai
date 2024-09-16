@@ -1,5 +1,5 @@
 import "./leads.css";
-import { Button, Modal, Skeleton } from "antd";
+import { Button, Skeleton } from "antd";
 import LeadsTable from "./leads-table";
 import { useNavigate, useLoaderData, useNavigation } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";

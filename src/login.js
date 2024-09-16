@@ -37,7 +37,6 @@ function Login() {
         },
         signInFailure: function (error) {
           // Throw error so we understand what happened.
-          console.log("failed to sign in user with error: ", error);
           throw error;
         },
       },

@@ -67,7 +67,6 @@ export const leadResearchReportLoader = (authContext) => {
     });
     const result = await response.json();
     if (result.status === "error") {
-      console.log("Error getting lead report: ", result);
       throw result;
     }
     return result;

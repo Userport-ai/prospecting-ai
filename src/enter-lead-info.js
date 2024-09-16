@@ -62,8 +62,7 @@ export const enterLeadAction = (authContext) => {
         });
         return null;
       }
-      // Any other error , throw it so it can be caught by component.
-      console.log("Got error when creating lead research report: ", result);
+      // Any other error, throw it so it can be caught by component.
       throw result;
     }
 

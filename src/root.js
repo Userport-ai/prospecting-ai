@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import { usePostHog } from "posthog-js/react";
 import { createContext, useEffect, useState } from "react";
 
 export const AuthContext = createContext(null);
@@ -20,6 +21,7 @@ function Root({ children }) {
   // Initialize Firebase and get auth object.
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
+  const posthog = usePostHog();
 
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -29,11 +31,23 @@ function Root({ children }) {
     const unRegistered = onAuthStateChanged(auth, (authUser) => {
       setUser(authUser);
       setIsAuthLoading(false);
+
+      if (authUser !== null) {
+        // User is logged in.
+        posthog.identify(authUser.uid, {
+          name: authUser.displayName,
+          email: authUser.email,
+          emailVerified: authUser.emailVerified,
+        });
+      } else {
+        // User is logged out.
+        posthog.reset();
+      }
     });
     return () => unRegistered();
   }, [auth]);
 
-  // Callback for User Logout event.
+  // Callback for User Logout click event.
   async function handleLogout() {
     try {
       await signOut(auth);

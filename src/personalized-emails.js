@@ -1,7 +1,7 @@
 import "./personalized-emails.css";
 import { addLineBreaks } from "./helper-functions";
-import { Card, Typography, Button, Select } from "antd";
-import { EditOutlined } from "@ant-design/icons";
+import { Card, Typography, Button, Select, message } from "antd";
+import { EditOutlined, CopyOutlined } from "@ant-design/icons";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
 
@@ -201,6 +201,35 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
   const [curEmailTemplate, setCurEmailTemplate] = useState(
     personalized_email.template
   );
+  const [messageApi, contextHolder] = message.useMessage();
+
+  // Handler when user copies email subject line.
+  async function handleEmailSubjectCopied() {
+    // Copy to clipboard.
+    navigator.clipboard.writeText(personalized_email.email_subject_line);
+
+    // Show message to prompt.
+    messageApi.open({
+      type: "success",
+      content: "Copied Email Subject Line",
+      duration: 3,
+    });
+  }
+
+  // Handler when user copies email body message.
+  async function handleEmailBodyCopied() {
+    // Copy to clipboard.
+    navigator.clipboard.writeText(
+      getEmailBodyText(personalized_email, curEmailTemplate)
+    );
+
+    // Show message to prompt.
+    messageApi.open({
+      type: "success",
+      content: "Copied Email Body",
+      duration: 3,
+    });
+  }
 
   // Handler for when template is updated by the user.
   function handleTemplateUpdate(newTemplate) {
@@ -219,34 +248,28 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
   }
   return (
     <Card>
+      {contextHolder}
       <div className="email-subject-container">
         <Text className="email-subject-label">Subject</Text>
         <div className="email-subject-text-container">
           <Text className="email-subject-text">
             {personalized_email.email_subject_line}
           </Text>
-          <Text
-            copyable={{
-              text: personalized_email.email_subject_line,
-              tooltips: ["Copy Subject"],
-            }}
-          ></Text>
+          <CopyOutlined onClick={handleEmailSubjectCopied} />
         </div>
       </div>
       <div className="email-body-container">
         <Text className="email-body-label">Body</Text>
         <div className="email-body-text-container">
+          <div className="email-opener-container">
+            <Text className="email-body-text">
+              {addLineBreaks(personalized_email.email_opener)}
+            </Text>
+            <CopyOutlined onClick={handleEmailBodyCopied} />
+          </div>
           <Text className="email-body-text">
-            {addLineBreaks(
-              getEmailBodyText(personalized_email, curEmailTemplate)
-            )}
+            {curEmailTemplate && addLineBreaks(curEmailTemplate.message)}
           </Text>
-          <Text
-            copyable={{
-              text: getEmailBodyText(personalized_email, curEmailTemplate),
-              tooltips: ["Copy Email Body"],
-            }}
-          ></Text>
         </div>
       </div>
       <div className="email-highlight-url-container">

@@ -34,6 +34,11 @@ import VerifyEmail from "./verify-email";
 import { loggedInLoader } from "./logged-in";
 import WelcomePage from "./welcome-page";
 import { isLocalEnv } from "./helper-functions";
+import { PostHogProvider } from "posthog-js/react";
+
+const postHogOptions = {
+  api_host: process.env.REACT_APP_PUBLIC_POSTHOG_HOST,
+};
 
 // Enables mocking only for local env, disabled in production and test.
 async function enableMocking() {
@@ -134,9 +139,14 @@ enableMocking().then(() => {
   const root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(
     <React.StrictMode>
-      <Root>
-        <AppRoutes />
-      </Root>
+      <PostHogProvider
+        apiKey={process.env.REACT_APP_PUBLIC_POSTHOG_KEY}
+        options={postHogOptions}
+      >
+        <Root>
+          <AppRoutes />
+        </Root>
+      </PostHogProvider>
     </React.StrictMode>
   );
 
