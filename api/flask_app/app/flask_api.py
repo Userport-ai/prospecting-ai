@@ -17,6 +17,7 @@ from app.utils import Utils
 from app.rate_limiter import rate_limiter, get_value
 from firebase_admin import auth
 from flask_limiter import RateLimitExceeded
+from app.metrics import Metrics
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -155,7 +156,8 @@ def get_user():
                 f"User ID: {user_id} does not exist in database, creating one for this new user.")
             db.create_new_user(user_id=user_id, email=email)
             logger.info(f"Created User with ID: {user_id} in the database.")
-            user = db.get_user(user_id=user_id, projection=get_user_state_db_projection())
+            user = db.get_user(
+                user_id=user_id, projection=get_user_state_db_projection())
 
         response = GetUserResponse(status=ResponseStatus.SUCCESS, user=user)
         logger.info(f"Got user for ID: {user_id} from database.")
@@ -934,7 +936,7 @@ def admin_migration():
 # Start of Celery Tasks
 #######################
 
-def shared_task_exception_handler(shared_task_obj, database: Database, lead_research_report_id: str, e: Exception, task_name: str, status_before_failure: LeadResearchReport.Status):
+def shared_task_exception_handler(shared_task_obj, database: Database, user_id: str, lead_research_report_id: str, e: Exception, task_name: str, status_before_failure: LeadResearchReport.Status):
     """Helper to handle the exception that occured in given shared task instance."""
     # We retry 3 times at max, so 4 times in total.
     max_retries = 3
@@ -950,6 +952,10 @@ def shared_task_exception_handler(shared_task_obj, database: Database, lead_rese
         }
         database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
                                              setFields=setFields)
+
+        # Send event.
+        Metrics().capture(user_id=user_id, event_name="report_research_failed", properties={
+            "report_id": lead_research_report_id, "status_before_failure": status_before_failure, "task_name": task_name, "error": str(e)})
         raise ValueError(
             f"Retries exhaused for request: {task_name} with report ID: {lead_research_report_id} with error: {e}")
 
@@ -971,46 +977,48 @@ def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
     report_status: LeadResearchReport.Status = None
     try:
         report: LeadResearchReport = database.get_lead_research_report(
-            lead_research_report_id=lead_research_report_id, projection={"status": 1, "status_before_failure": 1})
+            lead_research_report_id=lead_research_report_id, projection={"status": 1, "status_before_failure": 1, "user_id": 1})
         report_status: LeadResearchReport.Status = report.status if report.status != LeadResearchReport.Status.FAILED_WITH_ERRORS else report.status_before_failure
+        user_id: str = report.user_id
         logger.info(
             f"Current report status: {report_status} for report ID: {lead_research_report_id}")
         if report_status == LeadResearchReport.Status.NEW:
             logger.info(
                 f"Report just created with ID: {lead_research_report_id}, enrich lead profile next.")
             enrich_lead_info_in_background.delay(
-                lead_research_report_id=lead_research_report_id)
+                user_id=user_id, lead_research_report_id=lead_research_report_id)
         elif report_status == LeadResearchReport.Status.BASIC_PROFILE_FETCHED:
             logger.info(
                 f"Basic profile fetched for {lead_research_report_id}, fetch search results next.")
             fetch_search_results_in_background.delay(
-                lead_research_report_id=lead_research_report_id)
+                user_id=user_id, lead_research_report_id=lead_research_report_id)
         elif report_status == LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED:
             logger.info(
                 f"Fetched search results for {lead_research_report_id}, process content in search results next.")
             process_content_in_search_results_in_background.delay(
-                lead_research_report_id=lead_research_report_id)
+                user_id=user_id, lead_research_report_id=lead_research_report_id)
         elif report_status == LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE:
             logger.info(
                 f"Processed content in search results for {lead_research_report_id}, aggregate report results next.")
             aggregate_report_in_background.delay(
-                lead_research_report_id=lead_research_report_id)
+                user_id=user_id, lead_research_report_id=lead_research_report_id)
         elif report_status == LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE:
             logger.info(
                 f"Lead Report aggregation complete for {lead_research_report_id}, select email template next.")
             choose_template_and_create_emails_in_background.delay(
-                lead_research_report_id=lead_research_report_id)
+                user_id=user_id, lead_research_report_id=lead_research_report_id)
         elif report_status == LeadResearchReport.Status.COMPLETE:
             logger.info(
                 f"Lead research complete for {lead_research_report_id}, nothing more to do here.")
 
     except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
+        user_id = report.user_id if report else None
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
                                       e=e, task_name="fetch_lead_info_orchestrator", status_before_failure=report_status)
 
 
 @shared_task(bind=True, acks_late=True)
-def enrich_lead_info_in_background(self, lead_research_report_id: str):
+def enrich_lead_info_in_background(self, user_id: str, lead_research_report_id: str):
     """Enrich lead with name, company name, role titles in the given Lead Report."""
     logger.info(
         f"Creating lead profile for Lead Research report ID: {lead_research_report_id}")
@@ -1020,41 +1028,49 @@ def enrich_lead_info_in_background(self, lead_research_report_id: str):
         rp.enrich_lead_info(
             lead_research_report_id=lead_research_report_id)
         logger.info(
-            f"Enriched lead successfully in report ID: {lead_research_report_id}.")
+            f"Enriched lead successfully in report ID: {lead_research_report_id} for user ID: {user_id}.")
 
         # Fetch Search Results associated with the given leads.
         fetch_search_results_in_background.delay(
-            lead_research_report_id=lead_research_report_id)
+            user_id=user_id, lead_research_report_id=lead_research_report_id)
+
+        # Send event.
+        Metrics().capture(user_id=user_id, event_name="report_lead_info_enriched", properties={
+            "report_id": lead_research_report_id})
     except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
                                       e=e, task_name="enrich_lead_info", status_before_failure=LeadResearchReport.Status.NEW)
 
 
 @shared_task(bind=True, acks_late=True)
-def fetch_search_results_in_background(self, lead_research_report_id: str):
+def fetch_search_results_in_background(self, user_id: str, lead_research_report_id: str):
     """Fetch search results for given lead in background."""
     logger.info(
-        f"Start fetching search URLs for lead report ID: {lead_research_report_id}")
+        f"Start fetching search URLs for lead report ID: {lead_research_report_id} for user ID: {user_id}")
     database = Database()
     try:
         r = Researcher(database=database)
         r.fetch_search_results(lead_research_report_id=lead_research_report_id)
         logger.info(
-            f"Completed fetching search results for lead report ID: {lead_research_report_id}")
+            f"Completed fetching search results for lead report ID: {lead_research_report_id} for user ID: {user_id}")
 
         # Process search URLs contents next.
         process_content_in_search_results_in_background.delay(
-            lead_research_report_id=lead_research_report_id)
+            user_id=user_id, lead_research_report_id=lead_research_report_id)
+
+        # Send event.
+        Metrics().capture(user_id=user_id, event_name="report_search_results_fetched", properties={
+            "report_id": lead_research_report_id})
     except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
                                       e=e, task_name="fetch_search_results", status_before_failure=LeadResearchReport.Status.BASIC_PROFILE_FETCHED)
 
 
 @shared_task(bind=True, acks_late=True)
-def process_content_in_search_results_in_background(self, lead_research_report_id: str):
+def process_content_in_search_results_in_background(self, user_id: str, lead_research_report_id: str):
     """Processes URLs in search results in background."""
     logger.info(
-        f"Start processing search URLs to process for lead report: {lead_research_report_id}")
+        f"Start processing search URLs to process for lead report: {lead_research_report_id} for user ID: {user_id}")
     database = Database()
     try:
         research_report: LeadResearchReport = database.get_lead_research_report(
@@ -1069,7 +1085,7 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
         batch_size = int(total_urls_to_process/concurrency) + \
             (0 if total_urls_to_process % concurrency == 0 else 1)
         logger.info(
-            f"Splitting a total of {total_urls_to_process} Search URLs using {concurrency} workers which will each handle at max {batch_size} URLs for processing for lead report: {lead_research_report_id}.")
+            f"Splitting a total of {total_urls_to_process} Search URLs using {concurrency} workers which will each handle at max {batch_size} URLs for processing for lead report: {lead_research_report_id} and user ID: {user_id}.")
         batches: List[LeadResearchReport.WebSearchResults.Result] = []
         for i in range(concurrency):
             start_idx = i*batch_size
@@ -1078,24 +1094,30 @@ def process_content_in_search_results_in_background(self, lead_research_report_i
             if end_idx >= total_urls_to_process:
                 break
 
-        logger.info(f"Num batches: {len(batches)}")
-        logger.info(f"batching nums: {[len(b) for b in batches]}")
+        logger.info(
+            f"Num batches: {len(batches)} for report: {lead_research_report_id} for user ID: {user_id}")
+        logger.info(
+            f"Batching nums: {[len(b) for b in batches]} for report: {lead_research_report_id} for user ID: {user_id}")
 
         parallel_workers = [process_content_in_search_results_batch_in_background.s(
-            num, lead_research_report_id, [r.model_dump_json() for r in batch]) for num, batch in enumerate(batches)]
+            num, user_id, lead_research_report_id, [r.model_dump_json() for r in batch]) for num, batch in enumerate(batches)]
         aggregation_work = aggregate_processed_search_results_in_background.s(
-            lead_research_report_id)
+            user_id, lead_research_report_id)
+
+        # Send event.
+        Metrics().capture(user_id=user_id, event_name="report_search_results_start_processing", properties={
+            "report_id": lead_research_report_id, "total_urls": total_urls_to_process, "concurrency": concurrency, "batch_sizes": [len(b) for b in batches]})
 
         # Start processing.
         chord(parallel_workers)(aggregation_work)
 
     except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name="process_content_in_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
 @shared_task(bind=True, acks_late=True, ignore_result=False, rate_limit="5/m")
-def process_content_in_search_results_batch_in_background(self, batch_num: int, lead_research_report_id: str, search_results_batch_json: List[str]):
+def process_content_in_search_results_batch_in_background(self, batch_num: int, user_id: str, lead_research_report_id: str, search_results_batch_json: List[str]):
     """Process batch of given Search Result URLs and returns a list of URLs that failed to process."""
     search_results_batch = []
     for r_json in search_results_batch_json:
@@ -1104,25 +1126,25 @@ def process_content_in_search_results_batch_in_background(self, batch_num: int, 
         search_results_batch.append(search_result)
 
     logger.info(
-        f"Got {search_results_batch} search URLs to process for lead report: {lead_research_report_id} in batch number: {batch_num}")
+        f"Got {search_results_batch} search URLs to process for lead report: {lead_research_report_id} in batch number: {batch_num} for user ID: {user_id}")
     database = Database()
     try:
         r = Researcher(database=database)
         failed_urls: List[str] = r.process_content_in_search_urls(
             lead_research_report_id=lead_research_report_id, search_results_batch=search_results_batch, task_num=batch_num)
         logger.info(
-            f"Completed search URLs processing for lead report: {lead_research_report_id} in batch number: {batch_num}")
+            f"Completed search URLs processing for lead report: {lead_research_report_id} in batch number: {batch_num} for user ID: {user_id}")
         return failed_urls
     except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name=f"process_content_in_search_results_batch_{batch_num}", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
 @shared_task(bind=True, acks_late=True)
-def aggregate_processed_search_results_in_background(self, failed_urls_list: List[List[str]], lead_research_report_id: str):
+def aggregate_processed_search_results_in_background(self, failed_urls_list: List[List[str]], user_id: str, lead_research_report_id: str):
     """Aggregate processing of search results from each worker task that worked on a batch."""
     logger.info(
-        f"Start aggregating search results for lead report ID: {lead_research_report_id}")
+        f"Start aggregating search results for lead report ID: {lead_research_report_id} for user ID: {user_id}")
     database = Database()
     try:
         # Update status and failed URLs in database.
@@ -1135,38 +1157,46 @@ def aggregate_processed_search_results_in_background(self, failed_urls_list: Lis
             lead_research_report_id=lead_research_report_id, setFields=setFields)
 
         logger.info(
-            f"Completed aggregation of processed search results for lead report ID: {lead_research_report_id}")
+            f"Completed aggregation of processed search results for lead report ID: {lead_research_report_id} for user ID: {user_id}")
 
         # Aggregate Report next.
         aggregate_report_in_background.delay(
-            lead_research_report_id=lead_research_report_id)
+            user_id=user_id, lead_research_report_id=lead_research_report_id)
+
+        # Send event.
+        Metrics().capture(user_id=user_id, event_name="report_search_results_processed", properties={
+            "report_id": lead_research_report_id, "failed_urls": flattened_urls_list})
     except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name=f"aggregate_processed_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
 @shared_task(bind=True, acks_late=True)
-def aggregate_report_in_background(self, lead_research_report_id: str):
+def aggregate_report_in_background(self, user_id: str, lead_research_report_id: str):
     """Create a research report in background."""
     logger.info(
-        f"Start lead research report aggregation for report ID: {lead_research_report_id}")
+        f"Start lead research report aggregation for report ID: {lead_research_report_id} for user ID: {user_id}")
     database = Database()
     try:
         r = Researcher(database=database)
         r.aggregate(lead_research_report_id=lead_research_report_id)
         logger.info(
-            f"Completed aggregation of research report complete for report ID: {lead_research_report_id}")
+            f"Completed aggregation of research report complete for report ID: {lead_research_report_id} for user ID: {user_id}")
 
         # Select email outreach template next.
         choose_template_and_create_emails_in_background.delay(
-            lead_research_report_id=lead_research_report_id)
+            user_id=user_id, lead_research_report_id=lead_research_report_id)
+
+        # Send event.
+        Metrics().capture(user_id=user_id, event_name="report_details_created", properties={
+            "report_id": lead_research_report_id})
     except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id,
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
                                       e=e, task_name="aggregate_report", status_before_failure=LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE)
 
 
 @shared_task(bind=True, acks_late=True)
-def choose_template_and_create_emails_in_background(self, lead_research_report_id: str):
+def choose_template_and_create_emails_in_background(self, user_id: str, lead_research_report_id: str):
     """Selects outreach template and creates personalized emails in background."""
     logger.info(
         f"Start template selection and email creation for report ID: {lead_research_report_id}")
@@ -1177,6 +1207,10 @@ def choose_template_and_create_emails_in_background(self, lead_research_report_i
             lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Completed outreach template Selection and Email creation complete in background for report ID: {lead_research_report_id}")
+
+        # Send event.
+        Metrics().capture(user_id=user_id, event_name="report_personalized_emails_created", properties={
+            "report_id": lead_research_report_id})
     except Exception as e:
-        shared_task_exception_handler(shared_task_obj=self, database=database, lead_research_report_id=lead_research_report_id, e=e,
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name="choose_template_and_create_emails", status_before_failure=LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE)
