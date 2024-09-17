@@ -34,7 +34,8 @@ class User(BaseModel):
 
     id: Optional[str] = Field(
         alias="_id", default=None, description="Auth system generated unique identifier for authenticated user.")
-    email: Optional[str] = Field(default=None, description="Email address of the user.")
+    email: Optional[str] = Field(
+        default=None, description="Email address of the user.")
     creation_date: Optional[datetime] = Field(
         default=None, description="Date in UTC timezone when this user document was inserted in the database.")
     last_updated_date: Optional[datetime] = Field(
@@ -141,6 +142,10 @@ class ContentCategoryEnum(str, Enum):
     COMPANY_INTERNAL_EVENT = "company_internal_event"
     COMPANY_OFFSITE = "company_offsite"
     NONE_OF_THE_ABOVE = "none_of_the_above"
+
+    def is_personal_content(self) -> bool:
+        """Returns true if the category enum is a personal category or not."""
+        return self.value.startswith("personal")
 
 
 def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str:

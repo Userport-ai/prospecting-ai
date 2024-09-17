@@ -404,7 +404,7 @@ class WebPageScraper:
                     key_persons=final_summary.key_persons,
                     key_organizations=final_summary.key_organizations,
                     requesting_user_contact=None,
-                    focus_on_company=related_to_company,
+                    focus_on_company=False,
                     category=None,
                     category_reason=None,
                     num_linkedin_reactions=None,
@@ -427,6 +427,10 @@ class WebPageScraper:
             logger.info(
                 f"Content Category cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
             cur_cost_in_usd = cb.total_cost
+
+            if category.enum_value == None:
+                logger.error(
+                    f"Content Category is None with reason: {category.reason} for URL: {self.url}")
 
             requesting_user_contact: bool = self.is_page_requesting_user_contact(
                 page_structure=page_structure)
@@ -558,6 +562,10 @@ class WebPageScraper:
             logger.info(
                 f"LinkedIn Post Content Category cost: {cb.total_cost - cur_cost_in_usd} for URL: {self.url}")
             cur_cost_in_usd = cb.total_cost
+
+            if category.enum_value == None:
+                logger.error(
+                    f"LinkedIn post Content Category is None with reason: {category.reason} for URL: {self.url}")
 
             tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
@@ -934,11 +942,33 @@ class WebPageScraper:
             f"* Company offsite for {company_name} employees. [Enum value: {ContentCategoryEnum.COMPANY_OFFSITE.value}]\n"
             f"* None of the above categories. [Enum value: {ContentCategoryEnum.NONE_OF_THE_ABOVE.value}]\n"
         )
-        result = chain.invoke(
+        result: Optional[ContentCategory] = chain.invoke(
             {"question": question, "context": detailed_summary})
 
+        if not result:
+            # LLM returned None.
+            logger.error(
+                f"Content category was None by LLM for URL: {self.url}")
+            result = ContentCategory(
+                enum_value=None, reason="Content category returned was None by LLM.")
+
+        if result.enum_value == None:
+            # No category matched.
+            logger.error(
+                f"No content category matched with result: {result} for URL: {self.url}")
+            return result
+
+        if result.enum_value.is_personal_content():
+            # LLM has categorized content as personal. Ensure that this is indeed content mentioning the lead.
+            person_mentioned, answer_reason = self.is_person_mentioned_in_text(
+                person_name=person_name, detailed_summary=detailed_summary)
+            if not person_mentioned:
+                logger.warning(
+                    f"For personal category: {result.enum_value}, person: {person_name} is not mentioned in the content with reason: {answer_reason} for URL: {self.url}")
+                return ContentCategory(enum_value=None, reason=f"Initially Got personal category: {result.enum_value} but lead not mentioned in the content with reason: {answer_reason}")
+
         logger.info(
-            f"Content Category result for URL: {self.url} is: {result}")
+            f"Content Category found successfully with result for URL: {self.url} is: {result}")
         return result
 
     def parse_llm_output(self, text: str) -> ContentAuthorAndPublishDate:
@@ -1045,27 +1075,30 @@ class WebPageScraper:
             f"Is Page related to company for URL: {self.url} is: {result}")
         return result.about_company
 
-    def is_page_focused_on_person(self, person_name: str, detailed_summary: str) -> bool:
-        """[DEPRECATED] Returns whether the page's summary is focused about person."""
-
+    def is_person_mentioned_in_text(self, person_name: str, detailed_summary: str) -> tuple[bool, str]:
+        """Returns whether the page's summary is focused about person along with reason."""
         prompt_template = (
-            f"Is the main focus of the text below the Person {person_name}?\n"
+            f"Is {person_name} mentioned in the text below?\n"
             "Text:\n"
             "{page_text}"
         )
 
-        class FocusOnPerson(BaseModel):
-            person_main_focus: bool = Field(
-                ..., description="Set to true if content's main focus is the Person and false otherwise.")
+        class PersonMentionedInText(BaseModel):
+            person_mentioned: bool = Field(
+                ..., description="Set to true if the given person is mentioned in the text and false otherwise.")
+            reason: Optional[str] = Field(
+                default=None, description="Reason for whether the person is mentioned or not.")
 
-         # We want to use latest GPT model because it is likely more accurate than older ones like 3.5 Turbo.
+         # Using light model for now since it seems like an easy reasoning task.
         llm = ChatOpenAI(
-            temperature=0, model_name=self.OPENAI_GPT_4O_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(FocusOnPerson)
+            temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(PersonMentionedInText)
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
-        result: FocusOnPerson = chain.invoke(
+        result: PersonMentionedInText = chain.invoke(
             {"page_text": detailed_summary})
-        return result.person_main_focus
+        logger.info(
+            f"Is Person mentioned in the text result: {result} for URL: {self.url}")
+        return (result.person_mentioned, result.reason)
 
     def fetch_page(self) -> Document:
         """Fetches HTML page and returns it as a Langchain Document with Markdown text content."""
@@ -1603,12 +1636,17 @@ if __name__ == "__main__":
     # url = "https://audiencereports.in/bhavish-aggarwal-pioneering/"
 
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
-    url = "https://www.lithic.com/blog/talking-plaids-technological-choices-and-the-rise-of-american-open-finance-with-zach-perret"
+    # url = "https://www.lithic.com/blog/talking-plaids-technological-choices-and-the-rise-of-american-open-finance-with-zach-perret"
+    url = "https://www.linkedin.com/posts/chibuzoroluo_just-wrapped-up-my-first-quarter-here-at-activity-7180727182195896321-t7gC"
 
     person_name = "Zachary Perret"
+    # person_name = "Ananth Kumaraswamy"
+    # person_name = "Aakarshan Chawla"
     # person_name = "Jean-Denis Graze"
     # person_name = "Al Cook"
     company_name = "Plaid"
+    # company_name = "Rippling"
+    # company_name = "Rubrik"
     # person_name = "Anuj Kapur"
     # person_name = "Raj Sarkar"
     # company_name = "Cloudbees"
