@@ -867,28 +867,21 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
     then we will only delete the report.
     If there are no other such reports, then we will delete all content details that have given
     company profile and their associated web pages and linkedin posts as well. Finally we will delete the report.
+
+    WARNING: DO NOT USE IN PRODUCTION. This method has bugs and should be rewritten before it is used properly
+    in production.
     """
     database = Database()
     report = database.get_lead_research_report(
-        lead_research_report_id=lead_research_report_id, projection={"company_profile_id": 1, "user_id": 1})
+        lead_research_report_id=lead_research_report_id, projection={"company_profile_id": 1})
     company_profile_id: str = report.company_profile_id
-    user_id: str = report.user_id
-    # TODO: Bug in this filter. It doesn't return the correct reports.
-    reports: List[LeadResearchReport] = database.list_lead_research_reports(
-        filter={"company_profile_id": company_profile_id, "user_id": {"$ne": user_id}}, projection={"_id": 1})
-    if len(reports) > 0:
-        logger.info(
-            f"Found other reports: {[report.id for report in reports]} for given company profile ID: {company_profile_id} for request with report ID: {lead_research_report_id}.")
-        if confirm_deletion == "confirm_deletion":
-            # Delete lead report ID and exit.
-            database.delete_one_object_id(collection=database.get_lead_research_report_collection(
-            ), id_to_delete=lead_research_report_id)
-            logger.info(
-                f"Deletion complete. Stats deleted 1 lead report with ID: {lead_research_report_id}")
-        return Response("done\n")
-
+    # TODO: We probably want to delete only those Content Details (or highlights) in current report that are orphaned
+    # i.e. do not show up as highlights in any of the research report highlights across the database. For a given report,
+    # get all highlight IDs and then write an aggregation pipeline to fetch all reports (other than the one being deleted) that have
+    # any of the given highlight IDs. If there are other reports that reference the hightlights, we won't delete
+    # those content details.
     logger.info(
-        f"No other reports found for company profile ID: {company_profile_id} for given report ID: {lead_research_report_id}, will delete all associated artifacts.")
+        f"Will delete all associated artifacts with company profile ID: {company_profile_id} across all reports.")
     content_details_list: List[ContentDetails] = database.list_content_details(
         filter={"company_profile_id": company_profile_id}, projection={"linkedin_post_ref_id": 1, "web_page_ref_id": 1})
 
@@ -1179,7 +1172,7 @@ def aggregate_report_in_background(self, user_id: str, lead_research_report_id: 
     database = Database()
     try:
         r = Researcher(database=database)
-        r.aggregate(lead_research_report_id=lead_research_report_id)
+        r.aggregate_v2(lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Completed aggregation of research report complete for report ID: {lead_research_report_id} for user ID: {user_id}")
 

@@ -127,7 +127,11 @@ class ContentCategoryEnum(str, Enum):
     FUNDING_ANNOUNCEMENT = "funding_announcement"
     IPO_ANNOUNCEMENT = "ipo_announcement"
     COMPANY_RECOGNITION = "company_recognition"
+    COMPANY_ACQUISITION = "company_acquisition"
+    COMPANY_ACQUIRED = "company_acquired"
     COMPANY_ANNIVERSARY = "company_anniversary"
+    COMPANY_COMPETITION = "company_competition"
+    COMPANY_CUSTOMERS = "company_customers"
     COMPANY_EVENT_HOSTED_ATTENDED = "company_event_hosted_attended"
     COMPANY_WEBINAR = "company_webinar"
     COMPANY_LAYOFFS = "company_layoffs"
@@ -146,6 +150,18 @@ class ContentCategoryEnum(str, Enum):
     def is_personal_content(self) -> bool:
         """Returns true if the category enum is a personal category or not."""
         return self.value.startswith("personal")
+
+    @staticmethod
+    def get_personal_content_categories() -> List["ContentCategoryEnum"]:
+        """Returns all personal content categories in this enum. Please update if new enums are introduced."""
+        return [ContentCategoryEnum.PERSONAL_THOUGHTS,
+                ContentCategoryEnum.PERSONAL_ADVICE,
+                ContentCategoryEnum.PERSONAL_ANECDOTE,
+                ContentCategoryEnum.PERSONAL_PROMOTION,
+                ContentCategoryEnum.PERSONAL_RECOGITION,
+                ContentCategoryEnum.PERSONAL_JOB_CHANGE,
+                ContentCategoryEnum.PERSONAL_EVENT_ATTENDED,
+                ContentCategoryEnum.PERSONAL_TALK_AT_EVENT]
 
 
 def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str:
@@ -198,8 +214,16 @@ def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str
         return "IPO Announcement"
     elif category == ContentCategoryEnum.COMPANY_RECOGNITION:
         return "Company Recognition"
+    elif category == ContentCategoryEnum.COMPANY_ACQUISITION:
+        return "Company Acquisition"
+    elif category == ContentCategoryEnum.COMPANY_ACQUIRED:
+        return "Company Acquired"
     elif category == ContentCategoryEnum.COMPANY_ANNIVERSARY:
         return "Company Anniversary"
+    elif category == ContentCategoryEnum.COMPANY_COMPETITION:
+        return "Company Competition"
+    elif category == ContentCategoryEnum.COMPANY_CUSTOMERS:
+        return "Company Customers"
     elif category == ContentCategoryEnum.COMPANY_EVENT_HOSTED_ATTENDED:
         return "Company Events or Conferences"
     elif category == ContentCategoryEnum.COMPANY_WEBINAR:
@@ -246,6 +270,7 @@ class ContentDetails(BaseModel):
     """
     class ProcessingStatus(str, Enum):
         FAILED_MISSING_PUBLISH_DATE = "failed_missing_publish_date"
+        FAILED_STALE_PUBLISH_DATE = "failed_stale_publish_date"
         FAILED_UNRELATED_TO_COMPANY = "failed_unrelated_to_company"
         COMPLETE = "complete"
 
@@ -256,7 +281,7 @@ class ContentDetails(BaseModel):
     url: Optional[str] = Field(
         default=None, description="URL of the content if any.")
 
-    # Metadata associated with the content.
+    # Metadata associated with the content request.
     search_engine_query: Optional[str] = Field(
         default=None, description="Search engine query that resulted in this URL.")
     person_name: Optional[str] = Field(

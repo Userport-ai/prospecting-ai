@@ -339,6 +339,7 @@ class WebPageScraper:
             publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=12)
             if publish_date == None or publish_date < publish_cutoff_date:
                 # Exit early.
+                processing_status = ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE if publish_date == None else ContentDetails.ProcessingStatus.FAILED_STALE_PUBLISH_DATE
                 logger.info(
                     f"Publish date is stale or Unknown with value: {publish_date} for URL: {self.url}, skipping remaining computation.")
                 tokens_used = OpenAIUsage(url=self.url, operation_tag=WebPageScraper.OPERATION_TAG_NAME, prompt_tokens=cb.prompt_tokens,
@@ -348,7 +349,7 @@ class WebPageScraper:
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
-                    processing_status=ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE,
+                    processing_status=processing_status,
                     linkedin_post_details=None,
                     type=None,
                     type_reason=None,
@@ -482,6 +483,7 @@ class WebPageScraper:
             # We add 3 months extra because it might be someone's work anniversary which we can still celebrate 1 year and 3 months later.
             publish_cutoff_date = Utils.create_utc_time_now() - relativedelta(months=15)
             if post_details.publish_date == None or post_details.publish_date < publish_cutoff_date:
+                processing_status = ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE if post_details.publish_date == None else ContentDetails.ProcessingStatus.FAILED_STALE_PUBLISH_DATE
                 # Exit early.
                 logger.info(
                     f"LinkedIn Post publish date is too stale or unknown with value: {post_details.publish_date} for URL: {self.url}: {company_name}, skipping remaining computation.")
@@ -492,7 +494,7 @@ class WebPageScraper:
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
-                    processing_status=ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE,
+                    processing_status=processing_status,
                     linkedin_post_details=post_details,
                     type=ContentTypeEnum.LINKEDIN_POST,
                     type_reason=None,
@@ -754,9 +756,10 @@ class WebPageScraper:
     def fetch_publish_date_from_snippet(self) -> Optional[datetime]:
         """Fetches publish date from Page Snippet if it exists and returns it as a datetime object. Returns None if date is not found.
 
-        This only applies to Snippets that have one of the following formats returned by Google Custom Search API:
+        This only applies to Snippets that have one of the following formats returned by Google Custom Search API or the unofficial Search API:
         [1] 'Jun 24, 2024 ... ... swiggy s fy24 revenue up 24 quick commerce unit economics improve prosus · Swiggy launches new initiative to tackle staffing challenges in restaurants.'
         [2] '3 days ago ... Swiggy stated that the Incognito Mode is also ideal for discreet purchases, such as personal wellness products on Swiggy Instamart, as this feature ensures that ...'
+        [3] '28 May 2024 — Rippling's new integration with bswift simplifies HR and benefits management, enhancing onboarding, data sync, user experience, and more.'
 
         If the snippet is not of the following format, None is returned immediately.
         """
@@ -765,13 +768,18 @@ class WebPageScraper:
                 f"Cannot get publish date since Page Snippet not found for URL: {self.url} and page title: {self.page_title}, fetch from page body instead.")
             return None
 
+        # Try (...) format.
         snippet_pattern = r'(.*?)(\s\.\.\.\s)'
         import re
         match_result = re.match(snippet_pattern, self.page_snippet)
         if not match_result:
-            logger.info(
-                f"Snippet does not have publish date per expected format in URL: {self.url} with snippet text: {self.page_snippet}")
-            return None
+            # Try one more time with em dash format ( — ).
+            snippet_pattern = r'(.*?)(\s—\s)'
+            match_result = re.match(snippet_pattern, self.page_snippet)
+            if not match_result:
+                logger.info(
+                    f"Snippet does not have publish date per expected formats in URL: {self.url} with snippet text: {self.page_snippet}")
+                return None
 
         date_str: str = match_result[1]
         # Check if date format is of type: 3 days ago, 1 day ago, 2 months ago etc.
@@ -926,7 +934,11 @@ class WebPageScraper:
             f"* Funding announcement by {company_name}. [Enum value: {ContentCategoryEnum.FUNDING_ANNOUNCEMENT.value}]\n"
             f"* IPO announcement by {company_name}. [Enum value: {ContentCategoryEnum.IPO_ANNOUNCEMENT.value}]\n"
             f"* Recognition or award received by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_RECOGNITION.value}]\n"
-            f"* {company_name}'s anniversary announcement. [Enum value: [Enum value: {ContentCategoryEnum.COMPANY_ANNIVERSARY.value}]\n"
+            f"* Company acquisition by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_ACQUISITION.value}]\n"
+            f"* {company_name} has been acquired by another company. [Enum value: {ContentCategoryEnum.COMPANY_ACQUIRED.value}]\n"
+            f"* {company_name}'s anniversary announcement. [Enum value: {ContentCategoryEnum.COMPANY_ANNIVERSARY.value}]\n"
+            f"* Content relating to {company_name}'s competition. [Enum value: {ContentCategoryEnum.COMPANY_COMPETITION.value}]\n"
+            f"* Content relating to {company_name}'s customers. [Enum value: {ContentCategoryEnum.COMPANY_CUSTOMERS.value}]\n"
             f"* An event, conference or trade show hosted or attended by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_EVENT_HOSTED_ATTENDED.value}]\n"
             f"* A webinar hosted by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_WEBINAR.value}]\n"
             f"* Layoffs announced by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_LAYOFFS.value}]\n"
@@ -1637,15 +1649,19 @@ if __name__ == "__main__":
 
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # url = "https://www.lithic.com/blog/talking-plaids-technological-choices-and-the-rise-of-american-open-finance-with-zach-perret"
-    url = "https://www.linkedin.com/posts/chibuzoroluo_just-wrapped-up-my-first-quarter-here-at-activity-7180727182195896321-t7gC"
+    # url = "https://www.linkedin.com/posts/chibuzoroluo_just-wrapped-up-my-first-quarter-here-at-activity-7180727182195896321-t7gC"
+    # url = "https://www.linkedin.com/posts/aathira-menon-737431166_thrilled-to-share-that-ive-been-promoted-activity-7212746994350530560-4UzI"
+    url = "https://wise.com/us/business/rippling-alternatives"
 
-    person_name = "Zachary Perret"
+    # person_name = "Zachary Perret"
+    person_name = "Aathira Menon"
     # person_name = "Ananth Kumaraswamy"
     # person_name = "Aakarshan Chawla"
     # person_name = "Jean-Denis Graze"
     # person_name = "Al Cook"
-    company_name = "Plaid"
-    # company_name = "Rippling"
+    # company_name = "SpotDraft"
+    # company_name = "Plaid"
+    company_name = "Rippling"
     # company_name = "Rubrik"
     # person_name = "Anuj Kapur"
     # person_name = "Raj Sarkar"
@@ -1666,5 +1682,8 @@ if __name__ == "__main__":
     #     f.write(json.dumps(content_info.dict(), indent=4))
 
     # snippet = "3 days ago ... Swiggy stated that the Incognito Mode is also ideal for discreet purchases, such as personal wellness products on Swiggy Instamart, as this feature ensures that ..."
+    # snippet = "5 Dec 2023 ... Swiggy stated that the Incognito Mode is also ideal for discreet purchases, such as personal wellness products on Swiggy Instamart, as this feature ensures that ..."
+    # snippet = "26 Jun 2024 — Finch's partnership with Rippling will allow approved developers using Finch to read organization data from Rippling and be featured in ..."
+    # snippet = "The best Rippling alternatives are Paychex Flex, isolved, and Dayforce. Find top-ranking free & paid apps similar to Rippling for your Core HR Software ..."
     # graph = WebPageScraper(url="", title=None, snippet=snippet)
     # graph.fetch_publish_date_from_snippet()

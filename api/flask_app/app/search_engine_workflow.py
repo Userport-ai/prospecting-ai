@@ -161,6 +161,8 @@ class SearchEngineWorkflow:
         ]
         for page_num in range(num_pages):
             start = page_num*page_size + 1
+            num_rem_results = num_results - page_num*page_size
+            num_results_in_page = page_size if num_rem_results >= page_size else num_rem_results
             params = {
                 "key": os.environ["GOOGLE_CUSTOM_SEARCH_API_KEY"],
                 "cx": os.environ["GOOGLE_PROGRAMMABLE_SEARCH_ENGINE_ID"],
@@ -171,7 +173,7 @@ class SearchEngineWorkflow:
                 # Offset for paginated query. Starts at 1.
                 "start": start,
                 # Min value: 1, Max value: 10.
-                "num": page_size,
+                "num": num_results_in_page,
                 "filter": "1",
                 "safe": "active",
             }
@@ -301,30 +303,38 @@ if __name__ == "__main__":
         existing_urls = json.loads(f.read())
 
     search_request = SearchRequest(
-        person_name="Harsha",
-        company_name="Swiggy",
-        person_role_title="Cofounder/CEO",
+        person_name="Yash Dodia",
+        company_name="Airbase",
+        person_role_title="Sales Leader",
         existing_urls=[],
         query_configs=[
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+            #     suffix_query="product launches",
+            #     num_results_per_method=17,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+            # ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="product launches",
-                num_results_per_method=20,
+                suffix_query="Company recent achievements",
+                num_results_per_method=10,
                 methods=[
-                    SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+                    SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+                ]
             ),
             # SearchRequest.QueryConfig(
             #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #         suffix_query="funding announcements",
-            #         num_results=20,
+            #         num_results=10,
             # ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                methods=[
-                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                suffix_query="recent LinkedIn posts",
-                num_results_per_method=20,
-            ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            #     suffix_query="recent LinkedIn posts",
+            #     num_results_per_method=13,
+            # ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="pain points or challenges",
@@ -362,5 +372,5 @@ if __name__ == "__main__":
         ],
     )
     results = wf.get_search_results(search_request=search_request)
-    with open("example_linkedin_info/google_custom_search_results/se_test_1.json", "w") as f:
+    with open("example_linkedin_info/search_engine_results/se_1.json", "w") as f:
         f.write(results.model_dump_json(indent=4))
