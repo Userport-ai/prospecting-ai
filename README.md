@@ -59,6 +59,8 @@ Create Flower Web app to monitor Celery: `celery -A app.make_celery flower --con
 
 Gunicorn server: `gunicorn -b localhost:5000 -c "./app/gunicorn.conf.py" "app:create_app()"`
 
+Check out dependency tree in Pip by running: `pipdeptree > pip-dep-tree.txt`
+
 ## Docker Commands
 
 We want to specify platform as linux/amd64 since we are usually building these images on Mac M1s which by default select linux/arm64 as the target platform and this causes Deployment on Cloud to fail.
