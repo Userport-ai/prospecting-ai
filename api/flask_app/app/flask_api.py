@@ -6,6 +6,7 @@ from itertools import chain
 from enum import Enum
 from typing import Optional, List
 from celery import shared_task, chord
+from celery.exceptions import SoftTimeLimitExceeded
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
@@ -929,8 +930,32 @@ def admin_migration():
 # Start of Celery Tasks
 #######################
 
+def _update_status_as_failed(database: Database, user_id: str, lead_research_report_id: str, e: Exception, event_name: str, task_name: str, status_before_failure: LeadResearchReport.Status):
+    """Helper to clean up report state upon task failure."""
+
+    # Update status as failed and register last status.
+    setFields = {
+        "status": LeadResearchReport.Status.FAILED_WITH_ERRORS,
+        "status_before_failure": status_before_failure,
+    }
+    database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
+                                         setFields=setFields)
+
+    # Send event.
+    Metrics().capture(user_id=user_id, event_name=event_name, properties={
+        "report_id": lead_research_report_id, "status_before_failure": status_before_failure, "task_name": task_name, "error": str(e)})
+
+
 def shared_task_exception_handler(shared_task_obj, database: Database, user_id: str, lead_research_report_id: str, e: Exception, task_name: str, status_before_failure: LeadResearchReport.Status):
     """Helper to handle the exception that occured in given shared task instance."""
+    if isinstance(e, SoftTimeLimitExceeded):
+        logger.exception(
+            f"SoftTimeLimit Exception in Task: {task_name} with report ID: {lead_research_report_id} for user ID: {user_id} with status_before_failure: {status_before_failure} for  with error: {e}")
+
+        _update_status_as_failed(database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
+                                 e=e, event_name="celery_task_soft_time_limit_exceeded", task_name=task_name, status_before_failure=status_before_failure)
+        return
+
     # We retry 3 times at max, so 4 times in total.
     max_retries = 3
 
@@ -938,17 +963,11 @@ def shared_task_exception_handler(shared_task_obj, database: Database, user_id: 
         # Done with retries, go to the next step.
         logger.exception(
             f"Retries exhausted for request: {task_name} with report ID: {lead_research_report_id} with error: {e}")
-        # Done with retries, update status as failed and register last status.
-        setFields = {
-            "status": LeadResearchReport.Status.FAILED_WITH_ERRORS,
-            "status_before_failure": status_before_failure,
-        }
-        database.update_lead_research_report(lead_research_report_id=lead_research_report_id,
-                                             setFields=setFields)
 
-        # Send event.
-        Metrics().capture(user_id=user_id, event_name="report_research_failed", properties={
-            "report_id": lead_research_report_id, "status_before_failure": status_before_failure, "task_name": task_name, "error": str(e)})
+        # Done with retries, update status as failed and register last status.
+        _update_status_as_failed(database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
+                                 e=e, event_name="report_research_failed", task_name=task_name, status_before_failure=status_before_failure)
+
         raise ValueError(
             f"Retries exhaused for request: {task_name} with report ID: {lead_research_report_id} with error: {e}")
 

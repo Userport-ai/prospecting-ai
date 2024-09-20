@@ -23,7 +23,7 @@ from app.linkedin_scraper import LinkedInScraper, LinkedInPostDetails
 logger = logging.getLogger()
 
 
-class PageTooLargeException(BaseModel):
+class PageTooLargeException(Exception):
     pass
 
 
@@ -255,11 +255,11 @@ class WebPageScraper:
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 5
         # Max content size of HTTP response of fetching web page. It is a heuristic
-        # that was determined an existing web page (plaid legal). Without this, super
+        # that was determined by looking at web pages we saw during research. Without this, super
         # large pages processing takes more than 100% CPU in prod and is stuck.
-        self.HTTP_RESPONSE_MAX_RESPONSE_SIZE_BYTES = 150000
+        self.HTTP_RESPONSE_MAX_RESPONSE_SIZE_BYTES = 1000000
 
-        # Maximum number of chunks allowed in a page of chunk size 4096.
+        # Maximum number of chunks allowed in a page body of chunk size 4096.
         self.PAGE_MAX_CHUNKS = 15
 
         self.dev_mode = dev_mode
@@ -1173,7 +1173,7 @@ class WebPageScraper:
         chunks = text_splitter.split_documents([doc])
         if len(chunks) >= self.PAGE_MAX_CHUNKS:
             raise PageTooLargeException(
-                f"Page is too large with: {len(chunks)} chunks, expected max chunks: {self.PAGE_MAX_CHUNKS} for url: {self.url}")
+                f"Too many chunks in page, got: {len(chunks)} chunks, expected max chunks: {self.PAGE_MAX_CHUNKS} for url: {self.url}")
 
         logger.info(
             f"Created: {len(chunks)} chunks when splitting URL: {self.url} using chunk size: {self.chunk_size}")
@@ -1664,9 +1664,9 @@ if __name__ == "__main__":
     url = "https://wise.com/us/business/rippling-alternatives"
 
     # CRAAAAZY LARGE PAGES.
-    url = "https://plaid.com/legal/"
+    # url = "https://plaid.com/legal/"
     # This page is 25 times the page size above.
-    # url = "https://gist.github.com/wchargin/8927565"
+    url = "https://gist.github.com/wchargin/8927565"
 
     # person_name = "Zachary Perret"
     person_name = "Aathira Menon"

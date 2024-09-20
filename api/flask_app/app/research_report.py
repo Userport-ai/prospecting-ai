@@ -252,7 +252,7 @@ class Researcher:
                     f"Completed processing for search URL: {url} in task num: {task_num}")
             except PageTooLargeException as e:
                 logger.warning(
-                    f"Page too large for search URL: {url} in task num: {task_num}")
+                    f"Page too large exception for search URL: {url} in task num: {task_num} with error: {e}")
                 page_too_large_urls.add(url)
             except Exception as e:
                 logger.warning(
