@@ -1,12 +1,12 @@
 import logging
-from typing import Optional, List
+from typing import Optional, List, Set
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from app.utils import Utils
 from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
 from app.search_engine_workflow import SearchEngineWorkflow, SearchRequest
-from app.web_page_scraper import WebPageScraper, PageContentInfo
+from app.web_page_scraper import WebPageScraper, PageContentInfo, PageTooLargeException
 from app.outreach_template import OutreachTemplateMatcher
 from app.personalization import Personalization
 from app.models import (
@@ -240,6 +240,7 @@ class Researcher:
 
         content_parsing_failed_results: List[LeadResearchReport.WebSearchResults.Result] = [
         ]
+        page_too_large_urls: Set[str] = set()
         for search_result in search_results_batch:
             url: str = search_result.url
             try:
@@ -249,14 +250,18 @@ class Researcher:
                     search_result=search_result, research_report=research_report)
                 logger.info(
                     f"Completed processing for search URL: {url} in task num: {task_num}")
+            except PageTooLargeException as e:
+                logger.warning(
+                    f"Page too large for search URL: {url} in task num: {task_num}")
+                page_too_large_urls.add(url)
             except Exception as e:
                 logger.warning(
                     f"Failed to process content from search URL: {url} with error: {e}")
                 content_parsing_failed_results.append(search_result)
 
         if len(content_parsing_failed_results) == 0:
-            # Nothing to do.
-            return []
+            # Nothing to do return all large URLs as well.
+            return [] + list(page_too_large_urls)
 
         logger.info(
             f"Trying {len(content_parsing_failed_results)} failed URLs now for task num: {task_num}.")
@@ -277,7 +282,8 @@ class Researcher:
                     f"During retry: failed to process content from search URL: {failed_url} with error: {e}")
                 final_failed_urls.append(failed_url)
 
-        return final_failed_urls
+        # Return large URLs in addition to failed URLs.
+        return final_failed_urls + list(page_too_large_urls)
 
     def process_content(self, search_result: LeadResearchReport.WebSearchResults.Result, research_report: LeadResearchReport):
         """Fetch content from given URL, process it and store it in the database."""

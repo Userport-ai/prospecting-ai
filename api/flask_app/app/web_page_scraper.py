@@ -23,6 +23,10 @@ from app.linkedin_scraper import LinkedInScraper, LinkedInPostDetails
 logger = logging.getLogger()
 
 
+class PageTooLargeException(BaseModel):
+    pass
+
+
 class OpenAIUsage(BaseModel):
     """Token usage when calling workflows using Open AI models."""
     url: str = Field(...,
@@ -250,8 +254,12 @@ class WebPageScraper:
 
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 5
+        # Max content size of HTTP response of fetching web page. It is a heuristic
+        # that was determined an existing web page (plaid legal). Without this, super
+        # large pages processing takes more than 100% CPU in prod and is stuck.
+        self.HTTP_RESPONSE_MAX_RESPONSE_SIZE_BYTES = 150000
 
-        # Maximum number of chunks allowed in a page of size 4096.
+        # Maximum number of chunks allowed in a page of chunk size 4096.
         self.PAGE_MAX_CHUNKS = 15
 
         self.dev_mode = dev_mode
@@ -1135,6 +1143,11 @@ class WebPageScraper:
 
         logger.info(f"HTTP page fetch success for URL: {self.url}")
 
+        response_size_bytes = len(response.content)
+        if response_size_bytes > self.HTTP_RESPONSE_MAX_RESPONSE_SIZE_BYTES:
+            raise PageTooLargeException(
+                f"Page is too large with response size: {response_size_bytes}, expected max size: {self.HTTP_RESPONSE_MAX_RESPONSE_SIZE_BYTES} for URL: {self.url}")
+
         # Heading style argument is passed in to ensure we get '#' formatted headings.
         md = markdownify(response.text, heading_style="ATX")
 
@@ -1159,8 +1172,8 @@ class WebPageScraper:
         )
         chunks = text_splitter.split_documents([doc])
         if len(chunks) >= self.PAGE_MAX_CHUNKS:
-            raise ValueError(
-                f"Page is too large with: {len(chunks)} chunks for url: {self.url}")
+            raise PageTooLargeException(
+                f"Page is too large with: {len(chunks)} chunks, expected max chunks: {self.PAGE_MAX_CHUNKS} for url: {self.url}")
 
         logger.info(
             f"Created: {len(chunks)} chunks when splitting URL: {self.url} using chunk size: {self.chunk_size}")
@@ -1641,17 +1654,19 @@ if __name__ == "__main__":
     # url = "https://plaid.com/customer-stories/capital-on-tap/"
     # url = "https://www.reddit.com/r/teslamotors/comments/18wt1kq/new_porsche_taycan_crushes_tesla_model_s_plaids/"
     # url = "https://plaid.com/customer-stories/coinbase/"
-    # REALLY LARGE PAGE.
-    # url = "https://plaid.com/legal/"
     # url = "https://www.livemint.com/market/ipo/ola-ipo-bumpy-road-or-a-smooth-ride-ahead-for-investors-11703304354128.html"
     # url = "https://indianexpress.com/article/trending/trending-in-india/ola-bhavish-aggarwal-gender-pronouns-viral-post-9310997/"
     # url = "https://audiencereports.in/bhavish-aggarwal-pioneering/"
-
     # url = "https://a16z.com/podcast/my-first-16-creating-a-supportive-builder-community-with-plaids-zach-perret/"
     # url = "https://www.lithic.com/blog/talking-plaids-technological-choices-and-the-rise-of-american-open-finance-with-zach-perret"
     # url = "https://www.linkedin.com/posts/chibuzoroluo_just-wrapped-up-my-first-quarter-here-at-activity-7180727182195896321-t7gC"
     # url = "https://www.linkedin.com/posts/aathira-menon-737431166_thrilled-to-share-that-ive-been-promoted-activity-7212746994350530560-4UzI"
     url = "https://wise.com/us/business/rippling-alternatives"
+
+    # CRAAAAZY LARGE PAGES.
+    url = "https://plaid.com/legal/"
+    # This page is 25 times the page size above.
+    # url = "https://gist.github.com/wchargin/8927565"
 
     # person_name = "Zachary Perret"
     person_name = "Aathira Menon"
@@ -1676,8 +1691,9 @@ if __name__ == "__main__":
     graph = WebPageScraper(url=url, title=None,
                            snippet=snippet, dev_mode=False)
     doc = graph.fetch_page()
-    content_info: PageContentInfo = graph.fetch_page_content_info(
-        doc=doc, company_name=company_name, person_name=person_name)
+    graph.split_into_chunks(doc=doc)
+    # content_info: PageContentInfo = graph.fetch_page_content_info(
+    #     doc=doc, company_name=company_name, person_name=person_name)
     # with open("example_linkedin_info/parsed_page_info.json", "w") as f:
     #     f.write(json.dumps(content_info.dict(), indent=4))
 
