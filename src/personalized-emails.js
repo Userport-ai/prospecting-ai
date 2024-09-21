@@ -457,11 +457,22 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
     setEmailOpener(newEmailOpener);
   }
 
+  // Helper method to get email body text from personalized email and report.
+  function getEmailBodyText(emailOpener, email_template) {
+    if (email_template === null || email_template.id === null) {
+      // No template chosen, return only email opener.
+      return emailOpener;
+    }
+
+    // Return email opener as well as choen template.
+    return emailOpener + "\n\n" + email_template.message;
+  }
+
   // Handler when user copies email body message.
   async function handleEmailBodyCopied() {
     // Copy to clipboard.
     navigator.clipboard.writeText(
-      getEmailBodyText(personalized_email, curEmailTemplate)
+      getEmailBodyText(emailOpener, curEmailTemplate)
     );
 
     // Show message to prompt.
@@ -483,16 +494,6 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
     setCurEmailTemplate(newTemplate);
   }
 
-  // Helper method to get email body text from personalized email and report.
-  function getEmailBodyText(personalized_email, email_template) {
-    if (email_template === null || email_template.id === null) {
-      // No template chosen, return only email opener.
-      return personalized_email.email_opener;
-    }
-
-    // Return email opener as well as choen template.
-    return personalized_email.email_opener + "\n\n" + email_template.message;
-  }
   return (
     <Card>
       {contextHolder}
