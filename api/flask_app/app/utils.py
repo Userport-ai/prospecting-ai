@@ -1,7 +1,8 @@
 import re
 from datetime import datetime, timezone
 import pytz
-from typing import Optional
+from typing import Optional, List
+import gzip
 
 
 class Utils:
@@ -63,6 +64,14 @@ class Utils:
     def to_human_readable_date_str(dt: datetime) -> str:
         """Returns human readable date string."""
         return dt.strftime("%d %B, %Y")
+
+    def load_all_user_agents() -> List[str]:
+        """Loads all user agents from file and returns them as a list of strings."""
+        all_agents = []
+        with gzip.open("app/user_agents.txt.gz", 'rt') as f:
+            for line in f.readlines():
+                all_agents.append(line.strip())
+        return all_agents
 
 
 if __name__ == "__main__":

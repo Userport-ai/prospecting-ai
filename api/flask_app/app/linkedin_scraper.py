@@ -4,6 +4,7 @@ import json
 import logging
 import requests
 import urllib.parse
+import random
 from enum import Enum
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -18,6 +19,14 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_core.pydantic_v1 import BaseModel, Field
 
 logger = logging.getLogger()
+
+
+class LeadLinkedInProfileNotFoundException(Exception):
+    pass
+
+
+class InvalidLeadLinkedInUrlException(Exception):
+    pass
 
 
 class LinkedInPostDetails(BaseModel):
@@ -85,6 +94,17 @@ class LinkedInScraper:
         self.HTTP_REQUEST_TIMEOUT_SECONDS = 30
         # Per suggestion here: https://nubela.co/proxycurl/docs#proxycurl-overview-timeouts-and-api-response-time.
         self.HTTP_PROXYCURL_REQUEST_TIMEOUT_SECONDS = 60
+
+        # Proxy configuration. Currently configured only in prod to save costs.
+        self.HTTP_REQUEST_PROXIES = None
+        if os.getenv("BRIGHT_DATA_HTTP_PROXY_URL") and os.getenv("BRIGHT_DATA_HTTPS_PROXY_URL"):
+            self.HTTP_REQUEST_PROXIES = {
+                "http": os.environ["BRIGHT_DATA_HTTP_PROXY_URL"],
+                "https": os.environ["BRIGHT_DATA_HTTPS_PROXY_URL"]
+            }
+
+        # Fetch all user agents.
+        self.all_user_agents = Utils.load_all_user_agents()
 
     def index(self, url: str):
         if not self.dev_mode:
@@ -547,6 +567,31 @@ class LinkedInScraper:
             stack.append(c)
         return stack
 
+    def does_linkedin_profile_exist(self, profile_url: str) -> bool:
+        """Fetches Page associated with given LinkedIn Profile to check if it actually exists.
+
+        If it does not, then we don't need to spend credits to fetch it from ProxyCurl.
+        """
+        try:
+            headers = {"User-Agent": random.choice(self.all_user_agents)}
+            response = requests.get(
+                url=profile_url, headers=headers, proxies=self.HTTP_REQUEST_PROXIES, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS)
+        except Exception as e:
+            raise ValueError(
+                f"HTTP error when fetching LinkedIn Profile url: {profile_url} with error: {e}")
+
+        if response.status_code != 200:
+            if response.status_code == 404:
+                # Page not found, so return False.
+                logger.warning(
+                    f"LinkedIn profile fetch page request returned Not Found for profile URL: {profile_url}")
+                return False
+
+            logger.warning(
+                f"Received non 200 status code: {response.status_code} when checking if profile: {profile_url} exists.")
+
+        return True
+
     def fetch_person_profile(self, profile_url: str) -> Optional[PersonProfile]:
         """Fetches and returns LinkedIn Profile information of a given person from URL. Returns None if profile not found.
 
@@ -555,15 +600,19 @@ class LinkedInScraper:
         Piloterr also has an API but is inferiror to Proxycurl's APIs.
         """
         if not LinkedInScraper.is_valid_profile_url(profile_url):
-            raise ValueError(
+            raise InvalidLeadLinkedInUrlException(
                 f"Invalid URL format for LinkedIn profile: {profile_url}")
+
+        if not self.does_linkedin_profile_exist(profile_url=profile_url):
+            raise LeadLinkedInProfileNotFoundException(
+                f"LinkedIn Profile not found for URL: {profile_url}")
 
         headers = {
             'Authorization': f'Bearer {self.PROXYCURL_API_KEY}'
         }
         params = {
             'linkedin_profile_url': profile_url,
-            'skills': 'include',
+            'skills': 'exclude',
             'use_cache': 'if-recent',
             'fallback_to_cache': 'on-error',
         }
@@ -578,8 +627,11 @@ class LinkedInScraper:
         status_code = response.status_code
         if status_code != 200:
             if status_code == 404:
-                # Profile not found, return None.
-                return None
+                # Profile not found in ProxyCurl as well.
+                logger.warning(
+                    f"LinkedIn Profile not found via ProxyCurl API for Profile URL : {profile_url}")
+                raise LeadLinkedInProfileNotFoundException(
+                    f"LinkedIn Profile not found for URL: {profile_url}")
 
             raise ValueError(
                 f"Got invalid status code: {status_code} when fetching Person Profile from Proxycurl for url:  {profile_url}")
@@ -743,6 +795,9 @@ class LinkedInScraper:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(".env.dev")
     # import json
     # data = None
     # with open("../example_linkedin_info/proxycurl_company_profile_1.json", "r") as f:
@@ -777,6 +832,10 @@ if __name__ == "__main__":
     # LinkedInScraper.fetch_linkedin_profile(profile_url=profile_url)
 
     # profile_url = "https://www.linkedin.com/company/plaid-"
-    profile_url = "https://www.linkedin.com/company/stripe/"
+    # profile_url = "https://www.linkedin.com/company/stripe/"
+    # profile_url = "https://www.linkedin.com/in/gregory-burlak7601"
+    profile_url = "https://www.linkedin.com/in/vincent-lee-85a60b227"
     # LinkedInScraper().fetch_company_profile(profile_url=profile_url)
-    LinkedInScraper().fetch_person_profile()
+    # LinkedInScraper().fetch_person_profile(profile_url=profile_url)
+
+    LinkedInScraper().does_linkedin_profile_exist(profile_url=profile_url)

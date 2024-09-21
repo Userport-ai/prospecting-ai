@@ -1,7 +1,6 @@
 import os
 import logging
 import random
-import gzip
 import requests
 from bs4 import BeautifulSoup, Tag
 from datetime import datetime
@@ -253,7 +252,7 @@ class WebPageScraper:
             }
 
         # https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts
-        self.HTTP_REQUEST_TIMEOUT_SECONDS = 5
+        self.HTTP_REQUEST_TIMEOUT_SECONDS = 30
         # Max content size of HTTP response of fetching web page. It is a heuristic
         # that was determined by looking at web pages we saw during research. Without this, super
         # large pages processing takes more than 100% CPU in prod and is stuck.
@@ -263,7 +262,7 @@ class WebPageScraper:
         self.PAGE_MAX_CHUNKS = 15
 
         self.dev_mode = dev_mode
-        self.all_user_agents = self.load_all_user_agents()
+        self.all_user_agents = Utils.load_all_user_agents()
 
         if dev_mode:
             self.db = Chroma(persist_directory=WebPageScraper.CHROMA_DB_PATH,
@@ -1139,7 +1138,7 @@ class WebPageScraper:
                 f"Got non 200 response when fetching: {self.url}, code: {response.status_code}, text: {response.text}")
         if "text/html" not in response.headers["Content-Type"]:
             raise ValueError(
-                f"Invalid response content type: {response.headers} for URL: {self.url}")
+                f"Invalid response content type: {response.headers} for URL: {self.url} when fetching page.")
 
         logger.info(f"HTTP page fetch success for URL: {self.url}")
 
@@ -1156,14 +1155,6 @@ class WebPageScraper:
         self.page_md: str = md
 
         return Document(page_content=md)
-
-    def load_all_user_agents(self) -> List[str]:
-        """Loads all user agents."""
-        all_agents = []
-        with gzip.open("app/user_agents.txt.gz", 'rt') as f:
-            for line in f.readlines():
-                all_agents.append(line.strip())
-        return all_agents
 
     def split_into_chunks(self, doc: Document) -> List[Document]:
         """Split document into chunks using character splitter of given maximum chunk size and overlap."""
@@ -1667,6 +1658,8 @@ if __name__ == "__main__":
     # url = "https://plaid.com/legal/"
     # This page is 25 times the page size above.
     url = "https://gist.github.com/wchargin/8927565"
+    url = "https://www.linkedin.com/in/vincent-lee-85a60b227"
+    url = "https://www.linkedin.com/in/nicole-brann-950289a9"
 
     # person_name = "Zachary Perret"
     person_name = "Aathira Menon"
@@ -1691,7 +1684,8 @@ if __name__ == "__main__":
     graph = WebPageScraper(url=url, title=None,
                            snippet=snippet, dev_mode=False)
     doc = graph.fetch_page()
-    graph.split_into_chunks(doc=doc)
+    print(doc.page_content)
+    # graph.split_into_chunks(doc=doc)
     # content_info: PageContentInfo = graph.fetch_page_content_info(
     #     doc=doc, company_name=company_name, person_name=person_name)
     # with open("example_linkedin_info/parsed_page_info.json", "w") as f:

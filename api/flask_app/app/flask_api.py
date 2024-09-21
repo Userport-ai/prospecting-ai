@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.database import Database
 from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails, OpenAITokenUsage, UsageTier
 from app.research_report import Researcher
-from app.linkedin_scraper import LinkedInScraper
+from app.linkedin_scraper import LinkedInScraper, InvalidLeadLinkedInUrlException, LeadLinkedInProfileNotFoundException
 from app.personalization import Personalization
 from app.utils import Utils
 from app.rate_limiter import rate_limiter, get_value
@@ -1049,6 +1049,18 @@ def enrich_lead_info_in_background(self, user_id: str, lead_research_report_id: 
         # Send event.
         Metrics().capture(user_id=user_id, event_name="report_lead_info_enriched", properties={
             "report_id": lead_research_report_id})
+    except InvalidLeadLinkedInUrlException as e:
+        logger.exception(
+            f"Lead LinkedIn URL is invalid in Lead Report ID: {lead_research_report_id} and user ID: {user_id}")
+        _update_status_as_failed(database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
+                                 e=e, event_name="invalid_lead_linkedin_url", task_name="enrich_lead_info", status_before_failure=LeadResearchReport.Status.NEW)
+        return
+    except LeadLinkedInProfileNotFoundException as e:
+        logger.exception(
+            f"Lead Profile not found for Lead report ID: {lead_research_report_id} and user ID: {user_id}")
+        _update_status_as_failed(database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
+                                 e=e, event_name="lead_profile_not_found", task_name="enrich_lead_info", status_before_failure=LeadResearchReport.Status.NEW)
+        return
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
                                       e=e, task_name="enrich_lead_info", status_before_failure=LeadResearchReport.Status.NEW)
