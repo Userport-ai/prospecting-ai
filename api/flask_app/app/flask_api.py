@@ -1060,6 +1060,9 @@ def enrich_lead_info_in_background(self, user_id: str, lead_research_report_id: 
             f"Lead Profile not found for Lead report ID: {lead_research_report_id} and user ID: {user_id}")
         _update_status_as_failed(database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
                                  e=e, event_name="lead_profile_not_found", task_name="enrich_lead_info", status_before_failure=LeadResearchReport.Status.NEW)
+        
+        # Send event.
+        Metrics().capture(user_id=user_id, event_name="report_lead_linkedin_url_not_found", properties={"report_id": lead_research_report_id})
         return
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
@@ -1073,6 +1076,7 @@ def fetch_search_results_in_background(self, user_id: str, lead_research_report_
         f"Start fetching search URLs for lead report ID: {lead_research_report_id} for user ID: {user_id}")
     database = Database()
     try:
+        start_time = time.time()
         r = Researcher(database=database)
         r.fetch_search_results(lead_research_report_id=lead_research_report_id)
         logger.info(
@@ -1084,7 +1088,7 @@ def fetch_search_results_in_background(self, user_id: str, lead_research_report_
 
         # Send event.
         Metrics().capture(user_id=user_id, event_name="report_search_results_fetched", properties={
-            "report_id": lead_research_report_id})
+            "report_id": lead_research_report_id, "time_taken_seconds": time.time() - start_time})
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
                                       e=e, task_name="fetch_search_results", status_before_failure=LeadResearchReport.Status.BASIC_PROFILE_FETCHED)
@@ -1130,7 +1134,7 @@ def process_content_in_search_results_in_background(self, user_id: str, lead_res
 
         # Send event.
         Metrics().capture(user_id=user_id, event_name="report_search_results_start_processing", properties={
-            "report_id": lead_research_report_id, "total_urls": total_urls_to_process, "concurrency": concurrency, "batch_sizes": [len(b) for b in batches]})
+            "report_id": lead_research_report_id, "start_time": time.time(), "total_urls": total_urls_to_process, "concurrency": concurrency, "batch_sizes": [len(b) for b in batches]})
 
         # Start processing.
         chord(parallel_workers)(aggregation_work)
@@ -1189,7 +1193,7 @@ def aggregate_processed_search_results_in_background(self, failed_urls_list: Lis
 
         # Send event.
         Metrics().capture(user_id=user_id, event_name="report_search_results_processed", properties={
-            "report_id": lead_research_report_id, "failed_urls": flattened_urls_list})
+            "report_id": lead_research_report_id, "end_time": time.time(), "failed_urls": flattened_urls_list, "num_failed_urls": len(flattened_urls_list)})
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name=f"aggregate_processed_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)

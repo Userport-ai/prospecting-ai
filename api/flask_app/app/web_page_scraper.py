@@ -18,6 +18,7 @@ from langchain_community.callbacks import get_openai_callback
 from app.utils import Utils
 from app.models import ContentTypeEnum, ContentCategoryEnum, OpenAITokenUsage, ContentDetails
 from app.linkedin_scraper import LinkedInScraper, LinkedInPostDetails
+from app.metrics import Metrics
 
 logger = logging.getLogger()
 
@@ -230,6 +231,9 @@ class WebPageScraper:
     SPLIT_INDEX = "split_index"
     SUMMARY = "summary"
 
+    CONTENT_TYPE_GENERAL_PAGE = "content_type_general_page"
+    CONTENT_TYPE_LINKEDIN_POST = "content_type_linkedin_post"
+
     def __init__(self, url: str, title: Optional[str] = None, snippet: Optional[str] = None,  chunk_size: int = 4096, chunk_overlap: int = 200, dev_mode: bool = False) -> None:
         self.url = url
         self.page_title: Optional[str] = title
@@ -263,6 +267,8 @@ class WebPageScraper:
 
         self.dev_mode = dev_mode
         self.all_user_agents = Utils.load_all_user_agents()
+
+        self.metrics = Metrics()
 
         if dev_mode:
             self.db = Chroma(persist_directory=WebPageScraper.CHROMA_DB_PATH,
@@ -353,6 +359,11 @@ class WebPageScraper:
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
                 logger.info(
                     f"Tokens used for URL: {self.url} is: {tokens_used}")
+
+                # Send event.
+                self.metrics.capture_system_event(event_name="content_processing_skipped", properties={
+                    "content_type": WebPageScraper.CONTENT_TYPE_GENERAL_PAGE, "url": self.url, "reason": processing_status.value})
+
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
@@ -398,6 +409,11 @@ class WebPageScraper:
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
                 logger.info(
                     f"Tokens used for URL: {self.url} is: {tokens_used}")
+
+                # Send event.
+                self.metrics.capture_system_event(event_name="content_processing_skipped", properties={
+                    "content_type": WebPageScraper.CONTENT_TYPE_GENERAL_PAGE, "url": self.url, "reason": ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY})
+
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
@@ -498,6 +514,11 @@ class WebPageScraper:
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
                 logger.info(
                     f"Tokens used for URL: {self.url} is: {tokens_used}")
+
+                # Send event.
+                self.metrics.capture_system_event(event_name="content_processing_skipped", properties={
+                    "content_type": WebPageScraper.CONTENT_TYPE_LINKEDIN_POST, "url": self.url, "reason": processing_status.value})
+
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,
@@ -543,6 +564,11 @@ class WebPageScraper:
                                           completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
                 logger.info(
                     f"Tokens used for LinkedIn post URL: {self.URL} is: {tokens_used}")
+
+                # Send event.
+                self.metrics.capture_system_event(event_name="content_processing_skipped", properties={
+                    "content_type": WebPageScraper.CONTENT_TYPE_LINKEDIN_POST, "url": self.url, "reason": ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY.value})
+
                 return PageContentInfo(
                     url=self.url,
                     page_structure=page_structure,

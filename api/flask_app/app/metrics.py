@@ -15,3 +15,8 @@ class Metrics:
         """Capture event for given user ID and event name. ID can be anything unique."""
         self.posthog.capture(distinct_id=user_id,
                              event=event_name, properties=properties)
+
+    def capture_system_event(self, event_name: str, properties: Optional[Dict] = None):
+        """Capture system event with given event name. No user ID associated with this event."""
+        self.posthog.capture(distinct_id="System",
+                             event=event_name, properties=properties)

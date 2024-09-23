@@ -9,6 +9,7 @@ from app.search_engine_workflow import SearchEngineWorkflow, SearchRequest
 from app.web_page_scraper import WebPageScraper, PageContentInfo, PageTooLargeException
 from app.outreach_template import OutreachTemplateMatcher
 from app.personalization import Personalization
+from app.metrics import Metrics
 from app.models import (
     ContentDetails,
     ContentTypeEnum,
@@ -36,6 +37,7 @@ class Researcher:
         self.outreach_template_matcher = OutreachTemplateMatcher(
             database=database)
         self.personalization = Personalization(database=database)
+        self.metrics = Metrics()
 
     def enrich_lead_info(self, lead_research_report_id: str) -> str:
         """Enriches lead report with information such as name, their company, role etc."""
@@ -254,6 +256,10 @@ class Researcher:
                 logger.warning(
                     f"Page too large exception for search URL: {url} in task num: {task_num} with error: {e}")
                 page_too_large_urls.add(url)
+
+                # Send event.
+                self.metrics.capture_system_event(event_name="page_content_too_large_error", properties={
+                                                  "report_id": lead_research_report_id, "url": url, "error": str(e)})
             except Exception as e:
                 logger.warning(
                     f"Failed to process content from search URL: {url} with error: {e}")
@@ -282,6 +288,10 @@ class Researcher:
                     f"During retry: failed to process content from search URL: {failed_url} with error: {e}")
                 final_failed_urls.append(failed_url)
 
+                # Send event.
+                self.metrics.capture_system_event(event_name="content_processing_failed", properties={
+                                                  "report_id": lead_research_report_id, "failed_url": failed_url, "error": str(e)})
+
         # Return large URLs in addition to failed URLs.
         return final_failed_urls + list(page_too_large_urls)
 
@@ -291,6 +301,10 @@ class Researcher:
         if self.database.get_content_details_by_url(url=search_result.url, company_profile_id=research_report.company_profile_id, processing_status=ContentDetails.ProcessingStatus.COMPLETE):
             logger.info(
                 f"Web URL: {search_result.url} already indexed in the database for report: {research_report.id}, skip processing again.")
+
+            # Send event.
+            self.metrics.capture_system_event(event_name="content_already_indexed", properties={
+                "report_id": research_report.id, "url": search_result.url, "company_name": research_report.company_name})
             return
 
         # Fetch page and then process content.
