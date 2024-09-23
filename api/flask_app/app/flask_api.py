@@ -236,8 +236,8 @@ def create_lead_report():
     user_id: str = g.user["uid"]
 
     # Remove any leading and trailing whitespaces and trailing slashes.
-    person_linkedin_url: str = request.json.get(
-        'linkedin_url').strip().rstrip("/")
+    person_linkedin_url: str = Utils.remove_spaces_and_trailing_slashes(
+        url=request.json.get('linkedin_url'))
     if not LinkedInScraper.is_valid_profile_url(profile_url=person_linkedin_url):
         raise APIException(
             status_code=404, message=f"Invalid LinkedIn URL: {person_linkedin_url} requested.")
@@ -1060,9 +1060,10 @@ def enrich_lead_info_in_background(self, user_id: str, lead_research_report_id: 
             f"Lead Profile not found for Lead report ID: {lead_research_report_id} and user ID: {user_id}")
         _update_status_as_failed(database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
                                  e=e, event_name="lead_profile_not_found", task_name="enrich_lead_info", status_before_failure=LeadResearchReport.Status.NEW)
-        
+
         # Send event.
-        Metrics().capture(user_id=user_id, event_name="report_lead_linkedin_url_not_found", properties={"report_id": lead_research_report_id})
+        Metrics().capture(user_id=user_id, event_name="report_lead_linkedin_url_not_found",
+                          properties={"report_id": lead_research_report_id})
         return
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,

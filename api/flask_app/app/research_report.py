@@ -66,8 +66,8 @@ class Researcher:
         # Compute company profile ID.
         company_profile_id: str = None
         company_name, role_title = person_profile.get_company_and_role_title()
-        company_linkedin_url = person_profile.get_company_linkedin_url(
-            company_name=company_name)
+        company_linkedin_url = Utils.remove_spaces_and_trailing_slashes(
+            url=person_profile.get_company_linkedin_url(company_name=company_name))
         company_profile: Optional[CompanyProfile] = self.database.get_company_profile_by_url(
             company_linkedin_url=company_linkedin_url)
         if not company_profile:

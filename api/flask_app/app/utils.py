@@ -73,6 +73,11 @@ class Utils:
                 all_agents.append(line.strip())
         return all_agents
 
+    @staticmethod
+    def remove_spaces_and_trailing_slashes(url: str) -> str:
+        """Helper to remove extra whitespaces (leading or trailing) and trailing slashes in given URL string."""
+        return url.strip().rstrip("/")
+
 
 if __name__ == "__main__":
     # UTC time
