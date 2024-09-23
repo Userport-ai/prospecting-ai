@@ -85,6 +85,9 @@ export async function getUserFromServer(idToken) {
 
 // Replace newlines with HTML break tags.
 export function addLineBreaks(text) {
+  if (text === null) {
+    return null;
+  }
   return text.split("\n").map((substr) => {
     return (
       <>
