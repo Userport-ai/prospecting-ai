@@ -229,11 +229,11 @@ class Database:
             return None
         return CompanyProfile(**data_dict)
 
-    def get_content_details_by_url(self, url: str, company_profile_id: str, processing_status: ContentDetails.ProcessingStatus) -> Optional[ContentDetails]:
-        """Returns Content details for given url and company profile and given processing status. Returns None if not found."""
+    def get_content_details_by_url(self, url: str, company_profile_id: str) -> Optional[ContentDetails]:
+        """Returns Content details for given url and company profile. Returns None if not found."""
         collection = self.get_content_details_collection()
         data_dict = collection.find_one(
-            {"url": url, "company_profile_id": company_profile_id, "processing_status": processing_status.value})
+            {"url": url, "company_profile_id": company_profile_id})
         if not data_dict:
             return None
         return ContentDetails(**data_dict)

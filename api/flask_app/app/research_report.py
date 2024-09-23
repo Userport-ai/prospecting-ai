@@ -297,8 +297,9 @@ class Researcher:
 
     def process_content(self, search_result: LeadResearchReport.WebSearchResults.Result, research_report: LeadResearchReport):
         """Fetch content from given URL, process it and store it in the database."""
-        # If this URL has already been indexed for this company and has been processed successfully, skip processing again.
-        if self.database.get_content_details_by_url(url=search_result.url, company_profile_id=research_report.company_profile_id, processing_status=ContentDetails.ProcessingStatus.COMPLETE):
+        # If this URL has already been indexed for this company, skip processing again.
+        # TODO: In the future, also add a freshness check so that we don't keep relying on this content forever since it might be stale.
+        if self.database.get_content_details_by_url(url=search_result.url, company_profile_id=research_report.company_profile_id):
             logger.info(
                 f"Web URL: {search_result.url} already indexed in the database for report: {research_report.id}, skip processing again.")
 
