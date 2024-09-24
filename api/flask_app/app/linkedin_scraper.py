@@ -603,9 +603,10 @@ class LinkedInScraper:
             raise InvalidLeadLinkedInUrlException(
                 f"Invalid URL format for LinkedIn profile: {profile_url}")
 
-        if not self.does_linkedin_profile_exist(profile_url=profile_url):
-            raise LeadLinkedInProfileNotFoundException(
-                f"LinkedIn Profile not found for URL: {profile_url}")
+        # Removing this for now since it looks like this doesn't happen as often where the LinkedIn Profile is not found via ProxyCurl.
+        # if not self.does_linkedin_profile_exist(profile_url=profile_url):
+        #     raise LeadLinkedInProfileNotFoundException(
+        #         f"LinkedIn Profile not found for URL: {profile_url}")
 
         headers = {
             'Authorization': f'Bearer {self.PROXYCURL_API_KEY}'
