@@ -614,8 +614,8 @@ class LinkedInScraper:
         params = {
             'linkedin_profile_url': profile_url,
             'skills': 'exclude',
-            # Uncomment if this affects data quality in prod.
-            # 'use_cache': 'if-recent',
+            # This is needed otherwise sometimes data is stale in prod showing a different company to research.
+            'use_cache': 'if-recent',
             'fallback_to_cache': 'on-error',
         }
 
