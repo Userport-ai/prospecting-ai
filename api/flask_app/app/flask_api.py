@@ -930,6 +930,13 @@ def admin_migration():
 # Start of Celery Tasks
 #######################
 
+# Some constants for Celery tasks.
+# We set the code in seconds because command line
+# argument to set soft time limit doesn't seem to work,
+# only hard limit is set from command line.
+SOFT_TIME_LIMIT_SECONDS = 600
+
+
 def _update_status_as_failed(database: Database, user_id: str, lead_research_report_id: str, e: Exception, event_name: str, task_name: str, status_before_failure: LeadResearchReport.Status):
     """Helper to clean up report state upon task failure."""
 
@@ -1029,7 +1036,7 @@ def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
                                       e=e, task_name="fetch_lead_info_orchestrator", status_before_failure=report_status)
 
 
-@shared_task(bind=True, acks_late=True)
+@shared_task(bind=True, acks_late=True, soft_time_limit=SOFT_TIME_LIMIT_SECONDS)
 def enrich_lead_info_in_background(self, user_id: str, lead_research_report_id: str):
     """Enrich lead with name, company name, role titles in the given Lead Report."""
     logger.info(
@@ -1070,7 +1077,7 @@ def enrich_lead_info_in_background(self, user_id: str, lead_research_report_id: 
                                       e=e, task_name="enrich_lead_info", status_before_failure=LeadResearchReport.Status.NEW)
 
 
-@shared_task(bind=True, acks_late=True)
+@shared_task(bind=True, acks_late=True, soft_time_limit=SOFT_TIME_LIMIT_SECONDS)
 def fetch_search_results_in_background(self, user_id: str, lead_research_report_id: str):
     """Fetch search results for given lead in background."""
     logger.info(
@@ -1095,7 +1102,7 @@ def fetch_search_results_in_background(self, user_id: str, lead_research_report_
                                       e=e, task_name="fetch_search_results", status_before_failure=LeadResearchReport.Status.BASIC_PROFILE_FETCHED)
 
 
-@shared_task(bind=True, acks_late=True)
+@shared_task(bind=True, acks_late=True, soft_time_limit=SOFT_TIME_LIMIT_SECONDS)
 def process_content_in_search_results_in_background(self, user_id: str, lead_research_report_id: str):
     """Processes URLs in search results in background."""
     logger.info(
@@ -1145,7 +1152,7 @@ def process_content_in_search_results_in_background(self, user_id: str, lead_res
                                       task_name="process_content_in_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
-@shared_task(bind=True, acks_late=True, ignore_result=False, rate_limit="5/m")
+@shared_task(bind=True, acks_late=True, ignore_result=False, rate_limit="5/m", soft_time_limit=SOFT_TIME_LIMIT_SECONDS)
 def process_content_in_search_results_batch_in_background(self, batch_num: int, user_id: str, lead_research_report_id: str, search_results_batch_json: List[str]):
     """Process batch of given Search Result URLs and returns a list of URLs that failed to process."""
     search_results_batch = []
@@ -1169,7 +1176,7 @@ def process_content_in_search_results_batch_in_background(self, batch_num: int, 
                                       task_name=f"process_content_in_search_results_batch_{batch_num}", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
-@shared_task(bind=True, acks_late=True)
+@shared_task(bind=True, acks_late=True, soft_time_limit=SOFT_TIME_LIMIT_SECONDS)
 def aggregate_processed_search_results_in_background(self, failed_urls_list: List[List[str]], user_id: str, lead_research_report_id: str):
     """Aggregate processing of search results from each worker task that worked on a batch."""
     logger.info(
@@ -1200,7 +1207,7 @@ def aggregate_processed_search_results_in_background(self, failed_urls_list: Lis
                                       task_name=f"aggregate_processed_search_results", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
-@shared_task(bind=True, acks_late=True)
+@shared_task(bind=True, acks_late=True, soft_time_limit=SOFT_TIME_LIMIT_SECONDS)
 def aggregate_report_in_background(self, user_id: str, lead_research_report_id: str):
     """Create a research report in background."""
     logger.info(
@@ -1224,7 +1231,7 @@ def aggregate_report_in_background(self, user_id: str, lead_research_report_id: 
                                       e=e, task_name="aggregate_report", status_before_failure=LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE)
 
 
-@shared_task(bind=True, acks_late=True)
+@shared_task(bind=True, acks_late=True, soft_time_limit=SOFT_TIME_LIMIT_SECONDS)
 def choose_template_and_create_emails_in_background(self, user_id: str, lead_research_report_id: str):
     """Selects outreach template and creates personalized emails in background."""
     logger.info(
