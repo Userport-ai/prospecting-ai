@@ -7,7 +7,7 @@ import {
 import {
   exampleTemplateResponse,
   noTemplatesResponse,
-} from "./create-template-message-data";
+} from "./create-template-data";
 import { reportWithSelectedTemplate } from "./lead-report-with-template-data";
 import { reportWithNoTemplate } from "./lead-report-no-template-data";
 

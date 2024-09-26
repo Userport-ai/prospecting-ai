@@ -1,4 +1,4 @@
-import "./create-template-message.css";
+import "./create-or-edit-template.css";
 import { Typography, Input, Button, Skeleton } from "antd";
 import BackArrow from "./back-arrow";
 import { useState } from "react";
@@ -158,12 +158,12 @@ function CreateOrEditTemplateMessage() {
   }
 
   return (
-    <div id="create-template-message-outer">
-      <div id="create-template-message-area">
+    <div id="create-or-edit-template-outer">
+      <div id="create-or-edit-template-area">
         <div id="page-title">
           <BackArrow />
         </div>
-        <div id="create-template-message-container">
+        <div id="create-or-edit-template-container">
           <div id="form-container">
             <Title level={3}>{pageTitle}</Title>
             <RouterForm method="post">

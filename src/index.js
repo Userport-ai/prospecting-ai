@@ -7,8 +7,8 @@ import AllTemplates from "./all-templates";
 import { templateMessagesLoader } from "./all-templates";
 import CreateOrEditTemplateMessage, {
   createOrEditTemplateLoader,
-} from "./create-template-message";
-import { createOrEditTemplateAction } from "./create-template-message";
+} from "./create-or-edit-template";
+import { createOrEditTemplateAction } from "./create-or-edit-template";
 import Leads from "./leads";
 import { leadsLoader } from "./leads";
 import EnterLeadInfo, { enterLeadInfoLoader } from "./enter-lead-info";

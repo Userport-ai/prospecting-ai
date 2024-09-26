@@ -1,68 +1,68 @@
-#create-template-message-outer {
+#create-or-edit-template-outer {
   width: 100%;
   height: 100%;
   display: flex;
   justify-content: center;
 }
 
-#create-template-message-area {
+#create-or-edit-template-area {
   width: 70%;
   margin-top: 3%;
 }
 
-#create-template-message-area #page-title {
+#create-or-edit-template-area #page-title {
   display: flex;
   flex-direction: row;
   gap: 1rem;
 }
 
-#create-template-message-container {
+#create-or-edit-template-container {
   display: flex;
   flex-direction: row;
   justify-content: center;
 }
 
-#create-template-message-container #form-container {
+#create-or-edit-template-container #form-container {
   width: 90%;
 }
 
-#create-template-message-container #form-container .ant-input {
+#create-or-edit-template-container #form-container .ant-input {
   font-size: 1.6rem;
   margin-top: 1rem;
 }
-#create-template-message-container #form-container h3 {
+#create-or-edit-template-container #form-container h3 {
   color: var(--on-surface);
   margin-bottom: 2rem;
 }
 
-#create-template-message-container #form-container #form-item-list {
+#create-or-edit-template-container #form-container #form-item-list {
   display: flex;
   flex-direction: column;
   gap: 2rem;
 }
 
-#create-template-message-container #form-container .form-item-container {
+#create-or-edit-template-container #form-container .form-item-container {
   display: flex;
   flex-direction: column;
 }
 
-#create-template-message-container #form-container label {
+#create-or-edit-template-container #form-container label {
   font-size: 1.7rem;
   font-weight: 600;
 }
 
-#create-template-message-container #form-container .label-helper-text {
+#create-or-edit-template-container #form-container .label-helper-text {
   color: var(--secondary);
 }
 
-#create-template-message-container #btn-container {
+#create-or-edit-template-container #btn-container {
   margin-top: 2rem;
   display: flex;
   flex-direction: row;
   justify-content: end;
 }
 
-#create-template-message-container .ant-btn {
+#create-or-edit-template-container .ant-btn {
   width: 10rem;
   height: 4rem;
   font-size: 1.7rem;
@@ -70,6 +70,6 @@
   border-radius: 1.5rem;
 }
 
-#create-template-message-container .ant-btn:hover {
+#create-or-edit-template-container .ant-btn:hover {
   background-color: var(--hover-color);
 }
