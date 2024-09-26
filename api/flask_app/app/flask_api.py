@@ -652,7 +652,7 @@ def create_outreach_email_template():
 
     try:
         outreach_email_template = OutreachEmailTemplate(
-            user_id=user_id, name=name, persona_role_titles=persona_role_titles, description=description, message=message)
+            user_id=user_id, name=name, persona_role_titles=persona_role_titles, description=description, message=message, messages=[message])
         template_id: str = db.insert_outreach_email_template(
             outreach_email_template=outreach_email_template)
         logger.info(
@@ -798,6 +798,7 @@ def update_outreach_email_template(outreach_email_template_id: str):
             "persona_role_titles": persona_role_titles,
             "description": description,
             "message": message,
+            "messages": [message],
         }
         db.update_outreach_email_template(
             outreach_email_template_id=outreach_email_template_id, setFields=setFields)
