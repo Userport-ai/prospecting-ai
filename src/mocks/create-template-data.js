@@ -40,3 +40,20 @@ export const noTemplatesResponse = {
     state: "viewed_welcome_page",
   },
 };
+
+export const editTemplateResponse = {
+  status: "success",
+  outreach_email_template: {
+    id: "66b99cb49c27d1bc9122ed06",
+    user_id: null,
+    creation_date: null,
+    name: "Marketing folks",
+    creation_date_readable_str: "09 August, 2024",
+    persona_role_titles: ["VP of Marketing"],
+    description: "Experience in Performance Marketing",
+    message:
+      "Given you lead an team of more than 1000 employees, do you face challenges understanding the sentiment of your team after major announcements?\n\nAsking this as speaking with some of our customers like Visa and Stripe, I've learned that a major challenge facing unicorn companies is the impact of big announcements on employee productivity.\n\nTo keep track of your employees sentiments, do you mind spending 20 minutes to see WorkHR in action?",
+    last_updated_date: null,
+    last_updated_date_readable_str: "09 August, 2024",
+  },
+};

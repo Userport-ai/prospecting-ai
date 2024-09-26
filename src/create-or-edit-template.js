@@ -1,19 +1,15 @@
 import "./create-or-edit-template.css";
-import { Typography, Input, Button, Skeleton } from "antd";
+import { Typography, Input, Button, Skeleton, Modal } from "antd";
 import BackArrow from "./back-arrow";
-import { useState } from "react";
-import {
-  Form as RouterForm,
-  useNavigation,
-  redirect,
-  useLoaderData,
-} from "react-router-dom";
+import { useContext, useState } from "react";
+import { redirect, useLoaderData, useNavigate } from "react-router-dom";
 import {
   stateAfterFirstTemplateCreation,
   updateUserStateOnServer,
   userHasNotCreatedTemplate,
 } from "./helper-functions";
 import { usePostHog } from "posthog-js/react";
+import { AuthContext } from "./root";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -58,44 +54,129 @@ export const createOrEditTemplateLoader = (authContext) => {
   };
 };
 
-// Creates or edits template after user fills out new template form.
-export const createOrEditTemplateAction = (authContext) => {
-  return async ({ params, request }) => {
-    const { user } = authContext;
-    if (!user) {
-      // User is logged out.
-      return null;
+// Template message used to reach out to prospect.
+function OutreachMessage({ outreachMessages, index, onChange }) {
+  var labelText = "";
+  var helperText = "";
+  var message = outreachMessages[index];
+  const textAreaName = `message-${index.toString()}`;
+  if (index === 0) {
+    // First email.
+    labelText = "First Email";
+    helperText =
+      "Write a message that shines light on the prospect's problem as well as the value proposition of your product or service.";
+  } else {
+    // Follow up email.
+    labelText = `Follow Up - ${(index + 1).toString()}`;
+    helperText =
+      "Write a follow up message to remind your prospect about your previous outreach.";
+  }
+
+  return (
+    <div className="form-item-container">
+      <label htmlFor="message-textarea">{labelText}</label>
+      <Text className="label-helper-text">{helperText}</Text>
+      <TextArea
+        id="message-textarea"
+        name={textAreaName}
+        value={message}
+        onChange={(e) => onChange(e.target.value, index)}
+        autoSize={{ minRows: 10, maxRows: 100 }}
+      />
+    </div>
+  );
+}
+
+// Main component to create or edit template.
+function CreateOrEditTemplate() {
+  const loaderResponse = useLoaderData();
+  const { user } = useContext(AuthContext);
+  const firstTemplateCreation = userHasNotCreatedTemplate(
+    loaderResponse.userState
+  );
+  const existingOutreachTemplate = loaderResponse.outreachEmailTemplate;
+  const [templateName, setTemplateName] = useState(
+    existingOutreachTemplate ? existingOutreachTemplate.name : ""
+  );
+  const [templateRoleTitles, setTemplateRoleTitles] = useState(
+    existingOutreachTemplate
+      ? existingOutreachTemplate.persona_role_titles.join(",")
+      : ""
+  );
+  const [templateDescription, setTemplateDescription] = useState(
+    existingOutreachTemplate ? existingOutreachTemplate.description : ""
+  );
+  const [outreachMessages, setOutreachMessages] = useState(
+    existingOutreachTemplate ? [existingOutreachTemplate.message] : [""]
+  );
+  const pageTitle = existingOutreachTemplate
+    ? "Edit Email Template"
+    : "Create Email Template";
+  const actionButtonText = existingOutreachTemplate ? "Save" : "Create";
+
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const posthog = usePostHog();
+  const navigate = useNavigate();
+
+  if (formSubmitting) {
+    return (
+      <Skeleton
+        active
+        paragraph={{
+          rows: 15,
+        }}
+      />
+    );
+  }
+
+  // Handle changes to outreach message made by the user.
+  function handleOutreachMessageUpdate(newMessage, index) {
+    if (index < 0 || index >= outreachMessages.length) {
+      // Invalid index value.
+      const error_obj = {
+        message: "Invalid index value: " + index.toString(),
+        status_code: 400,
+      };
+      throw error_obj;
     }
 
-    // Template ID will be null when creating a template.
-    var templateId = null;
-    if (params.id !== undefined) {
-      // Send Update template request to given template ID.
-      templateId = params.id;
+    const newOutreachMessages = outreachMessages.map((message, i) => {
+      if (i === index) {
+        return newMessage;
+      }
+      return message;
+    });
+    setOutreachMessages(newOutreachMessages);
+  }
+
+  // Handle request to submit template to the server.
+  async function handleCreateOrEditTemplateRequest() {
+    var error_message = "";
+    if (!templateName) {
+      error_message = "Template Name cannot be empty";
+    } else if (!templateRoleTitles) {
+      error_message = "Role Titles cannot be empty";
+    } else {
+      // Template description is optional, so not validating its value here.
+      for (let i in outreachMessages) {
+        if (!outreachMessages[i]) {
+          error_message = "Email or Follow up messages cannot be empty";
+          break;
+        }
+      }
     }
-    const formData = await request.formData();
-    const apiRequest = Object.fromEntries(formData);
-    if (apiRequest["name"].length === 0) {
-      const error_obj = {
-        message: "Template Name Cannot be empty",
-        status_code: 400,
-      };
-      throw error_obj;
+    if (error_message) {
+      Modal.error({
+        title: "Missing Required fields!",
+        content: error_message,
+      });
+      return;
     }
-    if (apiRequest["persona_role_titles"].length === 0) {
-      const error_obj = {
-        message: "Role Titles Cannot be empty",
-        status_code: 400,
-      };
-      throw error_obj;
-    }
-    if (apiRequest["message"].length === 0) {
-      const error_obj = {
-        message: "Template message Cannot be empty",
-        status_code: 400,
-      };
-      throw error_obj;
-    }
+
+    setFormSubmitting(true);
+    const templateId = existingOutreachTemplate
+      ? existingOutreachTemplate.id
+      : null;
 
     const idToken = await user.getIdToken();
     var apiEndpoint = "/api/v1/outreach-email-templates";
@@ -109,7 +190,12 @@ export const createOrEditTemplateAction = (authContext) => {
     // Send request to server to create or edit template.
     const response = await fetch(apiEndpoint, {
       method: apiMethod,
-      body: JSON.stringify(apiRequest),
+      body: JSON.stringify({
+        name: templateName,
+        persona_role_titles: templateRoleTitles,
+        description: templateDescription,
+        message: outreachMessages[0],
+      }),
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + idToken,
@@ -117,44 +203,29 @@ export const createOrEditTemplateAction = (authContext) => {
     });
     const result = await response.json();
     if (result.status === "error") {
-      throw result;
+      setFormSubmitting(false);
+      Modal.error({
+        title: `Error: ${result.status_code.toString()}`,
+        content: result.message,
+      });
     }
 
     // Update user state if first template creation.
-    if (apiRequest["first_template_creation"]) {
+    if (firstTemplateCreation) {
       await updateUserStateOnServer(stateAfterFirstTemplateCreation(), idToken);
     }
 
+    // Send event.
+    if (templateId === null) {
+      posthog.capture("create_template_form_submitted");
+    } else {
+      posthog.capture("edit_template_form_submitted", {
+        template_id: templateId,
+      });
+    }
+
     // Successful creation or edit, go back to all templates page.
-    return redirect("/templates");
-  };
-};
-
-function CreateOrEditTemplateMessage() {
-  const loaderResponse = useLoaderData();
-  const firstTemplateCreation = userHasNotCreatedTemplate(
-    loaderResponse.userState
-  );
-  const existingOutreachTemplate = loaderResponse.outreachEmailTemplate;
-  const [currMessage, setCurrMessage] = useState(
-    existingOutreachTemplate ? existingOutreachTemplate.message : ""
-  );
-  const component_is_loading = useNavigation().state !== "idle";
-  const pageTitle = existingOutreachTemplate
-    ? "Edit Email Template"
-    : "Create Email Template";
-  const actionButtonText = existingOutreachTemplate ? "Save" : "Create";
-  const posthog = usePostHog();
-
-  if (component_is_loading) {
-    return (
-      <Skeleton
-        active
-        paragraph={{
-          rows: 15,
-        }}
-      />
-    );
+    return navigate("/templates");
   }
 
   return (
@@ -166,107 +237,84 @@ function CreateOrEditTemplateMessage() {
         <div id="create-or-edit-template-container">
           <div id="form-container">
             <Title level={3}>{pageTitle}</Title>
-            <RouterForm method="post">
-              <div id="form-item-list">
-                <div className="form-item-container">
-                  <label htmlFor="name-input">Template Name</label>
-                  <Text className="label-helper-text">
-                    Enter a name for the template that you can use to reference
-                    it. You can any enter name, just ensure it is unique among
-                    all your templates.
-                  </Text>
-                  <Input
-                    id="name-input"
-                    name="name"
-                    defaultValue={
-                      existingOutreachTemplate
-                        ? existingOutreachTemplate.name
-                        : ""
-                    }
-                  />
-                </div>
-
-                <div className="form-item-container">
-                  <label htmlFor="persona-role-titles-input">
-                    Persona Role Titles
-                  </label>
-                  <Text className="label-helper-text">
-                    You can enter multiple roles by separating them with commas.
-                    Ex: VP of Sales, Director of Sales, CEO.
-                  </Text>
-                  <Input
-                    id="persona-role-titles-input"
-                    name="persona_role_titles"
-                    defaultValue={
-                      existingOutreachTemplate
-                        ? existingOutreachTemplate.persona_role_titles
-                        : ""
-                    }
-                  />
-                </div>
-
-                <div className="form-item-container">
-                  <label htmlFor="description-input">
-                    Description (Optional)
-                  </label>
-                  <Text className="label-helper-text">
-                    Free form text describing the persona's skillset or
-                    background or any other specific detail. Ex: Experienced in
-                    Outbound Sales.
-                  </Text>
-                  <Input
-                    id="description-input"
-                    name="description"
-                    defaultValue={
-                      existingOutreachTemplate
-                        ? existingOutreachTemplate.description
-                        : ""
-                    }
-                  />
-                </div>
-
-                <div className="form-item-container">
-                  <label htmlFor="message-textarea">Message</label>
-                  <Text className="label-helper-text">
-                    The template message that shines light on the problem and
-                    provides the value proposition of your product.
-                  </Text>
-                  <TextArea
-                    id="message-textarea"
-                    name="message"
-                    value={currMessage}
-                    onChange={(e) => setCurrMessage(e.target.value)}
-                    autoSize={{ minRows: 10, maxRows: 100 }}
-                  />
-                </div>
-
-                {/* Whether this is the first template the user is creating. */}
+            <div id="form-item-list">
+              <div className="form-item-container">
+                <label htmlFor="name-input">Template Name</label>
+                <Text className="label-helper-text">
+                  Enter a name for the template that you can use to reference
+                  it. You can any enter name, just ensure it is unique among all
+                  your templates.
+                </Text>
                 <Input
-                  hidden={true}
-                  name="first_template_creation"
-                  defaultValue={firstTemplateCreation}
+                  id="name-input"
+                  name="name"
+                  defaultValue={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
                 />
-
-                <div id="btn-container">
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    onClick={() => {
-                      // Send event.
-                      if (existingOutreachTemplate === null) {
-                        posthog.capture("create_template_form_submitted");
-                      } else {
-                        posthog.capture("edit_template_form_submitted", {
-                          template_id: existingOutreachTemplate.id,
-                        });
-                      }
-                    }}
-                  >
-                    {actionButtonText}
-                  </Button>
-                </div>
               </div>
-            </RouterForm>
+
+              <div className="form-item-container">
+                <label htmlFor="persona-role-titles-input">
+                  Persona Role Titles
+                </label>
+                <Text className="label-helper-text">
+                  You can enter multiple roles by separating them with commas.
+                  Ex: VP of Sales, Director of Sales, CEO.
+                </Text>
+                <Input
+                  id="persona-role-titles-input"
+                  name="persona_role_titles"
+                  defaultValue={templateRoleTitles}
+                  onChange={(e) => setTemplateRoleTitles(e.target.value)}
+                />
+              </div>
+
+              <div className="form-item-container">
+                <label htmlFor="description-input">
+                  Description (Optional)
+                </label>
+                <Text className="label-helper-text">
+                  Free form text describing the persona's skillset or background
+                  or any other specific detail. Ex: Experienced in Outbound
+                  Sales.
+                </Text>
+                <Input
+                  id="description-input"
+                  name="description"
+                  defaultValue={templateDescription}
+                  onChange={(e) => setTemplateDescription(e.target.value)}
+                />
+              </div>
+
+              {/* Add email messages here. */}
+              {outreachMessages.map((_, index) => {
+                return (
+                  <OutreachMessage
+                    key={index}
+                    outreachMessages={outreachMessages}
+                    index={index}
+                    onChange={handleOutreachMessageUpdate}
+                  />
+                );
+              })}
+
+              {/* Whether this is the first template the user is creating. */}
+              <Input
+                hidden={true}
+                name="first_template_creation"
+                defaultValue={firstTemplateCreation}
+              />
+
+              <div id="btn-container">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  onClick={handleCreateOrEditTemplateRequest}
+                >
+                  {actionButtonText}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -274,4 +322,4 @@ function CreateOrEditTemplateMessage() {
   );
 }
 
-export default CreateOrEditTemplateMessage;
+export default CreateOrEditTemplate;

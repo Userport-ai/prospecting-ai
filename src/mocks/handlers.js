@@ -6,6 +6,7 @@ import {
 } from "./leads-table-data";
 import {
   exampleTemplateResponse,
+  editTemplateResponse,
   noTemplatesResponse,
 } from "./create-template-data";
 import { reportWithSelectedTemplate } from "./lead-report-with-template-data";
@@ -17,6 +18,9 @@ export const handlers = [
   }),
   http.get("/api/v1/outreach-email-templates", () => {
     return HttpResponse.json(exampleTemplateResponse);
+  }),
+  http.get("/api/v1/outreach-email-templates/*", () => {
+    return HttpResponse.json(editTemplateResponse);
   }),
   http.get("/api/v1/lead-research-reports/*", () => {
     return HttpResponse.json(reportWithNoTemplate);
