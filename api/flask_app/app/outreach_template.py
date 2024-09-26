@@ -110,13 +110,3 @@ class OutreachTemplateMatcher:
     def get_tokens_used(self) -> Optional[OpenAITokenUsage]:
         """Returns tokens used so far in personalization. Can return None if choose outreach template workflow is not run yet."""
         return self.openai_tokens_used
-
-    @ staticmethod
-    def from_outreach_template(outreach_email_template: OutreachEmailTemplate) -> LeadResearchReport.ChosenOutreachEmailTemplate:
-        """Helper to return Lead report template from given outreach template."""
-        return LeadResearchReport.ChosenOutreachEmailTemplate(
-            id=outreach_email_template.id,
-            name=outreach_email_template.name,
-            creation_date=Utils.create_utc_time_now(),
-            message=outreach_email_template.message,
-        )

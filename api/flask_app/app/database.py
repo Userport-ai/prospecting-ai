@@ -336,6 +336,18 @@ class Database:
                 OutreachEmailTemplate(**outreach_email_template_dict))
         return outreach_email_templates
 
+    def list_all_email_templates_for_migration(self, projection: Optional[Dict[str, int]] = None) -> List[OutreachEmailTemplate]:
+        """Returns all Outreach Emails in the database. Should only be used for migration use cases."""
+        collection = self.get_outreach_email_template_collection()
+        cursor = collection.find({}, projection).sort(
+            [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
+        )
+        outreach_email_templates: List[OutreachEmailTemplate] = []
+        for outreach_email_template_dict in cursor:
+            outreach_email_templates.append(
+                OutreachEmailTemplate(**outreach_email_template_dict))
+        return outreach_email_templates
+
     def update_user(self, user_id: str, setFields: Dict[str, str]):
         """Updates fields for given User object. Assumes that fields are existing fields in the User Document model."""
         collection = self._get_users_collection()

@@ -919,10 +919,22 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
 def admin_migration():
     logger.info("Got Migration request")
     db = Database()
-    for user in db.list_users(filter={}):
-        db.update_user(user_id=user.id, setFields={
-                       "usage_tier": UsageTier.ALPHA_TESTERS})
-    logger.info("Successfully completed migration request")
+    num_templates_updated = 0
+
+    dry_run: bool = request.json.get("dry_run")
+    logger.info(f"Dry run: {dry_run}")
+    for outreach_email_template in db.list_all_email_templates_for_migration():
+        if not dry_run:
+            db.update_outreach_email_template(outreach_email_template_id=outreach_email_template.id, setFields={
+                "messages": [outreach_email_template.message]})
+        num_templates_updated += 1
+
+    if not dry_run:
+        logger.info(
+            f"Successfully completed migration request. Num updated templates: {num_templates_updated}")
+    else:
+        logger.info(
+            f"This is a dry run, will update: {num_templates_updated} templates")
     return Response("ok\n")
 
 
