@@ -107,7 +107,7 @@ function CreateOrEditTemplate() {
     existingOutreachTemplate ? existingOutreachTemplate.description : ""
   );
   const [outreachMessages, setOutreachMessages] = useState(
-    existingOutreachTemplate ? [existingOutreachTemplate.message] : [""]
+    existingOutreachTemplate ? existingOutreachTemplate.messages : [""]
   );
   const pageTitle = existingOutreachTemplate
     ? "Edit Email Template"

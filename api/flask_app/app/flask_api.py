@@ -478,7 +478,7 @@ def update_template_in_personalized_email(personalized_email_id: str):
                 id=new_template.id,
                 name=new_template.name,
                 creation_date=new_template.creation_date,
-                message=new_template.message
+                message=new_template.messages[0]
             )
 
         if new_email_opener:
@@ -652,7 +652,7 @@ def create_outreach_email_template():
 
     try:
         outreach_email_template = OutreachEmailTemplate(
-            user_id=user_id, name=name, persona_role_titles=persona_role_titles, description=description, message=message, messages=[message])
+            user_id=user_id, name=name, persona_role_titles=persona_role_titles, description=description, messages=[message])
         template_id: str = db.insert_outreach_email_template(
             outreach_email_template=outreach_email_template)
         logger.info(
@@ -734,7 +734,7 @@ def list_outreach_email_templates():
             "name": 1,
             "persona_role_titles": 1,
             "description": 1,
-            "message": 1,
+            "messages": 1,
             "creation_date_readable_str": 1,
             "last_updated_date_readable_str": 1,
         }
@@ -797,7 +797,6 @@ def update_outreach_email_template(outreach_email_template_id: str):
             "name": name,
             "persona_role_titles": persona_role_titles,
             "description": description,
-            "message": message,
             "messages": [message],
         }
         db.update_outreach_email_template(
@@ -925,9 +924,7 @@ def admin_migration():
     dry_run: bool = request.json.get("dry_run")
     logger.info(f"Dry run: {dry_run}")
     for outreach_email_template in db.list_all_email_templates_for_migration():
-        if not dry_run:
-            db.update_outreach_email_template(outreach_email_template_id=outreach_email_template.id, setFields={
-                "messages": [outreach_email_template.message]})
+        # TODO: Add action here.
         num_templates_updated += 1
 
     if not dry_run:

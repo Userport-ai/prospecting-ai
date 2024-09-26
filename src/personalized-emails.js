@@ -87,9 +87,8 @@ function TemplateEditMode({
 
   var templateMessage = null;
   if (selectedTemplateId !== null) {
-    templateMessage = allTemplates.find(
-      (t) => t.id === selectedTemplateId
-    ).message;
+    templateMessage = allTemplates.find((t) => t.id === selectedTemplateId)
+      .messages[0];
   }
 
   // When user selects a template from the options dropdown.
@@ -115,8 +114,18 @@ function TemplateEditMode({
       null
     );
     setUpdateLoading(false);
-    const newTemplate = allTemplates.find((t) => t.id === selectedTemplateId);
-    onEditSuccess(newTemplate);
+
+    // We need to convert from OutreachEmailTemplate object to ChosenOutreachEmailTemplate (which is stored in PersonalizedEmail object).
+    const newOutreachTemplate = allTemplates.find(
+      (t) => t.id === selectedTemplateId
+    );
+    const chosenOutreachTemplate = {
+      id: newOutreachTemplate.id,
+      creation_date: newOutreachTemplate.creation_date,
+      name: newOutreachTemplate.name,
+      message: newOutreachTemplate.messages[0],
+    };
+    onEditSuccess(chosenOutreachTemplate);
 
     // Send event.
     posthog.capture("p_email_template_updated", {
@@ -210,7 +219,8 @@ function Template({
 }) {
   // Whether template is being edited or not.
   const [editTemplateMode, setEditTemplateMode] = useState(false);
-  // All templates uploaded by user.
+  // All templates uploaded by user. These are outreach email templates and
+  // not the template object stored within PersonalizedEmail object.
   const [allTemplates, setAllTemplates] = useState([]);
 
   function handleAllTemplatesFetched(fetchedTemplates) {

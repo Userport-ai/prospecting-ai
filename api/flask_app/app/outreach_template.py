@@ -104,7 +104,7 @@ class OutreachTemplateMatcher:
             id=result.matched_persona_id,
             name=chosen_email_template.name,
             creation_date=Utils.create_utc_time_now(),
-            message=chosen_email_template.message,
+            message=chosen_email_template.messages[0],
         )
 
     def get_tokens_used(self) -> Optional[OpenAITokenUsage]:

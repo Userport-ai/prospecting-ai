@@ -519,10 +519,8 @@ class OutreachEmailTemplate(BaseModel):
         default=None, description="Role Titles for the persona this template is targeting. Can be more than one title.")
     description: Optional[str] = Field(
         default=None, description="Free form text describing the persona's skillset or specific interests.")
-    message: Optional[str] = Field(
-        default=None, description="Message template used for outreach to role titles above.")
-    # Not yet populated in prod.
-    messages: Optional[List[str]] = Field(default=None, description="List of messages used for outreach. They are always ordered by sequence of outreach i.e. first email, follow up 1, follow 2 and so on.")
+    messages: Optional[List[str]] = Field(
+        default=None, description="List of messages used for outreach. They are always ordered by sequence of outreach i.e. first email, follow up 1, follow 2 and so on.")
     last_updated_date: Optional[datetime] = Field(
         default=None, description="Date in UTC timezone when this document was last updated in the database.")
     last_updated_date_readable_str: Optional[str] = Field(

@@ -67,7 +67,7 @@ function TemplateCard({ templateDetails, onDeleteTemplate }) {
           <Flex vertical={true} gap="small">
             <Text className="card-key">Message:</Text>
             <Text className="card-key-value-text">
-              {addLineBreaks(templateDetails.message)}
+              {addLineBreaks(templateDetails.messages[0])}
             </Text>
           </Flex>
 
