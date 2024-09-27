@@ -55,21 +55,65 @@
   color: var(--secondary);
 }
 
-#create-or-edit-template-container #btn-container {
+#create-or-edit-template-container
+  .form-item-container
+  .message-close-btn-container {
+  display: flex;
+  flex-direction: row;
+  align-items: end;
+  justify-content: space-between;
+}
+
+#create-or-edit-template-container .outreach-message-container {
+  display: flex;
+  flex-direction: column;
+}
+
+#create-or-edit-template-container .outreach-message-container .outreach-label {
+  font-size: 1.7rem;
+  font-weight: 600;
+}
+
+#create-or-edit-template-container .message-close-btn-container .close-btn {
+  background-color: var(--on-secondary);
+}
+
+#create-or-edit-template-container
+  .message-close-btn-container
+  .close-btn:hover {
+  background-color: var(--on-surface-lighter);
+  color: var(--on-secondary);
+}
+
+#create-or-edit-template-container #follow-up-email-btn {
+  width: fit-content;
+  padding: 1.8rem;
+  background-color: var(--secondary);
+  color: var(--on-secondary);
+  font-weight: 600;
+  border: 0;
+}
+
+#create-or-edit-template-container #follow-up-email-btn:hover {
+  background-color: var(--on-surface-lighter);
+}
+
+#create-or-edit-template-container #submit-btn-container {
   margin-top: 2rem;
+  margin-bottom: 4rem;
   display: flex;
   flex-direction: row;
   justify-content: end;
 }
 
-#create-or-edit-template-container .ant-btn {
-  width: 10rem;
-  height: 4rem;
+#create-or-edit-template-container #submit-btn-container .ant-btn {
+  padding: 1.8rem;
   font-size: 1.7rem;
+  font-weight: 600;
   background-color: var(--primary);
   border-radius: 1.5rem;
 }
 
-#create-or-edit-template-container .ant-btn:hover {
+#create-or-edit-template-container #submit-btn-container .ant-btn:hover {
   background-color: var(--hover-color);
 }

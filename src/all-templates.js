@@ -99,6 +99,7 @@ function TemplatesView({ templateMessages, onDeleteTemplate }) {
   ));
 }
 
+// Main component.
 function AllTemplates() {
   const navigate = useNavigate();
   const component_is_loading = useNavigation().state !== "idle";

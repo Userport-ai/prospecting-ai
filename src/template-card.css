@@ -53,12 +53,18 @@
   gap: 0.5rem;
 }
 
+.template-card .dates-container {
+  margin-top: 2rem;
+}
+
 .template-card .dates-container .date-key {
   color: var(--secondary);
+  font-size: 1.2rem;
   font-weight: 600;
 }
 
 .template-card .dates-container .date-key-value-text {
   color: var(--secondary);
+  font-size: 1.2rem;
   font-weight: 500;
 }

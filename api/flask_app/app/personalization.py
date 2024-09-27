@@ -85,6 +85,8 @@ class Personalization:
     def _create_personalized_email_helper(self, highlight: LeadResearchReport.ReportDetail.Highlight, email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate], lead_research_report: LeadResearchReport, creation_date: datetime) -> LeadResearchReport.PersonalizedEmail:
         """Helper method to create a personalized email for given highlight and email template for given report."""
         email_template_message: Optional[str] = email_template.message if email_template else None
+        # TODO: Right now, we are generating email subject line even for follow up emails which is not technically correct but it helps us
+        # not make any changes to the email generation prompt. If users actually ask for this to be removed in the UI, we will definitely implement it.
         email_subject_line: str = self.generate_email_subject_line(
             highlight=highlight, lead_research_report=lead_research_report, email_template_message=email_template_message)
         email_opener: str = self.generate_email_opener(highlight=highlight, lead_research_report=lead_research_report,
@@ -181,7 +183,7 @@ class Personalization:
     def generate_email_opener(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport, email_template_message: Optional[str], email_subject_line: str) -> Optional[str]:
         """Generates Personalized email opener for lead using given highlight and email subject line.
 
-        If email template is provided it is used in determining the email subject line. If not, only information from lead research report, highlight and email subject line are used.
+        If email template is provided it is used in determining the email opener. If not, only information from lead research report, highlight and email subject line are used.
         """
         prompt_email_template_is_given = (
             "You are given the email template message that will be used to highlight the pain point your product solves and its potential value proposition to the prospect.\n"

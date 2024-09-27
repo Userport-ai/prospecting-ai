@@ -302,7 +302,7 @@ class Database:
                 LeadResearchReport(**research_report_dict))
         return lead_research_reports
 
-    def list_raw_lead_research_reports(self, filter: Dict, projection: Optional[Dict[str, int]] = None) -> List[LeadResearchReport]:
+    def list_raw_lead_research_reports(self, filter: Dict, projection: Optional[Dict[str, int]] = None) -> List[Dict]:
         """Returns a list of python dictionaries of Lead Research reports with given filter. Should only be used for migration use cases."""
         collection = self.get_lead_research_report_collection()
         # TODO: Add pagination using skip() as well.

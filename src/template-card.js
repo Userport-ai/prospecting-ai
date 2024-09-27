@@ -47,29 +47,37 @@ function TemplateCard({ templateDetails, onDeleteTemplate }) {
     <Card key={templateDetails.id} className="template-card">
       <div className="contents-and-btn-container">
         <div className="card-contents-container">
-          <Flex vertical={false} gap="small">
-            <Text className="card-key">Name:</Text>
+          <Flex vertical={true}>
+            <Text className="card-key">Name</Text>
             <Text className="card-key-value-text">{templateDetails.name}</Text>
           </Flex>
 
-          <Flex vertical={false} gap="small">
-            <Text className="card-key">Role Titles:</Text>
+          <Flex vertical={true}>
+            <Text className="card-key">Role Titles</Text>
             <Text className="card-key-value-text">
               {toCommaSeparatedString(templateDetails.persona_role_titles)}
             </Text>
           </Flex>
-          <Flex vertical={false} gap="small">
-            <Text className="card-key">Description (Optional):</Text>
+          <Flex vertical={true}>
+            <Text className="card-key">Description (Optional)</Text>
             <Text className="card-key-value-text">
               {templateDetails.description}
             </Text>
           </Flex>
-          <Flex vertical={true} gap="small">
-            <Text className="card-key">Message:</Text>
-            <Text className="card-key-value-text">
-              {addLineBreaks(templateDetails.messages[0])}
-            </Text>
-          </Flex>
+
+          {/* Add email messages here */}
+          {templateDetails.messages.map((message, index) => {
+            const labelName =
+              index === 0 ? "First Email" : `Follow Up ${index.toString()}`;
+            return (
+              <Flex vertical={true}>
+                <Text className="card-key">{labelName}</Text>
+                <Text className="card-key-value-text">
+                  {addLineBreaks(message)}
+                </Text>
+              </Flex>
+            );
+          })}
 
           <div className="dates-container">
             <div className="created-date-container">

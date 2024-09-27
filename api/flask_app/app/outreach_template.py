@@ -100,11 +100,14 @@ class OutreachTemplateMatcher:
                 f"Expected to find 1 Email template with ID: {result.matched_persona_id}, found: {chosen_templates} for Lead with person profile ID: {person_profile.id} in report: {lead_research_report_id}")
         chosen_email_template: OutreachEmailTemplate = chosen_templates[0]
 
+        # Template message for this flow will always be the first email's message (index 0) since it is
+        # called during lead report creation to figure out which template to match against the lead's profile.
         return LeadResearchReport.ChosenOutreachEmailTemplate(
             id=result.matched_persona_id,
             name=chosen_email_template.name,
             creation_date=Utils.create_utc_time_now(),
             message=chosen_email_template.messages[0],
+            message_index=0,
         )
 
     def get_tokens_used(self) -> Optional[OpenAITokenUsage]:

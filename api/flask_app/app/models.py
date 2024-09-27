@@ -407,7 +407,8 @@ class LeadResearchReport(BaseModel):
         name: Optional[str] = Field(
             default=None, description="Name of the temmplate selected.")
         message: Optional[str] = Field(
-            default=None, description="Message template used for outreach to role titles above.")
+            default=None, description="Message used for outreach to role titles above. This can be the first email or any follow email message for given template ID.")
+        message_index: Optional[int] = Field(default=None, description="Index of the message used within the OutreachEmailTemplate object. 0 -> First email, 1 -> Follow up 1 and so on.")
 
     class PersonalizedEmail(BaseModel):
         """Personalized Email addressed to a given lead in the lead research report. Uses chosen template if it exists else generates email without template."""
@@ -535,7 +536,16 @@ class OutreachEmailTemplate(BaseModel):
             f"Description: {self.description if self.description else 'Unknown'}\n"
             "\n"
         )
-
+    
+    def to_personalized_email_outreach_template(self, message_index: int) -> "LeadResearchReport.ChosenOutreachEmailTemplate":
+        """Converts given template instance with given message index to outreach instance used in PersonalizedEmails."""
+        return LeadResearchReport.ChosenOutreachEmailTemplate(
+                id=self.id,
+                name=self.name,
+                creation_date=self.creation_date,
+                message=self.messages[message_index],
+                message_index=message_index,
+            )
 
 class PersonProfile(BaseModel):
     """Profile of a person.

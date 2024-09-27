@@ -1,5 +1,6 @@
 import "./create-or-edit-template.css";
 import { Typography, Input, Button, Skeleton, Modal } from "antd";
+import { CloseOutlined } from "@ant-design/icons";
 import BackArrow from "./back-arrow";
 import { useContext, useState } from "react";
 import { redirect, useLoaderData, useNavigate } from "react-router-dom";
@@ -55,7 +56,7 @@ export const createOrEditTemplateLoader = (authContext) => {
 };
 
 // Template message used to reach out to prospect.
-function OutreachMessage({ outreachMessages, index, onChange }) {
+function OutreachMessage({ outreachMessages, index, onChange, onRemove }) {
   var labelText = "";
   var helperText = "";
   var message = outreachMessages[index];
@@ -67,17 +68,29 @@ function OutreachMessage({ outreachMessages, index, onChange }) {
       "Write a message that shines light on the prospect's problem as well as the value proposition of your product or service.";
   } else {
     // Follow up email.
-    labelText = `Follow Up - ${(index + 1).toString()}`;
+    labelText = `Follow Up ${index.toString()}`;
     helperText =
       "Write a follow up message to remind your prospect about your previous outreach.";
   }
 
   return (
     <div className="form-item-container">
-      <label htmlFor="message-textarea">{labelText}</label>
-      <Text className="label-helper-text">{helperText}</Text>
+      <div className="message-close-btn-container">
+        <div className="outreach-message-container">
+          <Text className="outreach-label">{labelText}</Text>
+          <Text className="label-helper-text">{helperText}</Text>
+        </div>
+        {/* We show a close button only for follow up email messages. */}
+        {index > 0 && (
+          <Button
+            className="close-btn"
+            icon={<CloseOutlined />}
+            onClick={() => onRemove(index)}
+          ></Button>
+        )}
+      </div>
+
       <TextArea
-        id="message-textarea"
         name={textAreaName}
         value={message}
         onChange={(e) => onChange(e.target.value, index)}
@@ -129,6 +142,11 @@ function CreateOrEditTemplate() {
     );
   }
 
+  // Handle user action to add a new follow up message.
+  function handleOutreachMessageAdded() {
+    setOutreachMessages([...outreachMessages, ""]);
+  }
+
   // Handle changes to outreach message made by the user.
   function handleOutreachMessageUpdate(newMessage, index) {
     if (index < 0 || index >= outreachMessages.length) {
@@ -149,8 +167,14 @@ function CreateOrEditTemplate() {
     setOutreachMessages(newOutreachMessages);
   }
 
+  // Handle user action to remove outreach message.
+  function handleOutreachMessageRemoved(index) {
+    setOutreachMessages(outreachMessages.filter((_, idx) => idx !== index));
+  }
+
   // Handle request to submit template to the server.
   async function handleCreateOrEditTemplateRequest() {
+    // Validate all request params before sending to the server.
     var error_message = "";
     if (!templateName) {
       error_message = "Template Name cannot be empty";
@@ -194,7 +218,7 @@ function CreateOrEditTemplate() {
         name: templateName,
         persona_role_titles: templateRoleTitles,
         description: templateDescription,
-        message: outreachMessages[0],
+        messages: outreachMessages,
       }),
       headers: {
         "Content-Type": "application/json",
@@ -294,9 +318,20 @@ function CreateOrEditTemplate() {
                     outreachMessages={outreachMessages}
                     index={index}
                     onChange={handleOutreachMessageUpdate}
+                    onRemove={handleOutreachMessageRemoved}
                   />
                 );
               })}
+
+              {/* Add Follow up email button. */}
+              <div className="form-item-container">
+                <Button
+                  id="follow-up-email-btn"
+                  onClick={handleOutreachMessageAdded}
+                >
+                  Add Follow up Email
+                </Button>
+              </div>
 
               {/* Whether this is the first template the user is creating. */}
               <Input
@@ -305,7 +340,7 @@ function CreateOrEditTemplate() {
                 defaultValue={firstTemplateCreation}
               />
 
-              <div id="btn-container">
+              <div id="submit-btn-container">
                 <Button
                   type="primary"
                   htmlType="submit"

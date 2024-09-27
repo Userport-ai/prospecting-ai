@@ -328,6 +328,7 @@ def get_lead_report(lead_research_report_id: str):
                         "id": 1,
                         "name": 1,
                         "message": 1,
+                        "message_index": 1,
                     },
                 },
             }
@@ -426,14 +427,18 @@ def update_template_in_personalized_email(personalized_email_id: str):
     db = Database()
     user_id: str = g.user["uid"]
 
-    lead_research_report_id: str = None
-    new_template_id: str = None
+    lead_research_report_id: Optional[str] = None
+    new_template_id: Optional[str] = None
+    new_message_index: Optional[int] = None
+    new_email_opener: Optional[str] = None
+    new_email_subject_line: Optional[str] = None
     try:
-        lead_research_report_id: str = request.json.get(
+        lead_research_report_id = request.json.get(
             "lead_research_report_id")
-        new_template_id: Optional[str] = request.json.get("new_template_id")
-        new_email_opener: Optional[str] = request.json.get("new_email_opener")
-        new_email_subject_line: Optional[str] = request.json.get(
+        new_template_id = request.json.get("new_template_id")
+        new_message_index = request.json.get("new_message_index")
+        new_email_opener = request.json.get("new_email_opener")
+        new_email_subject_line = request.json.get(
             "new_email_subject_line")
 
         if new_template_id == None and new_email_opener == None and new_email_subject_line == None:
@@ -470,16 +475,12 @@ def update_template_in_personalized_email(personalized_email_id: str):
         if new_template_id:
             logger.info(
                 f"Updating template in email ID: {personalized_email_id} in report ID: {lead_research_report_id}")
-            new_template = db.get_outreach_email_template(
+            new_template: OutreachEmailTemplate = db.get_outreach_email_template(
                 outreach_email_template_id=new_template_id)
 
-            # Update new template and update time in matched email.
-            email.template = LeadResearchReport.ChosenOutreachEmailTemplate(
-                id=new_template.id,
-                name=new_template.name,
-                creation_date=new_template.creation_date,
-                message=new_template.messages[0]
-            )
+            # Convert new template to Personalized email template.
+            email.template = new_template.to_personalized_email_outreach_template(
+                message_index=new_message_index)
 
         if new_email_opener:
             logger.info(
@@ -568,8 +569,14 @@ def create_personalized_email():
             raise ValueError(
                 f"Could not find Highlight with ID: {highlight_id} in report ID: {lead_research_report_id}")
 
-        # Get template from latest updated personalized email. This is a potential signal that the user found the email useful.
-        # If not, they can always manually switch the template in the UI.
+        # The algorithm here tries to smartly detect which template to use for generating the personalized email. It is as follows:
+        # [1] Sort existing personalized emails in report in order of most recently updated to least recently updated.
+        # [2] Pick the first email that has a template (not None) and note down the last updated date for this email.
+        # [3] If the email's last updated date is equal to creation date, then it was created by the system on lead report creation and no were done by the user.
+        #     In this case, use the frst message in this template for new outreach email creation.
+        # [4] If the email's last updated date is different from creation date, it means the user has edited email subject line, body or template from the UI,
+        #     Use this as hint that the template in this email was already used. So use the next message (follow up) in this template for outreach email creation.
+        # [5] If our guess is wrong, the user can always manually elect a different template from the UI.
         personalized_outreach_messages: Optional[LeadResearchReport.PersonalizedOutreachMessages] = lead_research_report.personalized_outreach_messages
         if not personalized_outreach_messages or not personalized_outreach_messages.personalized_emails or not personalized_outreach_messages.total_tokens_used:
             raise ValueError(
@@ -579,13 +586,39 @@ def create_personalized_email():
             raise ValueError(
                 f"Expected personalied emails to be not empty, got empty in report ID: {lead_research_report_id}")
 
+        # Sort emails by last updated date.
         sorted_emails: List[LeadResearchReport.PersonalizedEmail] = sorted(
             personalized_emails, key=lambda e: e.last_updated_date, reverse=True)
         email_template: Optional[LeadResearchReport.ChosenOutreachEmailTemplate] = None
         for email in sorted_emails:
-            if email.template:
+            if not email.template:
+                continue
+
+            if email.last_updated_date == email.creation_date:
+                # Created by system and likely not used by the user for outreach yet.
+                # Use the same template.
+                logger.info(
+                    f"Using template with ID: {email.template.id} and message index: 0 to create personalized email for highlight ID: {highlight_id}, report ID: {lead_research_report_id} requested by user: {user_id}")
                 email_template = email.template
-                break
+            else:
+                # User has edited this email so likely has used it before.
+                # Set email template to the next message if there is one else set to current template.
+                next_message_index: int = email.template.message_index + 1
+                orig_template: OutreachEmailTemplate = db.get_outreach_email_template(
+                    outreach_email_template_id=email.template.id)
+                if next_message_index < len(orig_template.messages):
+                    # Next message index exists, get personalized email template with this index.
+                    logger.info(
+                        f"Using template with ID: {email.template.id} and message index: {next_message_index} to create personalized email for highlight ID: {highlight_id}, report ID: {lead_research_report_id} requested by user: {user_id}")
+                    email_template = orig_template.to_personalized_email_outreach_template(
+                        message_index=next_message_index)
+                else:
+                    logger.info(
+                        f"Next message index: {next_message_index} not found, using template with ID: {email.template.id} and and current message index: {email.template.message_index} to create personalized email for highlight ID: {highlight_id}, report ID: {lead_research_report_id} requested by user: {user_id}")
+                    # Next index doesn't exist. Just use current personalzed email template.
+                    email_template = email.template
+
+            break
 
         # Create email.
         pz = Personalization(database=db)
@@ -637,13 +670,16 @@ def create_outreach_email_template():
     name: str = None
     persona_role_titles: List[str] = None
     description: str = None
-    message: str = None
+    messages: List[str] = None
     try:
         name = request.json.get("name")
         persona_role_titles = [title.strip() for title in request.json.get(
             "persona_role_titles").split(",")]
         description = request.json.get("description")
-        message = request.json.get("message")
+        messages = request.json.get("messages")
+        if len(messages) == 0:
+            raise ValueError(
+                "Outreach template messages cannot be empty in request")
     except Exception as e:
         logger.exception(
             f"Invalid request: {request} to create outreach email template by user ID: {user_id} with error: {e}")
@@ -652,7 +688,7 @@ def create_outreach_email_template():
 
     try:
         outreach_email_template = OutreachEmailTemplate(
-            user_id=user_id, name=name, persona_role_titles=persona_role_titles, description=description, messages=[message])
+            user_id=user_id, name=name, persona_role_titles=persona_role_titles, description=description, messages=messages)
         template_id: str = db.insert_outreach_email_template(
             outreach_email_template=outreach_email_template)
         logger.info(
@@ -777,13 +813,16 @@ def update_outreach_email_template(outreach_email_template_id: str):
     name: str = None
     persona_role_titles: List[str] = None
     description: str = None
-    message: str = None
+    messages: List[str] = None
     try:
         name = request.json.get("name")
         persona_role_titles = [title.strip() for title in request.json.get(
             "persona_role_titles").split(",")]
         description = request.json.get("description")
-        message = request.json.get("message")
+        messages = request.json.get("messages")
+        if len(messages) == 0:
+            raise ValueError(
+                "Outreach template messages cannot be empty in request")
     except Exception as e:
         logger.exception(
             f"Invalid request: {request} for updating email template ID: {outreach_email_template_id} by user ID: {user_id} with error: {e}")
@@ -797,7 +836,7 @@ def update_outreach_email_template(outreach_email_template_id: str):
             "name": name,
             "persona_role_titles": persona_role_titles,
             "description": description,
-            "messages": [message],
+            "messages": messages,
         }
         db.update_outreach_email_template(
             outreach_email_template_id=outreach_email_template_id, setFields=setFields)
@@ -919,20 +958,29 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
 def admin_migration():
     logger.info("Got Migration request")
     db = Database()
-    num_templates_updated = 0
+    num_emails_updated = 0
 
     dry_run: bool = request.json.get("dry_run")
     logger.info(f"Dry run: {dry_run}")
-    for outreach_email_template in db.list_all_email_templates_for_migration():
-        # TODO: Add action here.
-        num_templates_updated += 1
+    for report in db.list_lead_research_reports(filter={"personalized_outreach_messages": {"$ne": None}}, projection={"personalized_outreach_messages": 1}):
+        update_report: bool = False
+        for email in report.personalized_outreach_messages.personalized_emails:
+            if email.template and not email.template.message_index:
+                # Set message index to 0 by default.
+                email.template.message_index = 0
+                num_emails_updated += 1
+                update_report = True
+
+        if update_report:
+            db.update_lead_research_report(lead_research_report_id=report.id, setFields={
+                "personalized_outreach_messages": report.personalized_outreach_messages.model_dump()})
 
     if not dry_run:
         logger.info(
-            f"Successfully completed migration request. Num updated templates: {num_templates_updated}")
+            f"Successfully completed migration request. Num updated emails: {num_emails_updated}")
     else:
         logger.info(
-            f"This is a dry run, will update: {num_templates_updated} templates")
+            f"This is a dry run, will update: {num_emails_updated} emails")
     return Response("ok\n")
 
 

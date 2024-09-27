@@ -8,6 +8,7 @@ import {
   message,
   Input,
   Tooltip,
+  Modal,
 } from "antd";
 import {
   EditOutlined,
@@ -22,6 +23,18 @@ import { usePostHog } from "posthog-js/react";
 const { Text, Link } = Typography;
 const { TextArea } = Input;
 
+// Helper to return Message text for given index.
+// Logic is simple but referenced at multiple places in this file.
+function getMessageText(index) {
+  return index === 0 ? "First Email" : `Follow Up ${index.toString()}`;
+}
+
+// Helper to returnd display name of template given the message index.
+function getTemplateDisplayName(templateName, index) {
+  const msgName = getMessageText(index);
+  return `${templateName}-${msgName}`;
+}
+
 // Helper to update Personalized email by calling the backend server.
 async function updateEmailOnBackend(
   posthog,
@@ -29,6 +42,7 @@ async function updateEmailOnBackend(
   lead_research_report_id,
   emailId,
   new_template_id = null,
+  new_message_index = null,
   newEmailOpener = null,
   newEmailSubjectLine = null
 ) {
@@ -40,6 +54,7 @@ async function updateEmailOnBackend(
       body: JSON.stringify({
         lead_research_report_id: lead_research_report_id,
         new_template_id: new_template_id,
+        new_message_index: new_message_index,
         new_email_opener: newEmailOpener,
         new_email_subject_line: newEmailSubjectLine,
       }),
@@ -77,29 +92,67 @@ function TemplateEditMode({
 }) {
   // Logged in user.
   const { user } = useContext(AuthContext);
+  // ID of the template selected by the user
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  // Index of the message selected by the user within a given template
+  const [selectedMessageIndex, setSelectedMessageIndex] = useState(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const posthog = usePostHog();
 
-  const templateOptions = allTemplates.map((template) => {
-    return { label: template.name, value: template.id };
+  // Template options are grouped by Template ID for easier user selection.
+  // We also assigned a unique key for each option that is made up of the
+  // ID, template name and message index.
+  const templateOptions = allTemplates.map((tmp) => {
+    var groupOptions = tmp.messages.map((_, idx) => {
+      return {
+        label: getMessageText(idx),
+        value: `${tmp.id}-${tmp.name}-${idx}`,
+      };
+    });
+    return {
+      label: <Text strong>{tmp.name}</Text>,
+      options: groupOptions,
+    };
   });
 
+  // This method dictates what label should be rendered on user selection.
+  // We want this to refelect the Template name + Email Message Name (First Email, Follow Up etc.)
+  // It constructs from the 'value' of the selected option which consists of template name and index.
+  const labelRender = (props) => {
+    const { label, value } = props;
+    if (label) {
+      const tmpArr = value.split("-");
+      const tmpName = tmpArr[1];
+      const msgIdx = Number(tmpArr[2]);
+      return getTemplateDisplayName(tmpName, msgIdx);
+    }
+    return "Select";
+  };
+
+  // Get template message associated with currrently selected template Id.
   var templateMessage = null;
-  if (selectedTemplateId !== null) {
+  if (selectedTemplateId !== null && selectedMessageIndex !== null) {
     templateMessage = allTemplates.find((t) => t.id === selectedTemplateId)
-      .messages[0];
+      .messages[selectedMessageIndex];
   }
 
   // When user selects a template from the options dropdown.
   function handleTemplateOptionSelection(value, option) {
-    setSelectedTemplateId(value);
+    const tmpArr = value.split("-");
+    const tmpId = tmpArr[0];
+    const msgIdx = Number(tmpArr[2]);
+    setSelectedTemplateId(tmpId);
+    setSelectedMessageIndex(msgIdx);
   }
 
   // When a user clicks to update the template for given email.
   async function handleTemplateUpdateClick() {
-    if (selectedTemplateId === null) {
-      // No template selected, nothing to do here.
+    if (selectedTemplateId === null || selectedMessageIndex === null) {
+      // No template or message index selected, tell the user.
+      Modal.error({
+        title: "No template selected",
+        content: "Please select a template first from the options",
+      });
       return;
     }
 
@@ -110,6 +163,7 @@ function TemplateEditMode({
       lead_research_report_id,
       emailId,
       selectedTemplateId,
+      selectedMessageIndex,
       null,
       null
     );
@@ -123,7 +177,8 @@ function TemplateEditMode({
       id: newOutreachTemplate.id,
       creation_date: newOutreachTemplate.creation_date,
       name: newOutreachTemplate.name,
-      message: newOutreachTemplate.messages[0],
+      message: newOutreachTemplate.messages[selectedMessageIndex],
+      message_index: selectedMessageIndex,
     };
     onEditSuccess(chosenOutreachTemplate);
 
@@ -138,6 +193,7 @@ function TemplateEditMode({
   return (
     <div className="email-template-edit-view">
       <Select
+        labelRender={labelRender}
         options={templateOptions}
         onChange={handleTemplateOptionSelection}
       ></Select>
@@ -196,10 +252,18 @@ function TemplateReadMode({ curEmailTemplate, onAllTemplatesFetched }) {
     setAllTemplatesLoading(false);
     onAllTemplatesFetched(result.outreach_email_templates);
   }
+
+  const templateDisplayName =
+    curEmailTemplate !== null
+      ? getTemplateDisplayName(
+          curEmailTemplate.name,
+          curEmailTemplate.message_index
+        )
+      : "None";
   return (
     <div className="email-template-read-view">
       <Text className="text-label">Template: </Text>
-      <Text>{curEmailTemplate !== null ? curEmailTemplate.name : "None"}</Text>
+      <Text>{templateDisplayName}</Text>
       <Button
         className="edit-email-template-icon"
         icon={<EditOutlined style={{ color: "#65558f" }} />}
@@ -289,6 +353,7 @@ function EmailSubjectLine({
       emailId,
       null,
       null,
+      null,
       curEmailSubjectLine
     );
     setUpdateLoading(false);
@@ -367,6 +432,7 @@ function EmailOpener({
       lead_research_report_id,
       emailId,
       null,
+      null,
       curEmailOpener,
       null
     );
@@ -425,7 +491,7 @@ function EmailOpener({
 
 // A single EmailCard component.
 function EmailCard({ lead_research_report_id, personalized_email }) {
-  // Current template used in this email card.
+  // Current template used in this email card. This is always the personalized email's template.
   const [curEmailTemplate, setCurEmailTemplate] = useState(
     personalized_email.template
   );
