@@ -911,6 +911,8 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
     WARNING: DO NOT USE IN PRODUCTION. This method has bugs and should be rewritten before it is used properly
     in production.
     """
+    # Remove return when there is safe to use.
+    return
     database = Database()
     report = database.get_lead_research_report(
         lead_research_report_id=lead_research_report_id, projection={"company_profile_id": 1})
@@ -962,6 +964,10 @@ def admin_migration():
 
     dry_run: bool = request.json.get("dry_run")
     logger.info(f"Dry run: {dry_run}")
+
+    # Remove return when there is a new migration to do.
+    return
+
     for report in db.list_lead_research_reports(filter={"personalized_outreach_messages": {"$ne": None}}, projection={"personalized_outreach_messages": 1}):
         update_report: bool = False
         for email in report.personalized_outreach_messages.personalized_emails:
@@ -971,7 +977,7 @@ def admin_migration():
                 num_emails_updated += 1
                 update_report = True
 
-        if update_report:
+        if dry_run and update_report:
             db.update_lead_research_report(lead_research_report_id=report.id, setFields={
                 "personalized_outreach_messages": report.personalized_outreach_messages.model_dump()})
 
