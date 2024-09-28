@@ -23,6 +23,11 @@ import { usePostHog } from "posthog-js/react";
 const { Text, Link } = Typography;
 const { TextArea } = Input;
 
+// Helper to get magic string used for splitting string.
+function getMagicString() {
+  return "UserportMagicString";
+}
+
 // Helper to return Message text for given index.
 // Logic is simple but referenced at multiple places in this file.
 function getMessageText(index) {
@@ -106,7 +111,7 @@ function TemplateEditMode({
     var groupOptions = tmp.messages.map((_, idx) => {
       return {
         label: getMessageText(idx),
-        value: `${tmp.id}-${tmp.name}-${idx}`,
+        value: [tmp.id, tmp.name, idx.toString()].join(getMagicString()),
       };
     });
     return {
@@ -121,7 +126,7 @@ function TemplateEditMode({
   const labelRender = (props) => {
     const { label, value } = props;
     if (label) {
-      const tmpArr = value.split("-");
+      const tmpArr = value.split(getMagicString());
       const tmpName = tmpArr[1];
       const msgIdx = Number(tmpArr[2]);
       return getTemplateDisplayName(tmpName, msgIdx);
@@ -138,7 +143,7 @@ function TemplateEditMode({
 
   // When user selects a template from the options dropdown.
   function handleTemplateOptionSelection(value, option) {
-    const tmpArr = value.split("-");
+    const tmpArr = value.split(getMagicString());
     const tmpId = tmpArr[0];
     const msgIdx = Number(tmpArr[2]);
     setSelectedTemplateId(tmpId);
