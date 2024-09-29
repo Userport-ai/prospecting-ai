@@ -60,8 +60,11 @@ class OpenAITokenUsage(BaseModel):
     total_cost_in_usd: float = Field(...,
                                      description="Total cost of tokens used.")
 
-    def add_tokens(self, another: "OpenAITokenUsage") -> "OpenAITokenUsage":
+    def add_tokens(self, another: Optional["OpenAITokenUsage"]) -> "OpenAITokenUsage":
         """Add tokens from another instance of OpenAITokenUsage to this instance."""
+        if not another:
+            # Do nothing.
+            return
         self.prompt_tokens += another.prompt_tokens
         self.completion_tokens += another.completion_tokens
         self.total_tokens += another.total_tokens
@@ -408,7 +411,8 @@ class LeadResearchReport(BaseModel):
             default=None, description="Name of the temmplate selected.")
         message: Optional[str] = Field(
             default=None, description="Message used for outreach to role titles above. This can be the first email or any follow email message for given template ID.")
-        message_index: Optional[int] = Field(default=None, description="Index of the message used within the OutreachEmailTemplate object. 0 -> First email, 1 -> Follow up 1 and so on.")
+        message_index: Optional[int] = Field(
+            default=None, description="Index of the message used within the OutreachEmailTemplate object. 0 -> First email, 1 -> Follow up 1 and so on.")
 
     class PersonalizedEmail(BaseModel):
         """Personalized Email addressed to a given lead in the lead research report. Uses chosen template if it exists else generates email without template."""
@@ -440,7 +444,7 @@ class LeadResearchReport(BaseModel):
             default=None, description="List of personalized emails associated with given lead.")
 
         total_tokens_used: Optional[OpenAITokenUsage] = Field(
-            default=None, description="Total Open AI tokens used in the entire workflow to create personalized messages for given lead.")
+            default=None, description="Total OpenAI tokens used in the entire workflow to create personalized messages for given lead.")
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
@@ -477,7 +481,9 @@ class LeadResearchReport(BaseModel):
     web_search_results: Optional[WebSearchResults] = Field(
         default=None, description="Web search results for given lead and their company.")
 
-    # Search Result URLs whose contents failed to be parsed by the web scraper.
+    # Content parsing results.
+    content_parsing_total_tokens_used: Optional[OpenAITokenUsage] = Field(
+        default=None, description="Total OpenAI tokens used in processing successfully parsed content from the returned search URLs for given lead. Currently it doesn't track tokens used before an exception was thrown but that's ok for now.")
     content_parsing_failed_urls: Optional[List[str]] = Field(
         default=None, description="Search Result URLs whose contents failed to be parsed by the web scraper.")
 
@@ -536,16 +542,17 @@ class OutreachEmailTemplate(BaseModel):
             f"Description: {self.description if self.description else 'Unknown'}\n"
             "\n"
         )
-    
+
     def to_personalized_email_outreach_template(self, message_index: int) -> "LeadResearchReport.ChosenOutreachEmailTemplate":
         """Converts given template instance with given message index to outreach instance used in PersonalizedEmails."""
         return LeadResearchReport.ChosenOutreachEmailTemplate(
-                id=self.id,
-                name=self.name,
-                creation_date=self.creation_date,
-                message=self.messages[message_index],
-                message_index=message_index,
-            )
+            id=self.id,
+            name=self.name,
+            creation_date=self.creation_date,
+            message=self.messages[message_index],
+            message_index=message_index,
+        )
+
 
 class PersonProfile(BaseModel):
     """Profile of a person.

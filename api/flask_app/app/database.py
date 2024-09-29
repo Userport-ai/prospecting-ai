@@ -270,11 +270,11 @@ class Database:
                 ContentDetails(**content_details_dict))
         return content_details_list
 
-    def get_lead_research_report(self, lead_research_report_id: str, projection: Optional[Dict[str, int]] = None) -> LeadResearchReport:
+    def get_lead_research_report(self, lead_research_report_id: str, projection: Optional[Dict[str, int]] = None, session: Optional[ClientSession] = None) -> LeadResearchReport:
         """Returns Lead Research report for given Report ID. Raises error if report is not found in the database."""
         collection = self.get_lead_research_report_collection()
         data_dict = collection.find_one(
-            {"_id": ObjectId(lead_research_report_id)}, projection=projection)
+            {"_id": ObjectId(lead_research_report_id)}, projection=projection, session=session)
         if not data_dict:
             raise ValueError(
                 f'Lead Research report not found for Id: {lead_research_report_id}')
@@ -360,14 +360,14 @@ class Database:
             raise ValueError(
                 f"Could not update User with ID: {user_id} in the database.")
 
-    def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str]):
-        """Updates fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model."""
+    def update_lead_research_report(self, lead_research_report_id: str, setFields: Dict[str, str], session: Optional[ClientSession] = None):
+        """Updates fields for given Lead Research Report ID. Assumes that fields are existing fields in the LeadResearchReport Document model. Write can be done in a transaction."""
         collection = self.get_lead_research_report_collection()
         if "last_updated_date" not in setFields:
             setFields["last_updated_date"] = Utils.create_utc_time_now()
 
         res: UpdateResult = collection.update_one(
-            {"_id": ObjectId(lead_research_report_id)}, {"$set": setFields})
+            {"_id": ObjectId(lead_research_report_id)}, {"$set": setFields}, session=session)
         if res.matched_count == 0:
             raise ValueError(
                 f"Could not update research report with ID: {lead_research_report_id}")

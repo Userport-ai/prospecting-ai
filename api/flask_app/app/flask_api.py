@@ -912,7 +912,7 @@ def admin_delete_report(lead_research_report_id: str, confirm_deletion: str):
     in production.
     """
     # Remove return when there is safe to use.
-    return
+    # return
     database = Database()
     report = database.get_lead_research_report(
         lead_research_report_id=lead_research_report_id, projection={"company_profile_id": 1})
@@ -1309,8 +1309,20 @@ def choose_template_and_create_emails_in_background(self, user_id: str, lead_res
             f"Completed outreach template Selection and Email creation complete in background for report ID: {lead_research_report_id}")
 
         # Send event.
-        Metrics().capture(user_id=user_id, event_name="report_personalized_emails_created", properties={
+        m = Metrics()
+        m.capture(user_id=user_id, event_name="report_personalized_emails_created", properties={
             "report_id": lead_research_report_id})
+
+        # Send event with total cost for lead generation.
+        lead_report: LeadResearchReport = database.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id, projection={"content_parsing_total_tokens_used": 1, "personalized_outreach_messages": {"total_tokens_used": 1}})
+        total_cost: float = 0.0
+        if lead_report.content_parsing_total_tokens_used:
+            total_cost += lead_report.content_parsing_total_tokens_used.total_cost_in_usd
+        if lead_report.personalized_outreach_messages and lead_report.personalized_outreach_messages.total_tokens_used:
+            total_cost += lead_report.personalized_outreach_messages.total_tokens_used.total_cost_in_usd
+        m.capture(user_id=user_id, event_name="report_generation_cost_in_usd", properties={
+                  "report_id": lead_research_report_id, "cost_in_usd": total_cost})
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name="choose_template_and_create_emails", status_before_failure=LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE)

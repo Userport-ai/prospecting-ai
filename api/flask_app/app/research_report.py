@@ -29,6 +29,7 @@ logger = logging.getLogger()
 class Researcher:
     """Helper to create a research report for given person in a company from all relevant data in the database."""
 
+    WE_SEARCH_CONTENT_PARSING_OPERATION_TAG_NAME = "web_search_content_parsing"
     PERSONALIZED_MESSAGES_OPERATION_TAG_NAME = "personalized_messages"
 
     def __init__(self, database: Database) -> None:
@@ -243,15 +244,18 @@ class Researcher:
         content_parsing_failed_results: List[LeadResearchReport.WebSearchResults.Result] = [
         ]
         page_too_large_urls: Set[str] = set()
+        total_openai_tokens_used = OpenAITokenUsage(
+            operation_tag=Researcher.WE_SEARCH_CONTENT_PARSING_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
         for search_result in search_results_batch:
             url: str = search_result.url
             try:
                 logger.info(
                     f"Start processing search URL: {url} in task num: {task_num}")
-                self.process_content(
+                tokens_used:  Optional[OpenAITokenUsage] = self.process_content(
                     search_result=search_result, research_report=research_report)
                 logger.info(
                     f"Completed processing for search URL: {url} in task num: {task_num}")
+                total_openai_tokens_used.add_tokens(tokens_used)
             except PageTooLargeException as e:
                 logger.warning(
                     f"Page too large exception for search URL: {url} in task num: {task_num} with error: {e}")
@@ -279,10 +283,11 @@ class Researcher:
             try:
                 logger.info(
                     f"Start processing failed search URL: {failed_url} in task num: {task_num}")
-                self.process_content(
+                tokens_used: Optional[OpenAITokenUsage] = self.process_content(
                     search_result=failed_url_result, research_report=research_report)
                 logger.info(
                     f"Completed processing for failed search URL: {failed_url} in task num: {task_num}")
+                total_openai_tokens_used.add_tokens(tokens_used)
             except Exception as e:
                 logger.warning(
                     f"During retry: failed to process content from search URL: {failed_url} with error: {e}")
@@ -292,11 +297,28 @@ class Researcher:
                 self.metrics.capture_system_event(event_name="content_processing_failed", properties={
                                                   "report_id": lead_research_report_id, "failed_url": failed_url, "error": str(e)})
 
+        # Update total tokens used in a single RMW transaction.
+        with self.database.transaction_session() as session:
+            txn_report: LeadResearchReport = self.database.get_lead_research_report(
+                lead_research_report_id=lead_research_report_id, projection={"content_parsing_total_tokens_used": 1}, session=session)
+            content_parsing_total_tokens_used: Optional[
+                OpenAITokenUsage] = txn_report.content_parsing_total_tokens_used
+            if not content_parsing_total_tokens_used:
+                # Field not populated, set to current value.
+                content_parsing_total_tokens_used = total_openai_tokens_used
+            else:
+                # Append to existing value.
+                content_parsing_total_tokens_used.add_tokens(
+                    total_openai_tokens_used)
+
+            self.database.update_lead_research_report(lead_research_report_id=lead_research_report_id, setFields={
+                                                      "content_parsing_total_tokens_used": content_parsing_total_tokens_used.model_dump()}, session=session)
+
         # Return large URLs in addition to failed URLs.
         return final_failed_urls + list(page_too_large_urls)
 
-    def process_content(self, search_result: LeadResearchReport.WebSearchResults.Result, research_report: LeadResearchReport):
-        """Fetch content from given URL, process it and store it in the database."""
+    def process_content(self, search_result: LeadResearchReport.WebSearchResults.Result, research_report: LeadResearchReport) -> Optional[OpenAITokenUsage]:
+        """Fetch content from given URL, process it and store it in the database. Returns OpenAI tokens used in the process."""
         # If this URL has already been indexed for this company, skip processing again.
         # TODO: In the future, also add a freshness check so that we don't keep relying on this content forever since it might be stale.
         if self.database.get_content_details_by_url(url=search_result.url, company_profile_id=research_report.company_profile_id):
@@ -306,7 +328,7 @@ class Researcher:
             # Send event.
             self.metrics.capture_system_event(event_name="content_already_indexed", properties={
                 "report_id": research_report.id, "url": search_result.url, "company_name": research_report.company_name})
-            return
+            return None
 
         # Fetch page and then process content.
         page_scraper = WebPageScraper(
@@ -358,6 +380,7 @@ class Researcher:
                     num_comments=post_details.repost.num_comments,
                 )
 
+        openai_tokens_used: OpenAITokenUsage = page_content_info.openai_usage.convert_to_model()
         content_details = ContentDetails(
             url=page_content_info.url,
             search_engine_query=search_result.query,
@@ -399,6 +422,8 @@ class Researcher:
 
             self.database.insert_content_details(
                 content_details=content_details, session=session)
+
+        return openai_tokens_used
 
     def aggregate_v2(self, lead_research_report_id: str):
         """Aggregate Details of research report for given Person and Company and updates them in the database.
@@ -658,7 +683,7 @@ class Researcher:
             raise ValueError(
                 f"Choosing outreach email template: Expected personalized_outreach_messages to be None, got non None value for report ID: {lead_research_report_id}")
         # Total tokens used in choosing template and generating personalized emails.
-        total_tokens_used: Optional[OpenAITokenUsage] = OpenAITokenUsage(
+        total_tokens_used: OpenAITokenUsage = OpenAITokenUsage(
             operation_tag=Researcher.PERSONALIZED_MESSAGES_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
 
         # Select outreach template to use for given lead.
