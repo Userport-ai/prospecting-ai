@@ -45,7 +45,16 @@ function renderIndustries(industries, record, index) {
 function renderReportStatus(researchStatus, record, index) {
   var status = "In Progress";
   if (record.status === "complete") {
-    return <Link className="research-report-ready">Ready</Link>;
+    return (
+      <Link
+        className="research-report-ready"
+        href={`/lead-research-reports/${record.id}`}
+        target="_blank"
+      >
+        {" "}
+        Ready
+      </Link>
+    );
   } else if (record.status === "failed_with_errors") {
     return <Text className="research-report-error">Error</Text>;
   }
@@ -100,9 +109,6 @@ function LeadsTable({ leads }) {
         posthog.capture("report_ready_link_clicked", {
           report_id: record.id,
         });
-
-        // Navigate to the Research Report link. This will prevent complete page load.
-        return navigate("/lead-research-reports/" + record.id);
       }
     };
   };
