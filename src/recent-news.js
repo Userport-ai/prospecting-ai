@@ -192,14 +192,21 @@ function RecentNews({ lead_research_report_id, details, onEmailCreation }) {
               )[0]
           )
           .flatMap((detail) =>
-            detail.highlights.map((highlight) => (
-              <Highlight
-                key={highlight.id}
-                lead_research_report_id={lead_research_report_id}
-                highlight={highlight}
-                onEmailCreation={onEmailCreation}
-              />
-            ))
+            detail.highlights
+              .toSorted(
+                // Sort highlights by the most recent publish date.
+                (h1, h2) => {
+                  return new Date(h2.publish_date) - new Date(h1.publish_date);
+                }
+              )
+              .map((highlight) => (
+                <Highlight
+                  key={highlight.id}
+                  lead_research_report_id={lead_research_report_id}
+                  highlight={highlight}
+                  onEmailCreation={onEmailCreation}
+                />
+              ))
           )}
       </Flex>
     </>
