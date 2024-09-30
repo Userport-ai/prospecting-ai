@@ -56,6 +56,11 @@
   font-size: 1.6rem;
 }
 
+/* We need this because the Leads and Templates tabs are inside a link now. */
+#nav-header .ant-menu-title-content a {
+  font-size: 1.6rem;
+}
+
 /* Selected menu item styling */
 
 #nav-header .ant-menu-item-selected {

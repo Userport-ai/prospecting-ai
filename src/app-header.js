@@ -1,5 +1,5 @@
 import "./app-header.css";
-import { Layout, Menu } from "antd";
+import { Layout, Menu, Typography } from "antd";
 import { UserOutlined, SettingOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useContext } from "react";
@@ -7,6 +7,7 @@ import { AuthContext } from "./root";
 import { usePostHog } from "posthog-js/react";
 
 const { Header } = Layout;
+const { Link } = Typography;
 const templates_key = "templates";
 const leads_key = "leads";
 const account_key = "account";
@@ -14,12 +15,12 @@ const logout_key = "logout";
 
 const items = [
   {
-    label: "Leads",
+    label: <Link href="/leads">Leads</Link>,
     key: leads_key,
     icon: <UserOutlined />,
   },
   {
-    label: "Templates",
+    label: <Link href="/templates">Templates</Link>,
     key: templates_key,
     icon: <UserOutlined />,
   },
