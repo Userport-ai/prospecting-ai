@@ -1,7 +1,6 @@
 import "./leads-table.css";
 import { Table, Typography } from "antd";
 import { usePostHog } from "posthog-js/react";
-import { useNavigate } from "react-router-dom";
 
 const { Text, Link } = Typography;
 
@@ -27,10 +26,14 @@ function TableEmptyState() {
 }
 
 function renderLinkedInProfile(person_name, record, index) {
+  // LinkedIn URL should always exist because it was originally provided as input by the user.
   const linkedin_url = record.person_linkedin_url;
+
+  // If fetching of the Person's profile failed in the backend, person name will be null.
+  const displayName = person_name ? person_name : linkedin_url;
   return (
     <Link href={linkedin_url} target="_blank">
-      {person_name}
+      {displayName}
     </Link>
   );
 }
@@ -98,7 +101,6 @@ const columns = [
 ];
 
 function LeadsTable({ leads }) {
-  const navigate = useNavigate();
   const posthog = usePostHog();
 
   // Handle user click of a report on a givent able row.
