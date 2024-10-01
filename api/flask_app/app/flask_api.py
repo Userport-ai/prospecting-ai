@@ -1175,7 +1175,7 @@ def process_content_in_search_results_in_background(self, user_id: str, lead_res
         # Split search URLs into batches depending on the number of concurrent processes in a worker.
         # Note: This concurrency value must match the concurreny passed during app intialization.
         # TODO: Make this read the concurrency value from the celery start command line argument.
-        concurrency = 8
+        concurrency = 12
         batch_size = int(total_urls_to_process/concurrency) + \
             (0 if total_urls_to_process % concurrency == 0 else 1)
         logger.info(
