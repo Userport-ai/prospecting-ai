@@ -27,6 +27,10 @@ class PageTooLargeException(Exception):
     pass
 
 
+class PageBodyIsEmptyException(Exception):
+    pass
+
+
 class OpenAIUsage(BaseModel):
     """Token usage when calling workflows using Open AI models."""
     url: str = Field(...,
@@ -1188,6 +1192,8 @@ class WebPageScraper:
             chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap, add_start_index=True
         )
         chunks = text_splitter.split_documents([doc])
+        if len(chunks) == 0:
+            raise PageBodyIsEmptyException(f"Page Body for URL: {self.url} is empty, likely footer tag founder before header tag in page.")
         if len(chunks) >= self.PAGE_MAX_CHUNKS:
             raise PageTooLargeException(
                 f"Too many chunks in page, got: {len(chunks)} chunks, expected max chunks: {self.PAGE_MAX_CHUNKS} for url: {self.url}")

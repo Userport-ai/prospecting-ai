@@ -6,7 +6,7 @@ from app.utils import Utils
 from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
 from app.search_engine_workflow import SearchEngineWorkflow, SearchRequest
-from app.web_page_scraper import WebPageScraper, PageContentInfo, PageTooLargeException
+from app.web_page_scraper import WebPageScraper, PageContentInfo, PageTooLargeException, PageBodyIsEmptyException
 from app.outreach_template import OutreachTemplateMatcher
 from app.personalization import Personalization
 from app.metrics import Metrics
@@ -243,7 +243,7 @@ class Researcher:
 
         content_parsing_failed_results: List[LeadResearchReport.WebSearchResults.Result] = [
         ]
-        page_too_large_urls: Set[str] = set()
+        non_retryable_error_urls: Set[str] = set()
         total_openai_tokens_used = OpenAITokenUsage(
             operation_tag=Researcher.WE_SEARCH_CONTENT_PARSING_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
         for search_result in search_results_batch:
@@ -256,10 +256,17 @@ class Researcher:
                 logger.info(
                     f"Completed processing for search URL: {url} in task num: {task_num}")
                 total_openai_tokens_used.add_tokens(tokens_used)
+            except PageBodyIsEmptyException as e:
+                logger.warning(
+                    f"Page Body empty for search URL: {url} in task num: {task_num} and report: {lead_research_report_id} with error: {e}")
+                non_retryable_error_urls.add(url)
+                # Send event.
+                self.metrics.capture_system_event(event_name="page_body_empty_error", properties={
+                                                  "report_id": lead_research_report_id, "url": url, "error": str(e)})
             except PageTooLargeException as e:
                 logger.warning(
-                    f"Page too large exception for search URL: {url} in task num: {task_num} with error: {e}")
-                page_too_large_urls.add(url)
+                    f"Page too large exception for search URL: {url} in task num: {task_num} and report: {lead_research_report_id} with error: {e}")
+                non_retryable_error_urls.add(url)
 
                 # Send event.
                 self.metrics.capture_system_event(event_name="page_content_too_large_error", properties={
@@ -270,8 +277,8 @@ class Researcher:
                 content_parsing_failed_results.append(search_result)
 
         if len(content_parsing_failed_results) == 0:
-            # Nothing to do return all large URLs as well.
-            return [] + list(page_too_large_urls)
+            # Nothing to do return all non retryable URLs as well.
+            return [] + list(non_retryable_error_urls)
 
         logger.info(
             f"Trying {len(content_parsing_failed_results)} failed URLs now for task num: {task_num}.")
@@ -314,8 +321,8 @@ class Researcher:
             self.database.update_lead_research_report(lead_research_report_id=lead_research_report_id, setFields={
                                                       "content_parsing_total_tokens_used": content_parsing_total_tokens_used.model_dump()}, session=session)
 
-        # Return large URLs in addition to failed URLs.
-        return final_failed_urls + list(page_too_large_urls)
+        # Return non retryable URLs in addition to failed URLs.
+        return final_failed_urls + list(non_retryable_error_urls)
 
     def process_content(self, search_result: LeadResearchReport.WebSearchResults.Result, research_report: LeadResearchReport) -> Optional[OpenAITokenUsage]:
         """Fetch content from given URL, process it and store it in the database. Returns OpenAI tokens used in the process."""
