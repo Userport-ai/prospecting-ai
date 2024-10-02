@@ -111,6 +111,8 @@ Delete a service: `kubectl delete service <service name>`
 
 Delete a deployment: `kubectl delete deployment <service name>`
 
+Scale down/scalup up all deployments: `kubectl apply -f manifests/flask-deployment.yaml,manifests/celery-worker-deployment.yaml,manifests/flower-deployment.yaml,manifests/react-deployment.yaml`
+
 ## Updating Deployments
 
 Reference: https://kubernetes.io/docs/tutorials/kubernetes-basics/update/update-intro/
