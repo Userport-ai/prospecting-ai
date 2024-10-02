@@ -31,6 +31,22 @@ class PageBodyIsEmptyException(Exception):
     pass
 
 
+class InvalidHTTPResponseContentException(Exception):
+    pass
+
+
+class HeadingTagNotFoundInPageException(Exception):
+    pass
+
+
+class LinkedInPostFooterNotFoundException(Exception):
+    pass
+
+
+class LinkedInPostHeadingTagNotFoundException(Exception):
+    pass
+
+
 class OpenAIUsage(BaseModel):
     """Token usage when calling workflows using Open AI models."""
     url: str = Field(...,
@@ -1084,9 +1100,6 @@ class WebPageScraper:
         llm = ChatOpenAI(
             temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL, api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(IsRequestingUserContact)
         prompt = PromptTemplate.from_template(prompt_template)
-        if len(page_structure.body_chunks) == 0:
-            raise ValueError(
-                f"Expected non zero body chunks for URL: {self.url}, got: {page_structure}")
         page_text = page_structure.body_chunks[0].page_content
 
         chain = prompt | llm
@@ -1167,7 +1180,7 @@ class WebPageScraper:
             raise ValueError(
                 f"Got non 200 response when fetching: {self.url}, code: {response.status_code}, text: {response.text}")
         if "text/html" not in response.headers["Content-Type"]:
-            raise ValueError(
+            raise InvalidHTTPResponseContentException(
                 f"Invalid response content type: {response.headers} for URL: {self.url} when fetching page.")
 
         logger.info(f"HTTP page fetch success for URL: {self.url}")
@@ -1193,7 +1206,8 @@ class WebPageScraper:
         )
         chunks = text_splitter.split_documents([doc])
         if len(chunks) == 0:
-            raise PageBodyIsEmptyException(f"Page Body for URL: {self.url} is empty, likely footer tag founder before header tag in page.")
+            raise PageBodyIsEmptyException(
+                f"Page Body for URL: {self.url} is empty, likely footer tag founder before header tag in page.")
         if len(chunks) >= self.PAGE_MAX_CHUNKS:
             raise PageTooLargeException(
                 f"Too many chunks in page, got: {len(chunks)} chunks, expected max chunks: {self.PAGE_MAX_CHUNKS} for url: {self.url}")
@@ -1227,8 +1241,8 @@ class WebPageScraper:
                 break
 
         if not header_tag:
-            raise ValueError(
-                f"Error could not find heading tag in page: {self.url}")
+            raise HeadingTagNotFoundInPageException(
+                f"Error could not find heading tag in page HTML: {self.url}")
 
         # Now compute footer.
         footer_tag: Tag = None
@@ -1309,14 +1323,14 @@ class WebPageScraper:
 
     def get_linkedin_post_structure(self, doc: Document) -> PageStructure:
         """Splits web page representing a linkedin post into header, body and footer elements."""
-        post_header, remaining_post = self.get_page_header(doc=doc)
+        post_header, remaining_post = self.get_linkedin_post_header(doc=doc)
 
         # Look for "## More Relevant Posts" for start of footer.
         footer_start: str = "## More Relevant Posts"
         footer_index: int = remaining_post.find(footer_start)
         if footer_index == -1:
-            raise ValueError(
-                f"Could not find footer start for: {footer_start} for URL: {self.url} in LinkedIn post: {remaining_post}")
+            raise LinkedInPostFooterNotFoundException(
+                f"Could not find footer start for: {footer_start} for URL: {self.url} in LinkedIn post")
         post_body = remaining_post[:footer_index]
         post_footer = remaining_post[footer_index:]
 
@@ -1325,8 +1339,8 @@ class WebPageScraper:
         # Unlike a regular web page, we can skip splitting the body into chunks since a LinkedIn post is usually small in size.
         return PageStructure(header=post_header, body=post_body, footer=post_footer)
 
-    def get_page_header(self, doc: Document) -> Tuple[Optional[str], str]:
-        """Splits given markdown page document into header and remaining page."""
+    def get_linkedin_post_header(self, doc: Document) -> Tuple[Optional[str], str]:
+        """Splits given markdown page document for a LinkedIn post page into header and remaining page."""
         markdown_page = doc.page_content
 
         # Fetch page header.
@@ -1338,16 +1352,16 @@ class WebPageScraper:
                 break
 
         if not heading_line:
-            raise ValueError(
-                f"Could not find Heading (1-7) for URL: {self.url} Markdown page: {markdown_page[:1000]}")
+            raise LinkedInPostHeadingTagNotFoundException(
+                f"Could not find Heading (1-7) for LinkedIn post for URL: {self.url} Markdown page")
 
         page_header: Optional[str] = None
         remaining_md_page: str = markdown_page
         if heading_line:
             index = markdown_page.find(heading_line)
             if index == -1:
-                raise ValueError(
-                    f"Could not find heading line: {heading_line} for URL: {self.url} in markdown page: {markdown_page[:1000]}")
+                raise LinkedInPostHeadingTagNotFoundException(
+                    f"Could not find heading line for LinkedIn post: {heading_line} for URL: {self.url} in markdown page")
             page_header = markdown_page[:index]
             remaining_md_page = markdown_page[index:]
 

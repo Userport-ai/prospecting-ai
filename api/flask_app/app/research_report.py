@@ -6,7 +6,16 @@ from app.utils import Utils
 from app.database import Database
 from app.linkedin_scraper import LinkedInScraper
 from app.search_engine_workflow import SearchEngineWorkflow, SearchRequest
-from app.web_page_scraper import WebPageScraper, PageContentInfo, PageTooLargeException, PageBodyIsEmptyException
+from app.web_page_scraper import (
+    WebPageScraper,
+    PageContentInfo,
+    PageTooLargeException,
+    PageBodyIsEmptyException,
+    InvalidHTTPResponseContentException,
+    HeadingTagNotFoundInPageException,
+    LinkedInPostFooterNotFoundException,
+    LinkedInPostHeadingTagNotFoundException
+)
 from app.outreach_template import OutreachTemplateMatcher
 from app.personalization import Personalization
 from app.metrics import Metrics
@@ -256,6 +265,34 @@ class Researcher:
                 logger.info(
                     f"Completed processing for search URL: {url} in task num: {task_num}")
                 total_openai_tokens_used.add_tokens(tokens_used)
+            except InvalidHTTPResponseContentException as e:
+                logger.warning(
+                    f"Page has invalid content type for search URL: {url} in task num: {task_num} and report: {lead_research_report_id} with error: {e}")
+                non_retryable_error_urls.add(url)
+                # Send event.
+                self.metrics.capture_system_event(event_name="page_invalid_content_type_error", properties={
+                                                  "report_id": lead_research_report_id, "url": url, "error": str(e)})
+            except HeadingTagNotFoundInPageException as e:
+                logger.warning(
+                    f"Heading tag not found for search URL: {url} in task num: {task_num} and report: {lead_research_report_id} with error: {e}")
+                non_retryable_error_urls.add(url)
+                # Send event.
+                self.metrics.capture_system_event(event_name="page_heading_not_found_error", properties={
+                                                  "report_id": lead_research_report_id, "url": url, "error": str(e)})
+            except LinkedInPostHeadingTagNotFoundException as e:
+                logger.warning(
+                    f"LinkedIn Post Heading tag not found for search URL: {url} in task num: {task_num} and report: {lead_research_report_id} with error: {e}")
+                non_retryable_error_urls.add(url)
+                # Send event.
+                self.metrics.capture_system_event(event_name="linkedin_post_heading_not_found_error", properties={
+                                                  "report_id": lead_research_report_id, "url": url, "error": str(e)})
+            except LinkedInPostFooterNotFoundException as e:
+                logger.warning(
+                    f"LinkedIn post footer not found for search URL: {url} in task num: {task_num} and report: {lead_research_report_id} with error: {e}")
+                non_retryable_error_urls.add(url)
+                # Send event.
+                self.metrics.capture_system_event(event_name="linkedin_post_footer_not_found_error", properties={
+                                                  "report_id": lead_research_report_id, "url": url, "error": str(e)})
             except PageBodyIsEmptyException as e:
                 logger.warning(
                     f"Page Body empty for search URL: {url} in task num: {task_num} and report: {lead_research_report_id} with error: {e}")
