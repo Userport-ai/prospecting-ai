@@ -16,16 +16,16 @@ spec:
     spec:
       containers:
       - name: celery-worker
-        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.78
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.79
         # Command to run Celery worker.
         command: ["celery"]
         args: ["-A", "app.make_celery", "worker", "--concurrency=8", "--soft-time-limit=600", "--time-limit=720", "--loglevel=INFO"]
         resources:
           limits:
-            cpu: 1000m
-            memory: "6Gi"
+            cpu: 1250m
+            memory: "4Gi"
           requests:
-            cpu: 500m
+            cpu: 1000m
             memory: "2Gi"
         ports:
         - containerPort: 5000
