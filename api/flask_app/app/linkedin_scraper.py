@@ -614,8 +614,8 @@ class LinkedInScraper:
         params = {
             'linkedin_profile_url': profile_url,
             'skills': 'exclude',
-            # This is needed otherwise sometimes data is stale in prod showing a different company to research.
-            'use_cache': 'if-recent',
+            # Data is stale in prod showing older person profile but ProxyCurl is very expensive so trying to cut costs.
+            # 'use_cache': 'if-recent',
             'fallback_to_cache': 'on-error',
         }
 
@@ -667,7 +667,8 @@ class LinkedInScraper:
         }
         params = {
             'url': profile_url,
-            'categories': 'include',
+            # Uncomment this if it affects data quality in prod.
+            #'categories': 'include',
             # Uncomment if this affects data quality in prod.
             # 'funding_data': 'include',
             # 'use_cache': 'if-recent',

@@ -81,12 +81,14 @@ const columns = [
     dataIndex: "company_name",
     key: "company_name",
   },
-  {
-    title: "Industries",
-    dataIndex: "company_industry_categories",
-    key: "company_industry_categories",
-    render: renderIndustries,
-  },
+  // Uncomment this once we start to return Categories once again (when there is a customer need)
+  // Right now its costing 1 extra credit by Proxycurl so too expensive.
+  // {
+  //   title: "Industries",
+  //   dataIndex: "company_industry_categories",
+  //   key: "company_industry_categories",
+  //   render: renderIndustries,
+  // },
   {
     title: "Company Headcount",
     dataIndex: "company_headcount",
