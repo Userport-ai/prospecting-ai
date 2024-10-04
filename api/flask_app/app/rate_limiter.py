@@ -66,11 +66,11 @@ RATE_LIMIT_CONFIG = RateLimitConfig(
             limits=[
                 RateLimitConfig.Request.Limit(
                     usage_tier=UsageTier.FREE,
-                    value="3 per minute;20 per day"
+                    value="3 per minute;50 per day"
                 ),
                 RateLimitConfig.Request.Limit(
                     usage_tier=UsageTier.ALPHA_TESTERS,
-                    value="5 per minute;100 per day"
+                    value="5 per minute;200 per day"
                 ),
             ]
         )
