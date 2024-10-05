@@ -90,6 +90,7 @@ async function updateEmailOnBackend(
 // Edit mode of template.
 function TemplateEditMode({
   lead_research_report_id,
+  curEmailTemplate,
   emailId,
   allTemplates,
   onCancel,
@@ -107,12 +108,22 @@ function TemplateEditMode({
   // Template options are grouped by Template ID for easier user selection.
   // We also assigned a unique key for each option that is made up of the
   // ID, template name and message index.
+  var defaultTemplateOption = null;
   const templateOptions = allTemplates.map((tmp) => {
     var groupOptions = tmp.messages.map((_, idx) => {
-      return {
+      const prop = {
         label: getMessageText(idx),
         value: [tmp.id, tmp.name, idx.toString()].join(getMagicString()),
       };
+      if (
+        curEmailTemplate &&
+        curEmailTemplate.id == tmp.id &&
+        curEmailTemplate.message_index === idx
+      ) {
+        // This is the default selection option.
+        defaultTemplateOption = prop;
+      }
+      return prop;
     });
     return {
       label: <Text strong>{tmp.name}</Text>,
@@ -131,7 +142,7 @@ function TemplateEditMode({
       const msgIdx = Number(tmpArr[2]);
       return getTemplateDisplayName(tmpName, msgIdx);
     }
-    return "Select";
+    return "No Template Selected";
   };
 
   // Get template message associated with currrently selected template Id.
@@ -199,6 +210,7 @@ function TemplateEditMode({
     <div className="email-template-edit-view">
       <Select
         labelRender={labelRender}
+        defaultValue={defaultTemplateOption}
         options={templateOptions}
         onChange={handleTemplateOptionSelection}
       ></Select>
@@ -264,11 +276,10 @@ function TemplateReadMode({ curEmailTemplate, onAllTemplatesFetched }) {
           curEmailTemplate.name,
           curEmailTemplate.message_index
         )
-      : "None";
+      : "No Template Selected";
   return (
     <div className="email-template-read-view">
-      <Text className="text-label">Template: </Text>
-      <Text>{templateDisplayName}</Text>
+      <Text className="text-value">{templateDisplayName}</Text>
       <Button
         className="edit-email-template-icon"
         icon={<EditOutlined style={{ color: "#65558f" }} />}
@@ -324,6 +335,7 @@ function Template({
   return (
     <TemplateEditMode
       lead_research_report_id={lead_research_report_id}
+      curEmailTemplate={curEmailTemplate}
       emailId={emailId}
       allTemplates={allTemplates}
       onCancel={handleTemplateEditCancelled}
@@ -578,6 +590,18 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
   return (
     <Card>
       {contextHolder}
+      <Template
+        lead_research_report_id={lead_research_report_id}
+        emailId={personalized_email.id}
+        curEmailTemplate={curEmailTemplate}
+        onTemplateChange={handleTemplateUpdate}
+      />
+      <div className="email-highlight-url-container">
+        <Text className="source-label">Source URL:</Text>
+        <Link href={personalized_email.highlight_url} target="_blank">
+          {personalized_email.highlight_url}
+        </Link>
+      </div>
       <div className="email-subject-container">
         <Text className="email-subject-label">Subject</Text>
         {/* Display Email subject Line. Editable. */}
@@ -610,18 +634,6 @@ function EmailCard({ lead_research_report_id, personalized_email }) {
           </Text>
         </div>
       </div>
-      <div className="email-highlight-url-container">
-        <Text className="source-label">Source:</Text>
-        <Link href={personalized_email.highlight_url} target="_blank">
-          {personalized_email.highlight_url}
-        </Link>
-      </div>
-      <Template
-        lead_research_report_id={lead_research_report_id}
-        emailId={personalized_email.id}
-        curEmailTemplate={curEmailTemplate}
-        onTemplateChange={handleTemplateUpdate}
-      />
     </Card>
   );
 }
