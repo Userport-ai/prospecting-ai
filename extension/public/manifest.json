@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "description": "Userport Profile Chrome Extension.",
   "icons": {
-    "16": "logo192.png",
-    "48": "logo192.png",
-    "128": "logo192.png"
+    "16": "logo256.png",
+    "48": "logo256.png",
+    "128": "logo256.png"
   },
   "background": {
     "service_worker": "./static/js/background.js"

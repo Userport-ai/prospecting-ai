@@ -1,0 +1,45 @@
+#login-container {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+#login-container #logo-container {
+  /* Adjust height of container and width of image to tweak logo size. */
+  height: 80px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#login-container #logo-container img {
+  /* Adjust height of container and width of image to tweak logo size. */
+  width: 80%;
+  object-fit: cover;
+}
+
+#login-container #tagline-container {
+  color: var(--primary);
+  text-align: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#tagline-container #tagline {
+  width: 80%;
+}
+
+#login-container #login-btn-container {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+#login-btn-container #login-btn {
+  width: 80%;
+  background-color: var(--primary);
+  color: var(--on-primary);
+}

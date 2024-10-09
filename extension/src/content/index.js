@@ -8,8 +8,7 @@ function registerClickListener(listener) {
 }
 
 function countClicks() {
-  count++;
-  console.log("click(): ", count);
+  // Do nothing for now.
 }
 
 export function init() {
