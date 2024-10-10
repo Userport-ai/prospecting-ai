@@ -2,6 +2,8 @@
   --primary: #65558f;
   --on-primary: #ffffff;
   --secondary: #625b71;
+  --hover-color: #9476e0;
+  --surface-tint: #6750a4;
 }
 
 body {
