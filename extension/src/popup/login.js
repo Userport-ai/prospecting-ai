@@ -1,7 +1,17 @@
+/*global chrome*/
 import "./login.css";
 import { Button } from "antd";
 
 function Login() {
+  // Handle click by user to login.
+  function handleLoginClick() {
+    // Chrome runtime exists only when called inside extension.
+    if (chrome.runtime) {
+      // Send message to service worker to start login.
+      chrome.runtime.sendMessage({ action: "login-user" });
+    }
+  }
+
   return (
     <div id="login-container">
       <div id="logo-container">
@@ -14,7 +24,7 @@ function Login() {
         <h4 id="tagline">Research and Personalize Outreach using AI</h4>
       </div>
       <div id="login-btn-container">
-        <Button id="login-btn" onClick={() => console.log("test")}>
+        <Button id="login-btn" onClick={handleLoginClick}>
           Sign In
         </Button>
       </div>

@@ -117,7 +117,7 @@ function TemplateEditMode({
       };
       if (
         curEmailTemplate &&
-        curEmailTemplate.id == tmp.id &&
+        curEmailTemplate.id === tmp.id &&
         curEmailTemplate.message_index === idx
       ) {
         // This is the default selection option.

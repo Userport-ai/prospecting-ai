@@ -45,7 +45,7 @@ function Root({ children }) {
       }
     });
     return () => unRegistered();
-  }, [auth]);
+  }, [auth, posthog]);
 
   // Callback for User Logout click event.
   async function handleLogout() {

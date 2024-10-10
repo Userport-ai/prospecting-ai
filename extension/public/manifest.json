@@ -20,5 +20,8 @@
   "action": {
     "default_popup": "index.html"
   },
+  "externally_connectable": {
+    "matches": ["http://localhost:3000/login*"]
+  },
   "permissions": ["storage", "tabs"]
 }

@@ -51,6 +51,17 @@ export function stateAfterViewedPersonalizedEmails() {
   return "viewed_personalized_emails";
 }
 
+// Returns true if the window URL contains query params params set by chrome extension and false otherwise.
+export function isCalledFromChromeExtension() {
+  let queryParams = new URL(window.location.href).searchParams;
+  return queryParams.toString() === getChromeExtensionQueryParamsString();
+}
+
+// Returns the chrome extension query params string used by the app to detect if called by chrome extension.
+export function getChromeExtensionQueryParamsString() {
+  return new URLSearchParams({ source: "extension" }).toString();
+}
+
 // Function that updates user state on the server and returns the result.
 // Throws an error if the update failed.
 export async function updateUserStateOnServer(newState, idToken) {

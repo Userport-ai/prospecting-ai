@@ -10,7 +10,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
-from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails, OpenAITokenUsage, UsageTier
+from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails, OpenAITokenUsage
 from app.research_report import Researcher
 from app.linkedin_scraper import LinkedInScraper, InvalidLeadLinkedInUrlException, LeadLinkedInProfileNotFoundException
 from app.personalization import Personalization
@@ -119,6 +119,42 @@ def get_health_check():
 def get_user_state_db_projection():
     """Returns dictionary with user state field that will serve as projection into to MongoDB query."""
     return {"state": 1}
+
+
+class GetCustomAuthTokenResponse(BaseModel):
+    """API Response to get custom auth token."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+    custom_token: str = Field(...,
+                              description="Custom token represented as JWT which will allow clients to sign in.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.get('/v1/auth/custom-token')
+@login_required
+def get_auth_custom_token():
+    """
+    Fetch Custom Auth token for given logged in user. This will be used by Chrome Extension to authenticate
+    with the app and perform API requests.
+    """
+    user_id: str = g.user["uid"]
+    try:
+        custom_token = auth.create_custom_token(uid=user_id)
+        response = GetCustomAuthTokenResponse(
+            status=ResponseStatus.SUCCESS, custom_token=custom_token)
+        logger.info(f"Got custom token for user ID: {user_id} successfully")
+        return response.model_dump()
+    except Exception as e:
+        logger.exception(
+            f"Failed to get custom Firebase Auth token for user ID: {user_id} with error: {e}")
+        raise APIException(
+            status_code=500, message="Failed to authenticate user due to an internal error.")
 
 
 class GetUserResponse(BaseModel):

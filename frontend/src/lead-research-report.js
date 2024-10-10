@@ -148,7 +148,7 @@ function LeadResearchReport() {
 
     // Send event.
     const activeTabName =
-      activeKey == recentNewsTabKey() ? "Recent News" : "Personalized Emails";
+      activeKey === recentNewsTabKey() ? "Recent News" : "Personalized Emails";
     posthog.capture("report_clicked_tab", {
       tab: activeTabName,
       report_id: report.id,

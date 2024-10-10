@@ -30,7 +30,7 @@ import EnteredLeadSuccess, {
   enteredLeadSuccessLoader,
 } from "./entered-lead-success";
 import VerifyEmail from "./verify-email";
-import { loggedInLoader } from "./logged-in";
+import LoggedIn, { loggedInLoader } from "./logged-in";
 import WelcomePage from "./welcome-page";
 import { isLocalEnv } from "./helper-functions";
 import { PostHogProvider } from "posthog-js/react";
@@ -75,6 +75,7 @@ function AppRoutes() {
         path: "/logged-in",
         errorElement: <ErrorPage />,
         loader: loggedInLoader(context),
+        element: <LoggedIn />,
       },
       {
         path: "/",

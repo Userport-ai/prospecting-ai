@@ -3,6 +3,7 @@
 import { redirect } from "react-router-dom";
 import {
   getUserFromServer,
+  isCalledFromChromeExtension,
   userHasNotCreatedTemplate,
   userHasNotViewedWelcomePage,
 } from "./helper-functions";
@@ -16,6 +17,11 @@ export const loggedInLoader = (authContext) => {
       // User is logged out.
       return null;
     }
+    if (isCalledFromChromeExtension()) {
+      // We don't do anything since the extension will take over and drive the user experience.
+      return null;
+    }
+
     if (!user.emailVerified) {
       // If user email is not verified, redirect to verification.
       return redirect("/verify-email");
@@ -33,3 +39,10 @@ export const loggedInLoader = (authContext) => {
     return redirect("/leads");
   };
 };
+
+// Main component.
+function LoggedIn() {
+  return <div>User logged in, Please wait while you get redirected.</div>;
+}
+
+export default LoggedIn;
