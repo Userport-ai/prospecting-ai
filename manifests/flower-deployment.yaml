@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: flower
-        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.83
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/backend:v0.0.84
         # Command to run Flower.
         command: ["celery"]
         args: ["-A", "app.make_celery", "flower", "--conf=./app/flowerconfig.py", "--port=5000"]
