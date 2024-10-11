@@ -32,11 +32,22 @@ runtime.onInstalled.addListener(() => {
   listenToAuthChanges(auth);
 });
 
+function getUser(idToken) {
+  fetch("https://8f43-223-185-130-56.ngrok-free.app/api/v1/users", {
+    headers: { Authorization: "Bearer " + idToken },
+  })
+    .then((response) => response.json())
+    .then((result) => {
+      console.log("Got USER fetch result: ", result);
+    });
+}
+
 // Listen to auth changes related to a user's login status.
 function listenToAuthChanges(auth) {
   onAuthStateChanged(auth, (authUser) => {
     if (authUser !== null) {
       console.log("Auth update: user is logged");
+      authUser.getIdToken().then((idToken) => getUser(idToken));
     } else {
       console.log("Auth update: user is logged out");
     }
