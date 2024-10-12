@@ -13,8 +13,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["./static/js/content.js"]
+      "matches": ["https://www.linkedin.com/in/*"],
+      "js": ["./static/js/content.js"],
+      "run_at": "document_end"
     }
   ],
   "action": {
@@ -24,7 +25,7 @@
     "matches": ["http://localhost:3000/login*"]
   },
   "host_permissions": [
-    "https://*.ngrok*"
+    "https://*.ngrok-free.app/*"
   ],
   "permissions": ["storage", "tabs"]
 }

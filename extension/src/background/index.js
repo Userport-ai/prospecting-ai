@@ -33,7 +33,7 @@ runtime.onInstalled.addListener(() => {
 });
 
 function getUser(idToken) {
-  fetch("https://8f43-223-185-130-56.ngrok-free.app/api/v1/users", {
+  fetch(`${process.env.REACT_APP_API_HOSTNAME}/api/v1/users`, {
     headers: { Authorization: "Bearer " + idToken },
   })
     .then((response) => response.json())
@@ -113,6 +113,11 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
       active: true,
     });
     return;
+  }
+
+  if (request.action === "linkedin-url-detected") {
+    // Check status of LinkedIn URL on server, whether it is already researched or not.
+    console.log("Got request for LinkedIn URL: ", request.linkedInProfileUrl);
   }
 });
 
