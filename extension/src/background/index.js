@@ -5,6 +5,7 @@ import {
   signInWithCustomToken,
   onAuthStateChanged,
 } from "firebase/auth/web-extension";
+import { message } from "antd";
 
 // Module constants.
 const loginTabIdKey = "login-tab-id";
@@ -71,6 +72,25 @@ function updateUserObjectInStorage(user) {
   storage.local.set({ [authUserObjectKey]: user });
 }
 
+// Handle tab updates to know when LinkedIn URL has changed. This change is then
+// passed to Content Script which can then parse the URL and return whether it is valid or not.
+// We need to pass to the Content Script since service worker does not have access
+// to the DOM for the specific tab.
+tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  const url = tab.url;
+  if (
+    url.includes("linkedin.com/in/") &&
+    !url.includes("?") &&
+    changeInfo.status === "complete"
+  ) {
+    tabs
+      .sendMessage(tabId, { action: "linkedin-profile-detected" })
+      .then((isValidURL) => {
+        console.log("url: ", url, " is valid?: ", isValidURL);
+      });
+  }
+});
+
 // Handle messages from Popup App and Content Script.
 runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetch-user") {
@@ -115,7 +135,7 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     return;
   }
 
-  if (request.action === "linkedin-url-detected") {
+  if (request.action === "new-linkedin-url") {
     // Check status of LinkedIn URL on server, whether it is already researched or not.
     console.log("Got request for LinkedIn URL: ", request.linkedInProfileUrl);
   }
