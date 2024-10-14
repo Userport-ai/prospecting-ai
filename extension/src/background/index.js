@@ -5,7 +5,6 @@ import {
   signInWithCustomToken,
   onAuthStateChanged,
 } from "firebase/auth/web-extension";
-import { message } from "antd";
 
 // Module constants.
 const loginTabIdKey = "login-tab-id";
@@ -46,25 +45,25 @@ function listenToAuthChanges(auth) {
     } else {
       console.log("Auth update: user is logged out");
     }
-    updateUserObjectInStorage(authUser);
     user = authUser;
   });
 }
 
-// Read user object from storage. Returns null if user is logged out or hasn't signed in yet.
-async function readUserObjectFromStorage() {
-  const item = await storage.local.get([authUserObjectKey]);
-  if (authUserObjectKey in item) {
-    return item[authUserObjectKey];
+// Returns lead profile from storage. Returns null if it does not exist.
+async function getLeadProfile(tabId) {
+  const tabIdKey = tabId.toString();
+  const item = await storage.local.get([tabIdKey]);
+  if (tabIdKey in item) {
+    return item[tabIdKey];
   }
   // User object does not exist, return null.
-  console.log("User object does not exist in storage.");
+  console.log(`Lead profile not found in storage in tab ID: ${tabIdKey}`);
   return null;
 }
 
-// Update given user object (can be null if user is logged out) to storage.
-function updateUserObjectInStorage(user) {
-  storage.local.set({ [authUserObjectKey]: user });
+// Return global user object. Returns null if user is logged out or hasn't signed in yet.
+function getUser() {
+  return user;
 }
 
 // LinkedIn profile detected in a tab, check if lead report exists for this profile.
@@ -89,28 +88,19 @@ function handleLinkedInProfileDetected(linkedInProfileUrl, tabId) {
         return;
       }
 
-      // Create user profile from the result.
-      const userProfile = {
+      // Create lead profile from the result.
+      const leadProfile = {
         url: linkedInProfileUrl,
         lead_research_report: result.report_exists
           ? result.lead_research_report
           : null,
       };
 
-      // Store userProfile for given tabId. This will override existing profile
+      // Store lead profile for given tabId. This will override existing profile
       // whenver the existing LinkedIn profile in the current tab is changed.
       // We will delete this key when the tab is closed in the listener.
       const tabIdKey = tabId.toString();
-      storage.local.set({ [tabIdKey]: userProfile }).then(() => {
-        storage.local.get([tabIdKey]).then((item) => {
-          console.log(
-            "stored userprofile: ",
-            item[tabIdKey],
-            " in tab Id: ",
-            tabIdKey
-          );
-        });
-      });
+      storage.local.set({ [tabIdKey]: leadProfile });
     });
 }
 
@@ -135,6 +125,19 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
         handleLinkedInProfileDetected(url, tabId);
       });
+  } else {
+    // Delete existing lead profile from storage if tab URL has changed.
+    // User should not see past profile in popup if tab is not that of a lead profile.
+    const tabIdKey = tabId.toString();
+    storage.local.get([tabIdKey]).then((item) => {
+      if (tabIdKey in item) {
+        const leadProfile = item[tabIdKey];
+        if (leadProfile.url !== url) {
+          // New URL detected that is not a Lead profile, delete existing lead profile from storage.
+          storage.local.remove([tabIdKey]);
+        }
+      }
+    });
   }
 });
 
@@ -142,10 +145,18 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetch-user") {
     // Fetch user object from storage and return to the caller.
-    readUserObjectFromStorage().then((user) => sendResponse(user));
+    sendResponse(getUser());
 
-    // Since the user fetch is async, we return true to wait for async process to complete.
+    // Since the user fetch is synchronous, we return false.
     // Reference: https://developer.chrome.com/docs/extensions/develop/concepts/messaging.
+    return false;
+  }
+  if (request.action === "fetch-lead-profile") {
+    getLeadProfile(request.tabId).then((leadProfile) =>
+      sendResponse(leadProfile)
+    );
+
+    // Since the lead profile fetch is asynchronous, we return true.
     return true;
   }
   if (request.action === "login-user") {
@@ -208,11 +219,7 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
     // Login user.
     signInWithCustomToken(auth, request.token)
       .then((userCredential) => {
-        const user = userCredential.user;
-        console.log("user logged in successfully: ", user);
-
-        // Save authenticated user to storage.
-        updateUserObjectInStorage(user);
+        console.log("user logged in successfully: ", userCredential.user);
       })
       .finally(() => {
         // Close Login tab. Cleaning up state will be done in close tab handler.
@@ -239,15 +246,12 @@ function handleTabClosed(tabId, removeInfo) {
 
       // Delete login tab key from storage.
       storage.local.remove([loginTabIdKey]);
-      console.log("deleted login tab id: ", tabId);
     } else {
       const tabIdKey = tabId.toString();
       storage.local.get(tabIdKey).then((item) => {
         if (item && tabIdKey in item) {
-          // Tab with LinkedIn profile is shut down. Remove any stored user profile in this tab.
+          // Tab with LinkedIn profile is shut down. Remove any stored lead profile in this tab.
           storage.local.remove([tabIdKey]);
-
-          console.log("deleted user profile in tab ID: ", tabIdKey);
         }
       });
     }

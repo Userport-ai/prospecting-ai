@@ -12,11 +12,11 @@ function App() {
     async function fetchUser() {
       // Chrome runtime exists only when called inside extension.
       if (chrome.runtime) {
-        // Send message to service worker to get user state.
-        const userFromStorage = await chrome.runtime.sendMessage({
+        // Send message to service worker to get user.
+        const gotUser = await chrome.runtime.sendMessage({
           action: "fetch-user",
         });
-        setUser(userFromStorage);
+        setUser(gotUser);
         setStateLoading(false);
       }
     }
@@ -36,12 +36,7 @@ function App() {
     );
   }
 
-  return (
-    <Main
-      linkedinProfileUrl={"https://www.linkedin.com/in/ranjith-v-85261219b/"}
-      researchStatus={"complete"}
-    />
-  );
+  return <Main />;
 }
 
 export default App;
