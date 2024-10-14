@@ -11,8 +11,10 @@ import { message } from "antd";
 const loginTabIdKey = "login-tab-id";
 const authUserObjectKey = "auth-user-object";
 
-// Global auth object.
+// Global objects.
 var auth;
+var user;
+
 runtime.onInstalled.addListener(() => {
   console.log("[background] loaded ");
 
@@ -31,28 +33,21 @@ runtime.onInstalled.addListener(() => {
   const app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   listenToAuthChanges(auth);
-});
 
-function getUser(idToken) {
-  fetch(`${process.env.REACT_APP_API_HOSTNAME}/api/v1/users`, {
-    headers: { Authorization: "Bearer " + idToken },
-  })
-    .then((response) => response.json())
-    .then((result) => {
-      console.log("Got USER fetch result: ", result);
-    });
-}
+  // Add tab closed listener.
+  tabs.onRemoved.addListener(handleTabClosed);
+});
 
 // Listen to auth changes related to a user's login status.
 function listenToAuthChanges(auth) {
   onAuthStateChanged(auth, (authUser) => {
     if (authUser !== null) {
-      console.log("Auth update: user is logged");
-      authUser.getIdToken().then((idToken) => getUser(idToken));
+      console.log("Auth update: user is logged in");
     } else {
       console.log("Auth update: user is logged out");
     }
     updateUserObjectInStorage(authUser);
+    user = authUser;
   });
 }
 
@@ -72,6 +67,53 @@ function updateUserObjectInStorage(user) {
   storage.local.set({ [authUserObjectKey]: user });
 }
 
+// LinkedIn profile detected in a tab, check if lead report exists for this profile.
+function handleLinkedInProfileDetected(linkedInProfileUrl, tabId) {
+  const encodedProfileURL = encodeURIComponent(linkedInProfileUrl);
+  user
+    .getIdToken()
+    .then((idToken) =>
+      fetch(
+        `${process.env.REACT_APP_API_HOSTNAME}/api/v1/lead-research-reports?url=${encodedProfileURL}`,
+        {
+          headers: { Authorization: "Bearer " + idToken },
+        }
+      )
+    )
+    .then((response) => response.json())
+    .then((result) => {
+      if (result.status === "error") {
+        console.error(
+          `Checking if LinkedIn profile exists failed with result: ${result}`
+        );
+        return;
+      }
+
+      // Create user profile from the result.
+      const userProfile = {
+        url: linkedInProfileUrl,
+        lead_research_report: result.report_exists
+          ? result.lead_research_report
+          : null,
+      };
+
+      // Store userProfile for given tabId. This will override existing profile
+      // whenver the existing LinkedIn profile in the current tab is changed.
+      // We will delete this key when the tab is closed in the listener.
+      const tabIdKey = tabId.toString();
+      storage.local.set({ [tabIdKey]: userProfile }).then(() => {
+        storage.local.get([tabIdKey]).then((item) => {
+          console.log(
+            "stored userprofile: ",
+            item[tabIdKey],
+            " in tab Id: ",
+            tabIdKey
+          );
+        });
+      });
+    });
+}
+
 // Handle tab updates to know when LinkedIn URL has changed. This change is then
 // passed to Content Script which can then parse the URL and return whether it is valid or not.
 // We need to pass to the Content Script since service worker does not have access
@@ -86,7 +128,12 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     tabs
       .sendMessage(tabId, { action: "linkedin-profile-detected" })
       .then((isValidURL) => {
-        console.log("url: ", url, " is valid?: ", isValidURL);
+        if (!isValidURL) {
+          // Do nothing.
+          return;
+        }
+
+        handleLinkedInProfileDetected(url, tabId);
       });
   }
 });
@@ -106,7 +153,6 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // Remove existing listeners if any.
     runtime.onMessageExternal.removeListener(handleUserLoginUpdate);
-    tabs.onRemoved.removeListener(handleUserLoginTabClosed);
 
     tabs
       .create({
@@ -118,9 +164,6 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
         storage.local.set({ [loginTabIdKey]: tab.id }).then(() => {
           // Add listener to listen to updates of user login.
           runtime.onMessageExternal.addListener(handleUserLoginUpdate);
-
-          // Add listener for tab closed.
-          tabs.onRemoved.addListener(handleUserLoginTabClosed);
         });
       });
     return;
@@ -185,21 +228,28 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
   throw Error(`Unidentified event request: ${request}`);
 }
 
-// Handle logic for when user login tab is closed.
-function handleUserLoginTabClosed(tabId, removeInfo) {
+// Handle state for when user closes a tab. Usually a clean up of state is needed.
+function handleTabClosed(tabId, removeInfo) {
   storage.local.get([loginTabIdKey]).then((item) => {
-    if (tabId === item[loginTabIdKey]) {
-      // Login Tab is shut down.
+    if (item && tabId === item[loginTabIdKey]) {
+      // User Login Tab (which has Userport web app) is shut down.
 
       // Remove listener for user login updates since tab is closed.
       runtime.onMessageExternal.removeListener(handleUserLoginUpdate);
 
-      // Close self as well.
-      tabs.onRemoved.removeListener(handleUserLoginTabClosed);
-
-      // Delete tab Id from storage.
+      // Delete login tab key from storage.
       storage.local.remove([loginTabIdKey]);
       console.log("deleted login tab id: ", tabId);
+    } else {
+      const tabIdKey = tabId.toString();
+      storage.local.get(tabIdKey).then((item) => {
+        if (item && tabIdKey in item) {
+          // Tab with LinkedIn profile is shut down. Remove any stored user profile in this tab.
+          storage.local.remove([tabIdKey]);
+
+          console.log("deleted user profile in tab ID: ", tabIdKey);
+        }
+      });
     }
   });
 }

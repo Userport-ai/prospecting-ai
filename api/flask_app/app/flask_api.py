@@ -111,7 +111,8 @@ def get_db_check():
 def get_health_check():
     """
     This is required in production for Health Check of server.
-    Reference: https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks.
+    #health_checks.
+    Reference: https://cloud.google.com/kubernetes-engine/docs/concepts/ingress
     """
     return Response(status=200)
 
@@ -453,6 +454,67 @@ class UpdateTemplateInPersonalizedEmailResponse(BaseModel):
         if v != ResponseStatus.SUCCESS:
             raise ValueError(f'Expected success status, got: {v}')
         return v
+
+
+class CheckLeadReportExistsResponse(BaseModel):
+    """API response for whether lead research report exists for given person linkedin URL."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+    report_exists: bool = Field(...,
+                                description="True if report exists and False otherwise.")
+    lead_research_report: Optional[LeadResearchReport] = Field(
+        default=None, description="Lead report if it exists and None otherwise.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.get('/v1/lead-research-reports')
+@login_required
+def check_if_report_exists():
+    person_linkedin_url: str = None
+    try:
+        person_linkedin_url = Utils.remove_spaces_and_trailing_slashes(
+            request.args.get("url"))
+    except Exception as e:
+        logger.exception(
+            f"Invalid check if report exists with request: {request} with error: {e}")
+        raise APIException(
+            status_code=400, message=f"Invalid request to check if lead report exists.")
+
+    # Checks whether Lead Research report exists for given person's LinkedIn URL and returns Report ID and Status if so.
+    db = Database()
+    user_id: str = g.user["uid"]
+    lead_research_report: Optional[LeadResearchReport] = None
+
+    logger.info(
+        f"Check if lead report exists for linkedin URL: {person_linkedin_url} requested by user ID: {user_id}")
+
+    try:
+        lead_research_report = db.get_lead_research_report_by_url(
+            user_id=user_id, person_linkedin_url=person_linkedin_url, projection={"_id": 1, "status": 1})
+    except Exception as e:
+        logger.exception(
+            f"Failed to check if Lead Research report exists for person LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id} with error: {e}")
+        raise APIException(
+            status_code=500, message=f"Failed to check if Lead Research report exists for LinkedIn URL: {person_linkedin_url}")
+
+    response: CheckLeadReportExistsResponse = None
+    if lead_research_report:
+        logger.info(
+            f"Found Research report with report ID: {lead_research_report.id} for LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}.")
+        response = CheckLeadReportExistsResponse(
+            status=ResponseStatus.SUCCESS, report_exists=True, lead_research_report=lead_research_report)
+    else:
+        logger.info(
+            f"Did not find research report for person LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}")
+        response = CheckLeadReportExistsResponse(
+            status=ResponseStatus.SUCCESS, report_exists=False, lead_research_report=None)
+    return response.model_dump()
 
 
 @bp.put('/v1/lead-research-reports/personalized-emails/<string:personalized_email_id>')
