@@ -180,18 +180,22 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     return;
   }
 
-  if (request.action === "view-all-leads") {
-    // Navigate user to new tab to view all the leads they have researched so far.
+  if (request.action === "view-lead-report") {
+    // Navigate user to new tab to view the lead report in the Userport UI.
     tabs.create({
-      url: `${process.env.REACT_APP_HOSTNAME}/leads`,
+      url: `${process.env.REACT_APP_HOSTNAME}/lead-research-reports/${request.report_id}`,
       active: true,
     });
     return;
   }
 
-  if (request.action === "new-linkedin-url") {
-    // Check status of LinkedIn URL on server, whether it is already researched or not.
-    console.log("Got request for LinkedIn URL: ", request.linkedInProfileUrl);
+  if (request.action === "view-all-leads") {
+    // Navigate user to new tab to view all the leads they have researched so far in the Userport UI.
+    tabs.create({
+      url: `${process.env.REACT_APP_HOSTNAME}/leads`,
+      active: true,
+    });
+    return;
   }
 });
 

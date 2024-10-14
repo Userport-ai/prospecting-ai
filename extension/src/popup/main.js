@@ -5,13 +5,32 @@ import { useEffect, useState } from "react";
 
 const { Text, Link } = Typography;
 
-// Component that displays based on research status.
-function ResearchStatus({ researchStatus }) {
+function ResearchReport({ lead_research_report }) {
+  const researchStatus = lead_research_report
+    ? lead_research_report.status
+    : "not_started";
+
+  // Handle user click to view research report.
+  function onViewReportClick() {
+    // Chrome runtime exists only when called inside extension.
+    if (chrome.runtime) {
+      // Send message to service worker to view lead research report.
+      chrome.runtime.sendMessage({
+        action: "view-lead-report",
+        report_id: lead_research_report.id,
+      });
+    }
+  }
+
   if (researchStatus === "not_started") {
     return <Button className="action-btn">Start Research</Button>;
   }
   if (researchStatus === "complete") {
-    return <Button className="action-btn">Research Report</Button>;
+    return (
+      <Button className="action-btn" onClick={onViewReportClick}>
+        View Research Report
+      </Button>
+    );
   }
   if (researchStatus === "in_progress") {
     return (
@@ -43,9 +62,6 @@ function LeadResearch({ leadProfile }) {
   }
 
   const linkedInProfileUrl = leadProfile.url;
-  const researchStatus = leadProfile.lead_research_report
-    ? leadProfile.lead_research_report.status
-    : "not_started";
   const profileDisplayText = linkedInProfileUrl.split("/in/")[1];
   return (
     <>
@@ -55,7 +71,7 @@ function LeadResearch({ leadProfile }) {
           {profileDisplayText}
         </Link>
       </div>
-      <ResearchStatus researchStatus={researchStatus} />
+      <ResearchReport lead_research_report={leadProfile.lead_research_report} />
     </>
   );
 }
@@ -102,7 +118,7 @@ function Main() {
       <div id="main-inner-container">
         <LeadResearch leadProfile={leadProfile} />
         <Button className="action-btn" onClick={handleViewLeadReportsClick}>
-          All Leads
+          View All Leads
         </Button>
       </div>
     </div>
