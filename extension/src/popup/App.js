@@ -23,6 +23,19 @@ function App() {
     fetchUser();
   }, []);
 
+  // User has chosen to log out.
+  async function handleLogoutClick() {
+    // Chrome runtime exists only when called inside extension.
+    if (chrome.runtime) {
+      const success = await chrome.runtime.sendMessage({
+        action: "logout-user",
+      });
+      if (success) {
+        setUser(null);
+      }
+    }
+  }
+
   if (stateLoading) {
     // Return nothing since everything is still loading.
     return <div></div>;
@@ -36,7 +49,7 @@ function App() {
     );
   }
 
-  return <Main />;
+  return <Main handleLogout={handleLogoutClick} />;
 }
 
 export default App;

@@ -1,14 +1,20 @@
 /*global chrome*/
+import { getCurrentTab } from "./helper";
 import "./login.css";
 import { Button } from "antd";
 
 function Login() {
   // Handle click by user to login.
-  function handleLoginClick() {
+  async function handleLoginClick() {
     // Chrome runtime exists only when called inside extension.
     if (chrome.runtime) {
+      const tab = await getCurrentTab();
+      if (tab === null) {
+        return;
+      }
+
       // Send message to service worker to start login.
-      chrome.runtime.sendMessage({ action: "login-user" });
+      chrome.runtime.sendMessage({ action: "login-user", tabId: tab.id });
     }
   }
 

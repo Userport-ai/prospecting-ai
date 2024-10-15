@@ -3,20 +3,9 @@ import "./main.css";
 import { Typography, Button, Modal } from "antd";
 import { useEffect, useState } from "react";
 import { mockLeadProfile } from "./mock";
+import { getCurrentTab } from "./helper";
 
 const { Text, Link } = Typography;
-
-// Get current tab of the popup.
-async function getCurrentTab() {
-  let queryOptions = { active: true, lastFocusedWindow: true };
-  // `tab` will either be a `tabs.Tab` instance or `undefined`.
-  let [tab] = await chrome.tabs.query(queryOptions);
-  if (tab === undefined) {
-    console.error("Got undefined active tab, could not fetch lead profile.");
-    return null;
-  }
-  return tab;
-}
 
 // Component to display outreach messages within the extension itself.
 function PersonalizedOutreachMessages({ lead_research_report }) {
@@ -64,11 +53,11 @@ function ResearchReport({ lead_research_report }) {
 
   // Handle user click to create report.
   async function onCreateReportClick() {
-    const tab = await getCurrentTab();
-    if (tab === null) {
-      return;
-    }
     if (chrome.runtime) {
+      const tab = await getCurrentTab();
+      if (tab === null) {
+        return;
+      }
       setLoading(true);
       // Send message to service worker to create lead research report.
       const leadReportStatus = await chrome.runtime.sendMessage({
@@ -157,7 +146,7 @@ function LeadProfile({ leadProfile }) {
 }
 
 // User Logged in component.
-function Main() {
+function Main({ handleLogout }) {
   const [leadProfile, setLeadProfile] = useState(null);
   useEffect(() => {
     async function fetchLeadProfile() {
@@ -195,6 +184,9 @@ function Main() {
           <Text className="other-actions-text">Other Actions:</Text>
           <Button className="action-btn" onClick={handleViewLeadReportsClick}>
             View All Leads
+          </Button>
+          <Button className="action-btn" onClick={handleLogout}>
+            Log Out
           </Button>
         </div>
       </div>

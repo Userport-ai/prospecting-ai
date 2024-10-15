@@ -2,12 +2,15 @@ import { runtime, tabs, storage, alarms } from "webextension-polyfill";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
+  signOut,
   signInWithCustomToken,
   onAuthStateChanged,
 } from "firebase/auth/web-extension";
 
 // Module constants.
 const loginTabIdKey = "login-tab-id";
+const webAppTab = "web-app-tab";
+const extensionTab = "extension-tab";
 const leadReportStatusSuccess = "complete";
 const leadReportStatusFailed = "failed_with_errors";
 
@@ -107,6 +110,10 @@ function createLeadProfile(
 // LinkedIn profile detected in a tab, check if lead report exists for this profile.
 function handleLinkedInProfileDetected(profileName, linkedInProfileUrl, tabId) {
   const encodedProfileURL = encodeURIComponent(linkedInProfileUrl);
+  if (user === null) {
+    // User not logged in, do nothing.
+    return;
+  }
   user
     .getIdToken()
     .then((idToken) =>
@@ -277,11 +284,15 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
         active: true,
       })
       .then((tab) => {
-        // Store tab ID for login. Delete it when tab is closed or login is complete.
-        storage.local.set({ [loginTabIdKey]: tab.id }).then(() => {
-          // Add listener to listen to updates of user login.
-          runtime.onMessageExternal.addListener(handleUserLoginUpdate);
-        });
+        // Store tab ID of web app and extension for login. Delete it when tab is closed or login is complete.
+        storage.local
+          .set({
+            [loginTabIdKey]: { webAppTab: tab.id, extensionTab: request.tabId },
+          })
+          .then(() => {
+            // Add listener to listen to updates of user login.
+            runtime.onMessageExternal.addListener(handleUserLoginUpdate);
+          });
       });
     return;
   }
@@ -310,6 +321,13 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return;
   }
+
+  if (request.action === "logout-user") {
+    signOut(auth).then(() => sendResponse(true));
+
+    // Async response, return true;
+    return true;
+  }
 });
 
 // Handle messages related to user login from Userport login page.
@@ -336,13 +354,15 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
     // Login user.
     signInWithCustomToken(auth, request.token)
       .then((userCredential) => {
-        console.log("user logged in successfully: ", userCredential.user);
+        console.log("user logged in successfully: ", userCredential.user.email);
       })
       .finally(() => {
-        // Close Login tab. Cleaning up state will be done in close tab handler.
+        // Close the web app Login tab and switch extension tab to active. Cleaning up storage state will be done in close tab handler.
         storage.local.get([loginTabIdKey]).then((item) => {
-          const tabId = item[loginTabIdKey];
-          tabs.remove(tabId);
+          const webAppTabId = item[loginTabIdKey].webAppTab;
+          const extensionTabId = item[loginTabIdKey].extensionTab;
+          tabs.update(extensionTabId, { active: true });
+          tabs.remove(webAppTabId);
         });
       });
 
@@ -355,7 +375,7 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
 // Handle state for when user closes a tab. Usually a clean up of state is needed.
 function handleTabClosed(tabId, removeInfo) {
   storage.local.get([loginTabIdKey]).then((item) => {
-    if (item && tabId === item[loginTabIdKey]) {
+    if (item && tabId === item[loginTabIdKey].webAppTab) {
       // User Login Tab (which has Userport web app) is shut down.
 
       // Remove listener for user login updates since tab is closed.
