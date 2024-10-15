@@ -11,28 +11,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 15px;
 }
 
 #main-inner-container #instructions-text-container {
   width: 90%;
-  text-align: center;
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
 
-#main-inner-container #instructions-text {
-  font-size: 18px;
-  color: rgb(208, 57, 57);
-  font-weight: 600;
-  text-shadow: 0.2px 0.2px;
-}
-
-#main-inner-container #profile-detected-text {
-  font-size: 18px;
-  color: rgb(50, 151, 50);
-  font-weight: 600;
+#main-inner-container #not-found-text {
+  color: var(--secondary);
+  font-weight: 500;
   text-shadow: 0.2px 0.2px;
 }
 
@@ -42,20 +33,120 @@
   color: rgb(81, 141, 238);
 }
 
-#main-inner-container #profile-url {
-  font-size: 14px;
-  font-weight: 500;
-  color: rgb(81, 141, 238);
-}
-
-#main-inner-container .action-btn {
+#main-inner-container #profile-details-container {
   width: 90%;
+  display: flex;
+  flex-direction: column;
+}
+
+#profile-details-container #profile-name {
+  font-size: 18px;
+  font-weight: 600;
   color: var(--primary);
-  border: 2px solid var(--surface-tint);
+}
+
+#profile-details-container #profile-url {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgb(81, 141, 238);
+}
+
+#main-inner-container #report-container {
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  gap: 10px;
+}
+
+#report-container #report-status-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: start;
+  gap: 10px;
+}
+
+#report-status-container #status-label {
+  color: var(--secondary);
   font-weight: 600;
 }
 
-#main-inner-container .action-btn:hover {
-  color: var(--on-primary);
-  background-color: var(--hover-color);
+#report-status-container #status-in-progress {
+  color: rgb(210, 172, 19);
+  font-weight: 700;
+}
+
+#report-status-container #status-not-started {
+  color: rgb(229, 153, 22);
+  font-weight: 700;
+}
+
+#report-status-container #status-failed {
+  color: rgb(219, 36, 36);
+  font-weight: 700;
+}
+
+#report-status-container #status-complete {
+  color: rgb(26, 150, 26);
+  font-weight: 700;
+}
+
+#report-container #start-research-btn {
+  width: 100%;
+  height: 25px;
+  color: white;
+  background-color: var(--primary);
+  border: 1px solid var(--primary);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+#main-inner-container #personalized-messages-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+#personalized-messages-container #personalized-messages-title {
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+#personalized-messages-container .message-text {
+  margin-top: 3px;
+  color: rgb(81, 73, 91);
+  font-weight: 500;
+  border: 1px solid lightgray;
+  padding: 5px;
+}
+
+#report-container #view-report-btn {
+  width: 100%;
+  height: 25px;
+  color: white;
+  background-color: var(--primary);
+  border: 1px solid var(--primary);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+#main-inner-container #other-actions-container {
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#other-actions-container .other-actions-text {
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+#other-actions-container .action-btn {
+  height: 25px;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  font-weight: 600;
+  font-size: 12px;
 }

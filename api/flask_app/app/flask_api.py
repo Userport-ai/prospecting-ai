@@ -503,7 +503,8 @@ def check_if_report_exists():
 
     try:
         lead_research_report = db.get_lead_research_report_by_url(
-            user_id=user_id, person_linkedin_url=person_linkedin_url, projection={"_id": 1, "status": 1})
+            user_id=user_id, person_linkedin_url=person_linkedin_url, projection={"_id": 1, "status": 1, "personalized_outreach_messages": {
+                "personalized_emails": {"email_opener": 1}}})
     except Exception as e:
         logger.exception(
             f"Failed to check if Lead Research report exists for person LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id} with error: {e}")

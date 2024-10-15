@@ -11,9 +11,11 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (element === null) {
       // URL is not final. Ex: https://www.linkedin.com/in/ACoAADagalYBPENv8mrVmPUm81VjZLC-w65uuZE/.
       // Do nothing and wait for service worker to return the final URL.
-      sendResponse(false);
+      sendResponse(null);
     } else {
-      sendResponse(true);
+      const nameElement = document.querySelector("img.presence-entity__image");
+      const name = nameElement.getAttribute("alt");
+      sendResponse(name);
     }
 
     // Return false since sendResponse is called synchronously.

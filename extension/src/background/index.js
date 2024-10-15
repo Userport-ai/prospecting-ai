@@ -71,8 +71,14 @@ function getUser() {
 
 // Helper that creates lead profile from given tab Id, Lead LinkedIn URL and report (can be null) and stores it in storage.
 // It also starts an alarm if the lead status exists but is not in failed or complete status.
-function createLeadProfile(tabId, linkedInProfileUrl, lead_research_report) {
+function createLeadProfile(
+  tabId,
+  profileName,
+  linkedInProfileUrl,
+  lead_research_report
+) {
   const leadProfile = {
+    name: profileName,
     url: linkedInProfileUrl,
     lead_research_report: lead_research_report,
   };
@@ -99,7 +105,7 @@ function createLeadProfile(tabId, linkedInProfileUrl, lead_research_report) {
 }
 
 // LinkedIn profile detected in a tab, check if lead report exists for this profile.
-function handleLinkedInProfileDetected(linkedInProfileUrl, tabId) {
+function handleLinkedInProfileDetected(profileName, linkedInProfileUrl, tabId) {
   const encodedProfileURL = encodeURIComponent(linkedInProfileUrl);
   user
     .getIdToken()
@@ -125,6 +131,7 @@ function handleLinkedInProfileDetected(linkedInProfileUrl, tabId) {
       // We will delete this key when the tab is closed in the listener.
       createLeadProfile(
         tabId,
+        profileName,
         linkedInProfileUrl,
         result.report_exists ? result.lead_research_report : null
       );
@@ -144,13 +151,12 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   ) {
     tabs
       .sendMessage(tabId, { action: "linkedin-profile-detected" })
-      .then((isValidURL) => {
-        if (!isValidURL) {
+      .then((profileName) => {
+        if (profileName === null) {
           // Do nothing.
           return;
         }
-
-        handleLinkedInProfileDetected(url, tabId);
+        handleLinkedInProfileDetected(profileName, url, tabId);
       });
   } else {
     // This else case is triggered even when LinkedIn profile is still loading and hasn't completed.
@@ -177,6 +183,7 @@ function createLeadReport(tabId, sendResponse) {
   const tabIdKey = tabId.toString();
   storage.local.get(tabIdKey).then((item) => {
     if (tabIdKey in item) {
+      const profileName = item[tabIdKey].name;
       const linkedInProfileUrl = item[tabIdKey].url;
       user
         .getIdToken()
@@ -208,6 +215,7 @@ function createLeadReport(tabId, sendResponse) {
           // This will also start an alarm if report status is not completed or failed.
           createLeadProfile(
             tabId,
+            profileName,
             linkedInProfileUrl,
             result.lead_research_report
           );
@@ -227,7 +235,11 @@ alarms.onAlarm.addListener((alarm) => {
       const leadProfile = item[tabIdKey];
       // Check report status in the backend. We will just reuse method that is used to
       // check if linkedin URL has a report or not and extract status from it.
-      handleLinkedInProfileDetected(leadProfile.url, Number(tabIdKey));
+      handleLinkedInProfileDetected(
+        leadProfile.name,
+        leadProfile.url,
+        Number(tabIdKey)
+      );
     } else {
       // Clear alarm since there is no lead profile associated with this alarm.
       alarms.clear(tabIdKey);

@@ -2,6 +2,7 @@
 import "./main.css";
 import { Typography, Button, Modal } from "antd";
 import { useEffect, useState } from "react";
+import { mockLeadProfile } from "./mock";
 
 const { Text, Link } = Typography;
 
@@ -15,6 +16,31 @@ async function getCurrentTab() {
     return null;
   }
   return tab;
+}
+
+// Component to display outreach messages within the extension itself.
+function PersonalizedOutreachMessages({ lead_research_report }) {
+  if (
+    lead_research_report === null ||
+    lead_research_report.personalized_outreach_messages === null
+  ) {
+    // This can be the case when research has not started or it is in progress
+    // and personalized messages have not been generated yet.
+    return <div></div>;
+  }
+
+  const outreachMessages =
+    lead_research_report.personalized_outreach_messages.personalized_emails.map(
+      (email) => email.email_opener
+    );
+  return (
+    <div id="personalized-messages-container">
+      <Text id="personalized-messages-title">Personalized Messages:</Text>
+      {outreachMessages.map((message) => (
+        <Text className="message-text">{message}</Text>
+      ))}
+    </div>
+  );
 }
 
 function ResearchReport({ lead_research_report }) {
@@ -61,10 +87,13 @@ function ResearchReport({ lead_research_report }) {
     }
   }
 
+  var reportStatusComp = null;
+  var reportActionComp = null;
   if (reportStatus === "not_started") {
-    return (
+    reportStatusComp = <Text id="status-not-started">Not Started</Text>;
+    reportActionComp = (
       <Button
-        className="action-btn"
+        id="start-research-btn"
         loading={loading}
         disabled={loading}
         onClick={onCreateReportClick}
@@ -72,38 +101,41 @@ function ResearchReport({ lead_research_report }) {
         Start Research
       </Button>
     );
-  }
-  if (reportStatus === "complete") {
-    return (
-      <Button className="action-btn" onClick={onViewReportClick}>
-        View Research Report
+  } else if (reportStatus === "complete") {
+    reportStatusComp = <Text id="status-complete">Ready</Text>;
+    reportActionComp = (
+      <Button id="view-report-btn" onClick={onViewReportClick}>
+        View Full Report
       </Button>
     );
-  }
-  if (reportStatus === "failed_with_errors") {
-    return (
-      <Button disabled className="action-btn">
-        Research Failed
-      </Button>
-    );
+  } else if (reportStatus === "failed_with_errors") {
+    reportStatusComp = <Text id="status-failed">Error</Text>;
+  } else {
+    // Any other status means report creation is still in progress.
+    reportStatusComp = <Text id="status-in-progress">In Progress</Text>;
   }
 
-  // Any other status means report creation is still in progress.
   return (
-    <Button disabled className="action-btn">
-      {" "}
-      Research In Progress
-    </Button>
+    <div id="report-container">
+      <div id="report-status-container">
+        <Text id="status-label">Research Status:</Text>
+        {reportStatusComp}
+      </div>
+      <PersonalizedOutreachMessages
+        lead_research_report={lead_research_report}
+      />
+      {reportActionComp}
+    </div>
   );
 }
 
-// Component that displays user profile.
-function LeadResearch({ leadProfile }) {
+// Component that displays lead profile.
+function LeadProfile({ leadProfile }) {
   if (leadProfile === null) {
     return (
       <div id="instructions-text-container">
-        <Text id="instructions-text">
-          LinkedIn profile not detected in this tab.
+        <Text id="not-found-text">
+          LinkedIn profile of a person not found in this tab.
         </Text>
       </div>
     );
@@ -113,8 +145,8 @@ function LeadResearch({ leadProfile }) {
   const profileDisplayText = linkedInProfileUrl.split("/in/")[1];
   return (
     <>
-      <div id="instructions-text-container">
-        <Text id="profile-detected-text">LinkedIn profile detected</Text>
+      <div id="profile-details-container">
+        <Text id="profile-name">{leadProfile.name}</Text>
         <Link id="profile-url" href={linkedInProfileUrl}>
           {profileDisplayText}
         </Link>
@@ -158,10 +190,13 @@ function Main() {
   return (
     <div id="main-outer-container">
       <div id="main-inner-container">
-        <LeadResearch leadProfile={leadProfile} />
-        <Button className="action-btn" onClick={handleViewLeadReportsClick}>
-          View All Leads
-        </Button>
+        <LeadProfile leadProfile={leadProfile} />
+        <div id="other-actions-container">
+          <Text className="other-actions-text">Other Actions:</Text>
+          <Button className="action-btn" onClick={handleViewLeadReportsClick}>
+            View All Leads
+          </Button>
+        </div>
       </div>
     </div>
   );
