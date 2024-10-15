@@ -257,6 +257,9 @@ class CreateLeadResearchReportResponse(BaseModel):
     status: ResponseStatus = Field(...,
                                    description="Status (success) of the response.")
 
+    lead_research_report: LeadResearchReport = Field(
+        ..., description="Created Lead Research report. Not all fields are populated since creation will still be in progress when this API response is returned.")
+
     @field_validator('status')
     @classmethod
     def status_must_be_success(cls, v: ResponseStatus) -> str:
@@ -308,8 +311,12 @@ def create_lead_report():
             lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Created report: {lead_research_report_id} for lead with LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}")
+
+        # Populate report ID and return report in the response.
+        lead_research_report.id = lead_research_report_id
         response = CreateLeadResearchReportResponse(
             status=ResponseStatus.SUCCESS,
+            lead_research_report=lead_research_report
         )
         return response.model_dump()
     except Exception as e:

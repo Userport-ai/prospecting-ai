@@ -1,14 +1,28 @@
 /*global chrome*/
 import "./main.css";
-import { Typography, Button } from "antd";
+import { Typography, Button, Modal } from "antd";
 import { useEffect, useState } from "react";
 
 const { Text, Link } = Typography;
 
+// Get current tab of the popup.
+async function getCurrentTab() {
+  let queryOptions = { active: true, lastFocusedWindow: true };
+  // `tab` will either be a `tabs.Tab` instance or `undefined`.
+  let [tab] = await chrome.tabs.query(queryOptions);
+  if (tab === undefined) {
+    console.error("Got undefined active tab, could not fetch lead profile.");
+    return null;
+  }
+  return tab;
+}
+
 function ResearchReport({ lead_research_report }) {
-  const researchStatus = lead_research_report
+  const initialReportStatus = lead_research_report
     ? lead_research_report.status
     : "not_started";
+  const [reportStatus, setReportStatus] = useState(initialReportStatus);
+  const [loading, setLoading] = useState(false);
 
   // Handle user click to view research report.
   function onViewReportClick() {
@@ -22,31 +36,65 @@ function ResearchReport({ lead_research_report }) {
     }
   }
 
-  if (researchStatus === "not_started") {
-    return <Button className="action-btn">Start Research</Button>;
+  // Handle user click to create report.
+  async function onCreateReportClick() {
+    const tab = await getCurrentTab();
+    if (tab === null) {
+      return;
+    }
+    if (chrome.runtime) {
+      setLoading(true);
+      // Send message to service worker to create lead research report.
+      const leadReportStatus = await chrome.runtime.sendMessage({
+        action: "create-lead-report",
+        tabId: tab.id,
+      });
+      setLoading(false);
+      if (!leadReportStatus) {
+        Modal.error({
+          title: "Research failed",
+          content: "Due to an error, failed to start research",
+        });
+        return;
+      }
+      setReportStatus(leadReportStatus);
+    }
   }
-  if (researchStatus === "complete") {
+
+  if (reportStatus === "not_started") {
+    return (
+      <Button
+        className="action-btn"
+        loading={loading}
+        disabled={loading}
+        onClick={onCreateReportClick}
+      >
+        Start Research
+      </Button>
+    );
+  }
+  if (reportStatus === "complete") {
     return (
       <Button className="action-btn" onClick={onViewReportClick}>
         View Research Report
       </Button>
     );
   }
-  if (researchStatus === "in_progress") {
-    return (
-      <Button disabled className="action-btn">
-        {" "}
-        Research In Progress
-      </Button>
-    );
-  }
-  if (researchStatus === "failed_with_errors") {
+  if (reportStatus === "failed_with_errors") {
     return (
       <Button disabled className="action-btn">
         Research Failed
       </Button>
     );
   }
+
+  // Any other status means report creation is still in progress.
+  return (
+    <Button disabled className="action-btn">
+      {" "}
+      Research In Progress
+    </Button>
+  );
 }
 
 // Component that displays user profile.
@@ -83,14 +131,8 @@ function Main() {
     async function fetchLeadProfile() {
       // Chrome runtime exists only when called inside extension.
       if (chrome.runtime) {
-        // Get current tab.
-        let queryOptions = { active: true, lastFocusedWindow: true };
-        // `tab` will either be a `tabs.Tab` instance or `undefined`.
-        let [tab] = await chrome.tabs.query(queryOptions);
-        if (tab === undefined) {
-          console.error(
-            "Got undefined active tab, could not fetch lead profile."
-          );
+        const tab = await getCurrentTab();
+        if (tab === null) {
           return;
         }
 
