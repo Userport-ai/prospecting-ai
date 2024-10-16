@@ -93,8 +93,8 @@ function Login() {
       // Sign In flow does not seem to work on localhost if not used in popup mode, don't know why.
       signInFlow: "popup",
       signInOptions: [
-        firebase.auth.EmailAuthProvider.PROVIDER_ID,
         firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+        firebase.auth.EmailAuthProvider.PROVIDER_ID,
       ],
       // TODO: Change this.
       tosUrl: "https://www.example.com/terms-conditions",
