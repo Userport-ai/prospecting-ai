@@ -64,11 +64,9 @@ function AppHeader() {
           if (e.key === leads_key) {
             // Send event.
             posthog.capture("leads_tab_clicked");
-            return navigate("/leads");
           } else if (e.key === templates_key) {
             // Send event.
             posthog.capture("templates_tab_clicked");
-            return navigate("/templates");
           } else if (e.key === logout_key) {
             return handleLogout();
           }

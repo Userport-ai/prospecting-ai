@@ -13,7 +13,7 @@ example_linkedin_info/
 *.pyc
 __pycache__/
 
-userport-dev-firebase-adminsdk-e7z7j-510124f904.json
+app/firebase_service_accounts/
 
 .pytest_cache/
 .coverage
