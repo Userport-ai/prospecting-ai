@@ -102,6 +102,12 @@ function ResearchReport({ lead_research_report }) {
   } else {
     // Any other status means report creation is still in progress.
     reportStatusComp = <Text id="status-in-progress">In Progress</Text>;
+    reportActionComp = (
+      <Text id="in-progress-notif">
+        It should complete in 5 minutes. Open the extension again after that. We
+        will also send you a Chrome notification upon completion!
+      </Text>
+    );
   }
 
   return (
