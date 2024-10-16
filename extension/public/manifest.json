@@ -27,5 +27,5 @@
   "host_permissions": [
     "https://*.ngrok-free.app/*"
   ],
-  "permissions": ["storage", "tabs", "alarms"]
+  "permissions": ["storage", "tabs", "alarms", "notifications"]
 }

@@ -1,4 +1,10 @@
-import { runtime, tabs, storage, alarms } from "webextension-polyfill";
+import {
+  runtime,
+  tabs,
+  storage,
+  alarms,
+  notifications,
+} from "webextension-polyfill";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -99,8 +105,29 @@ function createLeadProfile(
     // Create an alarm to poll report status and use tabId as key so that it is unique to a given tab.
     alarms.create(tabIdKey, { periodInMinutes: 1 });
   } else {
-    // Delete any existing alarm for this tab.
-    alarms.clear(tabIdKey);
+    // If there are any alarms for this tab, then it means users are waiting
+    // for the result of research. We should present a notification if so.
+    alarms.get(tabIdKey).then((item) => {
+      if (item !== undefined && "name" in item) {
+        // This is indeed a non empty 'alarm' object.
+        var notifTitle = `Research Complete for ${profileName}`;
+        var notifMessage = "View details in the extension!";
+
+        if (report_status === leadReportStatusFailed) {
+          notifTitle = `Research Failed for ${profileName}`;
+          notifMessage = "Failed due to an unknown error.";
+        }
+
+        notifications.create(tabIdKey, {
+          type: "basic",
+          title: notifTitle,
+          message: notifMessage,
+          iconUrl: runtime.getURL("logo256.png"),
+        });
+        // Delete alarm.
+        alarms.clear(tabIdKey);
+      }
+    });
   }
 
   // Add profile to storage.
@@ -375,7 +402,7 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
 // Handle state for when user closes a tab. Usually a clean up of state is needed.
 function handleTabClosed(tabId, removeInfo) {
   storage.local.get([loginTabIdKey]).then((item) => {
-    if (item && tabId === item[loginTabIdKey].webAppTab) {
+    if (loginTabIdKey in item && tabId === item[loginTabIdKey].webAppTab) {
       // User Login Tab (which has Userport web app) is shut down.
 
       // Remove listener for user login updates since tab is closed.
