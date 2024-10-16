@@ -22,3 +22,5 @@ Use the command: `ngrok http http://127.0.0.1:5000` to do so.
 Since local testing extension also requires you to build it via `npm run build`, the app uses `.env.production` file by default.
 
 When actually building for production, make sure to update `.env.production` to reflect the actual production env before starting the build.
+
+When building for local, you can rename `.env.local.production.local` to `.env.local.production` (so that it superceded `.env.production`) but change it back before building for production.
