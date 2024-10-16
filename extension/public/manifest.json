@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Userport",
-  "version": "1.0.0",
-  "description": "Userport Profile Chrome Extension.",
+  "version": "0.0.0.1",
+  "description": "Use AI to research leads and generate personalized messages for outreach. Go to your lead's LinkedIn profile and click 'Start Research', it's that simple!",
   "icons": {
     "16": "logo256.png",
     "48": "logo256.png",
@@ -22,9 +22,10 @@
     "default_popup": "index.html"
   },
   "externally_connectable": {
-    "matches": ["http://localhost:3000/login*"]
+    "matches": ["https://app.userport.ai/login*", "http://localhost:3000/login*"]
   },
   "host_permissions": [
+    "https://app.userport.ai/api/*",
     "https://*.ngrok-free.app/*"
   ],
   "permissions": ["storage", "tabs", "alarms", "notifications"]

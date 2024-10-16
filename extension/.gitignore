@@ -17,6 +17,9 @@
 .env.development.local
 .env.test.local
 .env.production.local
+# Rename this file to .env.production.local when you
+# want to build and test the extension locally.
+.env.local.production.local
 
 npm-debug.log*
 yarn-debug.log*
