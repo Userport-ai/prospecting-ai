@@ -12,6 +12,9 @@ import {
   signInWithCustomToken,
   onAuthStateChanged,
 } from "firebase/auth/web-extension";
+// No external code loading possible (this disables all extensions such as Replay, Surveys, Exceptions etc.)
+// Reference: https://posthog.com/docs/libraries/js.
+import posthog from "posthog-js/dist/module.no-external";
 
 // Module constants.
 const loginTabIdKey = "login-tab-id";
@@ -43,6 +46,12 @@ runtime.onInstalled.addListener(() => {
   auth = getAuth(app);
   listenToAuthChanges(auth);
 
+  // Initialize posthog.
+  posthog.init(process.env.REACT_APP_PUBLIC_POSTHOG_KEY, {
+    api_host: process.env.REACT_APP_PUBLIC_POSTHOG_HOST,
+    person_profiles: "identified_only",
+  });
+
   // Add tab closed listener.
   tabs.onRemoved.addListener(handleTabClosed);
 
@@ -55,8 +64,21 @@ function listenToAuthChanges(auth) {
   onAuthStateChanged(auth, (authUser) => {
     if (authUser !== null) {
       console.log("Auth update: user is logged in");
+
+      // User is logged in.
+      posthog.identify(authUser.uid, {
+        name: authUser.displayName,
+        email: authUser.email,
+        emailVerified: authUser.emailVerified,
+      });
+
+      // Send event.
+      posthog.capture("extension_user_logged_in");
     } else {
       console.log("Auth update: user is logged out");
+
+      // Reset posthog identification of the user.
+      posthog.reset();
     }
     user = authUser;
   });
@@ -134,8 +156,13 @@ function createLeadProfile(
   storage.local.set({ [tabIdKey]: leadProfile });
 }
 
-// LinkedIn profile detected in a tab, check if lead report exists for this profile.
-function handleLinkedInProfileDetected(profileName, linkedInProfileUrl, tabId) {
+// Check if lead report exists for this linkedin person profile and save the result to storage as profile of the lead.
+// Called when a new profile is detected in the tab or when we periodically check status of a lead report's status (upon start research).
+function checkLeadReportForGivenProfile(
+  profileName,
+  linkedInProfileUrl,
+  tabId
+) {
   const encodedProfileURL = encodeURIComponent(linkedInProfileUrl);
   if (user === null) {
     // User not logged in, do nothing.
@@ -190,7 +217,13 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
           // Do nothing.
           return;
         }
-        handleLinkedInProfileDetected(profileName, url, tabId);
+
+        // Send event.
+        posthog.capture("extension_lead_linkedin_profile_found", {
+          profile_url: url,
+        });
+
+        checkLeadReportForGivenProfile(profileName, url, tabId);
       });
   } else {
     // This else case is triggered even when LinkedIn profile is still loading and hasn't completed.
@@ -269,7 +302,7 @@ alarms.onAlarm.addListener((alarm) => {
       const leadProfile = item[tabIdKey];
       // Check report status in the backend. We will just reuse method that is used to
       // check if linkedin URL has a report or not and extract status from it.
-      handleLinkedInProfileDetected(
+      checkLeadReportForGivenProfile(
         leadProfile.name,
         leadProfile.url,
         Number(tabIdKey)
@@ -302,6 +335,9 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "login-user") {
     // Handle login request from user. Open userport in a new tab and log them in.
 
+    // Send event.
+    posthog.capture("extension_login_btn_clicked");
+
     // Remove existing listeners if any.
     runtime.onMessageExternal.removeListener(handleUserLoginUpdate);
 
@@ -325,6 +361,9 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "create-lead-report") {
+    // Send event.
+    posthog.capture("extension_start_research_btn_clicked");
+
     createLeadReport(request.tabId, sendResponse);
 
     // Async response, return true.
@@ -333,6 +372,10 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "view-lead-report") {
     // Navigate user to new tab to view the lead report in the Userport UI.
+
+    // Send event.
+    posthog.capture("extension_view_report_btn_clicked");
+
     tabs.create({
       url: `${process.env.REACT_APP_HOSTNAME}/lead-research-reports/${request.report_id}`,
       active: true,
@@ -342,6 +385,10 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "view-all-leads") {
     // Navigate user to new tab to view all the leads they have researched so far in the Userport UI.
+
+    // Send event.
+    posthog.capture("extension_view_all_leads_btn_clicked");
+
     tabs.create({
       url: `${process.env.REACT_APP_HOSTNAME}/leads`,
       active: true,
@@ -350,7 +397,12 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "logout-user") {
-    signOut(auth).then(() => sendResponse(true));
+    // Send event.
+    posthog.capture("extension_logged_out");
+
+    signOut(auth).then(() => {
+      sendResponse(true);
+    });
 
     // Async response, return true;
     return true;
@@ -381,7 +433,8 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
     // Login user.
     signInWithCustomToken(auth, request.token)
       .then((userCredential) => {
-        console.log("user logged in successfully: ", userCredential.user.email);
+        const loggedInUser = userCredential.user;
+        console.log("user logged in successfully: ", loggedInUser.email);
       })
       .finally(() => {
         // Close the web app Login tab and switch extension tab to active. Cleaning up storage state will be done in close tab handler.
