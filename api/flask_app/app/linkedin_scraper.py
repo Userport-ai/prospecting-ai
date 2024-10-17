@@ -614,8 +614,10 @@ class LinkedInScraper:
         params = {
             'linkedin_profile_url': profile_url,
             'skills': 'exclude',
-            # Data is stale in prod showing older person profile but ProxyCurl is very expensive so trying to cut costs.
-            # 'use_cache': 'if-recent',
+            # 2 credits because we are fetching data real time instead of using cache.
+            # For Indian SDRs, data is quite stale, so we are using recent values. Maybe in the future we can use smarter
+            # ways to fetch profile information like scraping LinkedIn directly if using a chrome extension.
+            'use_cache': 'if-recent',
             'fallback_to_cache': 'on-error',
         }
 
@@ -668,7 +670,7 @@ class LinkedInScraper:
         params = {
             'url': profile_url,
             # Uncomment this if it affects data quality in prod.
-            #'categories': 'include',
+            # 'categories': 'include',
             # Uncomment if this affects data quality in prod.
             # 'funding_data': 'include',
             # 'use_cache': 'if-recent',
