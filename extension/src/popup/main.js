@@ -20,13 +20,21 @@ function PersonalizedOutreachMessages({ lead_research_report }) {
 
   const outreachMessages =
     lead_research_report.personalized_outreach_messages.personalized_emails.map(
-      (email) => email.email_opener
+      (email) => {
+        return { text: email.email_opener, url: email.highlight_url };
+      }
     );
   return (
     <div id="personalized-messages-container">
       <Text id="personalized-messages-title">Personalized Messages:</Text>
       {outreachMessages.map((message) => (
-        <Text className="message-text">{message}</Text>
+        <div className="single-message-container">
+          <Text className="message-text">{message.text}</Text>
+          <Text className="message-source">Source:</Text>
+          <Link href={message.url} target="_blank" className="message-url">
+            {message.url}
+          </Link>
+        </div>
       ))}
     </div>
   );
@@ -130,7 +138,8 @@ function LeadProfile({ leadProfile }) {
     return (
       <div id="instructions-text-container">
         <Text id="not-found-text">
-          LinkedIn profile of a person not found in this tab.
+          LinkedIn profile of a person not found in this tab. Try reloading the
+          tab if you think this is the incorrect.
         </Text>
       </div>
     );

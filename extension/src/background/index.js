@@ -22,6 +22,7 @@ const webAppTab = "web-app-tab";
 const extensionTab = "extension-tab";
 const leadReportStatusSuccess = "complete";
 const leadReportStatusFailed = "failed_with_errors";
+const callOrigin = "extension";
 
 // Global objects.
 var auth;
@@ -166,6 +167,9 @@ function checkLeadReportForGivenProfile(
   const encodedProfileURL = encodeURIComponent(linkedInProfileUrl);
   if (user === null) {
     // User not logged in, do nothing.
+    console.log(
+      `User not logged in, cannot check lead report in tab Id: ${tabId} for profile: ${linkedInProfileUrl}`
+    );
     return;
   }
   user
@@ -252,6 +256,12 @@ function createLeadReport(tabId, sendResponse) {
     if (tabIdKey in item) {
       const profileName = item[tabIdKey].name;
       const linkedInProfileUrl = item[tabIdKey].url;
+      if (user === null) {
+        console.log(
+          `User not logged in, cannot create report in tab Id: ${tabId}`
+        );
+        return;
+      }
       user
         .getIdToken()
         .then((idToken) =>
@@ -259,7 +269,10 @@ function createLeadReport(tabId, sendResponse) {
             `${process.env.REACT_APP_API_HOSTNAME}/api/v1/lead-research-reports`,
             {
               method: "POST",
-              body: JSON.stringify({ linkedin_url: linkedInProfileUrl }),
+              body: JSON.stringify({
+                linkedin_url: linkedInProfileUrl,
+                origin: callOrigin,
+              }),
               headers: {
                 "Content-Type": "application/json",
                 Authorization: "Bearer " + idToken,
@@ -442,6 +455,8 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
           const webAppTabId = item[loginTabIdKey].webAppTab;
           const extensionTabId = item[loginTabIdKey].extensionTab;
           tabs.update(extensionTabId, { active: true });
+          // Tab reload is needed so that we can check if report exists on server now that user is logged in.
+          tabs.reload(extensionTabId);
           tabs.remove(webAppTabId);
         });
       });

@@ -113,12 +113,27 @@
   color: var(--secondary);
 }
 
-#personalized-messages-container .message-text {
+#personalized-messages-container .single-message-container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid lightgray;
+  padding: 5px;
+}
+
+.single-message-container .message-text {
   margin-top: 3px;
   color: rgb(81, 73, 91);
   font-weight: 500;
-  border: 1px solid lightgray;
-  padding: 5px;
+}
+
+.single-message-container .message-source {
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.single-message-container .message-url {
+  font-size: 11px;
 }
 
 #report-container #in-progress-notif {

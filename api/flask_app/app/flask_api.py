@@ -275,15 +275,24 @@ def create_lead_report():
     db = Database()
     user_id: str = g.user["uid"]
 
-    # Remove any leading and trailing whitespaces and trailing slashes.
-    person_linkedin_url: str = Utils.remove_spaces_and_trailing_slashes(
-        url=request.json.get('linkedin_url'))
-    if not LinkedInScraper.is_valid_profile_url(profile_url=person_linkedin_url):
+    person_linkedin_url: Optional[str] = None
+    origin: Optional[str] = None
+    try:
+        # Remove any leading and trailing whitespaces and trailing slashes.
+        person_linkedin_url = Utils.remove_spaces_and_trailing_slashes(
+            url=request.json.get('linkedin_url'))
+        if not LinkedInScraper.is_valid_profile_url(profile_url=person_linkedin_url):
+            raise ValueError(
+                f"Invalid LinkedIn URL: {person_linkedin_url} requested.")
+        origin = request.json.get("origin")
+    except Exception as e:
+        logger.exception(
+            f"Failed to create report with request: {request} for user ID: {user_id} with error: {e}")
         raise APIException(
-            status_code=404, message=f"Invalid LinkedIn URL: {person_linkedin_url} requested.")
+            status_code=400, message=f"Invalid request to create a report")
 
     logger.info(
-        f"Got request from user ID: {user_id} to start report for URL: {person_linkedin_url}")
+        f"Got request from user ID: {user_id} to start report for URL: {person_linkedin_url} and origin: {origin}")
 
     lead_research_report: Optional[LeadResearchReport] = None
     try:
@@ -483,6 +492,7 @@ class CheckLeadReportExistsResponse(BaseModel):
 @bp.get('/v1/lead-research-reports')
 @login_required
 def check_if_report_exists():
+    # Check if lead research report existing for given LinkedIn profile.
     person_linkedin_url: str = None
     try:
         person_linkedin_url = Utils.remove_spaces_and_trailing_slashes(
@@ -502,9 +512,18 @@ def check_if_report_exists():
         f"Check if lead report exists for linkedin URL: {person_linkedin_url} requested by user ID: {user_id}")
 
     try:
+        projection = {
+            "_id": 1,
+            "status": 1,
+            "personalized_outreach_messages": {
+                "personalized_emails": {
+                    "email_opener": 1,
+                    "highlight_url": 1
+                }
+            }
+        }
         lead_research_report = db.get_lead_research_report_by_url(
-            user_id=user_id, person_linkedin_url=person_linkedin_url, projection={"_id": 1, "status": 1, "personalized_outreach_messages": {
-                "personalized_emails": {"email_opener": 1}}})
+            user_id=user_id, person_linkedin_url=person_linkedin_url, projection=projection)
     except Exception as e:
         logger.exception(
             f"Failed to check if Lead Research report exists for person LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id} with error: {e}")
