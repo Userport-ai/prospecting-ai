@@ -99,8 +99,9 @@ function Login() {
       // TODO: Change this.
       tosUrl: "https://www.example.com/terms-conditions",
       privacyPolicyUrl: function () {
-        // TODO: Change this.
-        window.location.assign("https://www.example.com/privacy-policy");
+        window.location.assign(
+          "https://www.termsfeed.com/live/8aa65c78-8f14-4c68-ae4f-6453da49f8a3"
+        );
       },
     };
     const ui =
