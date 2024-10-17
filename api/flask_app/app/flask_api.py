@@ -313,7 +313,7 @@ def create_lead_report():
     try:
         # Create report in the database and continue updating it in the background.
         lead_research_report = LeadResearchReport(
-            user_id=user_id, person_linkedin_url=person_linkedin_url, status=LeadResearchReport.Status.NEW)
+            user_id=user_id, person_linkedin_url=person_linkedin_url, status=LeadResearchReport.Status.NEW, origin=origin)
         lead_research_report_id: str = db.insert_lead_research_report(
             lead_research_report=lead_research_report)
         fetch_lead_info_orchestrator.delay(

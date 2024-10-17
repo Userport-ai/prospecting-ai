@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 import { useState } from "react";
 import {
+  getCallOrigin,
   stateAfterFirstLeadCreation,
   updateUserStateOnServer,
   userHasNotCreatedLead,
@@ -36,7 +37,10 @@ export const enterLeadAction = (authContext) => {
     const idToken = await user.getIdToken();
     const response = await fetch("/api/v1/lead-research-reports", {
       method: "POST",
-      body: JSON.stringify({ linkedin_url: linkedin_url }),
+      body: JSON.stringify({
+        linkedin_url: linkedin_url,
+        origin: getCallOrigin(),
+      }),
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + idToken,

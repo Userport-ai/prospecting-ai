@@ -446,6 +446,13 @@ class LeadResearchReport(BaseModel):
         total_tokens_used: Optional[OpenAITokenUsage] = Field(
             default=None, description="Total OpenAI tokens used in the entire workflow to create personalized messages for given lead.")
 
+    class Origin(str, Enum):
+        # Origin from where report creation was triggered.
+        # App UI.
+        WEB = "web"
+        # Chrom Extension.
+        EXTENSION = "extension"
+
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
     creation_date: Optional[datetime] = Field(
@@ -474,6 +481,8 @@ class LeadResearchReport(BaseModel):
         default=None, description="Company Industry categories")
     user_id: Optional[str] = Field(
         default=None, description="User ID of the person who created this report.")
+    origin: Optional[Origin] = Field(
+        default=None, description="Origin of the call to create the report. Can be None for reports which have not been backfilled.")
 
     # Store search results.
     search_results_map: Optional[Dict[str, List[str]]] = Field(

@@ -117,13 +117,16 @@ class Researcher:
         existing_web_search_results: Optional[LeadResearchReport.WebSearchResults] = research_report.web_search_results
         existing_urls: List[str] = [
             r.url for r in existing_web_search_results.results] if existing_web_search_results else []
+        origin: Optional[LeadResearchReport.Origin] = research_report.origin
+        logger.info(
+            f"Origin for Lead report: {lead_research_report_id} is: {origin} when fetching web search results")
 
         search_request = SearchRequest(
             person_name=person_name,
             company_name=company_name,
             person_role_title=role_title,
             existing_urls=existing_urls,
-            query_configs=self._get_query_configs(exhaustive_search=False),
+            query_configs=self._get_query_configs(origin=origin),
         )
         # Get search results and update them in the database.
         web_search_results: LeadResearchReport.WebSearchResults = self.search_engine_workflow.get_search_results(
@@ -142,14 +145,64 @@ class Researcher:
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
 
-    def _get_query_configs(self, exhaustive_search: bool) -> List[SearchRequest.QueryConfig]:
-        """Return query configs used for searching the web depending type of searcg requested by the user."""
+    def _get_query_configs(self, origin: Optional[LeadResearchReport.Origin]) -> List[SearchRequest.QueryConfig]:
+        """Return query configs used for searching the web depending on origin of report creation request.
+        If origin is 'extension' i.e. Chrome extension, we want the research to be done quickly so user can get to value quickly.
+        """
         # Queries to consider = ["recent LinkedIn posts", "recent product launches", "recent thoughts on the industry",
         #    "recent articles or blogs", "personal recognitions", "recent interviews or podcasts",
         #    "recent talks or events or conferences attended",  "recent funding announcements",
         #    "recent leadership changes", "recent announcements made"]
         # The most important configs that are required for every search.
-        base_search_configs = [
+
+        if origin == LeadResearchReport.Origin.EXTENSION:
+            return [
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="product launches",
+                    num_results_per_method=5,
+                    methods=[
+                        SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent achievements",
+                    num_results_per_method=5,
+                    methods=[
+                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="recent LinkedIn Posts",
+                    num_results_per_method=5,
+                    methods=[
+                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="recent partnerships",
+                    num_results_per_method=5,
+                    methods=[
+                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="funding announcements",
+                    num_results_per_method=5,
+                    methods=[
+                        SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+                    suffix_query="recent talks or events or conferences attended",
+                    num_results_per_method=5,
+                    methods=[
+                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+            ]
+
+        # Origin is web.
+        return [
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                 suffix_query="product launches",
@@ -220,30 +273,28 @@ class Researcher:
                 methods=[
                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
             ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+            #     suffix_query="recent leadership hires",
+            #     num_results_per_method=5,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="thoughts on the industry",
+            #     num_results_per_method=5,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="personal recognitions",
+            #     num_results_per_method=5,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            # ),
         ]
-        if exhaustive_search:
-            base_search_configs.extend([
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="recent leadership hires",
-                    num_results_per_method=5,
-                    methods=[SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
-                             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                ),
-                # SearchRequest.QueryConfig(
-                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                #     suffix_query="thoughts on the industry",
-                #     num_results_per_method=10,
-                #     methods=[
-                #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-                # ),
-                # SearchRequest.QueryConfig(
-                #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                #     suffix_query="personal recognitions",
-                #     num_results=10,
-                # ),
-            ])
-        return base_search_configs
 
     def process_content_in_search_urls(self, lead_research_report_id: str, search_results_batch: List[LeadResearchReport.WebSearchResults.Result], task_num: int) -> List[str]:
         """Process URLs stored in given search results batch in a research report and return URLs that failed to process."""

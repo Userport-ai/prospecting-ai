@@ -62,6 +62,11 @@ export function getChromeExtensionQueryParamsString() {
   return new URLSearchParams({ source: "extension" }).toString();
 }
 
+// Used to set origin in the API request to create lead report.
+export function getCallOrigin() {
+  return "web";
+}
+
 // Function that updates user state on the server and returns the result.
 // Throws an error if the update failed.
 export async function updateUserStateOnServer(newState, idToken) {
