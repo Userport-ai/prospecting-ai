@@ -34,6 +34,7 @@ import LoggedIn, { loggedInLoader } from "./logged-in";
 import WelcomePage from "./welcome-page";
 import { isLocalEnv } from "./helper-functions";
 import { PostHogProvider } from "posthog-js/react";
+import PrivacyPolicy from "./privacy-policy";
 
 const postHogOptions = {
   api_host: process.env.REACT_APP_PUBLIC_POSTHOG_HOST,
@@ -76,6 +77,10 @@ function AppRoutes() {
         errorElement: <ErrorPage />,
         loader: loggedInLoader(context),
         element: <LoggedIn />,
+      },
+      {
+        path: "/privacy-policy",
+        element: <PrivacyPolicy />,
       },
       {
         path: "/",
