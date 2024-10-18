@@ -41,7 +41,7 @@ class Personalization:
             "Your goal is to write the opening lines of an email which addresses the prospect in second-person and is hyper personalized.\n"
             "You will be provided with information about the prospect as well as a summary of a recent news item related to them or their company.\n"
             "Reference specific details from the news summary (numbers, company names, quotes etc.) and details about the prospect and their company to create the hyper personalized opening lines.\n"
-            "The opening lines should be up to a maximum of 2 sentences in length and not be very formal in tone.\n"
+            "The opening lines should be up to a maximum of 2 sentences in length and should not exceed 30 words in total. It should also not be very formal in tone.\n"
             "\n"
             "Here are some examples of very good hyper-personalized opening lines that you can use as inspiration:\n"
             "Kudos to Greenhouse for being named the Best Applicant Tracking System for mid-market enterprise this year! A 94% user satisfaction rating while serving companies such as HubSpot and Buzzfeed is no easy feat!\n"
