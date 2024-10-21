@@ -9,7 +9,8 @@
     "128": "logo256.png"
   },
   "background": {
-    "service_worker": "./static/js/background.js"
+    "service_worker": "./static/js/background.js",
+    "type": "module"
   },
   "content_scripts": [
     {

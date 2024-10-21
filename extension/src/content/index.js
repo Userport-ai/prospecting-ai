@@ -2,6 +2,12 @@ import { runtime } from "webextension-polyfill";
 
 const linkedInDomain = "https://www.linkedin.com";
 
+// Activities that we care about.
+// const activitiesFilter()
+
+// Global state storing activity buttons on given tab.
+var recentActivityButtons = null;
+
 // Listen to messages related to this tab sent by the Service worker. Returns true if it is a valid LinkedIn profile URL and false otherwise.
 runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "linkedin-profile-detected") {
@@ -25,5 +31,26 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Return false since sendResponse is called synchronously.
     // Reference: https://developer.chrome.com/docs/extensions/develop/concepts/messaging.
     return false;
+  }
+  if (request.action === "start-research") {
+    // Get the activity button elements.
+    recentActivityButtons = document.querySelectorAll(
+      "div.pv-recent-activity-detail__core-rail div.mb3 button"
+    );
+
+    // console.log("all buttons: ", recentActivityButtons);
+    for (let idx in recentActivityButtons) {
+      console.log(
+        "Button text: ",
+        recentActivityButtons[idx].querySelector("span").textContent.trim()
+      );
+
+      // If active button, then scrape content of it.
+      if (idx == 1) {
+        // Click the button comments.
+        recentActivityButtons[idx].click();
+        break;
+      }
+    }
   }
 });

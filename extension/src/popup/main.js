@@ -59,8 +59,8 @@ function ResearchReport({ lead_research_report }) {
     }
   }
 
-  // Handle user click to create report.
-  async function onCreateReportClick() {
+  // Handle user click to start research.
+  async function onStartResearchClick() {
     if (chrome.runtime) {
       const tab = await getCurrentTab();
       if (tab === null) {
@@ -93,7 +93,7 @@ function ResearchReport({ lead_research_report }) {
         id="start-research-btn"
         loading={loading}
         disabled={loading}
-        onClick={onCreateReportClick}
+        onClick={onStartResearchClick}
       >
         Start Research
       </Button>

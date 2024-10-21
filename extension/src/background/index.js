@@ -5,47 +5,33 @@ import {
   alarms,
   notifications,
 } from "webextension-polyfill";
-import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  signOut,
-  signInWithCustomToken,
-  onAuthStateChanged,
-} from "firebase/auth/web-extension";
 // No external code loading possible (this disables all extensions such as Replay, Surveys, Exceptions etc.)
 // Reference: https://posthog.com/docs/libraries/js.
 import posthog from "posthog-js/dist/module.no-external";
+import { handleLoginTabClosed, logOut, startLogin } from "./login";
+import { getUserObj, initAuth } from "./auth";
 
 // Module constants.
-const loginTabIdKey = "login-tab-id";
-const webAppTab = "web-app-tab";
-const extensionTab = "extension-tab";
 const leadReportStatusSuccess = "complete";
 const leadReportStatusFailed = "failed_with_errors";
 const callOrigin = "extension";
 
-// Global objects.
-var auth;
-var user;
+// Action State enum constants which reflect the state of a given tab.
+// These will help simplify logic since we have global listeners
+// for all tabs and logic can be complicated to read and understand.
+// Frozen enum to make object immutable.
+const ActionState = Object.freeze({
+  IDLE: "idle",
+  LOGGING_IN: "logging-in",
+  RESEARCH_IN_PROGRESS: "research-in-progress",
+});
+
+// Global state for whether user is logging in or not.
+var userIsLoggingIn = false;
 
 runtime.onInstalled.addListener(() => {
   console.log("[background] loaded ");
-
-  // Initialize firebase.
-  const firebaseConfig = {
-    apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.REACT_APP_FIREBASE_APP_ID,
-    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
-  };
-
-  // Initialize Firebase and get auth object.
-  const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  listenToAuthChanges(auth);
+  initAuth();
 
   // Initialize posthog.
   posthog.init(process.env.REACT_APP_PUBLIC_POSTHOG_KEY, {
@@ -60,31 +46,6 @@ runtime.onInstalled.addListener(() => {
   alarms.clearAll();
 });
 
-// Listen to auth changes related to a user's login status.
-function listenToAuthChanges(auth) {
-  onAuthStateChanged(auth, (authUser) => {
-    user = authUser;
-    if (authUser !== null) {
-      console.log("Auth update: user is logged in");
-
-      // User is logged in.
-      posthog.identify(authUser.uid, {
-        name: authUser.displayName,
-        email: authUser.email,
-        emailVerified: authUser.emailVerified,
-      });
-
-      // Send event.
-      posthog.capture("extension_user_logged_in");
-    } else {
-      console.log("Auth update: user is logged out");
-
-      // Reset posthog identification of the user.
-      posthog.reset();
-    }
-  });
-}
-
 // Returns lead profile from storage. Returns null if it does not exist.
 async function getLeadProfile(tabId) {
   const tabIdKey = tabId.toString();
@@ -94,11 +55,6 @@ async function getLeadProfile(tabId) {
   }
   // User object does not exist (likely because this tab does not currently have a valid LinkedIn profile), return null.
   return null;
-}
-
-// Return global user object. Returns null if user is logged out or hasn't signed in yet.
-function getUser() {
-  return user;
 }
 
 // Helper that creates lead profile from given tab Id, Lead LinkedIn URL and report (can be null) and stores it in storage.
@@ -165,6 +121,7 @@ function checkLeadReportForGivenProfile(
   tabId
 ) {
   const encodedProfileURL = encodeURIComponent(linkedInProfileUrl);
+  const user = getUserObj();
   if (user === null) {
     // User not logged in, do nothing.
     console.log(
@@ -191,7 +148,7 @@ function checkLeadReportForGivenProfile(
         return;
       }
 
-      // Create lead profile from the result. This will override existing profile
+      // Create lead profile from the result. It will override any existing profile
       // whenver the existing LinkedIn profile in the current tab is changed.
       // We will delete this key when the tab is closed in the listener.
       createLeadProfile(
@@ -261,6 +218,7 @@ function createLeadReport(tabId, sendResponse) {
     if (tabIdKey in item) {
       const profileName = item[tabIdKey].name;
       const linkedInProfileUrl = item[tabIdKey].url;
+      const user = getUserObj();
       if (user === null) {
         console.log(
           `User not logged in, cannot create report in tab Id: ${tabId}`
@@ -277,6 +235,7 @@ function createLeadReport(tabId, sendResponse) {
               body: JSON.stringify({
                 linkedin_url: linkedInProfileUrl,
                 origin: callOrigin,
+                postsHTML: null,
               }),
               headers: {
                 "Content-Type": "application/json",
@@ -335,8 +294,8 @@ alarms.onAlarm.addListener((alarm) => {
 // Handle messages from Popup App and Content Script.
 runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetch-user") {
-    // Fetch user object from storage and return to the caller.
-    sendResponse(getUser());
+    // Fetch user object from auth module and return to the caller.
+    sendResponse(getUserObj());
 
     // Since the user fetch is synchronous, we return false.
     // Reference: https://developer.chrome.com/docs/extensions/develop/concepts/messaging.
@@ -351,30 +310,10 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "login-user") {
-    // Handle login request from user. Open userport in a new tab and log them in.
+    userIsLoggingIn = true;
 
-    // Send event.
-    posthog.capture("extension_login_btn_clicked");
+    startLogin(request);
 
-    // Remove existing listeners if any.
-    runtime.onMessageExternal.removeListener(handleUserLoginUpdate);
-
-    tabs
-      .create({
-        url: `${process.env.REACT_APP_HOSTNAME}/login?source=extension`,
-        active: true,
-      })
-      .then((tab) => {
-        // Store tab ID of web app and extension for login. Delete it when tab is closed or login is complete.
-        storage.local
-          .set({
-            [loginTabIdKey]: { webAppTab: tab.id, extensionTab: request.tabId },
-          })
-          .then(() => {
-            // Add listener to listen to updates of user login.
-            runtime.onMessageExternal.addListener(handleUserLoginUpdate);
-          });
-      });
     return;
   }
 
@@ -418,7 +357,7 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Send event.
     posthog.capture("extension_logged_out");
 
-    signOut(auth).then(() => {
+    logOut().then(() => {
       sendResponse(true);
     });
 
@@ -427,73 +366,27 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Handle messages related to user login from Userport login page.
-function handleUserLoginUpdate(request, sender, sendResponse) {
-  if (!("event" in request)) {
-    // Not a relevant request, do nothing.
-    return sendResponse();
-  }
-
-  if (request.event === "ping") {
-    // Do nothing since this is just a health check from web page.
-    return sendResponse();
-  }
-
-  if (request.event === "logged-in") {
-    if (!("token" in request)) {
-      // Token not found in request, log error.
-      console.log(
-        `Error: Token not found in web page message! Request: ${request}, Sender: ${sender}`
-      );
-      return sendResponse();
-    }
-
-    // Login user.
-    signInWithCustomToken(auth, request.token)
-      .then((userCredential) => {
-        const loggedInUser = userCredential.user;
-        console.log("user logged in successfully: ", loggedInUser.email);
-      })
-      .finally(() => {
-        // Close the web app Login tab and switch extension tab to active. Cleaning up storage state will be done in close tab handler.
-        storage.local.get([loginTabIdKey]).then((item) => {
-          const webAppTabId = item[loginTabIdKey].webAppTab;
-          const extensionTabId = item[loginTabIdKey].extensionTab;
-          tabs.update(extensionTabId, { active: true });
-          // Tab reload is needed so that we can check if report exists on server now that user is logged in.
-          tabs.reload(extensionTabId);
-          tabs.remove(webAppTabId);
-        });
-      });
-
-    return sendResponse();
-  }
-
-  throw Error(`Unidentified event request: ${request}`);
-}
-
 // Handle state for when user closes a tab. Usually a clean up of state is needed.
 function handleTabClosed(tabId, removeInfo) {
-  storage.local.get([loginTabIdKey]).then((item) => {
-    if (loginTabIdKey in item && tabId === item[loginTabIdKey].webAppTab) {
-      // User Login Tab (which has Userport web app) is shut down.
+  if (userIsLoggingIn) {
+    handleLoginTabClosed(tabId).then((success) => {
+      if (success) {
+        // Reset global logging in state.
+        userIsLoggingIn = false;
+      }
+    });
+    return;
+  }
 
-      // Remove listener for user login updates since tab is closed.
-      runtime.onMessageExternal.removeListener(handleUserLoginUpdate);
+  // handle clean up in this tab.
+  const tabIdKey = tabId.toString();
+  storage.local.get(tabIdKey).then((item) => {
+    if (item && tabIdKey in item) {
+      // Tab with LinkedIn profile is shut down. Clear any stored state in this tab.
+      storage.local.remove([tabIdKey]);
 
-      // Delete login tab key from storage.
-      storage.local.remove([loginTabIdKey]);
-    } else {
-      const tabIdKey = tabId.toString();
-      storage.local.get(tabIdKey).then((item) => {
-        if (item && tabIdKey in item) {
-          // Tab with LinkedIn profile is shut down. Remove any stored lead profile in this tab.
-          storage.local.remove([tabIdKey]);
-
-          // Delete any alarms associated with this tab as well.
-          alarms.clear(tabIdKey);
-        }
-      });
+      // Delete any alarms associated with this tab as well.
+      alarms.clear(tabIdKey);
     }
   });
 }
