@@ -1,20 +1,40 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged } from "firebase/auth/web-extension";
-// No external code loading possible (this disables all extensions such as Replay, Surveys, Exceptions etc.)
-// Reference: https://posthog.com/docs/libraries/js.
-import posthog from "posthog-js/dist/module.no-external";
-
-// Module level variable.
-var auth;
-var user;
+import { getAuth } from "firebase/auth/web-extension";
+import { captureEvent, identifyUser, resetUserIdentification } from "./metrics";
 
 // Return Firebase auth object.
-export function getAuthObj() {
+export async function getAuthObj() {
+  const auth = initAuth();
+  await auth.authStateReady();
   return auth;
 }
 
-// Return auth user object. It is null if logged out and present otherwise.
-export function getUserObj() {
+// Return auth user object. If non null, user is logged in and if null, user is logged out.
+// Checking currentUser from auth object requires auth object to be initialized. That's why
+// we wait for authStateReady() before reading currentUser object.
+// Reference: https://firebase.google.com/docs/auth/web/manage-users#get_the_currently_signed-in_user.
+// https://firebase.google.com/docs/reference/js/auth.auth.md#authauthstateready
+export async function getUserObj() {
+  const auth = await getAuthObj();
+  const user = auth.currentUser;
+  if (user !== null) {
+    console.log("Auth: user is logged in: ", user.email);
+
+    // Idenfity User as logged in.
+    identifyUser(user.uid, {
+      name: user.displayName,
+      email: user.email,
+      emailVerified: user.emailVerified,
+    });
+
+    // Send event.
+    captureEvent("extension_user_logged_in");
+  } else {
+    console.log("Auth update: user is logged out");
+
+    // Reset identification of the user.
+    resetUserIdentification();
+  }
   return user;
 }
 
@@ -30,32 +50,5 @@ export function initAuth() {
     measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
   };
   const app = initializeApp(firebaseConfig);
-
-  auth = getAuth(app);
-  listenToAuthChanges();
-}
-
-// Listen to auth changes related to a user's login status.
-function listenToAuthChanges() {
-  onAuthStateChanged(auth, (authUser) => {
-    user = authUser;
-    if (authUser !== null) {
-      console.log("Auth update: user is logged in");
-
-      // User is logged in.
-      posthog.identify(authUser.uid, {
-        name: authUser.displayName,
-        email: authUser.email,
-        emailVerified: authUser.emailVerified,
-      });
-
-      // Send event.
-      posthog.capture("extension_user_logged_in");
-    } else {
-      console.log("Auth update: user is logged out");
-
-      // Reset posthog identification of the user.
-      posthog.reset();
-    }
-  });
+  return getAuth(app);
 }

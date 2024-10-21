@@ -5,46 +5,19 @@ import {
   alarms,
   notifications,
 } from "webextension-polyfill";
-// No external code loading possible (this disables all extensions such as Replay, Surveys, Exceptions etc.)
-// Reference: https://posthog.com/docs/libraries/js.
-import posthog from "posthog-js/dist/module.no-external";
-import { handleLoginTabClosed, logOut, startLogin } from "./login";
-import { getUserObj, initAuth } from "./auth";
+import {
+  handleLoginTabClosed,
+  isUserLoggingIn,
+  logOut,
+  startLogin,
+} from "./login";
+import { getUserObj } from "./auth";
+import { captureEvent } from "./metrics";
 
 // Module constants.
 const leadReportStatusSuccess = "complete";
 const leadReportStatusFailed = "failed_with_errors";
 const callOrigin = "extension";
-
-// Action State enum constants which reflect the state of a given tab.
-// These will help simplify logic since we have global listeners
-// for all tabs and logic can be complicated to read and understand.
-// Frozen enum to make object immutable.
-const ActionState = Object.freeze({
-  IDLE: "idle",
-  LOGGING_IN: "logging-in",
-  RESEARCH_IN_PROGRESS: "research-in-progress",
-});
-
-// Global state for whether user is logging in or not.
-var userIsLoggingIn = false;
-
-runtime.onInstalled.addListener(() => {
-  console.log("[background] loaded ");
-  initAuth();
-
-  // Initialize posthog.
-  posthog.init(process.env.REACT_APP_PUBLIC_POSTHOG_KEY, {
-    api_host: process.env.REACT_APP_PUBLIC_POSTHOG_HOST,
-    person_profiles: "identified_only",
-  });
-
-  // Add tab closed listener.
-  tabs.onRemoved.addListener(handleTabClosed);
-
-  // Clear all alarms.
-  alarms.clearAll();
-});
 
 // Returns lead profile from storage. Returns null if it does not exist.
 async function getLeadProfile(tabId) {
@@ -121,43 +94,44 @@ function checkLeadReportForGivenProfile(
   tabId
 ) {
   const encodedProfileURL = encodeURIComponent(linkedInProfileUrl);
-  const user = getUserObj();
-  if (user === null) {
-    // User not logged in, do nothing.
-    console.log(
-      `User not logged in, cannot check lead report in tab Id: ${tabId} for profile: ${linkedInProfileUrl}`
-    );
-    return;
-  }
-  user
-    .getIdToken()
-    .then((idToken) =>
-      fetch(
-        `${process.env.REACT_APP_API_HOSTNAME}/api/v1/lead-research-reports?url=${encodedProfileURL}`,
-        {
-          headers: { Authorization: "Bearer " + idToken },
-        }
-      )
-    )
-    .then((response) => response.json())
-    .then((result) => {
-      if (result.status === "error") {
-        console.error(
-          `Checking if LinkedIn profile exists failed with result: ${result}`
-        );
-        return;
-      }
-
-      // Create lead profile from the result. It will override any existing profile
-      // whenver the existing LinkedIn profile in the current tab is changed.
-      // We will delete this key when the tab is closed in the listener.
-      createLeadProfile(
-        tabId,
-        profileName,
-        linkedInProfileUrl,
-        result.report_exists ? result.lead_research_report : null
+  getUserObj().then((user) => {
+    if (user === null) {
+      // User not logged in, do nothing.
+      console.log(
+        `User not logged in, cannot check lead report in tab Id: ${tabId} for profile: ${linkedInProfileUrl}`
       );
-    });
+      return;
+    }
+    user
+      .getIdToken()
+      .then((idToken) =>
+        fetch(
+          `${process.env.REACT_APP_API_HOSTNAME}/api/v1/lead-research-reports?url=${encodedProfileURL}`,
+          {
+            headers: { Authorization: "Bearer " + idToken },
+          }
+        )
+      )
+      .then((response) => response.json())
+      .then((result) => {
+        if (result.status === "error") {
+          console.error(
+            `Checking if LinkedIn profile exists failed with result: ${result}`
+          );
+          return;
+        }
+
+        // Create lead profile from the result. It will override any existing profile
+        // whenver the existing LinkedIn profile in the current tab is changed.
+        // We will delete this key when the tab is closed in the listener.
+        createLeadProfile(
+          tabId,
+          profileName,
+          linkedInProfileUrl,
+          result.report_exists ? result.lead_research_report : null
+        );
+      });
+  });
 }
 
 // Handle tab updates to know when LinkedIn URL has changed. This change is then
@@ -176,12 +150,13 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       .sendMessage(tabId, { action: "linkedin-profile-detected" })
       .then((profileDetails) => {
         if (profileDetails === null) {
+          console.error("profile details not found for URL: ", url);
           // Do nothing.
           return;
         }
 
         // Send event.
-        posthog.capture("extension_lead_linkedin_profile_found", {
+        captureEvent("extension_lead_linkedin_profile_found", {
           profile_url: url,
         });
 
@@ -218,54 +193,57 @@ function createLeadReport(tabId, sendResponse) {
     if (tabIdKey in item) {
       const profileName = item[tabIdKey].name;
       const linkedInProfileUrl = item[tabIdKey].url;
-      const user = getUserObj();
-      if (user === null) {
-        console.log(
-          `User not logged in, cannot create report in tab Id: ${tabId}`
-        );
-        return;
-      }
-      user
-        .getIdToken()
-        .then((idToken) =>
-          fetch(
-            `${process.env.REACT_APP_API_HOSTNAME}/api/v1/lead-research-reports`,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                linkedin_url: linkedInProfileUrl,
-                origin: callOrigin,
-                postsHTML: null,
-              }),
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: "Bearer " + idToken,
-              },
-            }
-          )
-        )
-        .then((response) => response.json())
-        .then((result) => {
-          if (result.status === "error") {
-            console.error(
-              `Failed to create report for linkedin URL: ${linkedInProfileUrl}`
-            );
-            // Send back null report status.
-            sendResponse(null);
-            return;
-          }
 
-          // Create leadProfile from the result and store it in the database.
-          // This will also start an alarm if report status is not completed or failed.
-          createLeadProfile(
-            tabId,
-            profileName,
-            linkedInProfileUrl,
-            result.lead_research_report
+      getUserObj().then((user) => {
+        if (user === null) {
+          console.log(
+            `User not logged in, cannot create report in tab Id: ${tabId}`
           );
-          // Return status of report.
-          sendResponse(result.lead_research_report.status);
-        });
+          return;
+        }
+
+        user
+          .getIdToken()
+          .then((idToken) =>
+            fetch(
+              `${process.env.REACT_APP_API_HOSTNAME}/api/v1/lead-research-reports`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  linkedin_url: linkedInProfileUrl,
+                  origin: callOrigin,
+                  postsHTML: null,
+                }),
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: "Bearer " + idToken,
+                },
+              }
+            )
+          )
+          .then((response) => response.json())
+          .then((result) => {
+            if (result.status === "error") {
+              console.error(
+                `Failed to create report for linkedin URL: ${linkedInProfileUrl}`
+              );
+              // Send back null report status.
+              sendResponse(null);
+              return;
+            }
+
+            // Create leadProfile from the result and store it in the database.
+            // This will also start an alarm if report status is not completed or failed.
+            createLeadProfile(
+              tabId,
+              profileName,
+              linkedInProfileUrl,
+              result.lead_research_report
+            );
+            // Return status of report.
+            sendResponse(result.lead_research_report.status);
+          });
+      });
     }
   });
 }
@@ -295,11 +273,11 @@ alarms.onAlarm.addListener((alarm) => {
 runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetch-user") {
     // Fetch user object from auth module and return to the caller.
-    sendResponse(getUserObj());
+    getUserObj().then((user) => sendResponse(user));
 
-    // Since the user fetch is synchronous, we return false.
+    // Since the user fetch is asynchronous, we return true;
     // Reference: https://developer.chrome.com/docs/extensions/develop/concepts/messaging.
-    return false;
+    return true;
   }
   if (request.action === "fetch-lead-profile") {
     getLeadProfile(request.tabId).then((leadProfile) =>
@@ -310,16 +288,13 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "login-user") {
-    userIsLoggingIn = true;
-
     startLogin(request);
-
     return;
   }
 
   if (request.action === "create-lead-report") {
     // Send event.
-    posthog.capture("extension_start_research_btn_clicked");
+    captureEvent("extension_start_research_btn_clicked");
 
     createLeadReport(request.tabId, sendResponse);
 
@@ -331,7 +306,7 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Navigate user to new tab to view the lead report in the Userport UI.
 
     // Send event.
-    posthog.capture("extension_view_report_btn_clicked");
+    captureEvent("extension_view_report_btn_clicked");
 
     tabs.create({
       url: `${process.env.REACT_APP_HOSTNAME}/lead-research-reports/${request.report_id}`,
@@ -344,7 +319,7 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Navigate user to new tab to view all the leads they have researched so far in the Userport UI.
 
     // Send event.
-    posthog.capture("extension_view_all_leads_btn_clicked");
+    captureEvent("extension_view_all_leads_btn_clicked");
 
     tabs.create({
       url: `${process.env.REACT_APP_HOSTNAME}/leads`,
@@ -355,9 +330,10 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "logout-user") {
     // Send event.
-    posthog.capture("extension_logged_out");
+    captureEvent("extension_logged_out");
 
     logOut().then(() => {
+      console.log("User logged out");
       sendResponse(true);
     });
 
@@ -367,26 +343,22 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Handle state for when user closes a tab. Usually a clean up of state is needed.
-function handleTabClosed(tabId, removeInfo) {
-  if (userIsLoggingIn) {
-    handleLoginTabClosed(tabId).then((success) => {
-      if (success) {
-        // Reset global logging in state.
-        userIsLoggingIn = false;
-      }
-    });
+tabs.onRemoved.addListener(async (tabId, removeInfo) => {
+  const userLoggingIn = await isUserLoggingIn(tabId);
+
+  if (userLoggingIn) {
+    handleLoginTabClosed();
     return;
   }
 
-  // handle clean up in this tab.
+  // Handle clean up in this tab since user has closed it.
   const tabIdKey = tabId.toString();
-  storage.local.get(tabIdKey).then((item) => {
-    if (item && tabIdKey in item) {
-      // Tab with LinkedIn profile is shut down. Clear any stored state in this tab.
-      storage.local.remove([tabIdKey]);
+  const item = await storage.local.get([tabIdKey]);
+  if (item && tabIdKey in item) {
+    // Tab with LinkedIn profile is shut down. Clear any stored state in this tab.
+    storage.local.remove([tabIdKey]);
 
-      // Delete any alarms associated with this tab as well.
-      alarms.clear(tabIdKey);
-    }
-  });
-}
+    // Delete any alarms associated with this tab as well.
+    alarms.clear(tabIdKey);
+  }
+});

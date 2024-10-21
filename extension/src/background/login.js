@@ -1,9 +1,7 @@
 import { runtime, tabs, storage } from "webextension-polyfill";
 import { signOut, signInWithCustomToken } from "firebase/auth/web-extension";
 import { getAuthObj } from "./auth";
-// No external code loading possible (this disables all extensions such as Replay, Surveys, Exceptions etc.)
-// Reference: https://posthog.com/docs/libraries/js.
-import posthog from "posthog-js/dist/module.no-external";
+import { captureEvent } from "./metrics";
 
 // Module constants.
 // Login process is global (per window not tab) and so the state associated
@@ -15,7 +13,7 @@ const extensionTab = "extension-tab";
 // Handle login request. Open userport in a new tab and log them in.
 export function startLogin(request) {
   // Send event.
-  posthog.capture("extension_login_btn_clicked");
+  captureEvent("extension_login_btn_clicked");
 
   // Remove existing listeners listening to login if any.
   runtime.onMessageExternal.removeListener(handleUserLoginUpdate);
@@ -60,22 +58,24 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
     }
 
     // Login user.
-    signInWithCustomToken(getAuthObj(), request.token)
-      .then((userCredential) => {
-        const loggedInUser = userCredential.user;
-        console.log("user logged in successfully: ", loggedInUser.email);
-      })
-      .finally(() => {
-        // Close the web app Login tab and switch extension tab to active. Cleaning up storage state will be done in close tab handler.
-        storage.local.get([loginTabIdKey]).then((item) => {
-          const webAppTabId = item[loginTabIdKey].webAppTab;
-          const extensionTabId = item[loginTabIdKey].extensionTab;
-          tabs.update(extensionTabId, { active: true });
-          // Tab reload is needed so that we can check if report exists on server now that user is logged in.
-          tabs.reload(extensionTabId);
-          tabs.remove(webAppTabId);
+    getAuthObj().then((auth) => {
+      signInWithCustomToken(auth, request.token)
+        .then((userCredential) => {
+          const loggedInUser = userCredential.user;
+          console.log("user logged in successfully: ", loggedInUser.email);
+        })
+        .finally(() => {
+          // Close the web app Login tab and switch extension tab to active. Cleaning up storage state will be done in close tab handler.
+          storage.local.get([loginTabIdKey]).then((item) => {
+            const webAppTabId = item[loginTabIdKey].webAppTab;
+            const extensionTabId = item[loginTabIdKey].extensionTab;
+            tabs.update(extensionTabId, { active: true });
+            // Tab reload is needed so that we can check if report exists on server now that user is logged in.
+            tabs.reload(extensionTabId);
+            tabs.remove(webAppTabId);
+          });
         });
-      });
+    });
 
     return sendResponse();
   }
@@ -83,26 +83,27 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
   throw Error(`Unidentified event request: ${request}`);
 }
 
-// Handle tab closed event when user is logging in.
-// Depending on which tab is closed, we clear login state (signalling end of login)
-// or we don't do anything. Returns true if login state was cleaned up and false otherwise.
-export async function handleLoginTabClosed(tabId) {
-  return storage.local.get([loginTabIdKey]).then((item) => {
-    if (loginTabIdKey in item && tabId === item[loginTabIdKey].webAppTab) {
-      // User Login Tab on Userport Web App has been closed.
+// Returns true if user is currently trying to login on given tab Id and false otherwise.
+export async function isUserLoggingIn(tabId) {
+  const item = await storage.local.get([loginTabIdKey]);
+  return loginTabIdKey in item && tabId == item[loginTabIdKey].webAppTab;
+}
 
-      // Remove listener for user login updates since tab is closed.
-      runtime.onMessageExternal.removeListener(handleUserLoginUpdate);
+// Handle Login tab closed event (Userport web app tab closure) after user has logged in.
+// Assume that check for whether user is loggin in has already been done.
+// Method clears login state (signalling end of login) from storage.
+export function handleLoginTabClosed() {
+  // Remove listener for user login updates since tab is closed.
+  runtime.onMessageExternal.removeListener(handleUserLoginUpdate);
 
-      // Delete login tab key from storage.
-      storage.local.remove([loginTabIdKey]);
-      return true;
-    }
-    return false;
-  });
+  // Delete login tab key from storage.
+  storage.local.remove([loginTabIdKey]);
+
+  console.log("done with cleanup login");
 }
 
 // Logs out user. Async method that returns a promise.
-export function logOut() {
-  return signOut(getAuthObj());
+export async function logOut() {
+  const auth = await getAuthObj();
+  return signOut(auth);
 }
