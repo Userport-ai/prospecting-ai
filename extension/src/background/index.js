@@ -63,6 +63,7 @@ runtime.onInstalled.addListener(() => {
 // Listen to auth changes related to a user's login status.
 function listenToAuthChanges(auth) {
   onAuthStateChanged(auth, (authUser) => {
+    user = authUser;
     if (authUser !== null) {
       console.log("Auth update: user is logged in");
 
@@ -81,7 +82,6 @@ function listenToAuthChanges(auth) {
       // Reset posthog identification of the user.
       posthog.reset();
     }
-    user = authUser;
   });
 }
 
@@ -211,13 +211,14 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   const url = tab.url;
   if (
     url.includes("linkedin.com/in/") &&
+    url.includes("recent-activity") &&
     !url.includes("?") &&
     changeInfo.status === "complete"
   ) {
     tabs
       .sendMessage(tabId, { action: "linkedin-profile-detected" })
-      .then((profileName) => {
-        if (profileName === null) {
+      .then((profileDetails) => {
+        if (profileDetails === null) {
           // Do nothing.
           return;
         }
@@ -227,7 +228,11 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
           profile_url: url,
         });
 
-        checkLeadReportForGivenProfile(profileName, url, tabId);
+        checkLeadReportForGivenProfile(
+          profileDetails.name,
+          profileDetails.profileURL,
+          tabId
+        );
       });
   } else {
     // This else case is triggered even when LinkedIn profile is still loading and hasn't completed.
