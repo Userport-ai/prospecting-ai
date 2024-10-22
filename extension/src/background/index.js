@@ -1,10 +1,4 @@
-import {
-  runtime,
-  tabs,
-  storage,
-  alarms,
-  notifications,
-} from "webextension-polyfill";
+import { runtime, tabs, alarms } from "webextension-polyfill";
 import {
   handleLoginTabClosed,
   isUserLoggingIn,
@@ -13,22 +7,21 @@ import {
 } from "./login";
 import { getUserObj } from "./auth";
 import { captureEvent } from "./metrics";
+import {
+  clearAlarm,
+  clearTabData,
+  createAlarm,
+  createNotification,
+  doesAlarmExist,
+  getTabData,
+  setTabData,
+  tabIdKeyToNumber,
+} from "./tab-state";
 
 // Module constants.
 const leadReportStatusSuccess = "complete";
 const leadReportStatusFailed = "failed_with_errors";
 const callOrigin = "extension";
-
-// Returns lead profile from storage. Returns null if it does not exist.
-async function getLeadProfile(tabId) {
-  const tabIdKey = tabId.toString();
-  const item = await storage.local.get([tabIdKey]);
-  if (tabIdKey in item) {
-    return item[tabIdKey];
-  }
-  // User object does not exist (likely because this tab does not currently have a valid LinkedIn profile), return null.
-  return null;
-}
 
 // Helper that creates lead profile from given tab Id, Lead LinkedIn URL and report (can be null) and stores it in storage.
 // It also starts an alarm if the lead status exists but is not in failed or complete status.
@@ -43,47 +36,54 @@ function createLeadProfile(
     url: linkedInProfileUrl,
     lead_research_report: lead_research_report,
   };
-  const tabIdKey = tabId.toString();
+
+  // Add lead profile to storage.
+  setTabData(tabId, leadProfile);
 
   // If report status is not complete or failed, then create an alarm to poll status periodically.
   const report_status = lead_research_report
     ? lead_research_report.status
     : null;
+  var periodicCheck = false;
   if (
     report_status &&
     report_status !== leadReportStatusSuccess &&
     report_status !== leadReportStatusFailed
   ) {
-    // Create an alarm to poll report status and use tabId as key so that it is unique to a given tab.
-    alarms.create(tabIdKey, { periodInMinutes: 1 });
-  } else {
-    // If there are any alarms for this tab, then it means users are waiting
-    // for the result of research. We should present a notification if so.
-    alarms.get(tabIdKey).then((item) => {
-      if (item !== undefined && "name" in item) {
-        // This is indeed a non empty 'alarm' object.
-        var notifTitle = `Research Complete for ${profileName}`;
-        var notifMessage = "View details in the extension!";
-
-        if (report_status === leadReportStatusFailed) {
-          notifTitle = `Research Failed for ${profileName}`;
-          notifMessage = "Failed due to an unknown error.";
-        }
-
-        notifications.create(tabIdKey, {
-          type: "basic",
-          title: notifTitle,
-          message: notifMessage,
-          iconUrl: runtime.getURL("logo256.png"),
-        });
-        // Delete alarm.
-        alarms.clear(tabIdKey);
-      }
-    });
+    // Report does not exist or is in progress.
+    // We should check report status periodically.
+    periodicCheck = true;
   }
 
-  // Add profile to storage.
-  storage.local.set({ [tabIdKey]: leadProfile });
+  // Check if alarm already exists.
+  doesAlarmExist(tabId).then((exists) => {
+    if (!exists) {
+      // Alarm does not exist.
+      if (periodicCheck) {
+        console.log("creating alarm for tab: ", tabId);
+        createAlarm(tabId);
+      }
+      return;
+    }
+
+    // Alarm already exists.
+    if (!periodicCheck) {
+      // Create a notification that lead research is now complete.
+      var notifTitle = `Research Complete for ${profileName}`;
+      var notifMessage = "View details in the extension!";
+
+      if (report_status === leadReportStatusFailed) {
+        notifTitle = `Research Failed for ${profileName}`;
+        notifMessage = "Failed due to an unknown error.";
+      }
+
+      createNotification(tabId, notifTitle, notifMessage);
+      // Delete alarm.
+      clearAlarm(tabId);
+
+      console.log("deleted alarm for tab: ", tabId);
+    }
+  });
 }
 
 // Check if lead report exists for this linkedin person profile and save the result to storage as profile of the lead.
@@ -170,16 +170,18 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     // This else case is triggered even when LinkedIn profile is still loading and hasn't completed.
     // Delete existing lead profile from storage and delete any alarms if tab URL has changed.
     // User should not see past profile in popup if tab is not that of a lead profile.
-    const tabIdKey = tabId.toString();
-    storage.local.get([tabIdKey]).then((item) => {
-      if (tabIdKey in item) {
-        const leadProfile = item[tabIdKey];
-        if (leadProfile.url !== url) {
-          // New URL detected that is not a Lead profile, delete existing lead profile from storage.
-          storage.local.remove([tabIdKey]);
-          // Delete alarms if any.
-          alarms.clear(tabIdKey);
-        }
+    getTabData(tabId).then((data) => {
+      if (data === null) {
+        // No tab data found.
+        return;
+      }
+      if (data.url !== url) {
+        // Current tab's lead profile URL is different from stored lead profile's URL.
+        // This means the tab has been reloaded, so we should delete existing stored data in the tab.
+        clearTabData(tabId);
+
+        // Delete alarms if any.
+        clearAlarm(tabId);
       }
     });
   }
@@ -188,88 +190,89 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Create Lead report using tabId that contains Lead's LinkedIn URL.
 function createLeadReport(tabId, sendResponse) {
   // Create lead research report in userport backend.
-  const tabIdKey = tabId.toString();
-  storage.local.get(tabIdKey).then((item) => {
-    if (tabIdKey in item) {
-      const profileName = item[tabIdKey].name;
-      const linkedInProfileUrl = item[tabIdKey].url;
-
-      getUserObj().then((user) => {
-        if (user === null) {
-          console.log(
-            `User not logged in, cannot create report in tab Id: ${tabId}`
-          );
-          return;
-        }
-
-        user
-          .getIdToken()
-          .then((idToken) =>
-            fetch(
-              `${process.env.REACT_APP_API_HOSTNAME}/api/v1/lead-research-reports`,
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  linkedin_url: linkedInProfileUrl,
-                  origin: callOrigin,
-                  postsHTML: null,
-                }),
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: "Bearer " + idToken,
-                },
-              }
-            )
-          )
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.status === "error") {
-              console.error(
-                `Failed to create report for linkedin URL: ${linkedInProfileUrl}`
-              );
-              // Send back null report status.
-              sendResponse(null);
-              return;
-            }
-
-            // Create leadProfile from the result and store it in the database.
-            // This will also start an alarm if report status is not completed or failed.
-            createLeadProfile(
-              tabId,
-              profileName,
-              linkedInProfileUrl,
-              result.lead_research_report
-            );
-            // Return status of report.
-            sendResponse(result.lead_research_report.status);
-          });
-      });
+  getTabData(tabId).then((data) => {
+    if (data === null) {
+      console.error(
+        "Cannot create lead report in tab ID: ",
+        tabId,
+        " because tab data is null (unexpected)!"
+      );
+      return;
     }
+
+    const profileName = data.name;
+    const linkedInProfileUrl = data.url;
+    getUserObj().then((user) => {
+      if (user === null) {
+        console.log(
+          `User not logged in, cannot create report in tab Id: ${tabId}`
+        );
+        return;
+      }
+
+      user
+        .getIdToken()
+        .then((idToken) =>
+          fetch(
+            `${process.env.REACT_APP_API_HOSTNAME}/api/v1/lead-research-reports`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                linkedin_url: linkedInProfileUrl,
+                origin: callOrigin,
+                postsHTML: null,
+              }),
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + idToken,
+              },
+            }
+          )
+        )
+        .then((response) => response.json())
+        .then((result) => {
+          if (result.status === "error") {
+            console.error(
+              `Failed to create report for linkedin URL: ${linkedInProfileUrl}`
+            );
+            // Send back null report status.
+            sendResponse(null);
+            return;
+          }
+
+          // Create leadProfile from the result and store it in the database.
+          // This will also start an alarm if report status is not completed or failed.
+          createLeadProfile(
+            tabId,
+            profileName,
+            linkedInProfileUrl,
+            result.lead_research_report
+          );
+          // Return status of report.
+          sendResponse(result.lead_research_report.status);
+        });
+    });
   });
 }
 
-// Alarm that handles
+// Handler for fire alarm events.
 alarms.onAlarm.addListener((alarm) => {
   console.log("alarm fired with name: ", alarm.name);
-  const tabIdKey = alarm.name;
-  storage.local.get([tabIdKey]).then((item) => {
-    if (tabIdKey in item) {
-      const leadProfile = item[tabIdKey];
-      // Check report status in the backend. We will just reuse method that is used to
-      // check if linkedin URL has a report or not and extract status from it.
-      checkLeadReportForGivenProfile(
-        leadProfile.name,
-        leadProfile.url,
-        Number(tabIdKey)
-      );
-    } else {
-      // Clear alarm since there is no lead profile associated with this alarm.
-      alarms.clear(tabIdKey);
+  const tabId = tabIdKeyToNumber(alarm.name);
+  getTabData(tabId).then((data) => {
+    if (data === null) {
+      // Clear alarm since there is no data associated with this alarm.
+      // Return immmediately since no need to call backend.
+      clearAlarm(tabId);
+      return;
     }
+    // Check report status in the backend. We will just reuse method that is used to
+    // check if linkedin URL has a report or not and extract status from it.
+    checkLeadReportForGivenProfile(data.name, data.url, tabId);
   });
 });
 
-// Handle messages from Popup App and Content Script.
+// List to messages from Popup App. Usually these are user actions.
 runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetch-user") {
     // Fetch user object from auth module and return to the caller.
@@ -280,9 +283,9 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "fetch-lead-profile") {
-    getLeadProfile(request.tabId).then((leadProfile) =>
-      sendResponse(leadProfile)
-    );
+    console.log("Fetch lead profile on tab: ", request.tabId);
+
+    getTabData(request.tabId).then((leadProfile) => sendResponse(leadProfile));
 
     // Since the lead profile fetch is asynchronous, we return true.
     return true;
@@ -345,20 +348,18 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Handle state for when user closes a tab. Usually a clean up of state is needed.
 tabs.onRemoved.addListener(async (tabId, removeInfo) => {
   const userLoggingIn = await isUserLoggingIn(tabId);
-
   if (userLoggingIn) {
     handleLoginTabClosed();
     return;
   }
 
   // Handle clean up in this tab since user has closed it.
-  const tabIdKey = tabId.toString();
-  const item = await storage.local.get([tabIdKey]);
-  if (item && tabIdKey in item) {
+  const data = await getTabData(tabId);
+  if (data !== null) {
     // Tab with LinkedIn profile is shut down. Clear any stored state in this tab.
-    storage.local.remove([tabIdKey]);
+    clearTabData(tabId);
 
     // Delete any alarms associated with this tab as well.
-    alarms.clear(tabIdKey);
+    clearAlarm(tabId);
   }
 });
