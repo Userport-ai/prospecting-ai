@@ -5,7 +5,8 @@ import { captureEvent } from "./metrics";
 // Module constants.
 const PostsActivity = "Posts";
 const CommentsActivity = "Comments";
-const wantedActivities = [PostsActivity, CommentsActivity];
+const ReactionsActivity = "Reactions";
+const wantedActivities = [PostsActivity, CommentsActivity, ReactionsActivity];
 
 // Start activity research on given tab.
 // We will need to store the activity research state in storage because: [1] Popup UI should
@@ -80,6 +81,10 @@ export async function fetchCurrentActivityHTML(tabId) {
     return true;
   }
 
+  // Add Random delay.
+  const delayms = Math.floor(Math.random() * 3000 + 1000);
+  await delay(delayms);
+
   // Send message to content script to click the next button.
   const success = await tabs.sendMessage(tabId, {
     action: "click-activity-button",
@@ -146,6 +151,18 @@ export function getCommentsActivityData(activityData) {
     }
   }
   console.error("Could not find Comments activity in data: ", activityData);
+  return null;
+}
+
+// Helper to get Reactions activity data from given activityData.
+// Returns null if not found.
+export function getReactionsActivityData(activityData) {
+  if ("visitedMap" in activityData) {
+    if (ReactionsActivity in activityData.visitedMap) {
+      return activityData.visitedMap[ReactionsActivity];
+    }
+  }
+  console.error("Could not find Reactions activity in data: ", activityData);
   return null;
 }
 

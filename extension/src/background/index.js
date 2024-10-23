@@ -23,6 +23,7 @@ import {
   fetchCurrentActivityHTML,
   getPostsActivityData,
   getCommentsActivityData,
+  getReactionsActivityData,
 } from "./activity";
 
 // Module constants.
@@ -263,6 +264,7 @@ function createLeadReport(tabId) {
     const linkedInProfileUrl = data.url;
     const postsHTML = getPostsActivityData(data.activityData);
     const commentsHTML = getCommentsActivityData(data.activityData);
+    const reactionsHTML = getReactionsActivityData(data.activityData);
     getUserObj().then((user) => {
       if (user === null) {
         console.log(
@@ -283,6 +285,7 @@ function createLeadReport(tabId) {
                 origin: callOrigin,
                 postsHTML: postsHTML,
                 commentsHTML: commentsHTML,
+                reactionsHTML: reactionsHTML,
               }),
               headers: {
                 "Content-Type": "application/json",
