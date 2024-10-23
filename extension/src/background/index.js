@@ -17,6 +17,13 @@ import {
   setTabData,
   tabIdKeyToNumber,
 } from "./tab-state";
+import {
+  getActivityData,
+  startActivityResearch,
+  fetchCurrentActivityHTML,
+  getPostsActivityData,
+  getCommentsActivityData,
+} from "./activity";
 
 // Module constants.
 const leadReportStatusSuccess = "complete";
@@ -38,6 +45,9 @@ function createLeadProfile(
   };
 
   // Add lead profile to storage.
+  // This will delete any existing activity data which is expected
+  // since activity data is only for the purposes of researching activity
+  // and should have complete by the time this method is invoked.
   setTabData(tabId, leadProfile);
 
   // If report status is not complete or failed, then create an alarm to poll status periodically.
@@ -68,16 +78,21 @@ function createLeadProfile(
 
     // Alarm already exists.
     if (!periodicCheck) {
-      // Create a notification that lead research is now complete.
-      var notifTitle = `Research Complete for ${profileName}`;
-      var notifMessage = "View details in the extension!";
+      if (
+        report_status == leadReportStatusSuccess ||
+        report_status == leadReportStatusFailed
+      ) {
+        // Create a notification that lead research is now complete.
+        var notifTitle = `Research Complete for ${profileName}`;
+        var notifMessage = "View details in the extension!";
 
-      if (report_status === leadReportStatusFailed) {
-        notifTitle = `Research Failed for ${profileName}`;
-        notifMessage = "Failed due to an unknown error.";
+        if (report_status === leadReportStatusFailed) {
+          notifTitle = `Research Failed for ${profileName}`;
+          notifMessage = "Failed due to an unknown error.";
+        }
+
+        createNotification(tabId, notifTitle, notifMessage);
       }
-
-      createNotification(tabId, notifTitle, notifMessage);
       // Delete alarm.
       clearAlarm(tabId);
 
@@ -134,38 +149,71 @@ function checkLeadReportForGivenProfile(
   });
 }
 
+// Helper that returns true if this is a LinkedIn activity URL and false otherwise.
+function isLinkedInRecentActivityURL(url) {
+  return url.includes("linkedin.com/in/") && url.includes("recent-activity");
+}
+
+// Returns LinkedIn profile username from given LinkedIn activity URL.
+// Returns null if username not found.
+function getUsernameFromRecentActivityURL(url) {
+  const urlElements = url.split("/");
+  for (let idx = 0; idx < urlElements.length - 1; idx++) {
+    const urlElem = urlElements[idx];
+    if (urlElem.trim() === "in") {
+      // The next one should be username.
+      return urlElements[idx + 1].trim();
+    }
+  }
+  console.error("Username not found for activity URL: ", url);
+  return null;
+}
+
 // Handle tab updates to know when LinkedIn URL has changed. This change is then
 // passed to Content Script which can then parse the URL and return whether it is valid or not.
 // We need to pass to the Content Script since service worker does not have access
 // to the DOM for the specific tab.
 tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   const url = tab.url;
-  if (
-    url.includes("linkedin.com/in/") &&
-    url.includes("recent-activity") &&
-    !url.includes("?") &&
-    changeInfo.status === "complete"
-  ) {
-    tabs
-      .sendMessage(tabId, { action: "linkedin-profile-detected" })
-      .then((profileDetails) => {
-        if (profileDetails === null) {
-          console.error("profile details not found for URL: ", url);
-          // Do nothing.
-          return;
-        }
+  if (isLinkedInRecentActivityURL(url) && changeInfo.status === "complete") {
+    getActivityData(tabId).then((activityData) => {
+      if (activityData !== null) {
+        console.log("Fetch recent activity in URL: ", url);
+        // We are in a state to fetch research activity from current tab.
+        fetchCurrentActivityHTML(tabId).then((complete) => {
+          if (complete) {
+            // Create report.
+            createLeadReport(tabId);
 
-        // Send event.
-        captureEvent("extension_lead_linkedin_profile_found", {
-          profile_url: url,
+            // Send event.
+            captureEvent("extension_create_report_called");
+          }
         });
+      } else {
+        console.log("Fetch profile from backend for URL: ", url);
+        // New URL in this tab, confirm and refetch profile.
+        tabs
+          .sendMessage(tabId, { action: "linkedin-profile-detected" })
+          .then((profileDetails) => {
+            if (profileDetails === null) {
+              console.error("profile details not found for URL: ", url);
+              // Do nothing.
+              return;
+            }
 
-        checkLeadReportForGivenProfile(
-          profileDetails.name,
-          profileDetails.profileURL,
-          tabId
-        );
-      });
+            // Send event.
+            captureEvent("extension_lead_linkedin_profile_found", {
+              profile_url: url,
+            });
+
+            checkLeadReportForGivenProfile(
+              profileDetails.name,
+              profileDetails.profileURL,
+              tabId
+            );
+          });
+      }
+    });
   } else {
     // This else case is triggered even when LinkedIn profile is still loading and hasn't completed.
     // Delete existing lead profile from storage and delete any alarms if tab URL has changed.
@@ -175,20 +223,31 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         // No tab data found.
         return;
       }
-      if (data.url !== url) {
-        // Current tab's lead profile URL is different from stored lead profile's URL.
-        // This means the tab has been reloaded, so we should delete existing stored data in the tab.
-        clearTabData(tabId);
 
-        // Delete alarms if any.
-        clearAlarm(tabId);
+      if (
+        isLinkedInRecentActivityURL(url) &&
+        getUsernameFromRecentActivityURL(data.url) ===
+          getUsernameFromRecentActivityURL(url)
+      ) {
+        // Do nothing since it is the same profile so even if the URLs are different, we shouldn't clear the data.
+        // We also delete any alarms that exist.
+        return;
       }
+
+      // Current tab's URL is different from stored lead's recent activity URL/
+      // We should delete existing stored data in the tab and refecth new information.
+      clearTabData(tabId);
+
+      // Delete alarms if any.
+      clearAlarm(tabId);
     });
   }
 });
 
 // Create Lead report using tabId that contains Lead's LinkedIn URL.
-function createLeadReport(tabId, sendResponse) {
+// Must not be called when activity research is in progress, only after
+// research is complete.
+function createLeadReport(tabId) {
   // Create lead research report in userport backend.
   getTabData(tabId).then((data) => {
     if (data === null) {
@@ -202,6 +261,8 @@ function createLeadReport(tabId, sendResponse) {
 
     const profileName = data.name;
     const linkedInProfileUrl = data.url;
+    const postsHTML = getPostsActivityData(data.activityData);
+    const commentsHTML = getCommentsActivityData(data.activityData);
     getUserObj().then((user) => {
       if (user === null) {
         console.log(
@@ -220,7 +281,8 @@ function createLeadReport(tabId, sendResponse) {
               body: JSON.stringify({
                 linkedin_url: linkedInProfileUrl,
                 origin: callOrigin,
-                postsHTML: null,
+                postsHTML: postsHTML,
+                commentsHTML: commentsHTML,
               }),
               headers: {
                 "Content-Type": "application/json",
@@ -235,21 +297,18 @@ function createLeadReport(tabId, sendResponse) {
             console.error(
               `Failed to create report for linkedin URL: ${linkedInProfileUrl}`
             );
-            // Send back null report status.
-            sendResponse(null);
             return;
           }
 
           // Create leadProfile from the result and store it in the database.
           // This will also start an alarm if report status is not completed or failed.
+          // It will also delete activity data that exists in the database automatically.
           createLeadProfile(
             tabId,
             profileName,
             linkedInProfileUrl,
             result.lead_research_report
           );
-          // Return status of report.
-          sendResponse(result.lead_research_report.status);
         });
     });
   });
@@ -283,7 +342,7 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "fetch-lead-profile") {
-    console.log("Fetch lead profile on tab: ", request.tabId);
+    console.log("Popup requests lead profile on tab: ", request.tabId);
 
     getTabData(request.tabId).then((leadProfile) => sendResponse(leadProfile));
 
@@ -299,10 +358,25 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Send event.
     captureEvent("extension_start_research_btn_clicked");
 
-    createLeadReport(request.tabId, sendResponse);
+    // Start activity research first.
+    const tabId = request.tabId;
+    startActivityResearch(tabId)
+      .then(() => fetchCurrentActivityHTML(tabId))
+      .then((complete) => {
+        if (complete) {
+          // Create report.
+          createLeadReport(tabId);
 
-    // Async response, return true.
-    return true;
+          // Send event.
+          captureEvent("extension_create_report_called");
+        }
+      });
+
+    // TODO: Update this to reflect activity research.
+    sendResponse("new");
+
+    // Sync response, return false.
+    return false;
   }
 
   if (request.action === "view-lead-report") {

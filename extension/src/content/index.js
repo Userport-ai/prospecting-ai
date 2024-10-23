@@ -2,11 +2,20 @@ import { runtime } from "webextension-polyfill";
 
 const linkedInDomain = "https://www.linkedin.com";
 
-// Activities that we care about.
-// const activitiesFilter()
+// Helper to fetch all activity buttons that returns a Nodelist.
+// Caution: Use forEach to loop over the Nodelist not regular for loop.
+function getActivityButtons() {
+  return document.querySelectorAll(
+    "div.pv-recent-activity-detail__core-rail div.mb3 button"
+  );
+}
 
-// Global state storing activity buttons on given tab.
-var recentActivityButtons = null;
+// Helper to fetch node element containing all the activity content.
+function getActivityOnPage() {
+  return document.querySelector(
+    "div.pv-recent-activity-detail__core-rail div.pv0 ul"
+  );
+}
 
 // Listen to messages related to this tab sent by the Service worker. Returns true if it is a valid LinkedIn profile URL and false otherwise.
 runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -32,25 +41,61 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Reference: https://developer.chrome.com/docs/extensions/develop/concepts/messaging.
     return false;
   }
-  if (request.action === "start-research") {
-    // Get the activity button elements.
-    recentActivityButtons = document.querySelectorAll(
-      "div.pv-recent-activity-detail__core-rail div.mb3 button"
-    );
-
-    // console.log("all buttons: ", recentActivityButtons);
-    for (let idx in recentActivityButtons) {
-      console.log(
-        "Button text: ",
-        recentActivityButtons[idx].querySelector("span").textContent.trim()
-      );
-
-      // If active button, then scrape content of it.
-      if (idx == 1) {
-        // Click the button comments.
-        recentActivityButtons[idx].click();
-        break;
+  if (request.action === "get-activity-buttons") {
+    // Get the activity button elements that are wanted.
+    const wantedActivities = request.wantedActivities;
+    var btnIndexMap = {};
+    getActivityButtons().forEach((elem, idx) => {
+      const btnName = elem.querySelector("span").textContent.trim();
+      if (wantedActivities.includes(btnName)) {
+        btnIndexMap[btnName] = idx;
       }
+    });
+    sendResponse(btnIndexMap);
+    return false;
+  }
+
+  if (request.action === "get-current-activity-html") {
+    // Find currently selected activity button's name.
+    var curBtnName = null;
+    getActivityButtons().forEach((elem, idx) => {
+      if (elem.classList.contains("artdeco-pill--selected")) {
+        const spanElem = elem.querySelector("span");
+        if (spanElem !== null) {
+          curBtnName = spanElem.textContent.trim();
+          // No way to break out of forEach.
+        }
+      }
+    });
+    if (curBtnName === null) {
+      console.error("Did not find selected activity on page!");
+      sendResponse(null);
+      return false;
     }
+
+    // Get data.
+    var htmlNode = getActivityOnPage();
+    if (htmlNode === null) {
+      console.error(`HTML for activity: ${curBtnName} not found on page`);
+      sendResponse(null);
+      return false;
+    }
+
+    sendResponse({ html: htmlNode.outerHTML, name: curBtnName });
+    return false;
+  }
+
+  if (request.action === "click-activity-button") {
+    // Click activity button with given index. Index was fetched previously
+    // with a different command in the same content script.
+    var success = false;
+    getActivityButtons().forEach((btnElem, idx) => {
+      if (idx === request.btnIndex) {
+        btnElem.click();
+        success = true;
+      }
+    });
+    sendResponse(success);
+    return false;
   }
 });

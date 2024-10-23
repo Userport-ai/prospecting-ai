@@ -86,7 +86,7 @@ function handleUserLoginUpdate(request, sender, sendResponse) {
 // Returns true if user is currently trying to login on given tab Id and false otherwise.
 export async function isUserLoggingIn(tabId) {
   const item = await storage.local.get([loginTabIdKey]);
-  return loginTabIdKey in item && tabId == item[loginTabIdKey].webAppTab;
+  return loginTabIdKey in item && tabId === item[loginTabIdKey].webAppTab;
 }
 
 // Handle Login tab closed event (Userport web app tab closure) after user has logged in.
