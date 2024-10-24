@@ -517,7 +517,7 @@ class WebPageScraper:
         with get_openai_callback() as cb:
             page_structure: PageStructure = self.get_linkedin_post_structure(
                 doc=doc)
-            post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details_v2(
+            post_details: LinkedInPostDetails = LinkedInScraper.extract_post_details(
                 post_body=page_structure.body)
             logger.info(
                 f"Successfully extracted LinkedIn post details for URL: {self.url}")
@@ -961,6 +961,7 @@ class WebPageScraper:
         chain = prompt | llm
 
         # Be very careful making changes to this prompt, it may result in worse results.
+        # TODO: Add new categories: PERSONAL_JOB_ANNIVERSARY, ABOUT_COMPANY, COMPANY_REPORT, PARTNER_RECOGNITION, COMPANY_TALK, COMPANY_PANEL_DISCUSSION.
         question = (
             "Does the text below fall into one of the following categories?\n",
             f"* Personal thoughts shared by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_THOUGHTS.value}]\n"
@@ -1114,7 +1115,7 @@ class WebPageScraper:
         """Returns whether the page's summary is focus is related to company name or not."""
 
         prompt_template = (
-            f"Is the text below talking about something that is related to Company {company_name}? Any of the author's being affiliated to {company_name} does not count.\n"
+            f"Is the text below talking about something that is related to Company {company_name}? Any of the authors being affiliated to {company_name} does not count.\n"
             "Text:\n"
             "{page_text}"
         )

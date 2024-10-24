@@ -87,6 +87,27 @@ class WebPage(BaseModel):
         default=None, description="Footer of the page in Markdown formatted text. None if it does not exist.")
 
 
+class LinkedInActivity(BaseModel):
+    """Instance representing a single unprocessed LinkedIn activity. The processing of this activity is done in a separate flow."""
+
+    class Type(str, Enum):
+        # Enum describing the type of LinkedIn activity.
+        POST = "post"
+        COMMENT = "comment"
+        REACTION = "reaction"
+
+    id: Optional[PyObjectId] = Field(
+        alias="_id", default=None, description="MongoDB generated unique identifier for LinkedIn activity.")
+    url: Optional[str] = Field(
+        default=None, description="URL associated with the activity.")
+    creation_date: Optional[datetime] = Field(
+        default=None, description="Date when this activity was created in the database in UTC timezone.")
+
+    # Content details.
+    content_md: Optional[str] = Field(
+        default=None, description="Entire Unprocessed Content of the activity stored in Markdown format.")
+
+
 class ContentTypeEnum(str, Enum):
     """Enum values associated with ContentTypeSource class."""
     ARTICLE = "article"
@@ -110,6 +131,7 @@ class ContentCategoryEnum(str, Enum):
     PERSONAL_ADVICE = "personal_advice"
     PERSONAL_ANECDOTE = "personal_anecdote"
     PERSONAL_PROMOTION = "personal_promotion"
+    PERSONAL_JOB_ANNIVERSARY = "personal_job_anniversary"
     PERSONAL_RECOGITION = "personal_recognition"
     PERSONAL_JOB_CHANGE = "personal_job_change"
     PERSONAL_EVENT_ATTENDED = "personal_event_attended"
@@ -123,20 +145,25 @@ class ContentCategoryEnum(str, Enum):
     EMPLOYEE_LEAVING = "employee_leaving"
     COMPANY_HIRING = "company_hiring"
     FINANCIAL_RESULTS = "financial_results"
+    ABOUT_COMPANY = "about_company"
     COMPANY_STORY = "company_story"
+    COMPANY_REPORT = "company_report"
     INDUSTRY_TRENDS = "industry_trends"
     COMPANY_PARTNERSHIP = "company_partnership"
     COMPANY_ACHIEVEMENT = "company_achievement"
     FUNDING_ANNOUNCEMENT = "funding_announcement"
     IPO_ANNOUNCEMENT = "ipo_announcement"
     COMPANY_RECOGNITION = "company_recognition"
+    PARTNER_RECOGNITION = "partner_recognition"
     COMPANY_ACQUISITION = "company_acquisition"
     COMPANY_ACQUIRED = "company_acquired"
     COMPANY_ANNIVERSARY = "company_anniversary"
     COMPANY_COMPETITION = "company_competition"
     COMPANY_CUSTOMERS = "company_customers"
     COMPANY_EVENT_HOSTED_ATTENDED = "company_event_hosted_attended"
+    COMPANY_TALK = "company_talk"
     COMPANY_WEBINAR = "company_webinar"
+    COMPANY_PANEL_DISCUSSION = "company_panel_discussion"
     COMPANY_LAYOFFS = "company_layoffs"
     COMPANY_CHALLENGE = "company_challenge"
     COMPANY_REBRAND = "company_rebrand"
@@ -161,6 +188,7 @@ class ContentCategoryEnum(str, Enum):
                 ContentCategoryEnum.PERSONAL_ADVICE,
                 ContentCategoryEnum.PERSONAL_ANECDOTE,
                 ContentCategoryEnum.PERSONAL_PROMOTION,
+                ContentCategoryEnum.PERSONAL_JOB_ANNIVERSARY,
                 ContentCategoryEnum.PERSONAL_RECOGITION,
                 ContentCategoryEnum.PERSONAL_JOB_CHANGE,
                 ContentCategoryEnum.PERSONAL_EVENT_ATTENDED,
@@ -179,6 +207,8 @@ def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str
         return "Personal Promotion"
     elif category == ContentCategoryEnum.PERSONAL_RECOGITION:
         return "Personal Recognition"
+    elif category == ContentCategoryEnum.PERSONAL_JOB_ANNIVERSARY:
+        return "Personal Job Anniversary"
     elif category == ContentCategoryEnum.PERSONAL_JOB_CHANGE:
         return "Personal Job Change"
     elif category == ContentCategoryEnum.PERSONAL_EVENT_ATTENDED:
@@ -205,6 +235,8 @@ def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str
         return "Company Financial Results"
     elif category == ContentCategoryEnum.COMPANY_STORY:
         return "Company Stories"
+    elif category == ContentCategoryEnum.ABOUT_COMPANY:
+        return "About Company"
     elif category == ContentCategoryEnum.INDUSTRY_TRENDS:
         return "Industry Trends"
     elif category == ContentCategoryEnum.COMPANY_PARTNERSHIP:
@@ -213,10 +245,14 @@ def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str
         return "Company Achievements"
     elif category == ContentCategoryEnum.FUNDING_ANNOUNCEMENT:
         return "Funding Announcements"
+    elif category == ContentCategoryEnum.COMPANY_REPORT:
+        return "Company Report"
     elif category == ContentCategoryEnum.IPO_ANNOUNCEMENT:
         return "IPO Announcement"
     elif category == ContentCategoryEnum.COMPANY_RECOGNITION:
         return "Company Recognition"
+    elif category == ContentCategoryEnum.PARTNER_RECOGNITION:
+        return "Partner Recognition"
     elif category == ContentCategoryEnum.COMPANY_ACQUISITION:
         return "Company Acquisition"
     elif category == ContentCategoryEnum.COMPANY_ACQUIRED:
@@ -229,8 +265,12 @@ def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str
         return "Company Customers"
     elif category == ContentCategoryEnum.COMPANY_EVENT_HOSTED_ATTENDED:
         return "Company Events or Conferences"
+    elif category == ContentCategoryEnum.COMPANY_TALK:
+        return "Employee Talks"
     elif category == ContentCategoryEnum.COMPANY_WEBINAR:
         return "Company Webinars"
+    elif category == ContentCategoryEnum.COMPANY_PANEL_DISCUSSION:
+        return "Company Panel Discussions"
     elif category == ContentCategoryEnum.COMPANY_LAYOFFS:
         return "Company Layoffs"
     elif category == ContentCategoryEnum.COMPANY_CHALLENGE:
@@ -254,7 +294,7 @@ def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str
     elif category == ContentCategoryEnum.COMPANY_OFFSITE:
         return "Company Offsites"
     elif category == ContentCategoryEnum.NONE_OF_THE_ABOVE:
-        return "None of the Above"
+        return "Other"
 
 
 class ContentDetails(BaseModel):
@@ -282,7 +322,7 @@ class ContentDetails(BaseModel):
     creation_date: Optional[datetime] = Field(
         default=None, description="Date in UTC timezone when this document was inserted in the database.")
     url: Optional[str] = Field(
-        default=None, description="URL of the content if any.")
+        default=None, description="URL of the content if any. Usually is one of Web Page URL, LinkedIn Post URL or LinkedIn Acitivity Page URL.")
 
     # Metadata associated with the content request.
     search_engine_query: Optional[str] = Field(
@@ -291,6 +331,8 @@ class ContentDetails(BaseModel):
         default=None, description="Full name of person. Populated only when the workflow was explicitly searching for person information and None when searching for only company information.")
     company_name: Optional[str] = Field(
         default=None, description="Company name used when searching content. Should mostly be populated, there may be some exceptions that are not known as of now.")
+    company_description: Optional[str] = Field(
+        default=None, description="Description of the company to help with content processing. This is especially true when ")
     person_role_title: Optional[str] = Field(
         default=None, description="Role title of person at company. Populated only when person_name is populated and None otherwise.")
     person_profile_id: Optional[str] = Field(
@@ -299,6 +341,8 @@ class ContentDetails(BaseModel):
         default=None, description="Reference ID to the parent web page that is stored in the database.")
     linkedin_post_ref_id: Optional[str] = Field(
         default=None, description="Reference ID to the parent LinkedIn post that is stored in the database.")
+    linkedin_activity_ref_id: Optional[str] = Field(
+        default=None, description="Reference ID to the LinkedIn Activity (used for processing this content) that is stored in the database. Different from LinkedIn Post ref ID since it is fetched from user's chrome extension.")
     company_profile_id: Optional[str] = Field(
         default=None, description="Reference ID to the Company Profile that is stored in the database.")
 
@@ -329,6 +373,12 @@ class ContentDetails(BaseModel):
         default=False, description="Whether the page is requesting user contact information in exchange for access to white paper, case study, webinar etc. Always False for LinkedIn posts.")
     focus_on_company: Optional[bool] = Field(
         default=False, description="Whether the content is related to the Company.")
+    focus_on_company_reason: Optional[str] = Field(
+        default=None, description="Reason for why this content is related or unrelated to the Company.")
+    team_members: Optional[List[str]] = Field(
+        default=None, description="Names of potential team members of given lead.")
+    product_associations: Optional[List[str]] = Field(
+        default=None, description="Names of potential products that the lead might be working at current company.")
     num_linkedin_reactions: Optional[int] = Field(
         default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post content and None otherwise.")
     num_linkedin_comments: Optional[int] = Field(

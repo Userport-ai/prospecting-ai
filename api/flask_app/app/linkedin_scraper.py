@@ -168,106 +168,6 @@ class LinkedInScraper:
 
         class ParseState(Enum):
             NONE = 1
-            POST_START_DETECTED = 2
-            POST_AUTHOR_DETECTED = 3
-            POST_HEADLINE_OR_FOLLOWERS_DETECTED = 4
-            POST_PUBLISH_DATE_DETECTED = 5
-            POST_URL_DETECTED = 6
-            REPOST_START_DETECTED = 7
-            REPOST_AUTHOR_DETECTED = 8
-            REPOST_HEADLINE_OR_FOLLOWERS_DETECTED = 9
-            REPOST_PUBLISH_DATE_DETECTED = 10
-            REPOST_URL_DETECTED = 11
-            POST_REACTIONS_AND_COMMENTS = 12
-
-        post = LinkedInPostDetails()
-        repost = None
-        state: ParseState = ParseState.NONE
-        # We choose between post and repost object.
-        current_post_obj: LinkedInPostDetails = post
-        for line in post_lines:
-            if LinkedInScraper.is_like_button(line):
-                # Done parsing post.
-                break
-
-            current_post_obj = post if repost is None else repost
-            if state == ParseState.NONE:
-                if LinkedInScraper.is_post_start(line):
-                    post.author_type = LinkedInScraper.get_author_type(line)
-                    state = ParseState.POST_START_DETECTED
-            elif state == ParseState.POST_START_DETECTED:
-                current_post_obj.author_name, current_post_obj.author_profile_url = LinkedInScraper.fetch_author_and_url(
-                    line)
-                state = ParseState.POST_AUTHOR_DETECTED
-            elif state == ParseState.POST_AUTHOR_DETECTED:
-                if current_post_obj.author_type == LinkedInPostDetails.AuthorType.PERSON:
-                    current_post_obj.author_headline = line.strip()
-                else:
-                    current_post_obj.author_follower_count = line.strip()
-                state = ParseState.POST_HEADLINE_OR_FOLLOWERS_DETECTED
-            elif state == ParseState.POST_HEADLINE_OR_FOLLOWERS_DETECTED:
-                publish_date = LinkedInScraper.fetch_publish_date(line)
-                current_post_obj.publish_date = publish_date
-                if not repost:
-                    state = ParseState.POST_PUBLISH_DATE_DETECTED
-                else:
-                    # In a repost, we don't observe the original URL so jump directly to parsing text.
-                    state = ParseState.POST_URL_DETECTED
-            elif state == ParseState.POST_PUBLISH_DATE_DETECTED:
-                url = LinkedInScraper.fetch_post_url(line)
-                if url:
-                    current_post_obj.url = url
-                    state = ParseState.POST_URL_DETECTED
-            elif state == ParseState.POST_URL_DETECTED:
-                # If another post start is detected or reaction count is detected, change state.
-                if LinkedInScraper.is_post_start(line):
-                    # Start of repost.
-                    repost = LinkedInPostDetails()
-                    repost.author_type = LinkedInScraper.get_author_type(line)
-                    state = ParseState.POST_START_DETECTED
-                elif LinkedInScraper.fetch_num_reactions(line):
-                    # Only post can have reactions, not repost.
-                    post.num_reactions = LinkedInScraper.fetch_num_reactions(
-                        line)
-                    state = ParseState.POST_REACTIONS_AND_COMMENTS
-                else:
-                    card_link_tuple = LinkedInScraper.fetch_card_heading_and_url(
-                        line)
-                    if not card_link_tuple:
-                        # Regular text. Extract links from line.
-                        current_post_obj.text_links += LinkedInScraper.fetch_md_links(
-                            line)
-                        current_post_obj.text += "\n" + line
-                    else:
-                        # Add to card links list dictionary.
-                        current_post_obj.card_links.append(card_link_tuple)
-            elif state == ParseState.POST_REACTIONS_AND_COMMENTS:
-                num_comments = LinkedInScraper.fetch_num_comments(line)
-                if num_comments:
-                    # Only post can have reactions, not repost.
-                    post.num_comments = num_comments
-
-            # Uncomment for debugging
-            # print("--------")
-            # print(line)
-
-        if repost:
-            post.repost = repost
-
-        # Uncomment for debugging
-        # print("\n\n\n")
-        # import pprint
-        # pprint.pprint(post.dict())
-        return post
-
-    @staticmethod
-    def extract_post_details_v2(post_body: str) -> LinkedInPostDetails:
-        """V2 version of Extracts and returns Post details from given Post Body Markdown formatted string."""
-        post_lines: List[str] = LinkedInScraper.preprocess_post(
-            post_body=post_body)
-
-        class ParseState(Enum):
-            NONE = 1
             POST_AUTHOR_DETECTED = 2
             POST_URL_DETECTED = 3
             POST_REACTIONS_AND_COMMENTS = 4
@@ -429,19 +329,33 @@ class LinkedInScraper:
     def fetch_publish_date(line: str) -> Optional[datetime]:
         """Returns datetime object of when post was published."""
         line = line.strip()
+        hour_pattern = r'(\d+)h'
+        day_pattern = r'(\d+)d'
         week_pattern = r'(\d+)w'
         month_pattern = r'(\d+)mo'
         year_pattern = r'(\d+)y'
+        another_year_pattern = r'(\d+)yr'
 
+        hour_result = re.match(hour_pattern, line)
+        day_result = re.match(day_pattern, line)
         week_result = re.match(week_pattern, line)
         month_result = re.match(month_pattern, line)
         year_result = re.match(year_pattern, line)
-        if not week_result and not month_result and not year_result:
+        another_year_result = re.match(another_year_pattern, line)
+        if not hour_result and not day_result and not week_result and not month_result and not year_result and not another_year_result:
             return None
 
         time_now = Utils.create_utc_time_now()
         publish_date = None
-        if week_result:
+        if hour_result:
+            # Subtract hours.
+            hours = int(hour_result[1])
+            publish_date = time_now - relativedelta(hours=hours)
+        elif day_result:
+            # Subtract days.
+            days = int(day_result[1])
+            publish_date = time_now - relativedelta(days=days)
+        elif week_result:
             # Subtract weeks.
             weeks = int(week_result[1])
             publish_date = time_now - relativedelta(weeks=weeks)
@@ -449,9 +363,13 @@ class LinkedInScraper:
             # Subtract months.
             months = int(month_result[1])
             publish_date = time_now - relativedelta(months=months)
-        else:
+        elif year_result:
             # Subtract years.
             years = int(year_result[1])
+            publish_date = time_now - relativedelta(years=years)
+        elif another_year_result:
+            # Subtract years.
+            years = int(another_year_result[1])
             publish_date = time_now - relativedelta(years=years)
 
         return publish_date
