@@ -8,7 +8,7 @@ from app.models import LeadResearchReport, ContentCategoryEnum, OpenAITokenUsage
 from app.utils import Utils
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import HumanMessagePromptTemplate
 from langchain_community.callbacks import get_openai_callback
@@ -143,15 +143,10 @@ class Personalization:
         email_template_message: Optional[str] = email_template.message if email_template else None
         # TODO: Right now, we are generating email subject line even for follow up emails which is not technically correct but it helps us
         # not make any changes to the email generation prompt. If users actually ask for this to be removed in the UI, we will definitely implement it.
-        email_opener: Optional[str] = self.generate_email_opener_v2(
+        email_opener: Optional[str] = self.generate_email_opener(
             highlight=highlight, lead_research_report=lead_research_report)
-        email_subject_line: Optional[str] = self.generate_email_subject_line_v2(
+        email_subject_line: Optional[str] = self.generate_email_subject_line(
             lead_research_report=lead_research_report, email_opener=email_opener, email_template_message=email_template_message)
-
-        # Uncomment to use the older way to generate email subject lines and openers.
-        # email_subject_line: str = self.generate_email_subject_line(highlight=highlight, lead_research_report=lead_research_report, email_template_message=email_template_message)
-        # email_opener: str = self.generate_email_opener(highlight=highlight, lead_research_report=lead_research_report,
-        #                                                email_template_message=email_template_message, email_subject_line=email_subject_line)
 
         return LeadResearchReport.PersonalizedEmail(
             id=ObjectId(),
@@ -168,157 +163,7 @@ class Personalization:
             email_opener=email_opener,
         )
 
-    def generate_email_subject_line(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport, email_template_message: Optional[str]) -> Optional[str]:
-        """Generates Personalized email subject line for lead using given highlight and Lead research report.
-
-        If email template is provided it is used in determining the email subject line. If not, only information from lead research report and highlight are used.
-        """
-        prompt_email_template_present_reference_details = (
-            "You are also given the email template message that will be used to highlight the pain point your product solves and its potential value proposition to the prospect.\n"
-            "Reference specific details from information about the prospect as well as the email template message to construct an email subject line that is addressed to the prospect.\n"
-        )
-        prompt_email_template_missing_reference_details = (
-            "Reference specific details from information about the prospect to construct an email subject line that is addressed to the prospect.\n"
-        )
-        prompt_email_template_formatted = (
-            "## Email Template Message\n"
-            f"{email_template_message}"
-        )
-
-        prompt_template = (
-            f"Today's date: {Utils.to_human_readable_date_str(Utils.create_utc_time_now())}\n\n"
-            "You are an exuberant sales person who is responsible for writing personalized outbound emails that stand out to the prospect.\n"
-            "You are provided with information about the prospect as well as summaries of recent news about them.\n"
-            f"{prompt_email_template_present_reference_details if email_template_message else prompt_email_template_missing_reference_details}"
-            "The email subject line should address the prospect in second-person and capture their attention. It could reference a recent story, statistic or a question about some comments they made.\n"
-            "\n"
-            "Here are some examples of subject lines templates that you can use as inspiration to capture the attention of a prospect:\n"
-            "1. [Prospect First Name], [pose an interesting question]?\n"
-            "2. Idea for [topic the prospect cares about]\n"
-            "3. If you are struggling with [pain point], you are not alone\n"
-            "4. [Prospect First Name], saw you're focused on [goal]\n"
-            "5. [Prospect First Name], loved your post about [content]\n"
-            "6. A solution for [Pain Point], [Prospect First Name]?\n"
-            "7. [Prospect First Name], [Pain point] initiatives for [Company name]?\n"
-            "8. [Prospect First Name], improving [Pain point] at [Company name]?\n"
-            "9. [Pain Point]: There’s a better way!\n"
-            "10. Excited about using [Product Name that solves the pain point] to ease your [Pain Point]?\n"
-            "11. [Prospect First Name], tackling [Pain Point] after [specific announcement or event]?\n"
-            "12. [Prospect First Name], curious about your take on [Content or Issue or Trend]?\n"
-            "13. [Prospect First Name], your [Content or post] got me thinking...\n"
-            "14. [Prospect First Name], inspired by your [Content] - must read for [audience]!\n"
-            "15. Curious about your take on [Content or Product or Story] after your chat with [Interviewer or Podcast Host]?\n"
-            "16. Curious about how [Product or Feature] has influenced [Company's decisions]?\n"
-            "17. Curious about your take on tackling [Pain point]?\n"
-            "\n"
-            "## Prospect Details\n"
-            "Name: {person_name}\n"
-            "Company: {company_name}\n"
-            "Role Title: {person_role_title}\n"
-            "News Source: {url}\n"
-            "News Publish Date: {publish_date_readable_str}\n"
-            "News Summary:\n"
-            "{concise_summary}\n"
-            "\n"
-            f"{prompt_email_template_formatted if email_template_message else ''}"
-        )
-        prompt = PromptTemplate.from_template(prompt_template)
-
-        class EmailSubjectLine(BaseModel):
-            subject_line: Optional[str] = Field(
-                default=None, description="Subject Line of the email.")
-
-        llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MODEL,
-                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(EmailSubjectLine)
-
-        chain = prompt | llm
-        result: EmailSubjectLine = chain.invoke({
-            "person_name": lead_research_report.person_name,
-            "company_name": lead_research_report.company_name,
-            "person_role_title": lead_research_report.person_role_title,
-            "url": highlight.url,
-            "publish_date_readable_str": highlight.publish_date_readable_str,
-            "concise_summary": highlight.concise_summary,
-        })
-        return result.subject_line
-
-    def generate_email_opener(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport, email_template_message: Optional[str], email_subject_line: str) -> Optional[str]:
-        """Generates Personalized email opener for lead using given highlight and email subject line.
-
-        If email template is provided it is used in determining the email opener. If not, only information from lead research report, highlight and email subject line are used.
-        """
-        prompt_email_template_is_given = (
-            "You are given the email template message that will be used to highlight the pain point your product solves and its potential value proposition to the prospect.\n"
-        )
-        prompt_email_template_present_reference_details = (
-            "Reference specific details from information about the prospect, the email subject line and the email template message to construct an email opener that is addressed to the prospect.\n"
-        )
-        prompt_email_template_missing_reference_details = (
-            "Reference specific details from information about the prospect and the email subject line to construct an email opener that is addressed to the prospect.\n"
-        )
-        prompt_email_template_formatted = (
-            "**Email Template Message:**\n"
-            f"{email_template_message}"
-        )
-
-        prompt_template = (
-            f"Today's date: {Utils.to_human_readable_date_str(Utils.create_utc_time_now())}\n\n"
-            "You are an exuberant sales person who is responsible for writing personalized outbound emails that stand out to the prospect.\n"
-            "You are provided with information about the prospect as well as summaries of recent news about them.\n"
-            f"{prompt_email_template_is_given if email_template_message else ''}"
-            "You are also given the email subject line.\n"
-            f"{prompt_email_template_present_reference_details if email_template_message else prompt_email_template_missing_reference_details}"
-            "The email opener should address the prospect in second-person and be hyper personalized.\n"
-            "It should be up to a maximum of 3 sentences in length.\n"
-            "\n"
-            "Here are some examples of email opener templates that you can use as inspiration to capture the attention of a prospect:\n"
-            "1. Hi [Prospect First Name],\n\nCongrats on the new job and for the launch of [Product Name], it's amazing that teams can now get value from [Product's feature].\n"
-            "2. Hi [Prospect First Name],\n\nRead the recent [Report Name]  and noticed to my surprise that [interesting insight from the report] has changed in 2023 compared to 2022!\n"
-            "3. Hi [Prospect First Name],\n\nNoticed that you recently spoke at [Event Name] about [Content about Talk], it was a great listen and I learned a lot!\n"
-            "4. Hi [Prospect First Name],\n\nCongrats on the recent [Promotion] and for [Company Achievement]!\n"
-            "5. Hi [Prospect First Name],\n\nNoticed your repost about [Product Launch and how it solves a problem]. Excited to see how [the product transforms the industry]\n"
-            "6. Hi [Prospect First Name],\n\nLoved reading your thoughts on [Content]! It was inspiring to see how [Product or Company accomplishes something]!\n"
-            "7. Hi [Prospect First Name],\n\nKudos on being recognized about [Recognition Description]! [Explain why the Recognition means something]\n"
-            "8. Hi [Prospect First Name],\n\nThrilled to see you'll be sharing insights about [Product or some other Content]. Looking forward to learning [some detail about the Product or Content]!\n"
-            "9. Hi [Prospect First Name],\n\nYour [Content or Post] were truly insightful! Given your expertise, I wanted to touch base on how you are addressing [Pain Point].\n"
-            "10. Hi [Prospect First Name],\n\nCongratulations on how you are tacking [Pain Point] and achieving [accomplishment]! Your dedication to addressing [Problem] is truly inspiring, especially amidst [Challenges they are facing].\n"
-            "11. Hi [Prospect First Name],\n\nI was truly inspired by your thoughts on [recent Content or Post]! Your proactive approach of [doing a task] reflects an exceptional commitment to [a set positive attributes].\n"
-            "12. Hi [Prospect First Name],\n\nKudos on taking a step towards [Solving a Problem] with the launch of [Product]! It's inspiring to see how [Company Name] can [Accomplish something] using [Product or Feature].\n"
-            "\n"
-            "**Prospect Details:**\n"
-            "Name: {person_name}\n"
-            "Company: {company_name}\n"
-            "Role Title: {person_role_title}\n"
-            "News Source: {url}\n"
-            "News Publish Date: {publish_date_readable_str}\n"
-            "News Summary:\n"
-            "{concise_summary}\n"
-            "\n"
-            f"**Email Subject Line:** {email_subject_line}\n"
-            "\n"
-            f"{prompt_email_template_formatted if email_template_message else ''}"
-        )
-        prompt = PromptTemplate.from_template(prompt_template)
-
-        class EmailOpener(BaseModel):
-            email_opener: Optional[str] = Field(
-                default=None, description="Personalized email opener addressed to the recipient.")
-
-        llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MODEL,
-                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(EmailOpener)
-
-        chain = prompt | llm
-        result: EmailOpener = chain.invoke({
-            "person_name": lead_research_report.person_name,
-            "company_name": lead_research_report.company_name,
-            "person_role_title": lead_research_report.person_role_title,
-            "url": highlight.url,
-            "publish_date_readable_str": highlight.publish_date_readable_str,
-            "concise_summary": highlight.concise_summary,
-        })
-        return result.email_opener
-
-    def generate_email_opener_v2(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport) -> Optional[str]:
+    def generate_email_opener(self, highlight: LeadResearchReport.ReportDetail.Highlight, lead_research_report: LeadResearchReport) -> Optional[str]:
         """Generate opening lines of an email using prospect details (from the report) and given highlight about the prospect."""
         human_message_prompt_template = (
             "**Prospect Details:**\n"
@@ -366,7 +211,7 @@ class Personalization:
         email_opener = f"Hi {first_name},\n\n{result.email_opener}"
         return email_opener
 
-    def generate_email_subject_line_v2(self, lead_research_report: LeadResearchReport, email_opener: Optional[str], email_template_message: Optional[str]) -> Optional[str]:
+    def generate_email_subject_line(self, lead_research_report: LeadResearchReport, email_opener: Optional[str], email_template_message: Optional[str]) -> Optional[str]:
         """Generates Personalized email subject line for lead using the given email that consists of personalized email opener and the template explaining the problem statement and value proposition.
 
         If email template is provided it is used in determining the email subject line. If not, only information from personalized opener and prospect details is used.
@@ -509,7 +354,7 @@ if __name__ == "__main__":
     database = Database()
     pz = Personalization(database=database)
 
-    pz.generate_email_opener_v2(None, None)
+    pz.generate_email_opener(None, None)
 
     lead_research_report_id = "66ab9633a3bb9048bc1a0be5"
     # email_list = pz.generate_personalized_emails(
@@ -518,5 +363,3 @@ if __name__ == "__main__":
 
     # lead_research_report = database.get_lead_research_report(
     #     lead_research_report_id=lead_research_report_id)
-    # pz.generate_email_subject_line(
-    #     highlight=lead_research_report.details[0].highlights[0], lead_research_report=lead_research_report, email_template_message=None)

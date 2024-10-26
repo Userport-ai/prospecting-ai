@@ -961,7 +961,6 @@ class WebPageScraper:
         chain = prompt | llm
 
         # Be very careful making changes to this prompt, it may result in worse results.
-        # TODO: Add new categories: PERSONAL_JOB_ANNIVERSARY, ABOUT_COMPANY, COMPANY_REPORT, PARTNER_RECOGNITION, COMPANY_TALK, COMPANY_PANEL_DISCUSSION.
         question = (
             "Does the text below fall into one of the following categories?\n",
             f"* Personal thoughts shared by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_THOUGHTS.value}]\n"
@@ -970,6 +969,7 @@ class WebPageScraper:
             f"* {person_name} got promoted in their job. [Enum value: {ContentCategoryEnum.PERSONAL_PROMOTION.value}]\n"
             f"* Recognition or award received by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_RECOGITION.value}]\n"
             f"* Job change announcement by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_JOB_CHANGE.value}]\n"
+            f"* {person_name} celebrated a work anniversary at their company. [Enum value: {ContentCategoryEnum.PERSONAL_JOB_ANNIVERSARY.value}]\n"
             f"* Event attended by {person_name}. [Enum value: {ContentCategoryEnum.PERSONAL_EVENT_ATTENDED.value}]\n"
             f"* Talk given by {person_name} at an event or gathering. [Enum value: {ContentCategoryEnum.PERSONAL_TALK_AT_EVENT.value}]\n"
             f"* Launch of {company_name}'s product. [Enum value: {ContentCategoryEnum.PRODUCT_LAUNCH.value}]\n"
@@ -982,19 +982,24 @@ class WebPageScraper:
             f"* Hiring announcement for {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_HIRING.value}]\n"
             f"* {company_name}'s Quarterly or Annual Financial results Announcement. [Enum value: {ContentCategoryEnum.FINANCIAL_RESULTS.value}]\n"
             f"* A Story about {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_STORY.value}]\n",
+            f"* General information about {company_name}. [Enum value: {ContentCategoryEnum.ABOUT_COMPANY.value}]\n"
             f"* Trends associated with {company_name}'s industry. [Enum value: {ContentCategoryEnum.INDUSTRY_TRENDS.value}]\n"
+            f"* A report released by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_REPORT.value}]\n"
             f"* Announcement of {company_name}'s recent partnership with another company. [Enum value: {ContentCategoryEnum.COMPANY_PARTNERSHIP.value}]\n"
             f"* A significant achievement by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_ACHIEVEMENT.value}]\n"
             f"* Funding announcement by {company_name}. [Enum value: {ContentCategoryEnum.FUNDING_ANNOUNCEMENT.value}]\n"
             f"* IPO announcement by {company_name}. [Enum value: {ContentCategoryEnum.IPO_ANNOUNCEMENT.value}]\n"
             f"* Recognition or award received by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_RECOGNITION.value}]\n"
+            f"* {company_name} recognized achievements of one of their partners. [Enum value: {ContentCategoryEnum.PARTNER_RECOGNITION.value}]\n"
             f"* Company acquisition by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_ACQUISITION.value}]\n"
             f"* {company_name} has been acquired by another company. [Enum value: {ContentCategoryEnum.COMPANY_ACQUIRED.value}]\n"
             f"* {company_name}'s anniversary announcement. [Enum value: {ContentCategoryEnum.COMPANY_ANNIVERSARY.value}]\n"
             f"* Content relating to {company_name}'s competition. [Enum value: {ContentCategoryEnum.COMPANY_COMPETITION.value}]\n"
             f"* Content relating to {company_name}'s customers. [Enum value: {ContentCategoryEnum.COMPANY_CUSTOMERS.value}]\n"
             f"* An event, conference or trade show hosted or attended by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_EVENT_HOSTED_ATTENDED.value}]\n"
+            f"* An talk given by {company_name}'s employee in a conference or workshop or event. [Enum value: {ContentCategoryEnum.COMPANY_TALK.value}]\n"
             f"* A webinar hosted by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_WEBINAR.value}]\n"
+            f"* A panel discussion hosted or organized by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_PANEL_DISCUSSION.value}]\n"
             f"* Layoffs announced by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_LAYOFFS.value}]\n"
             f"* A challenge facing {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_CHALLENGE.value}]\n"
             f"* A rebranding initiative by {company_name}. [Enum value: {ContentCategoryEnum.COMPANY_REBRAND.value}]\n"
