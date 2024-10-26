@@ -84,6 +84,7 @@ class LinkedInActivityParser:
             f"The prospect gave a talk at an event or conference or a workshop. [Enum value: {ContentCategoryEnum.PERSONAL_TALK_AT_EVENT.value}]\n"
             f"Announcement of the company's recent partnership with another company. [Enum value: {ContentCategoryEnum.COMPANY_PARTNERSHIP.value}]\n"
             f"About industry trends in the company's industry. [Enum value: {ContentCategoryEnum.INDUSTRY_TRENDS.value}]\n"
+            f"A collaboration or alliance by the company with other companies in the industry. [Enum value: {ContentCategoryEnum.INDUSTRY_COLLABORATION.value}]\n"
             f"The company's product launch. [Enum value: {ContentCategoryEnum.PRODUCT_LAUNCH.value}]\n"
             f"An update to the company's existing product. [Enum value: {ContentCategoryEnum.PRODUCT_UPDATE.value}]\n"
             f"A new leadership hire at the company. [Enum value: {ContentCategoryEnum.LEADERSHIP_HIRE.value}]\n"
@@ -152,17 +153,22 @@ class LinkedInActivityParser:
                     content_md=activity.content_md, content_details=content_details):
                 content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag="activity_processing", prompt_tokens=cb.prompt_tokens,
                                                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+                logger.info(
+                    f"\n\nTotal cost: {content_details.openai_tokens_used.total_cost_in_usd}")
                 return content_details
 
             if not self.fetch_detailed_summary(
                     content_md=activity.content_md, content_details=content_details):
                 content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag="activity_processing", prompt_tokens=cb.prompt_tokens,
                                                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+                logger.info(
+                    f"\n\nTotal cost: {content_details.openai_tokens_used.total_cost_in_usd}")
                 return content_details
 
             self.compute_content_category(content_details=content_details)
 
-            self.extract_team_members(content_details=content_details)
+            self.extract_mentioned_team_members(
+                content_details=content_details)
 
             self.extract_products(content_details=content_details)
 
@@ -218,17 +224,25 @@ class LinkedInActivityParser:
             "content_md": content_md,
         })
 
-        if not result.publish_date:
-            logger.error(
+        publish_date_str: Optional[str] = result.publish_date
+        if not publish_date_str:
+            logger.warning(
                 f"Publish date returned None in result: {result}, Exiting content processing in LinkedIn activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}.")
-            content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE
-            return False
+            # Usually date is present in LinkedIn activity, so we definitely want to try one more time to extract the date
+            # with a different prompt.
+            publish_date_str = self.extract_date_only(
+                content_md=content_md, content_details=content_details)
+            if not publish_date_str:
+                logger.warning(
+                    f"Retry Publish date returned None, Exiting content processing in LinkedIn activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}.")
+                content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE
+                return False
 
         publish_date: Optional[datetime] = LinkedInScraper.fetch_publish_date(
-            result.publish_date)
+            publish_date_str)
         if publish_date == None:
             logger.error(
-                f"Got None when converting LinkedIn activity date: {result.publish_date} to datetime object in LinkedIn Activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}.")
+                f"Got None when converting LinkedIn activity date: {publish_date_str} to datetime object in LinkedIn Activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}.")
             content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE
             return False
 
@@ -351,8 +365,8 @@ class LinkedInActivityParser:
         logger.info(
             f"Got Content Category: {content_details.category} with reason: {content_details.category_reason} for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
 
-    def extract_team_members(self, content_details: ContentDetails):
-        """Extracts multiple entitites from the given detailed summary of LinkedIn Activity."""
+    def extract_mentioned_team_members(self, content_details: ContentDetails):
+        """Extracts team members who are mentioned in the detailed summary of LinkedIn Activity."""
         if not content_details.detailed_summary:
             logger.error(
                 f"Team Members: Expected detailed summary to be not None in Content Details, found None. Exiting content processing for Content Details: {content_details}")
@@ -360,7 +374,7 @@ class LinkedInActivityParser:
 
         questions = (
             f"We are trying to infer team members of the prospect at {self.company_name} by inspecting their LinkedIn activity engagement.\n"
-            f"Extract the names of all other members mentioned in the text from company {self.company_name}. If the author of the activity is from the same company, include them as well.\n"
+            f"Extract the names of all other members mentioned (excluding {self.person_name}) in the text from company {self.company_name}. If the author of the activity is from the same company, include them as well.\n"
         )
         human_message_prompt_template = (
             '"""{detailed_summary}"""'
@@ -390,10 +404,10 @@ class LinkedInActivityParser:
         })
 
         # Populate team members.
-        content_details.team_members = result.team_members
+        content_details.mentioned_team_members = result.team_members
 
         logger.info(
-            f"Got team Members: {content_details.team_members} for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+            f"Team Members mentioned: {content_details.mentioned_team_members} for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
 
     def extract_products(self, content_details: ContentDetails):
         """Extracts products mentioned in the detailed summary for given LinkedIn Activity."""
@@ -437,6 +451,44 @@ class LinkedInActivityParser:
 
         logger.info(
             f"Got Product associations: {content_details.product_associations} in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
+
+    def extract_date_only(self, content_md: str, content_details: ContentDetails) -> Optional[str]:
+        """Extract date from given LinkedIn Activity Markdown and return it. Used as backup if date extraction failed when checking if activity is related to company or not.
+        Note that the date returned will be of the format: 4h, 5d, 1mo, 2yr, 3w etc. The caller must covert it to datetime instance separately.
+        """
+        question = (
+            "Extract the date when the text was published. The publish date is usually in one of the following formats: 4h, 5d, 1mo, 2yr, 3w etc."
+        )
+        human_message_prompt_template = (
+            '"""{content_md}"""'
+            "\n\n"
+            f"{question}"
+        )
+        human_message_prompt = HumanMessagePromptTemplate.from_template(
+            human_message_prompt_template)
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                self.RAW_ACTIVITY_SYSTEM_MESSAGE,
+                human_message_prompt,
+            ]
+        )
+
+        class PublishDate(BaseModel):
+            publish_date: Optional[str] = Field(
+                default=None, description="Publish date of the post.")
+
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL,
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(PublishDate)
+
+        chain = prompt | llm
+        result: PublishDate = chain.invoke({
+            "content_md": content_md,
+        })
+
+        logger.info(
+            f"Backup publish date result: {result.publish_date} for LinkedIn Activity URL: {content_details.url} and activity ID: {content_details.linkedin_activity_ref_id}")
+        return result.publish_date
 
     @staticmethod
     def get_activities(person_linkedin_url: str, page_html: str, activity_type: LinkedInActivity.Type) -> List[LinkedInActivity]:
@@ -504,9 +556,13 @@ if __name__ == "__main__":
     company_description = "We are Dabur, an Indian Transnational offering the best nature-based solutions to provide holistic Health & Well-Being to households in more than 120 markets spanning Asia, Europe and The US. A world leader in Ayurveda, we are a family of over 7,000 individuals continuously striving to conduct business in an environmentally sustainable manner."
     # person_name = "Pankush Kapoor"
     # person_role_title = "Group Brand Manager"
-    person_name = "Prashant Agarwal"
-    person_role_title = "Head of Marketing - Health Supplements & Baby Care"
-    activity_type = LinkedInActivity.Type.REACTION
+    # person_name = "Prashant Agarwal"
+    # person_role_title = "Head of Marketing - Health Supplements & Baby Care"
+    # person_name = "Vikram Dhawan"
+    # person_role_title = "Senior Brand Manager"
+    person_name = "Abhishek Jain"
+    person_role_title = "Senior Brand Manager"
+    activity_type = LinkedInActivity.Type.COMMENT
 
     filename = "_".join([p.lower() for p in person_name.split(
         " ")] + [activity_type.value.lower() + "s"])
@@ -523,7 +579,7 @@ if __name__ == "__main__":
     import time
     start_time = time.time()
     for i, act in enumerate(activities):
-        if i == 3:
+        if i == 1:
             act.id = "1"
             parser.parse(activity=act)
             break

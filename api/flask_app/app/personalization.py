@@ -301,6 +301,7 @@ class Personalization:
             ContentCategoryEnum.COMPANY_REBRAND,
             ContentCategoryEnum.COMPANY_ANNIVERSARY,
             ContentCategoryEnum.FUNDING_ANNOUNCEMENT,
+            ContentCategoryEnum.INDUSTRY_COLLABORATION,
             ContentCategoryEnum.COMPANY_HIRING,
             ContentCategoryEnum.COMPANY_NEW_OFFICE,
             ContentCategoryEnum.COMPANY_STORY,

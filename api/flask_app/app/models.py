@@ -125,6 +125,7 @@ class ContentTypeEnum(str, Enum):
 
 
 # Update Personalization class in personalization module whenever enums are updated below.
+# Also update method below that returns Human readable string for given enums.
 class ContentCategoryEnum(str, Enum):
     """Enum values associated with ContentCategory class."""
     PERSONAL_THOUGHTS = "personal_thoughts"
@@ -149,6 +150,7 @@ class ContentCategoryEnum(str, Enum):
     COMPANY_STORY = "company_story"
     COMPANY_REPORT = "company_report"
     INDUSTRY_TRENDS = "industry_trends"
+    INDUSTRY_COLLABORATION = "industry_collaboration"
     COMPANY_PARTNERSHIP = "company_partnership"
     COMPANY_ACHIEVEMENT = "company_achievement"
     FUNDING_ANNOUNCEMENT = "funding_announcement"
@@ -239,6 +241,8 @@ def content_category_to_human_readable_str(category: ContentCategoryEnum) -> str
         return "About Company"
     elif category == ContentCategoryEnum.INDUSTRY_TRENDS:
         return "Industry Trends"
+    elif category == ContentCategoryEnum.INDUSTRY_COLLABORATION:
+        return "Industry Collaboration"
     elif category == ContentCategoryEnum.COMPANY_PARTNERSHIP:
         return "Company Patnerships"
     elif category == ContentCategoryEnum.COMPANY_ACHIEVEMENT:
@@ -375,8 +379,8 @@ class ContentDetails(BaseModel):
         default=False, description="Whether the content is related to the Company.")
     focus_on_company_reason: Optional[str] = Field(
         default=None, description="Reason for why this content is related or unrelated to the Company.")
-    team_members: Optional[List[str]] = Field(
-        default=None, description="Names of potential team members of given lead.")
+    mentioned_team_members: Optional[List[str]] = Field(
+        default=None, description="Names of team members (in the same company) who have been mentioned in given content.")
     product_associations: Optional[List[str]] = Field(
         default=None, description="Names of potential products that the lead might be working at current company.")
     num_linkedin_reactions: Optional[int] = Field(
