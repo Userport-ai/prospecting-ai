@@ -88,7 +88,7 @@ class WebPage(BaseModel):
 
 
 class LinkedInActivity(BaseModel):
-    """Instance representing a single unprocessed LinkedIn activity. The processing of this activity is done in a separate flow."""
+    """Instance representing a single LinkedIn activity and it's raw contents in Markdown format. The processing of this activity is done in a separate flow."""
 
     class Type(str, Enum):
         # Enum describing the type of LinkedIn activity.
@@ -98,12 +98,16 @@ class LinkedInActivity(BaseModel):
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for LinkedIn activity.")
-    url: Optional[str] = Field(
-        default=None, description="URL associated with the activity.")
     creation_date: Optional[datetime] = Field(
         default=None, description="Date when this activity was created in the database in UTC timezone.")
-
-    # Content details.
+    person_linkedin_url: Optional[str] = Field(
+        default=None, description="URL of the person's LinkedIn profile.")
+    # Activity URL is one per activity type (posts, comments, reactions etc.). Currently not possible to extract each Activity's individual Post ID without manually copying the link.
+    # Alternatively, we can add publish date post processing to be able to better identify it if it needs to be retrieved in the future.
+    activity_url: Optional[str] = Field(
+        default=None, description="LinkedIn URL associated with the activity's page. This should be of the form linkedin.com/in/<username>/recent-activity/<all,comments/reactions>/.")
+    type: Optional["LinkedInActivity.Type"] = Field(
+        default=None, description="Type of LinkedIn Activity.")
     content_md: Optional[str] = Field(
         default=None, description="Entire Unprocessed Content of the activity stored in Markdown format.")
 
@@ -412,6 +416,11 @@ class LeadResearchReport(BaseModel):
         COMPLETE = "complete"
         FAILED_WITH_ERRORS = "failed_with_errors"
 
+    class LinkedInActivityInfo(BaseModel):
+        """Data related to LinkedIn Activity that is scraped by the chrome extension and processed by the backend."""
+        activity_ref_ids: Optional[List[str]] = Field(
+            default=None, description="Reference to List of LinkedInActivity instances which were created from activity information from this lead and whose content need to be processed.")
+
     class WebSearchResults(BaseModel):
         """Container for search results from processing information from the Web about Lead and their company."""
         class Result(BaseModel):
@@ -537,6 +546,10 @@ class LeadResearchReport(BaseModel):
         default=None, description="User ID of the person who created this report.")
     origin: Optional[Origin] = Field(
         default=None, description="Origin of the call to create the report. Can be None for reports which have not been backfilled.")
+
+    # Lead LinkedIn Activity Information.
+    linkedin_activity_info: Optional[List[LinkedInActivityInfo]] = Field(
+        default=None, description="Information from LinkedIn Activity feed of lead. Set only when origin of request is extension and None when it is Web.")
 
     # Store search results.
     search_results_map: Optional[Dict[str, List[str]]] = Field(

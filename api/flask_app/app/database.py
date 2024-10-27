@@ -18,6 +18,7 @@ from app.models import (
     CompanyProfile,
     ContentDetails,
     LinkedInPost,
+    LinkedInActivity,
     WebPage,
     LeadResearchReport,
     OutreachEmailTemplate,
@@ -59,6 +60,10 @@ class Database:
     def get_linkedin_posts_collection(self) -> Collection:
         """Returns LinkedIn posts collection."""
         return self.db['linkedin_posts']
+
+    def get_linkedin_activities_collection(self) -> Collection:
+        """Returns LinkedIn Activity collection."""
+        return self.db['linkedin_activities']
 
     def get_web_pages_collection(self) -> Collection:
         """Returns Web Page collection."""
@@ -127,6 +132,26 @@ class Database:
         result = collection.insert_one(
             linkedin_post.model_dump(exclude=Database._exclude_id()), session=session)
         return str(result.inserted_id)
+
+    def insert_linkedin_activities(self, linkedin_activities: List[LinkedInActivity], session: Optional[ClientSession] = None) -> List[str]:
+        """Inserts given LinkedIn activities as documents transactionally in the database and returns the created Ids. Throws an error if not called inside transactional session."""
+        if not session:
+            raise ValueError(
+                f"Missing transaction session! Cannot insert: {len(linkedin_activities)} LinkedIn Activities: {linkedin_activities}")
+
+        activity_docs: List[Dict] = []
+        creation_date: datetime = Utils.create_utc_time_now()
+        for activity in linkedin_activities:
+            if activity.id:
+                raise ValueError(
+                    f"LinkedInActivity instance cannot have an Id before db insertion: {activity}")
+            activity.creation_date = creation_date
+            activity_docs.append(activity.model_dump(
+                exclude=Database._exclude_id()))
+
+        collection = self.get_linkedin_activities_collection()
+        result = collection.insert_many(activity_docs, session=session)
+        return [str(inserted_id) for inserted_id in result.inserted_ids]
 
     def insert_web_page(self, web_page: WebPage, session: Optional[ClientSession] = None) -> str:
         """Inserts web page as document in the database and returns the created Id."""

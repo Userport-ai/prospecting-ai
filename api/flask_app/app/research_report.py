@@ -520,7 +520,7 @@ class Researcher:
 
         return openai_tokens_used
 
-    def aggregate_v2(self, lead_research_report_id: str):
+    def aggregate(self, lead_research_report_id: str):
         """Aggregate Details of research report for given Person and Company and updates them in the database.
 
         The match query is complex but critical to understanding how the report is generated.
@@ -548,6 +548,7 @@ class Researcher:
 
         # Create a new field that can contains personal content categories of other leads.
         # In the stage after this one, we will skip documents that have these values set to True.
+        # TODO: We need to also need to add documents that are from activity feed from other leads in the same company.
         stage_select_personal_cat_from_other_leads = {
             "$set": {
                 "personal_cat_from_other_leads": {
@@ -603,128 +604,6 @@ class Researcher:
             stage_match_person_and_company,
             stage_select_personal_cat_from_other_leads,
             stage_final_filter,
-            stage_project_fields,
-            stage_group_by_category,
-            stage_final_projection
-        ]
-
-        report_details: List[LeadResearchReport.ReportDetail] = []
-        results = self.database.get_content_details_collection().aggregate(pipeline=pipeline)
-        for detail in results:
-            rep_detail = LeadResearchReport.ReportDetail(**detail)
-
-            # Update publish date readable string manually.
-            for highlight in rep_detail.highlights:
-                # Convert to 02 August, 2024 format.
-                highlight.publish_date_readable_str = highlight.publish_date.strftime(
-                    "%d %B, %Y")
-                # Update category human readable string manually.
-                highlight.category_readable_str = content_category_to_human_readable_str(
-                    category=highlight.category)
-
-            # Update category human readable string manually.
-            rep_detail.category_readable_str = content_category_to_human_readable_str(
-                category=rep_detail.category)
-
-            report_details.append(rep_detail)
-
-        for detail in report_details:
-            logger.info(f"Category: {detail.category}")
-            logger.info(f"Num highlights: {len(detail.highlights)}")
-
-        setFields = {
-            "status": LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE,
-            "report_creation_date_readable_str": Utils.to_human_readable_date_str(time_now),
-            "report_publish_cutoff_date": report_publish_cutoff_date,
-            "report_publish_cutoff_date_readable_str": Utils.to_human_readable_date_str(report_publish_cutoff_date),
-            "details": [detail.model_dump() for detail in report_details],
-        }
-        self.database.update_lead_research_report(
-            lead_research_report_id=lead_research_report_id, setFields=setFields)
-
-        logger.info(f"Done with aggregating report: {lead_research_report_id}")
-
-    def aggregate(self, lead_research_report_id: str):
-        """[DEPRECATED]Aggregate Details of research report for given Person and Company and updates them in the database.
-
-        We are keeping this method in case things break with the newer version and we are forced to revert.
-        """
-        research_report: LeadResearchReport = self.database.get_lead_research_report(
-            lead_research_report_id=lead_research_report_id)
-
-        time_now: datetime = Utils.create_utc_time_now()
-
-        # Only filter documents from recent months. We use 15 since LinkedIn posts are configured to be at max 15 months old.
-        report_publish_cutoff_date = time_now - relativedelta(months=15)
-
-        stage_match_person_and_company = {
-            "$match": {
-                "person_profile_id": research_report.person_profile_id,
-                "company_profile_id": research_report.company_profile_id,
-            }
-        }
-
-        stage_match_publish_date = {
-            "$match": {
-                "publish_date": {"$gt": report_publish_cutoff_date}
-            }
-        }
-
-        stage_match_category = {
-            "$match": {
-                "category": {"$nin": [None, ContentCategoryEnum.NONE_OF_THE_ABOVE.value]}
-            }
-        }
-
-        stage_match_not_requesting_contact_info = {
-            "$match": {
-                "requesting_user_contact": {"$eq": False}
-            }
-        }
-
-        # Skip results that show documentation of a website.
-        stage_match_not_documentation = {
-            "$match": {
-                "type": {"$ne": ContentTypeEnum.DOCUMENTATION.value}
-            }
-        }
-
-        # TODO: Add filter to focus on company. Existing docs for Perret have bad values for the doc
-        # but we can try with new docs that we will index on.
-
-        stage_project_fields = {
-            "$project": {
-                # These next 2 lines will remove _id MongoDB ID and replace with id in our storage.
-                "_id": 0,
-                "id": "$_id",
-                "url": 1,
-                "publish_date": 1,
-                "concise_summary": 1,
-                "category": 1,
-            }
-        }
-
-        stage_group_by_category = {
-            "$group": {
-                "_id": "$category",
-                "highlights": {"$push": "$$ROOT"}
-            }
-        }
-
-        stage_final_projection = {
-            "$project": {
-                "_id": 0,
-                "category": "$_id",
-                "highlights": 1,
-            }
-        }
-
-        pipeline = [
-            stage_match_person_and_company,
-            stage_match_publish_date,
-            stage_match_category,
-            stage_match_not_requesting_contact_info,
-            stage_match_not_documentation,
             stage_project_fields,
             stage_group_by_category,
             stage_final_projection
@@ -826,5 +705,4 @@ if __name__ == "__main__":
     rp = Researcher(database=Database())
     # logger.info(
     #     f"Got {len(search_results)} search results for all the queries.")
-    # rp.aggregate(lead_research_report_id="66ab9633a3bb9048bc1a0be5")
-    rp.aggregate_v2(lead_research_report_id="66ea8401a5975beba768f19a")
+    rp.aggregate(lead_research_report_id="66ea8401a5975beba768f19a")

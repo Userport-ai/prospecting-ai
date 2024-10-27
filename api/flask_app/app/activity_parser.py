@@ -8,7 +8,6 @@ from app.linkedin_scraper import LinkedInScraper
 from app.utils import Utils
 from bs4 import BeautifulSoup
 from markdownify import markdownify
-from urllib.parse import urljoin
 from langchain_core.messages import SystemMessage
 from langchain_community.callbacks import get_openai_callback
 from langchain_core.prompts import HumanMessagePromptTemplate
@@ -22,7 +21,10 @@ logger = logging.getLogger()
 class LinkedInActivityParser:
     """Parses activity for a lead that is stored in the lead report."""
 
-    RECENT_ACTIVITY_ENDPOINT = "recent-activity"
+    RECENT_ACTIVITY = "recent-activity"
+    ACTIVITY_POSTS = "all/"
+    ACTIVITY_COMMENTS = "posts/"
+    ACTIVITY_REACTIONS = "reactions/"
 
     def __init__(self, person_name: str, company_name: str, company_description: str, person_role_title: str) -> None:
         self.person_name = person_name
@@ -137,7 +139,7 @@ class LinkedInActivityParser:
         """Parse given LinkedIn activity and convert it into Content instance post processing."""
         # TODO: Move this to caller and pass this as argument so that we can just populate fields related to content and return it.
         content_details = ContentDetails(
-            url=activity.url,
+            url=activity.activity_url,
             person_name=self.person_name,
             company_name=self.company_name,
             company_description=self.company_description,
@@ -146,6 +148,7 @@ class LinkedInActivityParser:
             person_profile_id=None,
             company_profile_id=None,
             linkedin_activity_ref_id=activity.id,
+            requesting_user_contact=False
         )
 
         with get_openai_callback() as cb:
@@ -515,8 +518,10 @@ class LinkedInActivityParser:
                 # any meaningul data.
                 continue
             act = LinkedInActivity(
-                url=LinkedInActivityParser._get_activity_url(
+                person_linkedin_url=person_linkedin_url,
+                activity_url=LinkedInActivityParser._get_activity_url(
                     person_linkedin_url=person_linkedin_url, activity_type=activity_type),
+                type=activity_type,
                 content_md=content
             )
             activity_list.append(act)
@@ -527,17 +532,14 @@ class LinkedInActivityParser:
         """Returns URL of the given activity for given lead's LinkedIn URL and activity type. These are hardcoded based on
         the endpoints we observe on LinkedIn today (as of 2024) but they can change in the future if LinkedIn wants it to.
         """
-        baseURL = urljoin(person_linkedin_url,
-                          LinkedInActivityParser.RECENT_ACTIVITY_ENDPOINT)
-
         if (activity_type == LinkedInActivity.Type.POST):
-            return urljoin(baseURL, "all/")
+            return f"{person_linkedin_url}/{LinkedInActivityParser.RECENT_ACTIVITY}/{LinkedInActivityParser.ACTIVITY_POSTS}"
 
         if (activity_type == LinkedInActivity.Type.COMMENT):
-            return urljoin(baseURL, "comments/")
+            return f"{person_linkedin_url}/{LinkedInActivityParser.RECENT_ACTIVITY}/{LinkedInActivityParser.ACTIVITY_COMMENTS}"
 
         if (activity_type == LinkedInActivity.Type.REACTION):
-            return urljoin(baseURL, "reactions/")
+            return f"{person_linkedin_url}/{LinkedInActivityParser.RECENT_ACTIVITY}/{LinkedInActivityParser.ACTIVITY_REACTIONS}"
 
         raise ValueError(
             f"Invalid LinkedInActivity type: {activity_type}, cannot get URL.")

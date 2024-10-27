@@ -10,10 +10,11 @@ from celery.exceptions import SoftTimeLimitExceeded
 from functools import wraps
 from pydantic import BaseModel, Field, field_validator
 from app.database import Database
-from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails, OpenAITokenUsage
+from app.models import LeadResearchReport, OutreachEmailTemplate, User, ContentDetails, OpenAITokenUsage, LinkedInActivity
 from app.research_report import Researcher
 from app.linkedin_scraper import LinkedInScraper, InvalidLeadLinkedInUrlException, LeadLinkedInProfileNotFoundException
 from app.personalization import Personalization
+from app.activity_parser import LinkedInActivityParser
 from app.utils import Utils
 from app.rate_limiter import rate_limiter, get_value
 from firebase_admin import auth
@@ -277,6 +278,9 @@ def create_lead_report():
 
     person_linkedin_url: Optional[str] = None
     origin: Optional[str] = None
+    postsHTML: Optional[str] = None
+    commentsHTML: Optional[str] = None
+    reactionsHTML: Optional[str] = None
     try:
         # Remove any leading and trailing whitespaces and trailing slashes.
         person_linkedin_url = Utils.remove_spaces_and_trailing_slashes(
@@ -285,6 +289,20 @@ def create_lead_report():
             raise ValueError(
                 f"Invalid LinkedIn URL: {person_linkedin_url} requested.")
         origin = request.json.get("origin")
+        postsHTML = request.json.get("postsHTML")
+        commentsHTML = request.json.get("commentsHTML")
+        reactionsHTML = request.json.get("reactionsHTML")
+        if origin == LeadResearchReport.Origin.EXTENSION.value:
+            # Origin is Extension, so we expect HTML for posts, comments and reactions to be present.
+            if postsHTML == None:
+                raise ValueError(
+                    f"Posts HTML cannot be empty for Origin Extension")
+            if commentsHTML == None:
+                raise ValueError(
+                    f"Comments HTML cannot be empty for Origin Extension")
+            if reactionsHTML == None:
+                raise ValueError(
+                    f"Reactions HTML cannot be empty for Origin Extension")
     except Exception as e:
         logger.exception(
             f"Failed to create report with request: {request} for user ID: {user_id} with error: {e}")
@@ -292,7 +310,7 @@ def create_lead_report():
             status_code=400, message=f"Invalid request to create a report")
 
     logger.info(
-        f"Got request from user ID: {user_id} to start report for URL: {person_linkedin_url} and origin: {origin}")
+        f"Got request to start report for URL: {person_linkedin_url} and origin: {origin}, from user ID: {user_id}")
 
     lead_research_report: Optional[LeadResearchReport] = None
     try:
@@ -311,17 +329,48 @@ def create_lead_report():
             status_code=409, message=f"Report already exists for URL: {person_linkedin_url}, please check in the Leads Table.")
 
     try:
-        # Create report in the database and continue updating it in the background.
+        lead_research_report_id: str
         lead_research_report = LeadResearchReport(
             user_id=user_id, person_linkedin_url=person_linkedin_url, status=LeadResearchReport.Status.NEW, origin=origin)
-        lead_research_report_id: str = db.insert_lead_research_report(
-            lead_research_report=lead_research_report)
-        fetch_lead_info_orchestrator.delay(
-            lead_research_report_id=lead_research_report_id)
-        logger.info(
-            f"Created report: {lead_research_report_id} for lead with LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id}")
+        if origin == LeadResearchReport.Origin.WEB.value:
+            # Create report in the database and continue updating it in the background.
+            lead_research_report_id = db.insert_lead_research_report(
+                lead_research_report=lead_research_report)
+        else:
+            # Create report along with any activity HTML in the database and continue updating it in the background.
+            # This is done in a single transaction so that we insert all activities and lead report successfully in an atomic manner.
+            with db.transaction_session() as session:
+                # Fetch list of activities from HTML.
+                posts_list: List[LinkedInActivity] = LinkedInActivityParser.get_activities(
+                    person_linkedin_url=person_linkedin_url, page_html=postsHTML, activity_type=LinkedInActivity.Type.POST)
+                comments_list: List[LinkedInActivity] = LinkedInActivityParser.get_activities(
+                    person_linkedin_url=person_linkedin_url, page_html=commentsHTML, activity_type=LinkedInActivity.Type.COMMENT)
+                reactions_list: List[LinkedInActivity] = LinkedInActivityParser.get_activities(
+                    person_linkedin_url=person_linkedin_url, page_html=reactionsHTML, activity_type=LinkedInActivity.Type.REACTION)
 
-        # Populate report ID and return report in the response.
+                # Add activities to database.
+                all_activities: List[LinkedInActivity] = posts_list + \
+                    comments_list + reactions_list
+                activity_ref_ids: List[str] = db.insert_linkedin_activities(
+                    linkedin_activities=all_activities, session=session)
+                logger.info(
+                    f"Created {len(all_activities)} activities into database for LinkedIn URL: {person_linkedin_url}, requested by user ID: {user_id}")
+
+                # Populate activity IDs in lead report and insert into database. They will be processed in the background later.
+                lead_research_report.linkedin_activity_info = LeadResearchReport.LinkedInActivityInfo(
+                    activity_ref_ids=activity_ref_ids)
+                lead_research_report_id = db.insert_lead_research_report(
+                    lead_research_report=lead_research_report, session=session)
+
+        if origin == LeadResearchReport.Origin.WEB:
+            # TODO: Remove this if condition once the flow for extension has been written.
+            fetch_lead_info_orchestrator.delay(
+                lead_research_report_id=lead_research_report_id)
+
+        logger.info(
+            f"Created report: {lead_research_report_id} for lead with LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id} for origin: {origin}")
+
+        # Add created report ID to the response.
         lead_research_report.id = lead_research_report_id
         response = CreateLeadResearchReportResponse(
             status=ResponseStatus.SUCCESS,
@@ -1419,7 +1468,7 @@ def aggregate_report_in_background(self, user_id: str, lead_research_report_id: 
     database = Database()
     try:
         r = Researcher(database=database)
-        r.aggregate_v2(lead_research_report_id=lead_research_report_id)
+        r.aggregate(lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Completed aggregation of research report complete for report ID: {lead_research_report_id} for user ID: {user_id}")
 
