@@ -16,12 +16,12 @@ from app.web_page_scraper import (
     LinkedInPostFooterNotFoundException,
     LinkedInPostHeadingTagNotFoundException
 )
+from app.activity_parser import LinkedInActivityParser
 from app.outreach_template import OutreachTemplateMatcher
 from app.personalization import Personalization
 from app.metrics import Metrics
 from app.models import (
     ContentDetails,
-    ContentTypeEnum,
     ContentCategoryEnum,
     WebPage,
     LinkedInPost,
@@ -29,6 +29,7 @@ from app.models import (
     LeadResearchReport,
     PersonProfile,
     CompanyProfile,
+    LinkedInActivity,
     content_category_to_human_readable_str
 )
 
@@ -38,7 +39,7 @@ logger = logging.getLogger()
 class Researcher:
     """Helper to create a research report for given person in a company from all relevant data in the database."""
 
-    WE_SEARCH_CONTENT_PARSING_OPERATION_TAG_NAME = "web_search_content_parsing"
+    CONTENT_PROCESSING_OPERATION_TAG_NAME = "content_processing"
     PERSONALIZED_MESSAGES_OPERATION_TAG_NAME = "personalized_messages"
 
     def __init__(self, database: Database) -> None:
@@ -99,6 +100,7 @@ class Researcher:
             "company_name": company_name,
             "person_name": person_profile.full_name,
             "person_role_title": role_title,
+            "company_description": company_profile.description,
             "company_headcount": company_profile.company_size_on_linkedin,
             "company_industry_categories": company_profile.categories,
             "status":  LeadResearchReport.Status.BASIC_PROFILE_FETCHED,
@@ -305,7 +307,7 @@ class Researcher:
         ]
         non_retryable_error_urls: Set[str] = set()
         total_openai_tokens_used = OpenAITokenUsage(
-            operation_tag=Researcher.WE_SEARCH_CONTENT_PARSING_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
+            operation_tag=Researcher.CONTENT_PROCESSING_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
         for search_result in search_results_batch:
             url: str = search_result.url
             try:
@@ -392,22 +394,10 @@ class Researcher:
                 self.metrics.capture_system_event(event_name="content_processing_failed", properties={
                                                   "report_id": lead_research_report_id, "failed_url": failed_url, "error": str(e)})
 
-        # Update total tokens used in a single RMW transaction.
-        with self.database.transaction_session() as session:
-            txn_report: LeadResearchReport = self.database.get_lead_research_report(
-                lead_research_report_id=lead_research_report_id, projection={"content_parsing_total_tokens_used": 1}, session=session)
-            content_parsing_total_tokens_used: Optional[
-                OpenAITokenUsage] = txn_report.content_parsing_total_tokens_used
-            if not content_parsing_total_tokens_used:
-                # Field not populated, set to current value.
-                content_parsing_total_tokens_used = total_openai_tokens_used
-            else:
-                # Append to existing value.
-                content_parsing_total_tokens_used.add_tokens(
-                    total_openai_tokens_used)
-
-            self.database.update_lead_research_report(lead_research_report_id=lead_research_report_id, setFields={
-                                                      "content_parsing_total_tokens_used": content_parsing_total_tokens_used.model_dump()}, session=session)
+        if total_openai_tokens_used.completion_tokens > 0:
+            # Update total tokens used in the lead report in the database.
+            self.update_content_parsing_tokens_in_db(
+                lead_research_report_id=lead_research_report_id, total_openai_tokens_used=total_openai_tokens_used)
 
         # Return non retryable URLs in addition to failed URLs.
         return final_failed_urls + list(non_retryable_error_urls)
@@ -519,6 +509,98 @@ class Researcher:
                 content_details=content_details, session=session)
 
         return openai_tokens_used
+
+    def process_linkedin_activities(self, lead_research_report_id: str, activity_ids: List[str], task_num: int):
+        """Process content in given batch of LinkedIn Activities in given lead research report and writes the result to the database."""
+        lead_research_report: LeadResearchReport = self.database.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id)
+
+        activity_object_ids = Database.get_object_ids(ids=activity_ids)
+        linkedin_activities: List[LinkedInActivity] = self.database.list_linkedin_activities(
+            filter={"_id": {"$in": activity_object_ids}})
+
+        activity_parser = LinkedInActivityParser(
+            person_name=lead_research_report.person_name,
+            company_name=lead_research_report.company_name,
+            company_description=lead_research_report.company_description,
+            person_role_title=lead_research_report.person_role_title,
+            person_profile_id=lead_research_report.person_profile_id,
+            company_profile_id=lead_research_report.company_profile_id
+        )
+        failed_activities: List[LinkedInActivity] = []
+        total_openai_tokens_used = OpenAITokenUsage(
+            operation_tag=Researcher.CONTENT_PROCESSING_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
+        for activity in linkedin_activities:
+            try:
+                tokens_used: Optional[OpenAITokenUsage] = self.process_linkedin_activity(
+                    activity_parser=activity_parser, activity=activity, lead_research_report_id=lead_research_report_id)
+                logger.info(
+                    f"Completed processing for Activity ID: {activity.id} in report ID: {lead_research_report_id} in task num: {task_num}")
+                total_openai_tokens_used.add_tokens(tokens_used)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to process content from Activity ID: {activity.id} in report ID: {lead_research_report_id} in task num: {task_num} with error: {e}")
+                failed_activities.append(activity)
+
+        # Retry failed activities to see if they will succeed this time.
+        for failed_activity in failed_activities:
+            try:
+                tokens_used: Optional[OpenAITokenUsage] = self.process_linkedin_activity(
+                    activity_parser=activity_parser, activity=failed_activity, lead_research_report_id=lead_research_report_id)
+                logger.info(
+                    f"Completed processing for failed Activity ID: {activity.id} in report ID: {lead_research_report_id} in task num: {task_num}")
+                total_openai_tokens_used.add_tokens(tokens_used)
+            except Exception as e:
+                logger.error(
+                    f"During retry, failed to process content from Activity ID: {activity.id} in report ID: {lead_research_report_id} in task num: {task_num} with error: {e}")
+
+                # Send event.
+                self.metrics.capture_system_event(event_name="activity_processing_failed", properties={
+                                                  "report_id": lead_research_report_id, "activity_id": activity.id, "activity_url": activity.activity_url, "error": str(e)})
+
+        if total_openai_tokens_used.completion_tokens > 0:
+            # Update total tokens used in the lead report in the database.
+            self.update_content_parsing_tokens_in_db(
+                lead_research_report_id=lead_research_report_id, total_openai_tokens_used=total_openai_tokens_used)
+
+    def process_linkedin_activity(self, activity_parser: LinkedInActivityParser, activity: LinkedInActivity, lead_research_report_id: str) -> Optional[OpenAITokenUsage]:
+        """Process content in given LinkedIn Activity and write to the database. Returns Tokens used in processing or None if activity is already processed."""
+        # If activity is already processed, skip. We don't need to search by Company name since activity ID is already unique per lead.
+        # TODO: Add search index so this lookup can be faster.
+        if self.database.get_content_details_by_activity_id(activity_id=activity.id, projection={"_id": 1}):
+            logger.info(
+                f"Activity ID: {activity.id} already indexed in the database for report ID: {lead_research_report_id}, skip processing again.")
+
+            # Send event.
+            self.metrics.capture_system_event(event_name="content_already_indexed", properties={
+                "report_id": lead_research_report_id, "activity_id": activity.id})
+            return None
+
+        content_details: ContentDetails = activity_parser.parse(
+            activity=activity)
+
+        # Write content details to database.
+        self.database.insert_content_details(content_details=content_details)
+
+        return content_details.openai_tokens_used
+
+    def update_content_parsing_tokens_in_db(self, lead_research_report_id: str, total_openai_tokens_used: OpenAITokenUsage):
+        """Update total tokens used in a single RMW transaction in the database. Applicable for both web search content and LinkedIn Activity content."""
+        with self.database.transaction_session() as session:
+            txn_report: LeadResearchReport = self.database.get_lead_research_report(
+                lead_research_report_id=lead_research_report_id, projection={"content_parsing_total_tokens_used": 1}, session=session)
+            content_parsing_total_tokens_used: Optional[
+                OpenAITokenUsage] = txn_report.content_parsing_total_tokens_used
+            if not content_parsing_total_tokens_used:
+                # Field not populated, set to current value.
+                content_parsing_total_tokens_used = total_openai_tokens_used
+            else:
+                # Append to existing value.
+                content_parsing_total_tokens_used.add_tokens(
+                    total_openai_tokens_used)
+
+            self.database.update_lead_research_report(lead_research_report_id=lead_research_report_id, setFields={
+                                                      "content_parsing_total_tokens_used": content_parsing_total_tokens_used.model_dump()}, session=session)
 
     def aggregate(self, lead_research_report_id: str):
         """Aggregate Details of research report for given Person and Company and updates them in the database.

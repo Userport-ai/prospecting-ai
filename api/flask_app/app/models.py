@@ -534,6 +534,8 @@ class LeadResearchReport(BaseModel):
         default=None, description="Company name of the person being researched.")
     person_role_title: Optional[str] = Field(
         default=None, description="Role title of person at company.")
+    company_description: Optional[str] = Field(
+        default=None, description="Text decribing the company.")
     status: Optional[Status] = Field(
         default=None, description="Status of the report creation at given point in time.")
     status_before_failure: Optional[Status] = Field(
@@ -548,7 +550,7 @@ class LeadResearchReport(BaseModel):
         default=None, description="Origin of the call to create the report. Can be None for reports which have not been backfilled.")
 
     # Lead LinkedIn Activity Information.
-    linkedin_activity_info: Optional[List[LinkedInActivityInfo]] = Field(
+    linkedin_activity_info: Optional[LinkedInActivityInfo] = Field(
         default=None, description="Information from LinkedIn Activity feed of lead. Set only when origin of request is extension and None when it is Web.")
 
     # Store search results.

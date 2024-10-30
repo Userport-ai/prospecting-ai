@@ -359,11 +359,8 @@ def create_lead_report():
                 lead_research_report_id = db.insert_lead_research_report(
                     lead_research_report=lead_research_report, session=session)
 
-        if origin == LeadResearchReport.Origin.WEB:
-            # TODO: Remove this if condition once the flow for extension has been written.
-            fetch_lead_info_orchestrator.delay(
-                lead_research_report_id=lead_research_report_id)
-
+        fetch_lead_info_orchestrator.delay(
+            lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Created report: {lead_research_report_id} for lead with LinkedIn URL: {person_linkedin_url} requested by user ID: {user_id} for origin: {origin}")
 

@@ -26,11 +26,13 @@ class LinkedInActivityParser:
     ACTIVITY_COMMENTS = "posts/"
     ACTIVITY_REACTIONS = "reactions/"
 
-    def __init__(self, person_name: str, company_name: str, company_description: str, person_role_title: str) -> None:
+    def __init__(self, person_name: str, company_name: str, company_description: str, person_role_title: str, person_profile_id: str, company_profile_id: str) -> None:
         self.person_name = person_name
         self.company_name = company_name
         self.company_description = company_description
         self.person_role_title = person_role_title
+        self.person_profile_id = person_profile_id
+        self.company_profile_id = company_profile_id
 
         # Constants.
         self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
@@ -137,16 +139,15 @@ class LinkedInActivityParser:
 
     def parse(self, activity: LinkedInActivity) -> ContentDetails:
         """Parse given LinkedIn activity and convert it into Content instance post processing."""
-        # TODO: Move this to caller and pass this as argument so that we can just populate fields related to content and return it.
+        # Populate content details as content is parsed.
         content_details = ContentDetails(
             url=activity.activity_url,
             person_name=self.person_name,
             company_name=self.company_name,
             company_description=self.company_description,
             person_role_title=self.person_role_title,
-            # TODO: Fill these out.
-            person_profile_id=None,
-            company_profile_id=None,
+            person_profile_id=self.person_profile_id,
+            company_profile_id=self.company_profile_id,
             linkedin_activity_ref_id=activity.id,
             requesting_user_contact=False
         )
@@ -312,6 +313,7 @@ class LinkedInActivityParser:
 
         # Populate content details.
         content_details.detailed_summary = result.content
+        content_details.concise_summary = result.content
 
         if not content_details.detailed_summary:
             logger.error(

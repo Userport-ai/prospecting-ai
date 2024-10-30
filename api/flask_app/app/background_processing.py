@@ -6,7 +6,7 @@ from itertools import chain
 from celery import shared_task, chord
 from celery.exceptions import SoftTimeLimitExceeded
 from app.database import Database
-from app.models import LeadResearchReport
+from app.models import LeadResearchReport, LinkedInActivity
 from app.research_report import Researcher
 from app.linkedin_scraper import InvalidLeadLinkedInUrlException, LeadLinkedInProfileNotFoundException
 from app.metrics import Metrics
@@ -44,7 +44,7 @@ def fetch_lead_info_orchestrator(self, lead_research_report_id: str):
         elif report_status == LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED:
             logger.info(
                 f"Fetched search results for {lead_research_report_id}, process content in search results next.")
-            process_content_in_search_results_in_background.delay(
+            process_content_in_search_results_and_activities_in_background.delay(
                 user_id=user_id, lead_research_report_id=lead_research_report_id)
         elif report_status == LeadResearchReport.Status.CONTENT_PROCESSING_COMPLETE:
             logger.info(
@@ -121,7 +121,7 @@ def fetch_search_results_in_background(self, user_id: str, lead_research_report_
             f"Completed fetching search results for lead report ID: {lead_research_report_id} for user ID: {user_id}")
 
         # Process search URLs contents next.
-        process_content_in_search_results_in_background.delay(
+        process_content_in_search_results_and_activities_in_background.delay(
             user_id=user_id, lead_research_report_id=lead_research_report_id)
 
         # Send event.
@@ -133,48 +133,80 @@ def fetch_search_results_in_background(self, user_id: str, lead_research_report_
 
 
 @shared_task(bind=True, acks_late=True)
-def process_content_in_search_results_in_background(self, user_id: str, lead_research_report_id: str):
-    """Processes URLs in search results in background."""
+def process_content_in_search_results_and_activities_in_background(self, user_id: str, lead_research_report_id: str):
+    """Processes URLs in search result and activities s in background."""
     logger.info(
-        f"Start processing search URLs to process for lead report: {lead_research_report_id} for user ID: {user_id}")
+        f"Start content processing from search URLs and activities in lead report: {lead_research_report_id} for user ID: {user_id}")
     database = Database()
     try:
         research_report: LeadResearchReport = database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id)
-        search_results_list: List[LeadResearchReport.WebSearchResults.Result] = research_report.web_search_results.results
-        total_urls_to_process: int = research_report.web_search_results.num_results
-
         # Split search URLs into batches depending on the number of concurrent processes in a worker.
         # Note: This concurrency value must match the concurreny passed during app intialization.
         # TODO: Make this read the concurrency value from the celery start command line argument.
         concurrency = 12
-        batch_size = int(total_urls_to_process/concurrency) + \
-            (0 if total_urls_to_process % concurrency == 0 else 1)
-        logger.info(
-            f"Splitting a total of {total_urls_to_process} Search URLs using {concurrency} workers which will each handle at max {batch_size} URLs for processing for lead report: {lead_research_report_id} and user ID: {user_id}.")
-        batches: List[LeadResearchReport.WebSearchResults.Result] = []
-        for i in range(concurrency):
-            start_idx = i*batch_size
-            end_idx = start_idx + batch_size
-            batches.append(search_results_list[start_idx: end_idx])
-            if end_idx >= total_urls_to_process:
-                break
+        parallel_workers = []
+        total_web_search_urls_to_process = 0
+        total_linkedin_activities_to_process = 0
 
-        logger.info(
-            f"Num batches: {len(batches)} for report: {lead_research_report_id} for user ID: {user_id}")
-        logger.info(
-            f"Batching nums: {[len(b) for b in batches]} for report: {lead_research_report_id} for user ID: {user_id}")
+        # Create batches for Web search result URLs if present.
+        if research_report.web_search_results:
+            search_results_list: List[LeadResearchReport.WebSearchResults.Result] = research_report.web_search_results.results
+            total_web_search_urls_to_process: int = research_report.web_search_results.num_results
+            batch_size = int(total_web_search_urls_to_process/concurrency) + \
+                (0 if total_web_search_urls_to_process % concurrency == 0 else 1)
+            logger.info(
+                f"Splitting processing of web search URLS: {total_web_search_urls_to_process} into {concurrency} workers which will each handle at max {batch_size} URLs for processing for lead report: {lead_research_report_id} and user ID: {user_id}.")
 
-        parallel_workers = [process_content_in_search_results_batch_in_background.s(
-            num, user_id, lead_research_report_id, [r.model_dump_json() for r in batch]) for num, batch in enumerate(batches)]
-        aggregation_work = aggregate_processed_search_results_in_background.s(
+            for i in range(concurrency):
+                start_idx = i*batch_size
+                end_idx = start_idx + batch_size
+                batch: List[LeadResearchReport.WebSearchResults.Result] = search_results_list[start_idx: end_idx]
+                logger.info(
+                    f"Web search task num: {i} has batch size: {len(batch)} in report ID: {lead_research_report_id} for user ID: {user_id}")
+                work = process_content_in_search_results_batch_in_background.s(
+                    i, user_id, lead_research_report_id, [r.model_dump_json() for r in batch])
+                parallel_workers.append(work)
+                if end_idx >= total_web_search_urls_to_process:
+                    break
+            logger.info(
+                f"Num web search result batches: {len(parallel_workers)} in report ID: {lead_research_report_id} for user ID: {user_id}")
+
+        # Create batches for activity IDs if any.
+        if research_report.linkedin_activity_info and research_report.linkedin_activity_info.activity_ref_ids:
+            activities_ids_to_process: List[str] = research_report.linkedin_activity_info.activity_ref_ids
+            total_linkedin_activities_to_process = len(
+                research_report.linkedin_activity_info.activity_ref_ids)
+            batch_size = int(total_linkedin_activities_to_process/concurrency) + \
+                (0 if total_linkedin_activities_to_process %
+                 concurrency == 0 else 1)
+            logger.info(
+                f"Splitting processing of activity IDs: {total_linkedin_activities_to_process} into {concurrency} workers which will each handle at max {batch_size} URLs for processing for lead report: {lead_research_report_id} and user ID: {user_id}.")
+            num_activity_batches = 0
+            for i in range(concurrency):
+                start_idx = i*batch_size
+                end_idx = start_idx + batch_size
+                batch = activities_ids_to_process[start_idx:end_idx]
+                logger.info(
+                    f"Activity processing task num: {i} has batch size: {len(batch)} in report ID: {lead_research_report_id} for user ID: {user_id}")
+                work = process_activities_batch_in_background.s(
+                    i, user_id, lead_research_report_id, batch)
+                parallel_workers.append(work)
+                num_activity_batches += 1
+                if end_idx >= total_linkedin_activities_to_process:
+                    break
+            logger.info(
+                f"Num activity batches: {num_activity_batches} in report ID: {lead_research_report_id} for user ID: {user_id}")
+
+        # Define task that will aggregate results of parallel workers at the end.
+        aggregation_work = aggregate_processed_content_results_in_background.s(
             user_id, lead_research_report_id)
-        aggregation_error_callback = on_process_content_in_search_results_batch_error.s(
+        aggregation_error_callback = on_process_content_results_batch_error.s(
             user_id, lead_research_report_id)
 
         # Send event.
-        Metrics().capture(user_id=user_id, event_name="report_search_results_start_processing", properties={
-            "report_id": lead_research_report_id, "start_time": time.time(), "total_urls": total_urls_to_process, "concurrency": concurrency, "batch_sizes": [len(b) for b in batches]})
+        Metrics().capture(user_id=user_id, event_name="report_content_start_processing", properties={
+            "report_id": lead_research_report_id, "start_time": time.time(), "total_web_search_urls": total_web_search_urls_to_process, "total_linkedin_activities": total_linkedin_activities_to_process,  "concurrency": concurrency})
 
         # Start processing.
         chord(parallel_workers)(
@@ -209,9 +241,30 @@ def process_content_in_search_results_batch_in_background(self, batch_num: int, 
                                       task_name=f"process_content_in_search_results_batch_{batch_num}", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
 
 
+@shared_task(bind=True, acks_late=True, ignore_result=False)
+def process_activities_batch_in_background(self, batch_num: int, user_id: str, lead_research_report_id: str, activity_ids: List[str]):
+    """Process given batch of LinkedIn Activities for given lead in background and return Activity IDs that failed to process."""
+    logger.info(
+        f"Start processing LinkedIn activity in batch num: {batch_num} for num activities: {len(activity_ids)} in report ID: {lead_research_report_id}")
+    database = Database()
+    try:
+        r = Researcher(database=database)
+        r.process_linkedin_activities(
+            lead_research_report_id=lead_research_report_id, activity_ids=activity_ids, task_num=batch_num)
+        logger.info(
+            f"Completed Activities processing in batch number: {batch_num} for lead report ID: {lead_research_report_id} and user ID: {user_id}")
+
+        # We are returning Empty list so that the API is compatible with other parallel worker that returns a list of failed web search URLs.
+        # TODO: Return failed activities in the form of a message container that can hold both failed activities and failed web URLs.
+        return []
+    except Exception as e:
+        shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id,
+                                      e=e, task_name=f"process_activities_batch_{batch_num}", status_before_failure=LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED)
+
+
 @shared_task(bind=True, acks_late=True)
-def aggregate_processed_search_results_in_background(self, failed_urls_list: List[List[str]], user_id: str, lead_research_report_id: str):
-    """Aggregate processing of search results from each worker task that worked on a batch."""
+def aggregate_processed_content_results_in_background(self, failed_urls_list: List[List[str]], user_id: str, lead_research_report_id: str):
+    """Aggregate processing of search results and activity results from each worker task that worked on a batch."""
     logger.info(
         f"Start aggregating search results for lead report ID: {lead_research_report_id} for user ID: {user_id}")
     database = Database()
@@ -241,8 +294,8 @@ def aggregate_processed_search_results_in_background(self, failed_urls_list: Lis
 
 
 @shared_task(acks_late=True)
-def on_process_content_in_search_results_batch_error(request, exc, traceback, user_id: str, lead_research_report_id: str):
-    """Handler in any of the search result processing tasks timeout due to hard timeout limit.
+def on_process_content_results_batch_error(request, exc, traceback, user_id: str, lead_research_report_id: str):
+    """Handler in any of the search results or activities processing tasks timeout due to hard timeout limit.
 
     Ideally this should be caught by SoftTimeLimitExceeded exception but that doesn't seem to work once the Web scraper code starts
     executing likely because it use libraries that are not written in Python (e.g. langchain) and aren't able to handle the SIGUSR1 signal

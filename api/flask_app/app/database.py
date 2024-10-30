@@ -263,6 +263,15 @@ class Database:
             return None
         return ContentDetails(**data_dict)
 
+    def get_content_details_by_activity_id(self, activity_id: str, projection:  Optional[Dict[str, int]] = None) -> Optional[ContentDetails]:
+        """Returns Content details for given activity ID. Returns None if not found."""
+        collection = self.get_content_details_collection()
+        data_dict = collection.find_one(
+            filter={"linkedin_activity_ref_id": activity_id}, projection=projection)
+        if not data_dict:
+            return None
+        return ContentDetails(**data_dict)
+
     def get_content_details(self, content_details_id: str) -> Optional[ContentDetails]:
         """Returns Content details for given ID."""
         collection = self.get_content_details_collection()
@@ -338,6 +347,18 @@ class Database:
         for research_report_dict in cursor:
             results.append(research_report_dict)
         return results
+
+    def list_linkedin_activities(self, filter: Dict, projection: Optional[Dict[str, int]] = None) -> List[LinkedInActivity]:
+        """Returns LinkedIn Activities with given filter. Returns only fields specified in the projection dictionary."""
+        collection = self.get_linkedin_activities_collection()
+        cursor = collection.find(filter, projection).sort(
+            [('creation_date', pymongo.DESCENDING), ('_id', pymongo.DESCENDING)]
+        )
+        linkedin_activities: List[LinkedInActivity] = []
+        for activity_dict in cursor:
+            linkedin_activities.append(
+                LinkedInActivity(**activity_dict))
+        return linkedin_activities
 
     def get_outreach_email_template(self, outreach_email_template_id: str, projection: Optional[Dict[str, int]] = None) -> OutreachEmailTemplate:
         """Returns Outreach Email Template for given Template ID."""
@@ -487,6 +508,11 @@ class Database:
         """Helper method to test successful connection to cluster deployment."""
         self.mongo_client.admin.command('ping')
 
+    @staticmethod
+    def get_object_ids(ids: List[str]) -> List[ObjectId]:
+        """Return Object Ids for given list of string MongoDB object Ids. Throws an exception if the strings are not valid object Ids."""
+        return [ObjectId(id) for id in ids]
+
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
@@ -499,11 +525,18 @@ if __name__ == "__main__":
 
     # db.delete_all_content_details()
 
-    delete_filter = {
-        "creation_date": {"$gte": Utils.create_utc_datetime(5, 9, 2024)}
-    }
-    db.delete_all_content_details(
-        find_filter=delete_filter, delete_confirm=False)
+    # delete_filter = {
+    #     "creation_date": {"$gte": Utils.create_utc_datetime(5, 9, 2024)}
+    # }
+    # db.delete_all_content_details(
+    #     find_filter=delete_filter, delete_confirm=False)
+
+    contents = db.list_content_details(
+        filter={"person_name": "Abhishek Jain"})
+
+    for c in contents:
+        res = db.get_content_details_collection().update_one(
+            {"_id": ObjectId(c.id)}, {"$set": {"concise_summary": c.detailed_summary}})
 
     # collection = db.get_lead_research_report_collection()
     # data_dict = collection.find_one(
