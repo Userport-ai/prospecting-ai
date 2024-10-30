@@ -104,6 +104,7 @@ class Researcher:
             "company_headcount": company_profile.company_size_on_linkedin,
             "company_industry_categories": company_profile.categories,
             "status":  LeadResearchReport.Status.BASIC_PROFILE_FETCHED,
+            "status_before_failure": None,
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
@@ -143,6 +144,7 @@ class Researcher:
         setFields = {
             "web_search_results": web_search_results.model_dump(),
             "status": LeadResearchReport.Status.URLS_FROM_SEARCH_ENGINE_FETCHED,
+            "status_before_failure": None,
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
@@ -717,6 +719,7 @@ class Researcher:
 
         setFields = {
             "status": LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE,
+            "status_before_failure": None,
             "report_creation_date_readable_str": Utils.to_human_readable_date_str(time_now),
             "report_publish_cutoff_date": report_publish_cutoff_date,
             "report_publish_cutoff_date_readable_str": Utils.to_human_readable_date_str(report_publish_cutoff_date),
@@ -766,6 +769,7 @@ class Researcher:
         # Update lead research report.
         setFields = {
             "status": LeadResearchReport.Status.COMPLETE,
+            "status_before_failure": None,
             "personalized_outreach_messages": personalized_outreach_messages.model_dump(),
         }
         self.database.update_lead_research_report(
