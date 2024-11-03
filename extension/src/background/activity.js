@@ -36,13 +36,13 @@ export async function startActivityResearch(tabId) {
 // and once all activity buttons are traversed, it returns True to signal
 // research completion. If there are more buttons to traverse, it returns False.
 export async function fetchCurrentActivityHTML(tabId) {
-  // Fetch HTML activity data from current page.
+  // Wait for HTML activity to load in current page. Usually takes a few seconds
+  // if page is being loaded, so we need to retry a few times.
   var count = 0;
   var result = null;
-  while (count < 3) {
+  while (count < 4) {
     result = await tabs.sendMessage(tabId, {
       action: "get-current-activity-html",
-      wantedActivities: wantedActivities,
     });
     if (result !== null) {
       break;
@@ -52,13 +52,57 @@ export async function fetchCurrentActivityHTML(tabId) {
     count += 1;
   }
   if (result === null) {
+    // Failed to fetch activity data in current page due to some error, return False.
     console.error("Could not fetch HTML for activity in tab: ", tabId);
     return false;
   }
-  const btnName = result.name;
-  const btnHTML = result.html;
+  // Get current activity button name and HTML of the activity from the result.
+  var btnName = result.name;
+  var btnHTML = result.html;
 
-  // Add data to visited map and update storage.
+  if (btnName === ReactionsActivity) {
+    // Scroll down to page to collect more reactions.
+    // We need to do this multiple times because, not all reactions are loaded in the given page so the
+    // the scroll down to page goes only till end of currently loaded reactions as opposed to actually last <li>
+    // element.
+    // For example: last <li> index = 20 but the actual page scroll will be to <li> element index 8 since other elements have
+    // not loaded yet. To solve for this, we scroll multiple times to load desired number of reactions.
+    for (let i = 0; i < 2; i++) {
+      // Random delay between 2-4 seconds before starting scroll.
+      const scrollDelay = Math.floor(Math.random() * 2000 + 2000);
+      await delay(scrollDelay);
+
+      const res = await tabs.sendMessage(tabId, {
+        action: "scroll-down-to-page",
+      });
+      if (!res) {
+        // Some failure in scrolling down in page.
+        console.error("Could not scroll down to page in tab: ", tabId);
+        return false;
+      }
+    }
+
+    // Random delay between 1-3 seconds for final scroll to load before reading activity HTML.
+    const scrollDelay = Math.floor(Math.random() * 3000 + 1000);
+    await delay(scrollDelay);
+
+    // Fetch Reactions HTML now that page has been scrolled and we have more reactions.
+    result = await tabs.sendMessage(tabId, {
+      action: "get-current-activity-html",
+    });
+    if (result === null) {
+      // Failed to fetch activity data in current page due to some error, return False.
+      console.error(
+        "Could not fetch HTML for Scrolled activity in tab: ",
+        tabId
+      );
+      return false;
+    }
+    btnName = result.name;
+    btnHTML = result.html;
+  }
+
+  // Stor btnName and btnHTML to visited map and update storage.
   var activityData = await getActivityData(tabId);
   if (activityData === null) {
     console.error(
@@ -81,7 +125,7 @@ export async function fetchCurrentActivityHTML(tabId) {
     return true;
   }
 
-  // Add Random delay.
+  // Add Random delay of 1-3 seconds before clicking next button.
   const delayms = Math.floor(Math.random() * 3000 + 1000);
   await delay(delayms);
 
@@ -92,7 +136,7 @@ export async function fetchCurrentActivityHTML(tabId) {
   });
   if (!success) {
     console.error("Failed to click next button for index: ", nextBtnIdx);
-    // TODO: do something.
+    // TODO: do something like sending an alert to posthog.
   }
   return false;
 }

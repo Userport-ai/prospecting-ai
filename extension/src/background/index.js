@@ -80,8 +80,8 @@ function createLeadProfile(
     // Alarm already exists.
     if (!periodicCheck) {
       if (
-        report_status == leadReportStatusSuccess ||
-        report_status == leadReportStatusFailed
+        report_status === leadReportStatusSuccess ||
+        report_status === leadReportStatusFailed
       ) {
         // Create a notification that lead research is now complete.
         var notifTitle = `Research Complete for ${profileName}`;

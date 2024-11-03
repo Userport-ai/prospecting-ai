@@ -12,9 +12,33 @@ function getActivityButtons() {
 
 // Helper to fetch node element containing all the activity content.
 function getActivityOnPage() {
+  // First <ul> tag with given CSS selector contains list of activities.
   return document.querySelector(
     "div.pv-recent-activity-detail__core-rail div.pv0 ul"
   );
+}
+
+// Returns current button name on activity page and null otherwise.
+function getCurrentBtnName() {
+  var curBtnName = null;
+  getActivityButtons().forEach((elem, idx) => {
+    // Check for currently selected activity's button to exist on page.
+    if (elem.classList.contains("artdeco-pill--selected")) {
+      const spanElem = elem.querySelector("span");
+      if (spanElem !== null) {
+        curBtnName = spanElem.textContent.trim();
+        // No way to break out of forEach.
+      }
+    }
+  });
+  return curBtnName;
+}
+
+// Helper to fetch node list containing all the activity contents as HTML <li> elements.
+function getActivityListOnPage() {
+  const activityParentElem = getActivityOnPage();
+  // Fetch direct children of an element: https://stackoverflow.com/questions/3680876/using-queryselectorall-to-retrieve-direct-children.
+  return activityParentElem.querySelectorAll(":scope > li");
 }
 
 // Listen to messages related to this tab sent by the Service worker. Returns true if it is a valid LinkedIn profile URL and false otherwise.
@@ -56,19 +80,9 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "get-current-activity-html") {
-    // Find currently selected activity button's name.
-    var curBtnName = null;
-    getActivityButtons().forEach((elem, idx) => {
-      if (elem.classList.contains("artdeco-pill--selected")) {
-        const spanElem = elem.querySelector("span");
-        if (spanElem !== null) {
-          curBtnName = spanElem.textContent.trim();
-          // No way to break out of forEach.
-        }
-      }
-    });
+    let curBtnName = getCurrentBtnName();
     if (curBtnName === null) {
-      console.error("Did not find selected activity on page!");
+      console.error("Did not find button name Activity on page!");
       sendResponse(null);
       return false;
     }
@@ -85,6 +99,25 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  if (request.action === "scroll-down-to-page") {
+    const activityNodeList = getActivityListOnPage();
+    if (activityNodeList.length === 0) {
+      // No activity list found.
+      console.log("No activities found on current activity page to scroll");
+      sendResponse(false);
+      return false;
+    }
+
+    // Scroll to last node in current page.
+    // TODO: make the scrolling smoother by using a timer. Ex: https://stackoverflow.com/questions/15935318/smooth-scroll-to-top
+    // or https://www.linkedin.com/pulse/scroll-bottom-javascript-frontend-interview-questions-swtuf/.
+    const lastElem = activityNodeList[activityNodeList.length - 1];
+    lastElem.scrollIntoView({ behavior: "smooth" });
+
+    sendResponse(true);
+    return false;
+  }
+
   if (request.action === "click-activity-button") {
     // Click activity button with given index. Index was fetched previously
     // with a different command in the same content script.
@@ -93,6 +126,7 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (idx === request.btnIndex) {
         btnElem.click();
         success = true;
+        // No way to break out of forEach loop.
       }
     });
     sendResponse(success);
