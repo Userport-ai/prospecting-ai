@@ -40,10 +40,15 @@ function PersonalizedOutreachMessages({ lead_research_report }) {
   );
 }
 
-function ResearchReport({ lead_research_report }) {
-  const initialReportStatus = lead_research_report
-    ? lead_research_report.status
-    : "not_started";
+function ResearchReport({ lead_research_report, activityDataExists }) {
+  var initialReportStatus = "not_started";
+  const ACTIVITY_PARSING_IN_PROGRESS = "activity-parsing-in-progress";
+
+  if (lead_research_report) {
+    initialReportStatus = lead_research_report.status;
+  } else if (activityDataExists) {
+    initialReportStatus = ACTIVITY_PARSING_IN_PROGRESS;
+  }
   const [reportStatus, setReportStatus] = useState(initialReportStatus);
   const [loading, setLoading] = useState(false);
 
@@ -68,19 +73,22 @@ function ResearchReport({ lead_research_report }) {
       }
       setLoading(true);
       // Send message to service worker to create lead research report.
-      const leadReportStatus = await chrome.runtime.sendMessage({
+      const result = await chrome.runtime.sendMessage({
         action: "create-lead-report",
         tabId: tab.id,
       });
       setLoading(false);
-      if (!leadReportStatus) {
+      if (!result.start) {
+        // Research did not start successfully.
         Modal.error({
-          title: "Research failed",
-          content: "Due to an error, failed to start research",
+          title: "Start Research failed",
+          content: result.message,
         });
         return;
       }
-      setReportStatus(leadReportStatus);
+      // We need to set the status here otherwise the popup doesn't update
+      // while it is already open post button click.
+      setReportStatus(ACTIVITY_PARSING_IN_PROGRESS);
     }
   }
 
@@ -107,13 +115,23 @@ function ResearchReport({ lead_research_report }) {
     );
   } else if (reportStatus === "failed_with_errors") {
     reportStatusComp = <Text id="status-failed">Error</Text>;
+  } else if (reportStatus === ACTIVITY_PARSING_IN_PROGRESS) {
+    // Any other status means report creation is still in progress.
+    reportStatusComp = <Text id="status-in-progress">In Progress</Text>;
+    reportActionComp = (
+      <Text id="in-progress-notif">
+        We are parsing the activities of the lead, please don't change or close
+        this tab for the next 30 seconds!
+      </Text>
+    );
   } else {
     // Any other status means report creation is still in progress.
     reportStatusComp = <Text id="status-in-progress">In Progress</Text>;
     reportActionComp = (
       <Text id="in-progress-notif">
-        Research should complete in 5-10 minutes. Open the extension again after
-        that. We will also send you a Chrome notification upon completion!
+        Research should complete in 5-10 minutes. You can now change or close
+        the tab if you want. We will also send a Chrome notification when the
+        research completes!
       </Text>
     );
   }
@@ -146,6 +164,8 @@ function LeadProfile({ leadProfile }) {
   }
 
   const linkedInProfileUrl = leadProfile.url;
+  // Activity parsing is ongoing in the UI.
+  const activityDataExists = "activityData" in leadProfile;
   const profileDisplayText = linkedInProfileUrl.split("/in/")[1];
   return (
     <>
@@ -155,7 +175,10 @@ function LeadProfile({ leadProfile }) {
           {profileDisplayText}
         </Link>
       </div>
-      <ResearchReport lead_research_report={leadProfile.lead_research_report} />
+      <ResearchReport
+        lead_research_report={leadProfile.lead_research_report}
+        activityDataExists={activityDataExists}
+      />
     </>
   );
 }

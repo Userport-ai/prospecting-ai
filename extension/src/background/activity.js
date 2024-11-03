@@ -174,6 +174,13 @@ async function setActivityData(tabId, activityData) {
   setTabData(tabId, data);
 }
 
+// Helper to clear activity state in storage.
+export async function clearActivityData(tabId) {
+  var data = await getTabData(tabId);
+  delete data.activityData;
+  setTabData(tabId, data);
+}
+
 // Helper to get Posts activity data from given activityData.
 // Returns null if not found.
 export function getPostsActivityData(activityData) {

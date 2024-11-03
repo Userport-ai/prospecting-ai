@@ -40,24 +40,35 @@ class RateLimitConfig(BaseModel):
         ..., description="List of usage tiers in this configuration.")
 
 
+# Separate variable for report creation rate limits
+# since it is reused for 2 API endpoints.
+REPORT_CREATION_RATE_LIMITS = [
+    RateLimitConfig.Request.Limit(
+        usage_tier=UsageTier.FREE,
+        value="5 per 5 minutes;80 per day"
+    ),
+    RateLimitConfig.Request.Limit(
+        usage_tier=UsageTier.ALPHA_TESTERS,
+        value="5 per 5 minutes;80 per day"
+    ),
+]
+
 # Module level constant that defines the current rate limit configuration for the different APIs.
 RATE_LIMIT_CONFIG = RateLimitConfig(
     # Add APIs to the requests list to enable Rate limiting for them.
     requests=[
         RateLimitConfig.Request(
+            # Check if activity research can be started by Chrome extension.
+            # We use limits identical to Lead Report Creation for now.
+            path="/api/v1/activity-research",
+            method="GET",
+            limits=REPORT_CREATION_RATE_LIMITS,
+        ),
+        RateLimitConfig.Request(
             # Create lead research report API.
             path="/api/v1/lead-research-reports",
             method="POST",
-            limits=[
-                RateLimitConfig.Request.Limit(
-                    usage_tier=UsageTier.FREE,
-                    value="3 per 5 minutes;15 per day"
-                ),
-                RateLimitConfig.Request.Limit(
-                    usage_tier=UsageTier.ALPHA_TESTERS,
-                    value="10 per 5 minutes;100 per day"
-                ),
-            ]
+            limits=REPORT_CREATION_RATE_LIMITS,
         ),
         RateLimitConfig.Request(
             # Create personalized email API.
@@ -66,7 +77,7 @@ RATE_LIMIT_CONFIG = RateLimitConfig(
             limits=[
                 RateLimitConfig.Request.Limit(
                     usage_tier=UsageTier.FREE,
-                    value="3 per minute;50 per day"
+                    value="5 per minute;200 per day"
                 ),
                 RateLimitConfig.Request.Limit(
                     usage_tier=UsageTier.ALPHA_TESTERS,

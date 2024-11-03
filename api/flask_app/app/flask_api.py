@@ -250,6 +250,31 @@ def update_user():
             status_code=500, message="Failed to update user due to internal error.")
 
 
+class StartActivityResearchResponse(BaseModel):
+    """API Response of whether activity research can be started by extension or not."""
+    status: ResponseStatus = Field(...,
+                                   description="Status (success) of the response.")
+
+    @field_validator('status')
+    @classmethod
+    def status_must_be_success(cls, v: ResponseStatus) -> str:
+        if v != ResponseStatus.SUCCESS:
+            raise ValueError(f'Expected success status, got: {v}')
+        return v
+
+
+@bp.get('/v1/activity-research')
+@login_required
+@rate_limiter.limit(key_func=lambda: g.user["uid"], limit_value=get_value)
+def can_start_activity_research():
+    """Called by Chrom extension to check if activity research can be started by given user or not. If the API response throws
+    an error with 429 error then the extension can relay that message to the end user. 
+
+    This is a hacky solution which should ideally be logic implemented in the chrome extension itself.
+    """
+    return StartActivityResearchResponse(status=ResponseStatus.SUCCESS).model_dump()
+
+
 class CreateLeadResearchReportResponse(BaseModel):
     """API Response of create lead research report request."""
     status: ResponseStatus = Field(...,

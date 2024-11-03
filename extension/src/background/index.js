@@ -24,6 +24,7 @@ import {
   getPostsActivityData,
   getCommentsActivityData,
   getReactionsActivityData,
+  clearActivityData,
 } from "./activity";
 
 // Module constants.
@@ -300,6 +301,8 @@ function createLeadReport(tabId) {
             console.error(
               `Failed to create report for linkedin URL: ${linkedInProfileUrl}`
             );
+            // Clear activity data information so that popup is not misleading.
+            clearActivityData(tabId);
             return;
           }
 
@@ -315,6 +318,50 @@ function createLeadReport(tabId) {
         });
     });
   });
+}
+
+// Check with server if Activity research can be started per backend rate limits
+// Returns true if so and false with error message if research is not possible.
+async function canStartActivityResearch(tabId) {
+  const user = await getUserObj();
+  if (user === null) {
+    console.log(`User not logged in, cannot create report in tab Id: ${tabId}`);
+    return {
+      start: false,
+      message: "User not logged in, cannot start research",
+    };
+  }
+  const idToken = await user.getIdToken();
+  const response = await fetch(
+    `${process.env.REACT_APP_API_HOSTNAME}/api/v1/activity-research`,
+    {
+      headers: { Authorization: "Bearer " + idToken },
+    }
+  );
+  const result = await response.json();
+  if (result.status === "error") {
+    if (result.status_code === 429) {
+      var message = "";
+      if (result.message.includes("minute")) {
+        message =
+          "Too many requests in a short duration! Please wait for research on existing profiles to finish and then retry.";
+      } else if (result.message.includes("day")) {
+        message =
+          "Exceeded the maximum number of profiles that can be researched in one day, please try again in 24 hours.";
+      }
+      return { start: false, message: message };
+    }
+    console.error(
+      `Can user start activity research API response failed with result: ${result}`
+    );
+    return {
+      start: false,
+      message: "Failed to start research, Internal error on the server.",
+    };
+  }
+
+  // Can start research.
+  return { start: true, message: null };
 }
 
 // Handler for fire alarm events.
@@ -363,23 +410,31 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // Start activity research first.
     const tabId = request.tabId;
-    startActivityResearch(tabId)
-      .then(() => fetchCurrentActivityHTML(tabId))
-      .then((complete) => {
-        if (complete) {
-          // Create report.
-          createLeadReport(tabId);
+    canStartActivityResearch(tabId).then((result) => {
+      if (!result.start) {
+        sendResponse(result);
+        return;
+      }
 
-          // Send event.
-          captureEvent("extension_create_report_called");
-        }
-      });
+      // Start research.
+      startActivityResearch(tabId)
+        .then(() => {
+          // Activity has started, let popup app know.
+          sendResponse(result);
+          return fetchCurrentActivityHTML(tabId);
+        })
+        .then((complete) => {
+          if (complete) {
+            // Create report.
+            createLeadReport(tabId);
 
-    // TODO: Update this to reflect activity research.
-    sendResponse("new");
-
-    // Sync response, return false.
-    return false;
+            // Send event.
+            captureEvent("extension_create_report_called");
+          }
+        });
+    });
+    // Async response, return true.
+    return true;
   }
 
   if (request.action === "view-lead-report") {
