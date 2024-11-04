@@ -135,6 +135,11 @@ function checkLeadReportForGivenProfile(
           console.error(
             `Checking if LinkedIn profile exists failed with result: ${result}`
           );
+          captureEvent("extension_check_linkedin_profile_exists_failed", {
+            linkedin_profile_url: linkedInProfileUrl,
+            status_code: result.status_code,
+            message: result.message,
+          });
           return;
         }
 
@@ -168,6 +173,9 @@ function getUsernameFromRecentActivityURL(url) {
     }
   }
   console.error("Username not found for activity URL: ", url);
+  captureEvent("extension_get_linkedin_username_failed", {
+    linkedin_profile_url: url,
+  });
   return null;
 }
 
@@ -199,6 +207,9 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
           .then((profileDetails) => {
             if (profileDetails === null) {
               console.error("profile details not found for URL: ", url);
+              captureEvent("extension_linkedin_profile_details_not_found", {
+                linkedin_profile_url: url,
+              });
               // Do nothing.
               return;
             }
@@ -258,6 +269,9 @@ function createLeadReport(tabId) {
         tabId,
         " because tab data is null (unexpected)!"
       );
+      captureEvent("extension_tab_data_missing_cannot_start_research", {
+        tab_id: tabId,
+      });
       return;
     }
 
@@ -303,6 +317,11 @@ function createLeadReport(tabId) {
             );
             // Clear activity data information so that popup is not misleading.
             clearActivityData(tabId);
+            captureEvent("extension_start_research_failed", {
+              linkedin_profile_url: linkedInProfileUrl,
+              status_code: result.status_code,
+              message: result.message,
+            });
             return;
           }
 
@@ -345,15 +364,21 @@ async function canStartActivityResearch(tabId) {
       if (result.message.includes("minute")) {
         message =
           "Too many requests in a short duration! Please wait for research on existing profiles to finish and then retry.";
+        captureEvent("extension_can_start_user_activity_short_term_throttled");
       } else if (result.message.includes("day")) {
         message =
           "Exceeded the maximum number of profiles that can be researched in one day, please try again in 24 hours.";
+        captureEvent("extension_can_start_user_activity_throttled_for_day");
       }
       return { start: false, message: message };
     }
     console.error(
       `Can user start activity research API response failed with result: ${result}`
     );
+    captureEvent("extension_can_start_user_activity_failed", {
+      status_code: result.status_code,
+      message: result.message,
+    });
     return {
       start: false,
       message: "Failed to start research, Internal error on the server.",

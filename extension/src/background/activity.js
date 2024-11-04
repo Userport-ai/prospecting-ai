@@ -54,6 +54,9 @@ export async function fetchCurrentActivityHTML(tabId) {
   if (result === null) {
     // Failed to fetch activity data in current page due to some error, return False.
     console.error("Could not fetch HTML for activity in tab: ", tabId);
+    captureEvent("extension_fetch_activity_html_failed", {
+      tab_id: tabId,
+    });
     return false;
   }
   // Get current activity button name and HTML of the activity from the result.
@@ -78,6 +81,9 @@ export async function fetchCurrentActivityHTML(tabId) {
       if (!res) {
         // Some failure in scrolling down in page.
         console.error("Could not scroll down to page in tab: ", tabId);
+        captureEvent("extension_scroll_down_to_page_failed", {
+          tab_id: tabId,
+        });
         return false;
       }
     }
@@ -96,6 +102,9 @@ export async function fetchCurrentActivityHTML(tabId) {
         "Could not fetch HTML for Scrolled activity in tab: ",
         tabId
       );
+      captureEvent("extension_get_activity_html_after_page_scroll_failed", {
+        tab_id: tabId,
+      });
       return false;
     }
     btnName = result.name;
@@ -109,6 +118,10 @@ export async function fetchCurrentActivityHTML(tabId) {
       "Failed to find activity data in storage for tab ID: ",
       tabId
     );
+    captureEvent("extension_activity_data_in_storage_not_found", {
+      tab_id: tabId,
+      button_name: btnName,
+    });
     return false;
   }
   activityData.visitedMap[btnName] = btnHTML;
@@ -136,7 +149,11 @@ export async function fetchCurrentActivityHTML(tabId) {
   });
   if (!success) {
     console.error("Failed to click next button for index: ", nextBtnIdx);
-    // TODO: do something like sending an alert to posthog.
+    captureEvent("extension_activity_next_button_click_failed", {
+      tab_id: tabId,
+      next_button_index: nextBtnIdx,
+      previous_button: btnName,
+    });
   }
   return false;
 }
