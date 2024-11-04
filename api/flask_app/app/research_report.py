@@ -617,7 +617,10 @@ class Researcher:
         # Only filter documents from recent months. We use 15 since LinkedIn posts are configured to be at max 15 months old.
         report_publish_cutoff_date = time_now - relativedelta(months=15)
 
-        stage_match_person_and_company = {
+        # Match documents from given company after given publish date. We don't match by person
+        # as well since we want each person (lead) to have information about entire company in the
+        # report as well.
+        stage_match_company = {
             "$match": {
                 "$and": [
                     {"company_profile_id": research_report.company_profile_id},
@@ -632,7 +635,6 @@ class Researcher:
 
         # Create a new field that can contains personal content categories of other leads.
         # In the stage after this one, we will skip documents that have these values set to True.
-        # TODO: We need to also need to add documents that are from activity feed from other leads in the same company.
         stage_select_personal_cat_from_other_leads = {
             "$set": {
                 "personal_cat_from_other_leads": {
@@ -669,8 +671,11 @@ class Researcher:
             }
         }
 
+        # We group the projected fields by category and call them highlights.
+        # https://www.mongodb.com/docs/manual/reference/operator/aggregation/group/#mongodb-pipeline-pipe.-group.
         stage_group_by_category = {
             "$group": {
+                # This _id is the group key which is different from MongoDB generated db Ids.
                 "_id": "$category",
                 "highlights": {"$push": "$$ROOT"}
             }
@@ -678,6 +683,7 @@ class Researcher:
 
         stage_final_projection = {
             "$project": {
+                # Renames _ID to category in the final output.
                 "_id": 0,
                 "category": "$_id",
                 "highlights": 1,
@@ -685,7 +691,7 @@ class Researcher:
         }
 
         pipeline = [
-            stage_match_person_and_company,
+            stage_match_company,
             stage_select_personal_cat_from_other_leads,
             stage_final_filter,
             stage_project_fields,
@@ -713,9 +719,68 @@ class Researcher:
 
             report_details.append(rep_detail)
 
-        for detail in report_details:
-            logger.info(f"Category: {detail.category}")
-            logger.info(f"Num highlights: {len(detail.highlights)}")
+        # Generate lead insights from LinkedIn Activity (linkedin_activity_ref_id not None).
+        # We want to fetch product area and team member insights from given person's profile.
+        # and given company profile ID.
+        stage_match_person_and_company_activity_feed = {
+            "$match": {
+                "$and": [
+                    {"company_profile_id": research_report.company_profile_id},
+                    {"person_profile_id": research_report.person_profile_id},
+                    {"linkedin_activity_ref_id": {"$ne": None}},
+                    {"focus_on_company": True},
+                    {"publish_date": {"$gt": report_publish_cutoff_date}},
+                    {"category": {
+                        "$nin": [None, ContentCategoryEnum.NONE_OF_THE_ABOVE]}},
+                    {"requesting_user_contact": False},
+                ]
+            }
+        }
+
+        # Project only ID, team members and product association fields.
+        stage_project_members_and_products = {
+            "$project": {
+                "_id": 1,
+                "mentioned_team_members": 1,
+                "product_associations": 1,
+            }
+        }
+
+        # Unwind (unnest) team members and product associations from the documents and
+        # sort them by count in a faceted stage. This allow two sub pipelines to run in
+        # parallel and output respective array of results.
+        # Reference: https://www.mongodb.com/docs/manual/reference/operator/aggregation/facet/.
+        stage_count_members_and_products = {
+            "$facet": {
+                "mentioned_team_members": [
+                    {"$unwind": "$mentioned_team_members"},
+                    # Skip instances where lead is mentioned as their own team member. This is because of LLM hallucination.
+                    {"$match": {"mentioned_team_members": {
+                        "$ne": research_report.person_name}}},
+                    {"$sortByCount": "$mentioned_team_members"},
+                    {"$project": {"_id": 0, "name": "$_id", "count": 1}}
+                ],
+                "potential_product_associations": [
+                    {"$unwind": "$product_associations"},
+                    {"$sortByCount": "$product_associations"},
+                    {"$project": {"_id": 0, "name": "$_id", "count": 1}}
+                ]
+            }
+
+        }
+
+        pipeline = [
+            stage_match_person_and_company_activity_feed,
+            stage_project_members_and_products,
+            stage_count_members_and_products
+        ]
+
+        results = self.database.get_content_details_collection().aggregate(pipeline=pipeline)
+        insights: Optional[LeadResearchReport.Insights] = None
+        for res in results:
+            insights = LeadResearchReport.Insights(**res)
+            # We expect only a single document from the output of our pipeline, so ok to break.
+            break
 
         setFields = {
             "status": LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE,
@@ -724,6 +789,7 @@ class Researcher:
             "report_publish_cutoff_date": report_publish_cutoff_date,
             "report_publish_cutoff_date_readable_str": Utils.to_human_readable_date_str(report_publish_cutoff_date),
             "details": [detail.model_dump() for detail in report_details],
+            "insights": insights.model_dump(),
         }
         self.database.update_lead_research_report(
             lead_research_report_id=lead_research_report_id, setFields=setFields)
@@ -780,6 +846,8 @@ class Researcher:
 
 if __name__ == "__main__":
     import logging
+    logging.basicConfig(level=logging.INFO)
+
     from dotenv import load_dotenv
     load_dotenv()
     load_dotenv(".env.dev")
@@ -789,6 +857,4 @@ if __name__ == "__main__":
     # company_profile_id = '66a7a6b5066fac22c378bd75'
 
     rp = Researcher(database=Database())
-    # logger.info(
-    #     f"Got {len(search_results)} search results for all the queries.")
-    rp.aggregate(lead_research_report_id="66ea8401a5975beba768f19a")
+    rp.aggregate(lead_research_report_id="672093dd9053c3dac82ea05e")

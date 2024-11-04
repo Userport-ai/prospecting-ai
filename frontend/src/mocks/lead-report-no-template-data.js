@@ -381,6 +381,7 @@ export const reportWithNoTemplate = {
         ],
       },
     ],
+    insights: null,
     personalized_outreach_messages: {
       personalized_emails: [
         {

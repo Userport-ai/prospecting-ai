@@ -381,6 +381,25 @@ export const reportWithSelectedTemplate = {
         ],
       },
     ],
+    insights: {
+      mentioned_team_members: [
+        { name: "Kushagra Verma", count: 2 },
+        { name: "Rakesh Tahiliani", count: 2 },
+        { name: "Vikram Smihan", count: 2 },
+        { name: "Ankur Kumar", count: 2 },
+        { name: "Ajay Singh Parihar", count: 1 },
+        { name: "Jasleen Kohli", count: 1 },
+        { name: "Sahej Grewal", count: 1 },
+        { name: "Avinash Singh", count: 1 },
+        { name: "Suhail Pratap Singh", count: 1 },
+      ],
+      potential_product_associations: [
+        { name: "Dabur Amla", count: 4 },
+        { name: "Anmol Cocunut Hair Oil", count: 1 },
+        { name: "Anmol Jasmine and Jasmine Hair Oil", count: 1 },
+      ],
+      // potential_product_associations: null,
+    },
     personalized_outreach_messages: {
       personalized_emails: [
         {

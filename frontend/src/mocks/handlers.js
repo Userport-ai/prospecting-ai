@@ -23,6 +23,6 @@ export const handlers = [
     return HttpResponse.json(editTemplateResponse);
   }),
   http.get("/api/v1/lead-research-reports/*", () => {
-    return HttpResponse.json(reportWithNoTemplate);
+    return HttpResponse.json(reportWithSelectedTemplate);
   }),
 ];

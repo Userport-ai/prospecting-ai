@@ -464,6 +464,27 @@ class LeadResearchReport(BaseModel):
         highlights: Optional[List[Highlight]] = Field(
             default=None, description="List of Highlights associated with given category.")
 
+    class Insights(BaseModel):
+        """Insights garnered about lead or company from all the content processed about them."""
+        class TeamMemberCount(BaseModel):
+            """Counts of team members mentioned across all LinkedIn activity."""
+            name: Optional[str] = Field(
+                default=None, description="Name of the mentioned team member.")
+            count: Optional[int] = Field(
+                default=None, description="Count of the mentioned team member across all LinkedIn activity.")
+
+        class ProductAssociationCount(BaseModel):
+            """Counts of products the lead may be associated with across all LinkedIn activity that user."""
+            name: Optional[str] = Field(
+                default=None, description="Name of the product.")
+            count: Optional[int] = Field(
+                default=None, description="Count of the product across all LinkedIn activity.")
+
+        mentioned_team_members: Optional[List[TeamMemberCount]] = Field(
+            default=None, description="List of mentioned team members across all LinkedIn activity. Mentioned also includes members whose content the lead has engaged with (liked, commented etc.). Sorted in descending order by count.")
+        potential_product_associations: Optional[List[ProductAssociationCount]] = Field(
+            default=None, description="List of potential products the lead is potentailly associated with. Sorted in descending order by count.")
+
     class ChosenOutreachEmailTemplate(BaseModel):
         """Outreach Template chosen for this Lead. If ID is None, then none of the existing templates were chosen at that time."""
         id: Optional[PyObjectId] = Field(
@@ -574,6 +595,10 @@ class LeadResearchReport(BaseModel):
         default=None, description="Report Publish Date human readable string value.")
     details: Optional[List[ReportDetail]] = Field(
         default=None, description="Report details associated with the lead.")
+
+    # Insights gleaned about lead/company across all LinkedIn activity.
+    insights: Optional[Insights] = Field(
+        default=None, description="Insights garnered about lead and company from all LinkedIn activity. Set for Chrome extension triggered report creation and None otherwise. It may also be None for any older Chrome extension flows.")
 
     # New field to store all outreach messages and related info.
     personalized_outreach_messages: Optional[PersonalizedOutreachMessages] = Field(

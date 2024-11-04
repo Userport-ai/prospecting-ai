@@ -18,13 +18,13 @@ import { usePostHog } from "posthog-js/react";
 
 const { Text, Link } = Typography;
 
-// Header of the report.
+// Header of the report. Contains information and insights about the lead.
 function ReportHeader({ report }) {
   const navigate = useNavigate();
   const posthog = usePostHog();
 
   return (
-    <div id="header">
+    <div id="report-header">
       <div id="back-arrow">
         <ArrowLeftOutlined onClick={() => navigate("/")} />
       </div>
@@ -59,6 +59,68 @@ function ReportHeader({ report }) {
           <Text strong> {report.report_publish_cutoff_date_readable_str}</Text>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Component to display lead and company insights in the appropriate format.
+function Insights({ report }) {
+  if (report.insights === null) {
+    return null;
+  }
+
+  function PotentialTeamMembers() {
+    if (
+      report.insights.mentioned_team_members === null ||
+      report.insights.mentioned_team_members.length === 0
+    ) {
+      return null;
+    }
+    return (
+      <div id="mentioned-team-members">
+        <Text className="title-text">Potential team members:</Text>
+        <div>
+          {report.insights.mentioned_team_members.map((memberInfo) => {
+            const displayName = memberInfo.name;
+            return (
+              <Text key={displayName} className="value-text">
+                {displayName}
+              </Text>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function PotentialProductAssociations() {
+    if (
+      report.insights.potential_product_associations === null ||
+      report.insights.potential_product_associations.length === 0
+    ) {
+      return null;
+    }
+    return (
+      <div id="potential-product-associations">
+        <Text className="title-text">Potential Products associatons:</Text>
+        <div>
+          {report.insights.potential_product_associations.map((productInfo) => {
+            const displayName = productInfo.name;
+            return (
+              <Text key={displayName} className="value-text">
+                {displayName}
+              </Text>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div id="report-insights">
+      <PotentialTeamMembers />
+      <PotentialProductAssociations />
     </div>
   );
 }
@@ -169,6 +231,7 @@ function LeadResearchReport() {
       )}
       <div id="lead-research-report-container">
         <ReportHeader report={report} />
+        <Insights report={report} />
         <Tabs
           onChange={onActiveTabChange}
           activeKey={activeTabKey}
