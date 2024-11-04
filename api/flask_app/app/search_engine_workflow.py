@@ -123,7 +123,7 @@ class SearchEngineWorkflow:
             if config.prefix_format == SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION:
                 search_query += f"{company_name} {person_role_title} {person_name}'s "
             elif config.prefix_format == SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION:
-                search_query += f"{company_name}'s "
+                search_query += f"{company_name} Company "
 
             search_query += config.suffix_query
             num_results: int = config.num_results_per_method
@@ -226,7 +226,10 @@ class SearchEngineWorkflow:
         ]
         logger.info(
             f"Search query: {search_query}, num results: {num_results}")
-        for search_result in search(search_query, num_results=num_results, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS, proxy=self.SERP_PROXY_URL, ssl_verify=False, sleep_interval=2, advanced=True):
+        # We are hardcording country of search (Localization) to use "us" as country of search. Previously without this parameter, the search was probably using random country because the results
+        # were poor for Indian companies. I don't know for sure but likely the country of search was being determined by the IP location of Proxy used for that specific request which can be random.
+        # TODO: Preliminary testing did not reveal too much difference in search results when using "us" or "in" when searching for Indian companies. Research more when there is an urgency.
+        for search_result in search(search_query, num_results=num_results, timeout=self.HTTP_REQUEST_TIMEOUT_SECONDS, proxy=self.SERP_PROXY_URL, ssl_verify=False, sleep_interval=2, advanced=True, region="us"):
             logger.info(
                 f"\nURL: {search_result.url}, Title: {search_result.title}, Description: {search_result.description}\n")
             if not self.is_valid_search_url(url=search_result.url, skip_urls=skip_urls):
@@ -303,30 +306,32 @@ if __name__ == "__main__":
         existing_urls = json.loads(f.read())
 
     search_request = SearchRequest(
-        person_name="Yash Dodia",
-        company_name="Airbase",
-        person_role_title="Sales Leader",
+        person_name="Divyabh Singh",
+        company_name="Dabur India Limited",
+        person_role_title="Lead Brand & PR (Branding, Comms, Social Media)",
         existing_urls=[],
         query_configs=[
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="product launches",
-            #     num_results_per_method=17,
+            #     num_results_per_method=20,
             #     methods=[
-            #         SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
             # ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="Company recent achievements",
+                suffix_query="industry news",
                 num_results_per_method=10,
                 methods=[
-                    SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API,
+                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY,
                 ]
             ),
             # SearchRequest.QueryConfig(
             #         prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-            #         suffix_query="funding announcements",
-            #         num_results=10,
+            #         suffix_query="case studies",
+            #         num_results_per_method=10,
+            #         methods=[
+            #             SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
             # ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
@@ -372,5 +377,5 @@ if __name__ == "__main__":
         ],
     )
     results = wf.get_search_results(search_request=search_request)
-    with open("example_linkedin_info/search_engine_results/se_1.json", "w") as f:
+    with open("example_linkedin_info/search_engine_results/se_noncs_proxy_gl_us.json", "w") as f:
         f.write(results.model_dump_json(indent=4))

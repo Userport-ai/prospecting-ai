@@ -159,18 +159,28 @@ class Researcher:
         #    "recent leadership changes", "recent announcements made"]
         # The most important configs that are required for every search.
 
+        # Note: We removed all usage of Custom Search API since it was giving the pretty poort results
+        # for companies based out of India from experience. TODO: Re-test custom search API in the future but for now
+        # just using web search library.
         if origin == LeadResearchReport.Origin.EXTENSION:
             return [
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                     suffix_query="product launches",
-                    num_results_per_method=5,
+                    num_results_per_method=10,
                     methods=[
-                        SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="recent achievements",
+                    suffix_query="partnerships",
+                    num_results_per_method=10,
+                    methods=[
+                        SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+                ),
+                SearchRequest.QueryConfig(
+                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                    suffix_query="achievements",
                     num_results_per_method=5,
                     methods=[
                         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
@@ -184,21 +194,14 @@ class Researcher:
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="recent partnerships",
+                    suffix_query="industry news",
                     num_results_per_method=5,
                     methods=[
                         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
                 ),
                 SearchRequest.QueryConfig(
                     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                    suffix_query="funding announcements",
-                    num_results_per_method=5,
-                    methods=[
-                        SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
-                ),
-                SearchRequest.QueryConfig(
-                    prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                    suffix_query="recent talks or events or conferences attended",
+                    suffix_query="events or conferences",
                     num_results_per_method=5,
                     methods=[
                         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
@@ -210,13 +213,20 @@ class Researcher:
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                 suffix_query="product launches",
-                num_results_per_method=20,
+                num_results_per_method=10,
                 methods=[
-                    SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
+                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
             ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="recent achievements",
+                suffix_query="partnerships",
+                num_results_per_method=10,
+                methods=[
+                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            ),
+            SearchRequest.QueryConfig(
+                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
+                suffix_query="achievements",
                 num_results_per_method=10,
                 methods=[
                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
@@ -237,8 +247,8 @@ class Researcher:
             ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="customers",
-                num_results_per_method=5,
+                suffix_query="industry news",
+                num_results_per_method=10,
                 methods=[
                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
             ),
@@ -251,32 +261,25 @@ class Researcher:
             ),
             SearchRequest.QueryConfig(
                 prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
-                suffix_query="recent partnerships",
-                num_results_per_method=5,
-                methods=[
-                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-            ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
                 suffix_query="funding announcements",
                 num_results_per_method=5,
                 methods=[
-                    SearchRequest.QueryConfig.Method.GOOGLE_CUSTOM_SEARCH_API],
-            ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                suffix_query="interviews or podcasts",
-                num_results_per_method=10,
-                methods=[
                     SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
             ),
-            SearchRequest.QueryConfig(
-                prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
-                suffix_query="recent talks or events or conferences attended",
-                num_results_per_method=5,
-                methods=[
-                    SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
-            ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="recent talks or events or conferences attended",
+            #     num_results_per_method=5,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            # ),
+            # SearchRequest.QueryConfig(
+            #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_ROLE_LEAD_POSSESSION,
+            #     suffix_query="interviews or podcasts",
+            #     num_results_per_method=10,
+            #     methods=[
+            #         SearchRequest.QueryConfig.Method.UNOFFICIAL_GOOGLE_SEARCH_LIBRARY],
+            # ),
             # SearchRequest.QueryConfig(
             #     prefix_format=SearchRequest.QueryConfig.PrefixFormat.COMPANY_POSSESSION,
             #     suffix_query="recent leadership hires",
