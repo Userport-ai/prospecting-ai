@@ -78,10 +78,10 @@ function Insights({ report }) {
     }
     return (
       <div id="mentioned-team-members">
-        <Text className="title-text">Potential team members:</Text>
+        <Text className="title-text">Engagement with colleagues:</Text>
         <div>
           {report.insights.mentioned_team_members.map((memberInfo) => {
-            const displayName = memberInfo.name;
+            const displayName = memberInfo.name + `-${memberInfo.count}`;
             return (
               <Text key={displayName} className="value-text">
                 {displayName}
@@ -102,10 +102,10 @@ function Insights({ report }) {
     }
     return (
       <div id="potential-product-associations">
-        <Text className="title-text">Potential Products associatons:</Text>
+        <Text className="title-text">Engagement with Products:</Text>
         <div>
           {report.insights.potential_product_associations.map((productInfo) => {
-            const displayName = productInfo.name;
+            const displayName = productInfo.name + `-${productInfo.count}`;
             return (
               <Text key={displayName} className="value-text">
                 {displayName}
