@@ -34,6 +34,7 @@ class Personalization:
         # Open AI configurations.
         self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
         self.OPENAI_GPT_4O_MODEL = os.environ["OPENAI_GPT_4O_MODEL"]
+        self.OPENAI_GPT_4O_MINI_MODEL = os.environ["OPENAI_GPT_4O_MINI_MODEL"]
         self.openai_tokens_used: Optional[OpenAITokenUsage] = None
         self.OPENAI_REQUEST_TIMEOUT_SECONDS = 20
         self.EMAIL_OPENER_SYSTEM_MESSAGE = SystemMessage(content=(
@@ -189,7 +190,19 @@ class Personalization:
             email_opener: Optional[str] = Field(
                 default=None, description="Hyper personalized opening lines of email addressed to the prospect.")
 
-        llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MODEL,
+        # We are using a Mini model here because there is an insidious LLM hallucination problem we ran into during testing. When creating
+        # email opener for report ID: 6729b08317af7bbda6401add in dev env for lead 'Prashant Agarwal', we saw this intermittent error:
+        # File "/Users/addarsh/virtualenvs/prospecting-ai/api/flask_app/.venv/lib/python3.9/site-packages/langchain_core/output_parsers/openai_tools.py", line 292, in parse_result
+        # pydantic_objects.append(name_dict[res["type"]](**res["args"]))
+        # KeyError: 'Prashant Agarwal'
+        # Upon printing the line in langchain, it looks like OpenAI's GPT-4o model is hallucinating the structured output type sometimes (not always) like so:
+        # {'args': {'email_opener': "Excited to see your appreciation for Samrat's LinkedIn post about Dabur's Chyawanprash campaign using the immersive mixed reality ads! Your team's innovation in redefining newspaper advertising is truly groundbreaking!"}, 'type': 'Prashant Agarwal'}
+        # while in the success case it should look as follows:
+        # {'args': {'email_opener': 'Congrats Prashant on smashing it at the e4m Indian Marketing Awards 2023! The Dabur South team scooping 4 trophies is a killer achievement, especially for campaigns like Vatika and Honey!'}, 'type': 'EmailOpener'}
+        # The output type is wrong leading to a KeyError which seems to fail repeatedly even on retries.
+        # Strangely this is not a problem on the mini model upon multiple testing.
+        # TODO: Monitor and change back in future with a workaround if we need more accuracy.
+        llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MINI_MODEL,
                          api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(EmailOpener)
 
         chain = prompt | llm
@@ -352,15 +365,32 @@ if __name__ == "__main__":
     load_dotenv()
     load_dotenv(".env.dev")
 
+    import logging
+    logging.basicConfig(level=logging.INFO)
+
     database = Database()
     pz = Personalization(database=database)
 
-    pz.generate_email_opener(None, None)
+    lead_research_report_id = "6729b08317af7bbda6401add"
+    lead_research_report = database.get_lead_research_report(
+        lead_research_report_id=lead_research_report_id)
 
-    lead_research_report_id = "66ab9633a3bb9048bc1a0be5"
-    # email_list = pz.generate_personalized_emails(
-    #     lead_research_report_id=lead_research_report_id)
-    # email_list_json = [email.model_dump_json() for email in email_list]
+    all_highlights: List[LeadResearchReport.ReportDetail.Highlight] = lead_research_report.get_all_highlights()
+    if len(all_highlights) == 0:
+        raise ValueError(
+            f"No highlights found for lead report ID: {lead_research_report.id}, cannot generate personalized emails.")
 
-    # lead_research_report = database.get_lead_research_report(
-    #     lead_research_report_id=lead_research_report_id)
+    # Fetch best highlights and chosen email template.
+    referenced_highlights: List[LeadResearchReport.ReportDetail.Highlight] = pz.get_best_highlights(
+        all_highlights=all_highlights)
+
+    logger.info(f"Got highlights: {len(referenced_highlights)}")
+
+    for i, highlight in enumerate(referenced_highlights):
+        # logger.info(
+        #     f"\n\n pub date: {lead_research_report.person_role_title}, type: {type(lead_research_report.company_name)} and ID: {highlight.id}\n\n")
+        pz.generate_email_opener(
+            highlight=highlight, lead_research_report=lead_research_report)
+        logger.info(f"\n\nDone with email gen: {i}\n\n")
+
+    logger.info("Done generating email opener")
