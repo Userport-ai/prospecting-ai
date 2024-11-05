@@ -196,7 +196,11 @@ tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             createLeadReport(tabId);
 
             // Send event.
-            captureEvent("extension_create_report_called");
+            captureEvent("extension_create_report_from_tab_update", {
+              tab_id: tabId,
+              tab_change_info: changeInfo,
+              url: tab.url,
+            });
           }
         });
       } else {
@@ -431,7 +435,9 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "create-lead-report") {
     // Send event.
-    captureEvent("extension_start_research_btn_clicked");
+    captureEvent("extension_start_research_btn_clicked", {
+      tab_id: request.tabId,
+    });
 
     // Start activity research first.
     const tabId = request.tabId;
@@ -454,7 +460,12 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
             createLeadReport(tabId);
 
             // Send event.
-            captureEvent("extension_create_report_called");
+            captureEvent(
+              "extension_create_report_after_single_activity_parse",
+              {
+                tab_id: tabId,
+              }
+            );
           }
         });
     });

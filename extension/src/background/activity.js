@@ -127,6 +127,9 @@ export async function fetchCurrentActivityHTML(tabId) {
   activityData.visitedMap[btnName] = btnHTML;
   await setActivityData(tabId, activityData);
 
+  // Send event.
+  captureEvent("extension_visited_button", { tab_id: tabId, button: btnName });
+
   // Find next button to visit.
   const nextBtnIdx = await nextButtonToVisit(activityData);
   if (nextBtnIdx === null) {
@@ -134,7 +137,7 @@ export async function fetchCurrentActivityHTML(tabId) {
     console.log("Activity Research is complete");
 
     // Send event.
-    captureEvent("extension_activity_research_complete");
+    captureEvent("extension_activity_research_complete", { tab_id: tabId });
     return true;
   }
 
