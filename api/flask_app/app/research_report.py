@@ -633,8 +633,7 @@ class Researcher:
                     {"company_profile_id": research_report.company_profile_id},
                     {"focus_on_company": True},
                     {"publish_date": {"$gt": report_publish_cutoff_date}},
-                    {"category": {
-                        "$nin": [None, ContentCategoryEnum.NONE_OF_THE_ABOVE]}},
+                    {"category": {"$ne": None}},
                     {"requesting_user_contact": False},
                 ]
             }
@@ -737,8 +736,7 @@ class Researcher:
                     {"linkedin_activity_ref_id": {"$ne": None}},
                     {"focus_on_company": True},
                     {"publish_date": {"$gt": report_publish_cutoff_date}},
-                    {"category": {
-                        "$nin": [None, ContentCategoryEnum.NONE_OF_THE_ABOVE]}},
+                    {"category": {"$ne": None}},
                     {"requesting_user_contact": False},
                 ]
             }
@@ -864,4 +862,4 @@ if __name__ == "__main__":
     # company_profile_id = '66a7a6b5066fac22c378bd75'
 
     rp = Researcher(database=Database())
-    rp.aggregate(lead_research_report_id="672093dd9053c3dac82ea05e")
+    rp.aggregate(lead_research_report_id="672a0c36fceeccf8634f427d")

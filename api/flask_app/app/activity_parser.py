@@ -24,7 +24,7 @@ class LinkedInActivityParser:
 
     RECENT_ACTIVITY = "recent-activity"
     ACTIVITY_POSTS = "all/"
-    ACTIVITY_COMMENTS = "posts/"
+    ACTIVITY_COMMENTS = "comments/"
     ACTIVITY_REACTIONS = "reactions/"
 
     def __init__(self, person_name: str, company_name: str, company_description: str, person_role_title: str, person_profile_id: str, company_profile_id: str) -> None:

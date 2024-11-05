@@ -287,13 +287,6 @@ class Personalization:
         # Update this list whenever categories enums are updated.
         categories_sorting_order: List[ContentCategoryEnum] = [
             # Start with positive categories first.
-            ContentCategoryEnum.INDUSTRY_TRENDS,
-            ContentCategoryEnum.COMPANY_ACHIEVEMENT,
-            ContentCategoryEnum.COMPANY_RECOGNITION,
-            ContentCategoryEnum.COMPANY_REPORT,
-            ContentCategoryEnum.PRODUCT_LAUNCH,
-            ContentCategoryEnum.PRODUCT_UPDATE,
-            ContentCategoryEnum.COMPANY_PARTNERSHIP,
             ContentCategoryEnum.PERSONAL_THOUGHTS,
             ContentCategoryEnum.PERSONAL_TALK_AT_EVENT,
             ContentCategoryEnum.PERSONAL_EVENT_ATTENDED,
@@ -303,6 +296,13 @@ class Personalization:
             ContentCategoryEnum.PERSONAL_JOB_ANNIVERSARY,
             ContentCategoryEnum.PERSONAL_PROMOTION,
             ContentCategoryEnum.PERSONAL_JOB_CHANGE,
+            ContentCategoryEnum.INDUSTRY_TRENDS,
+            ContentCategoryEnum.COMPANY_ACHIEVEMENT,
+            ContentCategoryEnum.COMPANY_RECOGNITION,
+            ContentCategoryEnum.COMPANY_REPORT,
+            ContentCategoryEnum.PRODUCT_LAUNCH,
+            ContentCategoryEnum.PRODUCT_UPDATE,
+            ContentCategoryEnum.COMPANY_PARTNERSHIP,
             ContentCategoryEnum.FINANCIAL_RESULTS,
             ContentCategoryEnum.COMPANY_NEW_MARKET_EXPANSION,
             ContentCategoryEnum.IPO_ANNOUNCEMENT,
