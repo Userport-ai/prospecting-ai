@@ -381,8 +381,9 @@ class WebPageScraper:
                     f"Tokens used for URL: {self.url} is: {tokens_used}")
 
                 # Send event.
-                self.metrics.capture_system_event(event_name="content_processing_skipped", properties={
-                    "content_type": WebPageScraper.CONTENT_TYPE_GENERAL_PAGE, "url": self.url, "reason": processing_status.value})
+                publish_date_metric_repr: str = publish_date.strftime("%d-%m-%Y") if publish_date else ""
+                self.metrics.capture_system_event(event_name="content_processing_skipped_web_page_missing_or_stale_publish_date", properties={
+                    "content_type": WebPageScraper.CONTENT_TYPE_GENERAL_PAGE, "url": self.url, "reason": processing_status.value, "publish_date": publish_date_metric_repr})
 
                 return PageContentInfo(
                     url=self.url,
@@ -431,8 +432,8 @@ class WebPageScraper:
                     f"Tokens used for URL: {self.url} is: {tokens_used}")
 
                 # Send event.
-                self.metrics.capture_system_event(event_name="content_processing_skipped", properties={
-                    "content_type": WebPageScraper.CONTENT_TYPE_GENERAL_PAGE, "url": self.url, "reason": ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY})
+                self.metrics.capture_system_event(event_name="content_processing_skipped_web_page_unrelated_to_company", properties={
+                    "content_type": WebPageScraper.CONTENT_TYPE_GENERAL_PAGE, "url": self.url})
 
                 return PageContentInfo(
                     url=self.url,
@@ -536,8 +537,9 @@ class WebPageScraper:
                     f"Tokens used for URL: {self.url} is: {tokens_used}")
 
                 # Send event.
-                self.metrics.capture_system_event(event_name="content_processing_skipped", properties={
-                    "content_type": WebPageScraper.CONTENT_TYPE_LINKEDIN_POST, "url": self.url, "reason": processing_status.value})
+                publish_date_metric_repr: str = post_details.publish_date.strftime("%d-%m-%Y") if post_details.publish_date else ""
+                self.metrics.capture_system_event(event_name="content_processing_skipped_linkedin_post_missing_or_stale_date", properties={
+                    "content_type": WebPageScraper.CONTENT_TYPE_LINKEDIN_POST, "url": self.url, "reason": processing_status.value, "publish_date": publish_date_metric_repr})
 
                 return PageContentInfo(
                     url=self.url,
@@ -586,8 +588,8 @@ class WebPageScraper:
                     f"Tokens used for LinkedIn post URL: {self.URL} is: {tokens_used}")
 
                 # Send event.
-                self.metrics.capture_system_event(event_name="content_processing_skipped", properties={
-                    "content_type": WebPageScraper.CONTENT_TYPE_LINKEDIN_POST, "url": self.url, "reason": ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY.value})
+                self.metrics.capture_system_event(event_name="content_processing_skipped_linkedin_post_unrelated_to_company", properties={
+                    "content_type": WebPageScraper.CONTENT_TYPE_LINKEDIN_POST, "url": self.url})
 
                 return PageContentInfo(
                     url=self.url,

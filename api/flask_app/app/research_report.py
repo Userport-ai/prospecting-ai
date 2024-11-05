@@ -564,6 +564,11 @@ class Researcher:
                                                   "report_id": lead_research_report_id, "activity_id": activity.id, "activity_url": activity.activity_url, "error": str(e)})
 
         if total_openai_tokens_used.completion_tokens > 0:
+            # This is how we currently track cost of processing content because Activity because it's split into batches and there isn't a better way right now.
+            # TODO: Return total cost of each activity batch in response and let the aggregator method do the processing in one go.
+            self.metrics.capture_system_event(event_name="activity_batch_processing_cost", properties={
+                                              "report_id": lead_research_report_id, "batch_num": task_num, "cost_in_usd": total_openai_tokens_used.total_cost_in_usd})
+
             # Update total tokens used in the lead report in the database.
             self.update_content_parsing_tokens_in_db(
                 lead_research_report_id=lead_research_report_id, total_openai_tokens_used=total_openai_tokens_used)
@@ -571,13 +576,12 @@ class Researcher:
     def process_linkedin_activity(self, activity_parser: LinkedInActivityParser, activity: LinkedInActivity, lead_research_report_id: str) -> Optional[OpenAITokenUsage]:
         """Process content in given LinkedIn Activity and write to the database. Returns Tokens used in processing or None if activity is already processed."""
         # If activity is already processed, skip. We don't need to search by Company name since activity ID is already unique per lead.
-        # TODO: Add search index so this lookup can be faster.
         if self.database.get_content_details_by_activity_id(activity_id=activity.id, projection={"_id": 1}):
             logger.info(
                 f"Activity ID: {activity.id} already indexed in the database for report ID: {lead_research_report_id}, skip processing again.")
 
             # Send event.
-            self.metrics.capture_system_event(event_name="content_already_indexed", properties={
+            self.metrics.capture_system_event(event_name="linkedin_activity_already_indexed", properties={
                 "report_id": lead_research_report_id, "activity_id": activity.id})
             return None
 

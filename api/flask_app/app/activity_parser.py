@@ -14,6 +14,7 @@ from langchain_core.prompts import HumanMessagePromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from app.metrics import Metrics
 
 logger = logging.getLogger()
 
@@ -33,6 +34,7 @@ class LinkedInActivityParser:
         self.person_role_title = person_role_title
         self.person_profile_id = person_profile_id
         self.company_profile_id = company_profile_id
+        self.metrics = Metrics()
 
         # Constants.
         self.OPENAI_API_KEY = os.environ["OPENAI_USERPORT_API_KEY"]
@@ -240,6 +242,10 @@ class LinkedInActivityParser:
                 logger.warning(
                     f"Retry Publish date returned None, Exiting content processing in LinkedIn activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}.")
                 content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE
+
+                # Send event.
+                self.metrics.capture_system_event(event_name="activity_processing_skipped_missing_publish_date", properties={
+                                                  "activity_url": content_details.url, "activity_id": content_details.linkedin_activity_ref_id})
                 return False
 
         publish_date: Optional[datetime] = LinkedInScraper.fetch_publish_date(
@@ -248,6 +254,10 @@ class LinkedInActivityParser:
             logger.error(
                 f"Got None when converting LinkedIn activity date: {publish_date_str} to datetime object in LinkedIn Activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}.")
             content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_MISSING_PUBLISH_DATE
+
+            # Send event.
+            self.metrics.capture_system_event(event_name="activity_processing_skipped_publish_date_conversion_failed", properties={
+                "activity_url": content_details.url, "activity_id": content_details.linkedin_activity_ref_id})
             return False
 
         # If post is older than 1 year and 3 months from todays date, skip it may be too old for relevance.
@@ -257,6 +267,10 @@ class LinkedInActivityParser:
             logger.warning(
                 f"Got Stale publish date: {publish_date} which is older than 15 months, Exiting content processing in LinkedIn activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}.")
             content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_STALE_PUBLISH_DATE
+
+            # Send event.
+            self.metrics.capture_system_event(event_name="activity_processing_skipped_stale_publish_date", properties={
+                "activity_url": content_details.url, "activity_id": content_details.linkedin_activity_ref_id, "publish_date": publish_date.strftime("%d-%m-%Y")})
             return False
 
         # Populate publish date.
@@ -266,12 +280,20 @@ class LinkedInActivityParser:
             logger.error(
                 f"Related to company returned None with reason: {result.reason} and publish date: {content_details.publish_date}, Exiting content processing in LinkedIn Activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}.")
             content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY
+            
+            # Send event.
+            self.metrics.capture_system_event(event_name="activity_processing_skipped_related_to_company_none_result", properties={
+                "activity_url": content_details.url, "activity_id": content_details.linkedin_activity_ref_id})
             return False
 
         if result.related == False:
             logger.info(
                 f"Not related to company: {self.company_name}, reason: {result.reason} and publish date: {content_details.publish_date}, Exiting content processing for content in LinkedIn Activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}")
             content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY
+            
+            # Send event.
+            self.metrics.capture_system_event(event_name="activity_processing_skipped_unrelated_to_company", properties={
+                "activity_url": content_details.url, "activity_id": content_details.linkedin_activity_ref_id})
             return False
 
         # Populate content details.

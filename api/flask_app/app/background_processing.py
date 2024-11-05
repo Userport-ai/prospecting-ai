@@ -1,4 +1,5 @@
 import logging
+import random
 import json
 import time
 from typing import List
@@ -357,12 +358,16 @@ def choose_template_and_create_emails_in_background(self, user_id: str, lead_res
         lead_report: LeadResearchReport = database.get_lead_research_report(
             lead_research_report_id=lead_research_report_id, projection={"content_parsing_total_tokens_used": 1, "personalized_outreach_messages": {"total_tokens_used": 1}})
         total_cost: float = 0.0
+        content_processing_cost: float = 0.0
+        personalized_emails_generation_cost: float = 0.0
         if lead_report.content_parsing_total_tokens_used:
-            total_cost += lead_report.content_parsing_total_tokens_used.total_cost_in_usd
+            content_processing_cost = lead_report.content_parsing_total_tokens_used.total_cost_in_usd
+            total_cost += content_processing_cost
         if lead_report.personalized_outreach_messages and lead_report.personalized_outreach_messages.total_tokens_used:
-            total_cost += lead_report.personalized_outreach_messages.total_tokens_used.total_cost_in_usd
+            personalized_emails_generation_cost = lead_report.personalized_outreach_messages.total_tokens_used.total_cost_in_usd
+            total_cost += personalized_emails_generation_cost
         m.capture(user_id=user_id, event_name="report_generation_cost_in_usd", properties={
-                  "report_id": lead_research_report_id, "cost_in_usd": total_cost})
+                  "report_id": lead_research_report_id, "total_cost_in_usd": total_cost, "content_processing_cost_in_usd": content_processing_cost, "personalized_emails_generation_cost_in_usd": personalized_emails_generation_cost})
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name="choose_template_and_create_emails", status_before_failure=LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE)
@@ -413,8 +418,8 @@ def shared_task_exception_handler(shared_task_obj, database: Database, user_id: 
         raise ValueError(
             f"Retries exhaused for request: {task_name} with report ID: {lead_research_report_id} with error: {e}")
 
-    # Retry after delay.
-    retry_interval_seconds: int = 10
+    # Retry after delay. Adding randomness because we saw some concurrent RMW transactions fail on retry because all tasks were retrying at the same time.
+    retry_interval_seconds: int = 10 + random.randint(0, 10)
     logger.exception(
         f"Error in {task_name} for report ID: {lead_research_report_id} with retry count: {shared_task_obj.request.retries}, error details: {e}")
     raise shared_task_obj.retry(
