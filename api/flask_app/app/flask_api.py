@@ -316,15 +316,9 @@ def create_lead_report():
         reactionsHTML = request.json.get("reactionsHTML")
         if origin == LeadResearchReport.Origin.EXTENSION.value:
             # Origin is Extension, so we expect HTML for posts, comments and reactions to be present.
-            if postsHTML == None:
+            if postsHTML == None and commentsHTML == None and reactionsHTML == None:
                 raise ValueError(
-                    f"Posts HTML cannot be empty for Origin Extension")
-            if commentsHTML == None:
-                raise ValueError(
-                    f"Comments HTML cannot be empty for Origin Extension")
-            if reactionsHTML == None:
-                raise ValueError(
-                    f"Reactions HTML cannot be empty for Origin Extension")
+                    f"One of Posts HTML, Comments HTML and Reactions HTMl has to be present for Origin Extension")
     except Exception as e:
         logger.exception(
             f"Failed to create report with request: {request} for user ID: {user_id} with error: {e}")
@@ -364,11 +358,11 @@ def create_lead_report():
             with db.transaction_session() as session:
                 # Fetch list of activities from HTML.
                 posts_list: List[LinkedInActivity] = LinkedInActivityParser.get_activities(
-                    person_linkedin_url=person_linkedin_url, page_html=postsHTML, activity_type=LinkedInActivity.Type.POST)
+                    person_linkedin_url=person_linkedin_url, page_html=postsHTML, activity_type=LinkedInActivity.Type.POST) if postsHTML else []
                 comments_list: List[LinkedInActivity] = LinkedInActivityParser.get_activities(
-                    person_linkedin_url=person_linkedin_url, page_html=commentsHTML, activity_type=LinkedInActivity.Type.COMMENT)
+                    person_linkedin_url=person_linkedin_url, page_html=commentsHTML, activity_type=LinkedInActivity.Type.COMMENT) if commentsHTML else []
                 reactions_list: List[LinkedInActivity] = LinkedInActivityParser.get_activities(
-                    person_linkedin_url=person_linkedin_url, page_html=reactionsHTML, activity_type=LinkedInActivity.Type.REACTION)
+                    person_linkedin_url=person_linkedin_url, page_html=reactionsHTML, activity_type=LinkedInActivity.Type.REACTION) if reactionsHTML else []
 
                 # Add activities to database.
                 all_activities: List[LinkedInActivity] = posts_list + \
