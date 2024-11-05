@@ -116,8 +116,7 @@ function ResearchReport({ lead_research_report, activityDataExists }) {
   } else if (reportStatus === "failed_with_errors") {
     reportStatusComp = <Text id="status-failed">Error</Text>;
   } else if (reportStatus === ACTIVITY_PARSING_IN_PROGRESS) {
-    // Any other status means report creation is still in progress.
-    reportStatusComp = <Text id="status-in-progress">In Progress</Text>;
+    reportStatusComp = <Text id="status-wait">Wait</Text>;
     reportActionComp = (
       <Text id="in-progress-notif">
         We are parsing the activities of the lead, please don't change or close

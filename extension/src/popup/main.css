@@ -71,6 +71,11 @@
   font-weight: 600;
 }
 
+#report-status-container #status-wait {
+  color: rgba(168, 63, 225, 0.819);
+  font-weight: 700;
+}
+
 #report-status-container #status-in-progress {
   color: rgb(210, 172, 19);
   font-weight: 700;
