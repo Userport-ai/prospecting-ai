@@ -83,7 +83,7 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     let curBtnName = getCurrentBtnName();
     if (curBtnName === null) {
       console.error("Did not find button name Activity on page!");
-      sendResponse(null);
+      sendResponse({ html: null, name: null });
       return false;
     }
 
@@ -91,7 +91,7 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     var htmlNode = getActivityOnPage();
     if (htmlNode === null) {
       console.error(`HTML for activity: ${curBtnName} not found on page`);
-      sendResponse(null);
+      sendResponse({ html: null, name: curBtnName });
       return false;
     }
 

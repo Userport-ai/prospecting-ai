@@ -39,32 +39,48 @@ export async function fetchCurrentActivityHTML(tabId) {
   // Wait for HTML activity to load in current page. Usually takes a few seconds
   // if page is being loaded, so we need to retry a few times.
   var count = 0;
-  var result = null;
+  var result = { name: null, html: null };
   while (count < 4) {
     result = await tabs.sendMessage(tabId, {
       action: "get-current-activity-html",
     });
-    if (result !== null) {
+    // Return value from sendMessage should always be non null.
+    // Check content script to be sure.
+    if (result.name !== null && result.html !== null) {
       break;
     }
     // Wait and try again after 2 seconds.
     await delay(2000);
     count += 1;
   }
-  if (result === null) {
-    // Failed to fetch activity data in current page due to some error, return False.
-    console.error("Could not fetch HTML for activity in tab: ", tabId);
-    captureEvent("extension_fetch_activity_html_failed", {
+  if (result.name === null) {
+    // Failed to fetch button on current page.
+    console.error("Could not fetch activity button in tab: ", tabId);
+    captureEvent("extension_fetch_activity_button_failed", {
       tab_id: tabId,
     });
     return false;
   }
+  if (result.html === null) {
+    // It's possible that this activity is actually empty even after page is loaded.
+    // Example: Posts in https://www.linkedin.com/in/mahendra-rao-0258319/recent-activity/all/.
+    // We will just assume this to be the case and resume processing.
+
+    // Logging event for analytics.
+    captureEvent("extension_fetch_activity_html_activity_empty", {
+      tab_id: tabId,
+      button: result.name,
+    });
+  }
+
   // Get current activity button name and HTML of the activity from the result.
+  // HTML can still be null if there are no activities on current page but
+  // Button name should always exist here on.
   var btnName = result.name;
   var btnHTML = result.html;
 
-  if (btnName === ReactionsActivity) {
-    // Scroll down to page to collect more reactions.
+  if (btnName === ReactionsActivity && btnHTML !== null) {
+    // Scroll down to page to collect more reactions only if reactions are already non empty without scroll.
     // We need to do this multiple times because, not all reactions are loaded in the given page so the
     // the scroll down to page goes only till end of currently loaded reactions as opposed to actually last <li>
     // element.
@@ -83,6 +99,7 @@ export async function fetchCurrentActivityHTML(tabId) {
         console.error("Could not scroll down to page in tab: ", tabId);
         captureEvent("extension_scroll_down_to_page_failed", {
           tab_id: tabId,
+          button: btnName,
         });
         return false;
       }
@@ -96,22 +113,28 @@ export async function fetchCurrentActivityHTML(tabId) {
     result = await tabs.sendMessage(tabId, {
       action: "get-current-activity-html",
     });
-    if (result === null) {
+    if (result.name === null || result.html === null) {
       // Failed to fetch activity data in current page due to some error, return False.
       console.error(
         "Could not fetch HTML for Scrolled activity in tab: ",
-        tabId
+        tabId,
+        " and button: ",
+        btnName
       );
       captureEvent("extension_get_activity_html_after_page_scroll_failed", {
         tab_id: tabId,
+        button: btnName,
       });
       return false;
     }
+
+    // Re-assign button name and html.
+    // Both should exist here.
     btnName = result.name;
     btnHTML = result.html;
   }
 
-  // Stor btnName and btnHTML to visited map and update storage.
+  // Store btnName and btnHTML to visited map and update storage.
   var activityData = await getActivityData(tabId);
   if (activityData === null) {
     console.error(
