@@ -313,6 +313,7 @@ class ContentDetails(BaseModel):
     1. Using search engine to find page and then scrape it manually or using an API (e.g. LinkedIn posts).
     2. Scraping company website directly.
     3. Calling specific APIs like Crunchbase, NYSE for information about the company.
+    4. Scraping LinkedIn activity from user's chrome extension.
 
     In the future, we can add more workflows if needed.
 
@@ -324,6 +325,11 @@ class ContentDetails(BaseModel):
         FAILED_STALE_PUBLISH_DATE = "failed_stale_publish_date"
         FAILED_UNRELATED_TO_COMPANY = "failed_unrelated_to_company"
         COMPLETE = "complete"
+
+    class AuthorType(str, Enum):
+        """Type of author of content. Usually a person but can also be company that authored a LinkedIn post."""
+        PERSON = "person"
+        COMPANY = "company"
 
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for web search result.")
@@ -363,6 +369,10 @@ class ContentDetails(BaseModel):
         default=None, description="Reason for chosen enum value of type.")
     author: Optional[str] = Field(
         default=None, description="Full name of author of content if any.")
+    author_type: Optional[AuthorType] = Field(
+        default=None, description="Type of author (person or company) of content if any.")
+    author_linkedin_url: Optional[str] = Field(
+        default=None, description="LinkedIn URL of the Author (person or company) of the content. If not known, set to None.")
     publish_date: Optional[datetime] = Field(
         default=None, description="Date when this content was published in UTC timezone.")
     detailed_summary: Optional[str] = Field(default=None,
@@ -391,6 +401,12 @@ class ContentDetails(BaseModel):
         default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post content and None otherwise.")
     num_linkedin_comments: Optional[int] = Field(
         default=None, description="Number of LinkedIn comments for a post. Set only for LinkedIn post content and None otherwise.")
+
+    # New fields for LinkedIn activity parsing.
+    hashtags_in_linkedin_activity: Optional[List[str]] = Field(
+        default=None, description="If content is a LinkedIn Activity, list of hashtags in it and None otherwise.")
+    linkedin_activity_type: Optional[LinkedInActivity.Type] = Field(
+        default=None, description="If content is LinkedIn Activity, represents type (post, comment or reaction). Set to None otherwise.")
 
     openai_tokens_used: Optional[OpenAITokenUsage] = Field(
         default=None, description="Total Open AI tokens used in fetching this content info.")
@@ -537,6 +553,13 @@ class LeadResearchReport(BaseModel):
         # Chrom Extension.
         EXTENSION = "extension"
 
+    class ResearchRequestType(str, Enum):
+        # Type of research request for this lead.
+        # Research only lead's LinkedIn activity.
+        LINKEDIN_ONLY = "linkedin_only"
+        # Research both lead's LinkedIn activity and public sources of information on web.
+        LINKEDIN_AND_WEB = "linkedin_and_web"
+
     id: Optional[PyObjectId] = Field(
         alias="_id", default=None, description="MongoDB generated unique identifier for Lead Research Report.")
     creation_date: Optional[datetime] = Field(
@@ -569,6 +592,8 @@ class LeadResearchReport(BaseModel):
         default=None, description="User ID of the person who created this report.")
     origin: Optional[Origin] = Field(
         default=None, description="Origin of the call to create the report. Can be None for reports which have not been backfilled.")
+    research_request_type: Optional[ResearchRequestType] = Field(
+        default=None, description="Research Request Type for this report. Can be None for reports which have not been backfilled.")
 
     # Lead LinkedIn Activity Information.
     linkedin_activity_info: Optional[LinkedInActivityInfo] = Field(
