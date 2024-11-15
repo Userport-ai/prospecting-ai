@@ -398,9 +398,11 @@ class ContentDetails(BaseModel):
     product_associations: Optional[List[str]] = Field(
         default=None, description="Names of potential products that the lead might be working at current company.")
     num_linkedin_reactions: Optional[int] = Field(
-        default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post content and None otherwise.")
+        default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post or LinkedInActivity content and None otherwise.")
     num_linkedin_comments: Optional[int] = Field(
-        default=None, description="Number of LinkedIn comments for a post. Set only for LinkedIn post content and None otherwise.")
+        default=None, description="Number of LinkedIn comments for a post. Set only for LinkedIn post or LinkedInActivity content and None otherwise.")
+    num_linkedin_reposts: Optional[int] = Field(
+        default=None, description="Number of LinkedIn reposts for a given post. Set only for LinkedIn post or LinkedInActivity content and None otherwise.")
 
     # New fields for LinkedIn activity parsing.
     hashtags_in_linkedin_activity: Optional[List[str]] = Field(

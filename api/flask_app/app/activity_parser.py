@@ -28,6 +28,8 @@ class LinkedInActivityParser:
     ACTIVITY_COMMENTS = "comments/"
     ACTIVITY_REACTIONS = "reactions/"
 
+    OPERATION_TAG = "activity_processing"
+
     def __init__(self, person_name: str, company_name: str, company_description: str, person_role_title: str, person_profile_id: str, company_profile_id: str) -> None:
         self.person_name = person_name
         self.company_name = company_name
@@ -211,9 +213,13 @@ class LinkedInActivityParser:
         )
 
         with get_openai_callback() as cb:
-
-            self.extract_publish_date(
-                content_md=activity.content_md, content_details=content_details)
+            if not self.extract_publish_date(
+                    content_md=activity.content_md, content_details=content_details):
+                content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag=LinkedInActivityParser.OPERATION_TAG, prompt_tokens=cb.prompt_tokens,
+                                                                      completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
+                logger.info(
+                    f"\n\nTotal cost: {content_details.openai_tokens_used.total_cost_in_usd}")
+                return content_details
 
             self.is_content_related_to_company(
                 content_md=activity.content_md, content_details=content_details, must_be_company_related=False)
@@ -224,18 +230,14 @@ class LinkedInActivityParser:
             self.extract_hashtags(
                 content_md=activity.content_md, content_details=content_details)
 
-            logger.info(
-                f"\n\nTotal cost: {cb.total_cost}")
+            self.extract_num_reactions_and_comments(
+                content_md=activity.content_md, content_details=content_details)
 
-            return content_details
+            self.fetch_detailed_summary(
+                content_md=activity.content_md, content_details=content_details)
 
-            if not self.fetch_detailed_summary(
-                    content_md=activity.content_md, content_details=content_details):
-                content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag="activity_processing", prompt_tokens=cb.prompt_tokens,
-                                                                      completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-                logger.info(
-                    f"\n\nTotal cost: {content_details.openai_tokens_used.total_cost_in_usd}")
-                return content_details
+            self.extact_concise_summary_and_interests(
+                content_md=activity.content_md, content_details=content_details)
 
             self.compute_content_category(content_details=content_details)
 
@@ -382,7 +384,13 @@ class LinkedInActivityParser:
         """Extracts detailed summary from the following activity and populates in the content details. Returns True if workflow should continue to next step and False otherwise."""
 
         question = (
-            f"Provide a detailed summary explaining the text. Include details like all the names names, titles, numbers, metrics and the engagement action of the prospect {self.person_name} in the detailed summary wherever possible.\n"
+            f"Provide a detailed summary explaining the LinkeedIn activity contents.\n"
+            f"The summary should be written as an essay with plain text formatting.\n"
+            "Include details like all the names, titles, numbers, metrics in the detailed summary wherever possible.\n"
+            "Do not add details about how many likes, comments or reposts the activity got in the summary.\n"
+            "Do not mention any hashtags listed in the actiity in the summary.\n"
+            f"If this is post has a comment or reaction by {self.person_name}, mention it in one line at the end of the summary (not beginning).\n"
+            f"Use an easygoing tone which is not too formal.\n"
         )
         human_message_prompt_template = (
             '"""{content_md}"""'
@@ -399,13 +407,18 @@ class LinkedInActivityParser:
             ]
         )
 
-        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MODEL,
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL,
                          api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS)
 
         chain = prompt | llm
         result = chain.invoke({
             "content_md": content_md,
         })
+
+        if result == None:
+            logger.error(
+                f"Detailed Summary returned None from LLM result for LinkedIn Activity URL: {content_details.url}, activity ID: {content_details.linkedin_activity_ref_id}")
+            return False
 
         # Populate content details.
         content_details.detailed_summary = result.content
@@ -417,8 +430,100 @@ class LinkedInActivityParser:
             return False
 
         logger.info(
-            f"Detailed Summary of content: {content_details.detailed_summary} for LinkedIn Activity URL: {content_details.url}, activity ID: {content_details.linkedin_activity_ref_id}")
+            f"Detailed Summary of content: {content_details.detailed_summary[:500]}... for LinkedIn Activity URL: {content_details.url}, activity ID: {content_details.linkedin_activity_ref_id}")
         return True
+
+    def extract_num_reactions_and_comments(self, content_md: str, content_details: ContentDetails):
+        """Extracts number of reactions and commnets in the given LinkedIn Activity."""
+        question = (
+            "Extract the number of Reactions (like, celebrate, love) and Comments in the given LinkedIn activity. Do not make it numbers if they don't exist.\n"
+        )
+        human_message_prompt_template = (
+            '"""{content_md}"""'
+            "\n\n"
+            f"{question}"
+        )
+        human_message_prompt = HumanMessagePromptTemplate.from_template(
+            human_message_prompt_template)
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                self.RAW_ACTIVITY_SYSTEM_MESSAGE,
+                human_message_prompt,
+            ]
+        )
+
+        class LikesAndComments(BaseModel):
+            num_reactions: Optional[int] = Field(
+                default=None, description="Number of Reactions in the given activity. Set to 0 if Reactions are not found.")
+            num_comments: Optional[int] = Field(
+                default=None, description="Number of Comments in the given activity. Set to 0 if Comments are not found.")
+            num_reposts: Optional[int] = Field(
+                default=None, description="Number of Reposts of the given activity. Set to 0 if Reposts are not found.")
+
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL,
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(LikesAndComments)
+
+        chain = prompt | llm
+        result: LikesAndComments = chain.invoke({
+            "content_md": content_md,
+        })
+
+        if result == None:
+            logger.error(
+                f"Got Likes and Comments result as None from LLM output for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+            return
+
+        # Populate content details.
+        content_details.num_linkedin_reactions = result.num_reactions
+        content_details.num_linkedin_comments = result.num_comments
+        content_details.num_linkedin_reposts = result.num_reposts
+
+        logger.info(
+            f"Got {content_details.num_linkedin_reactions} reactions and {content_details.num_linkedin_comments} comments and {content_details.num_linkedin_reposts} reposts in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
+
+    def extact_concise_summary_and_interests(self, content_md: str, content_details: ContentDetails):
+        """Extracts one line summary (stored as concise summary) of the lead from the given LinkedIn Activity along with what it showcases about their interests."""
+        question = (
+            f"Provide a one line summary of the activity and include how {content_details.person_name} engaged with in it and what it showcases about their interests.\n"
+        )
+        human_message_prompt_template = (
+            '"""{content_md}"""'
+            "\n\n"
+            f"{question}"
+        )
+        human_message_prompt = HumanMessagePromptTemplate.from_template(
+            human_message_prompt_template)
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                self.RAW_ACTIVITY_SYSTEM_MESSAGE,
+                human_message_prompt,
+            ]
+        )
+
+        class PersonalitySummary(BaseModel):
+            summary: Optional[str] = Field(
+                default=None, description="Summary of the activity.")
+
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL,
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(PersonalitySummary)
+
+        chain = prompt | llm
+        result: PersonalitySummary = chain.invoke({
+            "content_md": content_md,
+        })
+
+        if result == None:
+            logger.error(
+                f"Got Topics of Interest as None from LLM output for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+            return
+
+        # Populate content details.
+        content_details.concise_summary = result.summary
+
+        logger.info(
+            f"Got Concise summary: {content_details.concise_summary} in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
 
     def compute_content_category(self, content_details: ContentDetails):
         """Computes content category from the detailed summary."""
@@ -806,16 +911,19 @@ if __name__ == "__main__":
     # company_name = "Dabur India Limited"
     # company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
 
-    person_name = "Akanksha Arora"
-    person_role_title = "Brand Manager"
-    company_name = "Dabur India Limited"
-    company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
+    # person_name = "Akanksha Arora"
+    # person_role_title = "Brand Manager"
+    # company_name = "Dabur India Limited"
+    # company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
 
-    # activity_type = LinkedInActivity.Type.COMMENT
+    person_name = "Shridhar Navalgund"
+    person_role_title = "Senior Director"
+    company_name = "CoreStack"
+    company_description = "CoreStack provides an AI-powered multi-cloud governance platform that enables enterprises to manage and optimize their cloud operations efficiently."
 
     db = Database()
     activity_object_ids = Database.get_object_ids(
-        ids=["672a043de8b12906c5c21879"])
+        ids=["67399d12989687e2818ba91e"])
     linkedin_activities: List[LinkedInActivity] = db.list_linkedin_activities(
         filter={"_id": {"$in": activity_object_ids}})
 
