@@ -381,6 +381,8 @@ class ContentDetails(BaseModel):
                                            description="A concise summary of the content.")
     category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
+    unsupervised_category: Optional[str] = Field(
+        default=None, description="Category of the content generated in an unsupervised manner by the LLM. It is different from category field above which is constrained to provided enum values.")
     category_reason: Optional[str] = Field(
         default=None, description="Reason for chosen enum value of category.")
     key_persons: Optional[List[str]] = Field(

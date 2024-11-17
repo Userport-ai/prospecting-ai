@@ -239,7 +239,8 @@ class LinkedInActivityParser:
             self.extact_concise_summary_and_interests(
                 content_md=activity.content_md, content_details=content_details)
 
-            self.compute_content_category(content_details=content_details)
+            self.fetch_content_category(
+                content_md=activity.content_md, content_details=content_details)
 
             self.extract_mentioned_team_members(
                 content_details=content_details)
@@ -516,7 +517,7 @@ class LinkedInActivityParser:
 
         if result == None:
             logger.error(
-                f"Got Topics of Interest as None from LLM output for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+                f"Got Concise Summary as None from LLM output for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
             return
 
         # Populate content details.
@@ -524,6 +525,57 @@ class LinkedInActivityParser:
 
         logger.info(
             f"Got Concise summary: {content_details.concise_summary} in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
+
+    def fetch_content_category(self, content_md: str, content_details: ContentDetails):
+        """Fetch content category from the given content details.
+
+        Examples include: Career Update, Event Promotion, Company Anniversary, Job Opportunity, AI advancements, Startup Insights, Event Summary, Company Announcement, Farewell Post,
+        Investment Announcement, Event Announcement, Partnership Announcement, Celebration, Team Announcement, Congratulatory, Professional Congratulations, Congratulatory Comment etc.
+        """
+
+        question = (
+            f"Use two to three words to describe the category of the content in the Activity.\n"
+        )
+        human_message_prompt_template = (
+            '"""{content_md}"""'
+            "\n\n"
+            f"{question}"
+        )
+        human_message_prompt = HumanMessagePromptTemplate.from_template(
+            human_message_prompt_template)
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                self.RAW_ACTIVITY_SYSTEM_MESSAGE,
+                human_message_prompt,
+            ]
+        )
+
+        class ContentCategory(BaseModel):
+            category: Optional[str] = Field(
+                default=None, description="Category of the content in the activity.")
+            reason: Optional[str] = Field(
+                default=None, description="Reason for the picking the category.")
+
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL,
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(ContentCategory)
+
+        chain = prompt | llm
+        result: ContentCategory = chain.invoke({
+            "content_md": content_md,
+        })
+
+        if result == None:
+            logger.error(
+                f"Got Unsupervised Category as None for LLM output for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+            return
+
+        # Populate content details.
+        content_details.unsupervised_category = result.category
+        content_details.category_reason = result.reason
+
+        logger.info(
+            f"Got Unsupervised Category: {content_details.unsupervised_category} with reason: {content_details.category_reason} for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
 
     def compute_content_category(self, content_details: ContentDetails):
         """Computes content category from the detailed summary."""
@@ -901,10 +953,10 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO)
 
-    # person_name = "Gaurav Baid"
-    # person_role_title = "Director-Strategic Sales"
-    # company_name = "Ceipal"
-    # company_description = "Ceipal provides comprehensive talent acquisition and management software solutions for staffing and recruiting firms."
+    person_name = "Gaurav Baid"
+    person_role_title = "Director-Strategic Sales"
+    company_name = "Ceipal"
+    company_description = "Ceipal provides comprehensive talent acquisition and management software solutions for staffing and recruiting firms."
 
     # person_name = "Avinash Singh"
     # person_role_title = "Assistant Marketing Manager"
@@ -916,14 +968,14 @@ if __name__ == "__main__":
     # company_name = "Dabur India Limited"
     # company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
 
-    person_name = "Shridhar Navalgund"
-    person_role_title = "Senior Director"
-    company_name = "CoreStack"
-    company_description = "CoreStack provides an AI-powered multi-cloud governance platform that enables enterprises to manage and optimize their cloud operations efficiently."
+    # person_name = "Shridhar Navalgund"
+    # person_role_title = "Senior Director"
+    # company_name = "CoreStack"
+    # company_description = "CoreStack provides an AI-powered multi-cloud governance platform that enables enterprises to manage and optimize their cloud operations efficiently."
 
     db = Database()
     activity_object_ids = Database.get_object_ids(
-        ids=["67399d12989687e2818ba91e"])
+        ids=["6736c56a71bc3188df5a51b4"])
     linkedin_activities: List[LinkedInActivity] = db.list_linkedin_activities(
         filter={"_id": {"$in": activity_object_ids}})
 
