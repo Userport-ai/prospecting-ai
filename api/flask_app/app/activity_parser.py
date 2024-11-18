@@ -213,6 +213,15 @@ class LinkedInActivityParser:
         )
 
         with get_openai_callback() as cb:
+            self.is_content_related_to_company(
+                content_md=activity.content_md, content_details=content_details, must_be_company_related=False)
+
+            self.extract_engaged_colleague(
+                content_md=activity.content_md, content_details=content_details)
+
+            logger.info(f"\ntotal cost: {cb.total_cost}")
+            return
+
             if not self.extract_publish_date(
                     content_md=activity.content_md, content_details=content_details):
                 content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag=LinkedInActivityParser.OPERATION_TAG, prompt_tokens=cb.prompt_tokens,
@@ -236,7 +245,7 @@ class LinkedInActivityParser:
             self.fetch_detailed_summary(
                 content_md=activity.content_md, content_details=content_details)
 
-            self.extact_concise_summary_and_interests(
+            self.extact_one_line_summary_and_interests(
                 content_md=activity.content_md, content_details=content_details)
 
             self.fetch_content_category(
@@ -483,7 +492,7 @@ class LinkedInActivityParser:
         logger.info(
             f"Got {content_details.num_linkedin_reactions} reactions and {content_details.num_linkedin_comments} comments and {content_details.num_linkedin_reposts} reposts in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
 
-    def extact_concise_summary_and_interests(self, content_md: str, content_details: ContentDetails):
+    def extact_one_line_summary_and_interests(self, content_md: str, content_details: ContentDetails):
         """Extracts one line summary (stored as concise summary) of the lead from the given LinkedIn Activity along with what it showcases about their interests."""
         question = (
             f"Provide a one line summary of the activity and include how {content_details.person_name} engaged with in it and what it showcases about their interests.\n"
@@ -521,10 +530,10 @@ class LinkedInActivityParser:
             return
 
         # Populate content details.
-        content_details.concise_summary = result.summary
+        content_details.one_line_summary = result.summary
 
         logger.info(
-            f"Got Concise summary: {content_details.concise_summary} in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
+            f"Got Concise summary: {content_details.one_line_summary} in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
 
     def fetch_content_category(self, content_md: str, content_details: ContentDetails):
         """Fetch content category from the given content details.
@@ -576,6 +585,69 @@ class LinkedInActivityParser:
 
         logger.info(
             f"Got Unsupervised Category: {content_details.unsupervised_category} with reason: {content_details.category_reason} for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+
+    def extract_engaged_colleague(self, content_md: str, content_details: ContentDetails):
+        """Extract connection with a colleague from the activity if there is one. We don't know if they are exactly a colleague so will use is related to the company as the criteria and pick the main character in the activity."""
+        if not content_details.focus_on_company:
+            # Content is not about Company, so no need to extract colleague from it.
+            return
+
+        question = (
+            "Extract the main person being discussed in the activity if any.\n"
+            "Here are common attributes of the main person:\n"
+            f"* The main person must be an employee of {content_details.company_name} or one of its subsidiaries.\n"
+            "* The main person is core to the content of the activity.\n"
+            "* The main person can only be a human and cannot be a company.\n"
+            "* Main person has to be a single person not a group of people.\n"
+            "\n"
+            "Return None if there is no main person found in the activity.\n"
+        )
+        human_message_prompt_template = (
+            '"""{content_md}"""'
+            "\n\n"
+            f"{question}"
+        )
+        human_message_prompt = HumanMessagePromptTemplate.from_template(
+            human_message_prompt_template)
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                self.RAW_ACTIVITY_SYSTEM_MESSAGE,
+                human_message_prompt,
+            ]
+        )
+
+        class EngagedColleague(BaseModel):
+            name: Optional[str] = Field(
+                default=None, description="Name of the main person in the activity.")
+            reason: Optional[str] = Field(
+                default=None, description="Reason for the choosing this as the main person.")
+
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL,
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(EngagedColleague)
+
+        chain = prompt | llm
+        result: EngagedColleague = chain.invoke({
+            "content_md": content_md,
+        })
+
+        if result == None:
+            logger.error(
+                f"Got Engaged colleague as None for LLM output for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+            return
+
+        if result.name == content_details.person_name:
+            # The prospect is the main person in the activity, skip.
+            logger.info(
+                f"No engaged colleague since propsect {content_details.person_name} is the main person in Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+            return
+
+        # Populate content details.
+        content_details.main_colleague = result.name
+        content_details.main_colleague_reason = result.reason
+
+        logger.info(
+            f"Got Engaged colleague: {content_details.main_colleague} with reason: {content_details.main_colleague_reason} for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
 
     def compute_content_category(self, content_details: ContentDetails):
         """Computes content category from the detailed summary."""
@@ -832,10 +904,10 @@ class LinkedInActivityParser:
             return
 
         # Populate content details.
-        content_details.hashtags_in_linkedin_activity = result.hashtags
+        content_details.hashtags = result.hashtags
 
         logger.info(
-            f"Got Hashtags: {content_details.hashtags_in_linkedin_activity} in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
+            f"Got Hashtags: {content_details.hashtags} in LinkedIn Activity URL: {content_details.url} and Activity ID: {content_details.linkedin_activity_ref_id}")
 
     def extract_date(self, content_md: str, content_details: ContentDetails) -> Optional[str]:
         """Extract date from given LinkedIn Activity Markdown and return it.
@@ -973,9 +1045,19 @@ if __name__ == "__main__":
     # company_name = "CoreStack"
     # company_description = "CoreStack provides an AI-powered multi-cloud governance platform that enables enterprises to manage and optimize their cloud operations efficiently."
 
+    # person_name = "Pankush Kapoor"
+    # person_role_title = "Brand Manager"
+    # company_name = "Dabur India Limited"
+    # company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
+
+    person_name = "Prashant Agarwal"
+    person_role_title = "Head Of Marketing - Health Supplements & Baby Care"
+    company_name = "Dabur India Limited"
+    company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
+
     db = Database()
     activity_object_ids = Database.get_object_ids(
-        ids=["6736c56a71bc3188df5a51b4"])
+        ids=["6729b08217af7bbda6401acc"])
     linkedin_activities: List[LinkedInActivity] = db.list_linkedin_activities(
         filter={"_id": {"$in": activity_object_ids}})
 

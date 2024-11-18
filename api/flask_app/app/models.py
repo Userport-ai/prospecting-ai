@@ -379,6 +379,8 @@ class ContentDetails(BaseModel):
                                             description="A detailed summary of the content.")
     concise_summary: Optional[str] = Field(default=None,
                                            description="A concise summary of the content.")
+    one_line_summary: Optional[str] = Field(default=None,
+                                            description="A one line summary summary of the content. Useful for performing analysis over many contentDetail instances.")
     category: Optional[ContentCategoryEnum] = Field(
         default=None, description="Category of the content found")
     unsupervised_category: Optional[str] = Field(
@@ -407,10 +409,14 @@ class ContentDetails(BaseModel):
         default=None, description="Number of LinkedIn reposts for a given post. Set only for LinkedIn post or LinkedInActivity content and None otherwise.")
 
     # New fields for LinkedIn activity parsing.
-    hashtags_in_linkedin_activity: Optional[List[str]] = Field(
+    hashtags: Optional[List[str]] = Field(
         default=None, description="If content is a LinkedIn Activity, list of hashtags in it and None otherwise.")
     linkedin_activity_type: Optional[LinkedInActivity.Type] = Field(
         default=None, description="If content is LinkedIn Activity, represents type (post, comment or reaction). Set to None otherwise.")
+    main_colleague: Optional[str] = Field(
+        default=None, description="Main person who is a colleague of prospect and who is the center of LinkedIn Activity content. We hope this will help build an org chart over time. Set to None otherwise.")
+    main_colleague_reason: Optional[str] = Field(
+        default=None, description="Reason for picking this person as main colleague of LinkedIn Activity. Set to None otherwise.")
 
     openai_tokens_used: Optional[OpenAITokenUsage] = Field(
         default=None, description="Total Open AI tokens used in fetching this content info.")
