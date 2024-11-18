@@ -12,7 +12,7 @@ from langchain_core.messages import SystemMessage
 from langchain_community.callbacks import get_openai_callback
 from langchain_core.prompts import HumanMessagePromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_openai import ChatOpenAI
 from app.metrics import Metrics
 from enum import Enum
@@ -213,15 +213,6 @@ class LinkedInActivityParser:
         )
 
         with get_openai_callback() as cb:
-            self.is_content_related_to_company(
-                content_md=activity.content_md, content_details=content_details, must_be_company_related=False)
-
-            self.extract_engaged_colleague(
-                content_md=activity.content_md, content_details=content_details)
-
-            logger.info(f"\ntotal cost: {cb.total_cost}")
-            return
-
             if not self.extract_publish_date(
                     content_md=activity.content_md, content_details=content_details):
                 content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag=LinkedInActivityParser.OPERATION_TAG, prompt_tokens=cb.prompt_tokens,
@@ -251,10 +242,11 @@ class LinkedInActivityParser:
             self.fetch_content_category(
                 content_md=activity.content_md, content_details=content_details)
 
-            self.extract_mentioned_team_members(
-                content_details=content_details)
+            self.extract_engaged_colleague(
+                content_md=activity.content_md, content_details=content_details)
 
-            self.extract_products(content_details=content_details)
+            self.extract_any_products(
+                content_md=activity.content_md, content_details=content_details)
 
             logger.info(
                 f"Successfully processed Content in LinkedIn Activity URL: {content_details.url} with Activity ID: {content_details.linkedin_activity_ref_id}")
@@ -649,6 +641,70 @@ class LinkedInActivityParser:
         logger.info(
             f"Got Engaged colleague: {content_details.main_colleague} with reason: {content_details.main_colleague_reason} for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
 
+    def extract_any_products(self, content_md: str, content_details: ContentDetails):
+        """Extract any products in the Activity if any. We will use is related to the company as the criteria to check for products."""
+        if not content_details.focus_on_company:
+            # Content is not about Company, so no need to extract product from it.
+            return
+
+        question = (
+            "Extract one or more products mentioned in the activity if any.\n"
+            "Here are the conditions:\n"
+            "* The product name should not be a hashtag.\n"
+            f"* The product must be made by {content_details.company_name}\n"
+            "* The product cannot be category names like 'Food', 'Beverage', 'AI', 'ATS', 'Staffing Automation' etc.\n"
+            "* The product must be a proper noun.\n"
+            "* The product should not be confused with the name of a campaign.\n"
+            "* The company name or a short form of the company name cannot be a product.\n"
+            "* A company event or conference name cannot be a product.\n"
+            "\n"
+            "Return empty list if it does not specify any products.\n"
+        )
+        human_message_prompt_template = (
+            '"""{content_md}"""'
+            "\n\n"
+            f"{question}"
+        )
+        human_message_prompt = HumanMessagePromptTemplate.from_template(
+            human_message_prompt_template)
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                self.RAW_ACTIVITY_SYSTEM_MESSAGE,
+                human_message_prompt,
+            ]
+        )
+
+        class MentionedProducts(BaseModel):
+            products: Optional[List[str]] = Field(
+                default=None, description="Name of the products mentioned in the activity.")
+            reason: Optional[str] = Field(
+                default=None, description="Reason for choosing these products.")
+
+        llm = ChatOpenAI(temperature=0, model_name=self.OPENAI_GPT_4O_MINI_MODEL,
+                         api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(MentionedProducts)
+
+        chain = prompt | llm
+        result: MentionedProducts = chain.invoke({
+            "content_md": content_md,
+        })
+
+        if result == None:
+            logger.error(
+                f"Got Mentioned products as None for LLM output for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+            return
+
+        if result.products:
+            # Remove company name from Product since the LLM can hallucinate at times.
+            result.products = list(
+                filter(lambda p: p != content_details.company_name, result.products))
+
+        # Populate content details.
+        content_details.product_associations = result.products
+
+        logger.info(
+            f"Got Mentioned products: {content_details.product_associations} with reason: {result.reason} for LinkedIn Activity URL: {content_details.url} for activity ID: {content_details.linkedin_activity_ref_id}")
+
     def compute_content_category(self, content_details: ContentDetails):
         """Computes content category from the detailed summary."""
         if not content_details.detailed_summary:
@@ -1025,10 +1081,10 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO)
 
-    person_name = "Gaurav Baid"
-    person_role_title = "Director-Strategic Sales"
-    company_name = "Ceipal"
-    company_description = "Ceipal provides comprehensive talent acquisition and management software solutions for staffing and recruiting firms."
+    # person_name = "Gaurav Baid"
+    # person_role_title = "Director-Strategic Sales"
+    # company_name = "Ceipal"
+    # company_description = "Ceipal provides comprehensive talent acquisition and management software solutions for staffing and recruiting firms."
 
     # person_name = "Avinash Singh"
     # person_role_title = "Assistant Marketing Manager"
@@ -1040,24 +1096,24 @@ if __name__ == "__main__":
     # company_name = "Dabur India Limited"
     # company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
 
-    # person_name = "Shridhar Navalgund"
-    # person_role_title = "Senior Director"
-    # company_name = "CoreStack"
-    # company_description = "CoreStack provides an AI-powered multi-cloud governance platform that enables enterprises to manage and optimize their cloud operations efficiently."
+    person_name = "Shridhar Navalgund"
+    person_role_title = "Senior Director"
+    company_name = "CoreStack"
+    company_description = "CoreStack provides an AI-powered multi-cloud governance platform that enables enterprises to manage and optimize their cloud operations efficiently."
 
     # person_name = "Pankush Kapoor"
     # person_role_title = "Brand Manager"
     # company_name = "Dabur India Limited"
     # company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
 
-    person_name = "Prashant Agarwal"
-    person_role_title = "Head Of Marketing - Health Supplements & Baby Care"
-    company_name = "Dabur India Limited"
-    company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
+    # person_name = "Prashant Agarwal"
+    # person_role_title = "Head Of Marketing - Health Supplements & Baby Care"
+    # company_name = "Dabur India Limited"
+    # company_description = "Dabur India Limited is a leading Indian multinational consumer goods company focused on Ayurvedic and natural health care products."
 
     db = Database()
     activity_object_ids = Database.get_object_ids(
-        ids=["6729b08217af7bbda6401acc"])
+        ids=["67399d12989687e2818ba91b"])
     linkedin_activities: List[LinkedInActivity] = db.list_linkedin_activities(
         filter={"_id": {"$in": activity_object_ids}})
 
