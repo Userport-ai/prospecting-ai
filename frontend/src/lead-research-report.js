@@ -51,12 +51,10 @@ function ReportHeader({ report }) {
       </div>
       <div id="report-dates">
         <div id="report-creation-date">
-          <Text className="report-dates-label">Report Creation Date: </Text>
-          <Text strong>{report.report_creation_date_readable_str}</Text>
-        </div>
-        <div id="research-start-date">
-          <Text className="report-dates-label">Research Start Date: </Text>
-          <Text strong> {report.report_publish_cutoff_date_readable_str}</Text>
+          <Text className="report-dates-label">Created On: </Text>
+          <Text className="report-dates-value">
+            {report.report_creation_date_readable_str}
+          </Text>
         </div>
       </div>
     </div>
@@ -126,8 +124,10 @@ function Insights({ report }) {
     }
     return (
       <div id="personality-description">
-        <Text>Personality</Text>
-        <Text>{report.insights.personality_description}</Text>
+        <Text className="insight-label">Personality</Text>
+        <Text className="insight-text">
+          {report.insights.personality_description}
+        </Text>
       </div>
     );
   }
@@ -144,17 +144,21 @@ function Insights({ report }) {
 
     return (
       <div id="areas-of-interest">
-        <Text>Areas of Interest</Text>
-        {report.insights.areas_of_interest.interests.map((interest) => {
-          if (interest.description) {
-            return (
-              <div key={interest.description}>
-                <Text>{interest.description}:</Text>
-                <Text>{interest.reason}</Text>
-              </div>
-            );
-          }
-        })}
+        <Text className="insight-label">Areas of Interest</Text>
+        <div id="all-interests-container">
+          {report.insights.areas_of_interest.interests.map((interest) => {
+            if (interest.description) {
+              return (
+                <div key={interest.description} className="interest-container">
+                  <Text className="interest-description">
+                    {interest.description}
+                  </Text>
+                  <Text className="interest-reason">{interest.reason}</Text>
+                </div>
+              );
+            }
+          })}
+        </div>
       </div>
     );
   }
@@ -171,12 +175,15 @@ function Insights({ report }) {
 
     return (
       <div id="company-posts-engagement-stats">
-        <Text>Engagement with {report.company_name}'s posts</Text>
-        <Text>
+        <Text className="insight-label">
+          Engagement with {report.company_name}'s posts
+        </Text>
+        <Text className="insight-text">
           {report.person_name} has engaged with{" "}
           {report.insights.num_company_related_activities} posts related to{" "}
-          {report.company_name} out of the total of{" "}
-          {report.insights.total_engaged_activities} posts.
+          {report.company_name} out of the{" "}
+          {report.insights.total_engaged_activities} posts they have engaged
+          with.
         </Text>
       </div>
     );
@@ -195,8 +202,8 @@ function Insights({ report }) {
 
     return (
       <div id="engaged-colleagues">
-        <Text>Engagement with Colleagues</Text>
-        <Text>{engagedColleagues}</Text>
+        <Text className="insight-label">Engagement with Colleagues</Text>
+        <Text className="insight-text">{engagedColleagues}</Text>
       </div>
     );
   }
@@ -214,8 +221,10 @@ function Insights({ report }) {
 
     return (
       <div id="engaged-colleagues">
-        <Text>Engagement with {report.company_name}'s Products</Text>
-        <Text>{engagedProducts}</Text>
+        <Text className="insight-label">
+          Engagement with {report.company_name}'s Products
+        </Text>
+        <Text className="insight-text">{engagedProducts}</Text>
       </div>
     );
   }

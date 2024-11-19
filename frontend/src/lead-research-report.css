@@ -47,6 +47,7 @@
 #lead-research-report-container #role-title {
   margin-top: 0.5rem;
   font-weight: 600;
+  color: rgb(96, 96, 96);
 }
 
 #lead-research-report-container #report-dates {
@@ -71,6 +72,12 @@
 
 #lead-research-report-container .report-dates-label {
   color: var(--primary);
+  font-weight: 500;
+}
+
+#lead-research-report-container .report-dates-value {
+  font-weight: 600;
+  color: rgb(114, 114, 114);
 }
 
 #lead-research-report-container .anticon-arrow-left svg {
@@ -88,7 +95,7 @@
   margin-top: 2rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 4rem;
 }
 
 #report-insights #mentioned-team-members {
@@ -101,6 +108,19 @@
   flex-direction: column;
 }
 
+#report-insights .insight-label {
+  font-size: 2rem;
+  font-weight: 600;
+  color: rgb(105, 88, 126);
+}
+
+#report-insights .insight-text {
+  margin-top: 0.5rem;
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: rgb(100, 100, 100);
+}
+
 #report-insights #personality-description {
   display: flex;
   flex-direction: column;
@@ -109,6 +129,31 @@
 #report-insights #areas-of-interest {
   display: flex;
   flex-direction: column;
+}
+
+#areas-of-interest #all-interests-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  margin-top: 1rem;
+}
+
+#all-interests-container .interest-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#all-interests-container .interest-container .interest-description {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: rgb(79, 79, 79);
+}
+
+#all-interests-container .interest-container .interest-reason {
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: rgb(100, 100, 100);
 }
 
 #report-insights #company-posts-engagement-stats {
