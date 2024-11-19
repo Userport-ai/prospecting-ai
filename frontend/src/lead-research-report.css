@@ -101,6 +101,26 @@
   flex-direction: column;
 }
 
+#report-insights #personality-description {
+  display: flex;
+  flex-direction: column;
+}
+
+#report-insights #areas-of-interest {
+  display: flex;
+  flex-direction: column;
+}
+
+#report-insights #company-posts-engagement-stats {
+  display: flex;
+  flex-direction: column;
+}
+
+#report-insights #engaged-colleagues {
+  display: flex;
+  flex-direction: column;
+}
+
 #report-insights .title-text {
   color: var(--hover-color);
   font-weight: 600;

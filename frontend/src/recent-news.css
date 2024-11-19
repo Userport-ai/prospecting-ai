@@ -40,6 +40,30 @@
   justify-content: space-between;
 }
 
+#report-details-container .card-category-title-container {
+  display: flex;
+  flex-direction: row;
+  gap: 2rem;
+}
+
+#report-details-container
+  .card-category-title-container
+  .card-company-related-container {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-top: 4px;
+  border: 1px solid green;
+  border-radius: 5px;
+}
+
+#report-details-container
+  .card-company-related-container
+  .company-related-text {
+  color: rgb(26, 123, 26);
+  font-weight: 700;
+  font-size: 1.4rem;
+}
+
 #report-details-container .card-category-container .card-category {
   font-size: 2rem;
   color: var(--surface-tint);
@@ -47,14 +71,11 @@
 }
 
 #report-details-container .card-category-container .personalize-btn {
-  background-color: var(--primary);
-  color: white;
-  font-weight: 600;
-}
-
-#report-details-container .card-category-container .personalize-btn:hover {
-  border: 0;
+  padding: 1.6rem 1.2rem;
   background-color: var(--hover-color);
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
 #report-details-container .card-citation-link-container {
@@ -96,6 +117,54 @@
 
 #report-details-container .ant-card .card-text {
   font-size: 1.7rem;
+  color: var(--secondary);
+  font-weight: 500;
+}
+
+#report-details-container .ant-card .card-hashtags-container {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+#report-details-container .ant-card .card-hashtags-label {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+#report-details-container .ant-card .card-hashtags-value {
+  font-size: 1.5rem;
+  color: var(--secondary);
+  font-weight: 500;
+}
+
+#report-details-container .ant-card .card-post-engagement-container {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+#report-details-container
+  .card-post-engagement-container
+  .card-post-engagement-label {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+#report-details-container
+  .card-post-engagement-container
+  .card-post-engagement-value-container {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+#report-details-container
+  .card-post-engagement-value-container
+  .post-engagement-value-text {
+  font-size: 1.5rem;
   color: var(--secondary);
   font-weight: 500;
 }

@@ -3,6 +3,7 @@ import { Flex, Button, Card, Typography, Tooltip, Modal } from "antd";
 import { useContext, useState } from "react";
 import { AuthContext } from "./root";
 import { usePostHog } from "posthog-js/react";
+import { addLineBreaks } from "./helper-functions";
 
 const { Text, Link } = Typography;
 
@@ -76,16 +77,24 @@ function Highlight({ lead_research_report_id, highlight, onEmailCreation }) {
   return (
     <Card>
       <div className="card-category-container">
-        <Text strong className="card-category">
-          {highlight.category_readable_str}
-        </Text>
+        <div className="card-category-title-container">
+          <Text strong className="card-category">
+            {highlight.category_readable_str}
+          </Text>
+          {highlight.focus_on_company && (
+            <div className="card-company-related-container">
+              <Text className="company-related-text">Company Related</Text>
+            </div>
+          )}
+        </div>
+
         <Tooltip title="AI will automatically create a personalized outreach message for your lead using this news item as source.">
           <Button
             className="personalize-btn"
             onClick={handlePersonalizeRequest}
             loading={createEmailLoading}
           >
-            Use for outreach
+            Generate Email
           </Button>
         </Tooltip>
       </div>
@@ -119,8 +128,42 @@ function Highlight({ lead_research_report_id, highlight, onEmailCreation }) {
         <Text className="card-text-label" strong>
           Summary
         </Text>
-        <Text className="card-text">{highlight.concise_summary}</Text>
+        <Text className="card-text">
+          {addLineBreaks(highlight.concise_summary)}
+        </Text>
       </div>
+      {highlight.hashtags && (
+        <div className="card-hashtags-container">
+          <Text className="card-hashtags-label">HashTags</Text>
+          <Text className="card-hashtags-value">
+            {highlight.hashtags.join(", ")}
+          </Text>
+        </div>
+      )}
+      {(highlight.num_linkedin_reactions ||
+        highlight.num_linkedin_comments ||
+        highlight.num_linkedin_reposts) && (
+        <div className="card-post-engagement-container">
+          <Text className="card-post-engagement-label">Post Engagement</Text>
+          <div className="card-post-engagement-value-container">
+            {highlight.num_linkedin_reactions > 0 && (
+              <Text className="post-engagement-value-text">
+                Num Reactions: {highlight.num_linkedin_reactions}
+              </Text>
+            )}
+            {highlight.num_linkedin_comments > 0 && (
+              <Text className="post-engagement-value-text">
+                Num Comments: {highlight.num_linkedin_comments}
+              </Text>
+            )}
+            {highlight.num_linkedin_reposts > 0 && (
+              <Text className="post-engagement-value-text">
+                Num Reposts: {highlight.num_linkedin_reposts}
+              </Text>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

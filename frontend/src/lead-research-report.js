@@ -69,6 +69,7 @@ function Insights({ report }) {
     return null;
   }
 
+  //  Older method to show team members.
   function PotentialTeamMembers() {
     if (
       report.insights.mentioned_team_members === null ||
@@ -93,6 +94,7 @@ function Insights({ report }) {
     );
   }
 
+  //  Older method to show product associations.
   function PotentialProductAssociations() {
     if (
       report.insights.potential_product_associations === null ||
@@ -117,8 +119,114 @@ function Insights({ report }) {
     );
   }
 
+  // Description of their Personality.
+  function PersonalityDescription() {
+    if (report.insights.personality_description === null) {
+      return null;
+    }
+    return (
+      <div id="personality-description">
+        <Text>Personality</Text>
+        <Text>{report.insights.personality_description}</Text>
+      </div>
+    );
+  }
+
+  // Description of their areas of interest.
+  function AreasOfInterest() {
+    if (
+      report.insights.areas_of_interest === null ||
+      report.insights.areas_of_interest.interests === null ||
+      report.insights.areas_of_interest.interests.length === 0
+    ) {
+      return null;
+    }
+
+    return (
+      <div id="areas-of-interest">
+        <Text>Areas of Interest</Text>
+        {report.insights.areas_of_interest.interests.map((interest) => {
+          if (interest.description) {
+            return (
+              <div key={interest.description}>
+                <Text>{interest.description}:</Text>
+                <Text>{interest.reason}</Text>
+              </div>
+            );
+          }
+        })}
+      </div>
+    );
+  }
+
+  // Stats related to number of company-related posts the lead has engaged with.
+  function CompanyPostsStats() {
+    if (
+      report.insights.num_company_related_activities === null ||
+      report.insights.total_engaged_activities === null ||
+      report.insights.total_engaged_activities === 0
+    ) {
+      return null;
+    }
+
+    return (
+      <div id="company-posts-engagement-stats">
+        <Text>Engagement with {report.company_name}'s posts</Text>
+        <Text>
+          {report.person_name} has engaged with{" "}
+          {report.insights.num_company_related_activities} posts related to{" "}
+          {report.company_name} out of the total of{" "}
+          {report.insights.total_engaged_activities} posts.
+        </Text>
+      </div>
+    );
+  }
+
+  // List of colleagues they have engaged with on LinkedIn posts.
+  function EngagedColleagues() {
+    if (report.insights.engaged_colleagues === null) {
+      return null;
+    }
+
+    var engagedColleagues = "None";
+    if (report.insights.engaged_colleagues.length > 0) {
+      engagedColleagues = report.insights.engaged_colleagues.join(", ");
+    }
+
+    return (
+      <div id="engaged-colleagues">
+        <Text>Engagement with Colleagues</Text>
+        <Text>{engagedColleagues}</Text>
+      </div>
+    );
+  }
+
+  // List of products they have engaged with on LinkedIn posts.
+  function EngagedProducts() {
+    if (report.insights.engaged_products === null) {
+      return null;
+    }
+
+    var engagedProducts = "None";
+    if (report.insights.engaged_products.length > 0) {
+      engagedProducts = report.insights.engaged_products.join(", ");
+    }
+
+    return (
+      <div id="engaged-colleagues">
+        <Text>Engagement with {report.company_name}'s Products</Text>
+        <Text>{engagedProducts}</Text>
+      </div>
+    );
+  }
+
   return (
     <div id="report-insights">
+      <PersonalityDescription />
+      <AreasOfInterest />
+      <CompanyPostsStats />
+      <EngagedColleagues />
+      <EngagedProducts />
       <PotentialTeamMembers />
       <PotentialProductAssociations />
     </div>
@@ -224,6 +332,13 @@ function LeadResearchReport() {
     setActiveTabKey(personalizedEmailsTabKey());
   }
 
+  // TODO: Remove this once we know if we are only using LinkedIn activity or combined
+  // Activity + web results for outreach.
+  const tabHeading =
+    report.research_request_type === "linkedin_only"
+      ? "Recent Activity"
+      : "Recent News";
+
   return (
     <div id="lead-research-report-outer">
       {isUserOnboarding(userFromServer) && (
@@ -237,7 +352,7 @@ function LeadResearchReport() {
           activeKey={activeTabKey}
           items={[
             {
-              label: <h1>Recent News</h1>,
+              label: <h1>{tabHeading}</h1>,
               key: recentNewsTabKey(),
               children: (
                 <RecentNews

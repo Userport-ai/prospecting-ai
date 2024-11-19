@@ -434,6 +434,7 @@ def get_lead_report(lead_research_report_id: str):
             "report_publish_cutoff_date_readable_str": 1,
             "details": 1,
             "insights": 1,
+            "research_request_type": 1,
             "personalized_outreach_messages": {
                 "personalized_emails": {
                     "id": 1,
