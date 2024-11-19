@@ -173,6 +173,12 @@ function Insights({ report }) {
       return null;
     }
 
+    var companyPostsPercent =
+      (Number(report.insights.num_company_related_activities) /
+        report.insights.total_engaged_activities) *
+      100.0;
+    companyPostsPercent = companyPostsPercent.toFixed(2);
+
     return (
       <div id="company-posts-engagement-stats">
         <Text className="insight-label">
@@ -180,10 +186,10 @@ function Insights({ report }) {
         </Text>
         <Text className="insight-text">
           {report.person_name} has engaged with{" "}
-          {report.insights.num_company_related_activities} posts related to{" "}
-          {report.company_name} out of the{" "}
-          {report.insights.total_engaged_activities} posts they have engaged
-          with.
+          <b>{report.insights.num_company_related_activities}</b> posts related
+          to {report.company_name} out of{" "}
+          {report.insights.total_engaged_activities} posts (
+          <b>{companyPostsPercent}%</b>)
         </Text>
       </div>
     );
@@ -232,10 +238,10 @@ function Insights({ report }) {
   return (
     <div id="report-insights">
       <PersonalityDescription />
-      <AreasOfInterest />
       <CompanyPostsStats />
       <EngagedColleagues />
       <EngagedProducts />
+      <AreasOfInterest />
       <PotentialTeamMembers />
       <PotentialProductAssociations />
     </div>
