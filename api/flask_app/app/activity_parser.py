@@ -12,10 +12,9 @@ from langchain_core.messages import SystemMessage
 from langchain_community.callbacks import get_openai_callback
 from langchain_core.prompts import HumanMessagePromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from app.metrics import Metrics
-from enum import Enum
 
 logger = logging.getLogger()
 
@@ -167,6 +166,8 @@ class LinkedInActivityParser:
                 return content_details
 
             if not self.is_content_related_to_company(content_md=activity.content_md, content_details=content_details, must_be_company_related=True):
+                content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag="activity_processing", prompt_tokens=cb.prompt_tokens,
+                                                                      completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
                 logger.info(
                     f"\n\nTotal cost: {content_details.openai_tokens_used.total_cost_in_usd}")
                 return content_details
@@ -217,21 +218,10 @@ class LinkedInActivityParser:
                     content_md=activity.content_md, content_details=content_details):
                 content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag=LinkedInActivityParser.OPERATION_TAG, prompt_tokens=cb.prompt_tokens,
                                                                       completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
-                logger.info(
-                    f"\n\nTotal cost: {content_details.openai_tokens_used.total_cost_in_usd}")
                 return content_details
 
             self.is_content_related_to_company(
                 content_md=activity.content_md, content_details=content_details, must_be_company_related=False)
-
-            self.extract_author_details(
-                content_md=activity.content_md, content_details=content_details)
-
-            self.extract_hashtags(
-                content_md=activity.content_md, content_details=content_details)
-
-            self.extract_num_reactions_and_comments(
-                content_md=activity.content_md, content_details=content_details)
 
             self.fetch_detailed_summary(
                 content_md=activity.content_md, content_details=content_details)
@@ -248,14 +238,20 @@ class LinkedInActivityParser:
             self.extract_any_products(
                 content_md=activity.content_md, content_details=content_details)
 
-            logger.info(
-                f"Successfully processed Content in LinkedIn Activity URL: {content_details.url} with Activity ID: {content_details.linkedin_activity_ref_id}")
+            self.extract_author_details(
+                content_md=activity.content_md, content_details=content_details)
+
+            self.extract_hashtags(
+                content_md=activity.content_md, content_details=content_details)
+
+            self.extract_num_reactions_and_comments(
+                content_md=activity.content_md, content_details=content_details)
 
             content_details.processing_status = ContentDetails.ProcessingStatus.COMPLETE
             content_details.openai_tokens_used = OpenAITokenUsage(url=content_details.url, operation_tag="activity_processing", prompt_tokens=cb.prompt_tokens,
                                                                   completion_tokens=cb.completion_tokens, total_tokens=cb.total_tokens, total_cost_in_usd=cb.total_cost)
             logger.info(
-                f"\n\nTotal cost: {content_details.openai_tokens_used.total_cost_in_usd}")
+                f"Successfully processed Content in LinkedIn Activity URL: {content_details.url} with Activity ID: {content_details.linkedin_activity_ref_id}")
             return content_details
 
     def extract_publish_date(self, content_md: str, content_details: ContentDetails) -> bool:
@@ -300,8 +296,10 @@ class LinkedInActivityParser:
                 "activity_url": content_details.url, "activity_id": content_details.linkedin_activity_ref_id, "publish_date": publish_date.strftime("%d-%m-%Y")})
             return False
 
-        # Populate publish date.
+        # Populate publish date and human readable format of the date.
         content_details.publish_date = publish_date
+        content_details.publish_date_readable_str = publish_date.strftime(
+            "%d %B, %Y")
 
         logger.info(
             f"Got Publish date: {content_details.publish_date} in LinkedIn Activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}")
@@ -367,6 +365,8 @@ class LinkedInActivityParser:
             # Exit early if content must be company related.
             logger.info(
                 f"Not related to company: {self.company_name}, reason: {result.reason} and publish date: {content_details.publish_date}, Exiting content processing for content in LinkedIn Activity URL: {content_details.url} and ID: {content_details.linkedin_activity_ref_id}")
+            content_details.focus_on_company = result.related
+            content_details.focus_on_company_reason = result.reason
             content_details.processing_status = ContentDetails.ProcessingStatus.FAILED_UNRELATED_TO_COMPANY
 
             # Send event.
@@ -652,11 +652,11 @@ class LinkedInActivityParser:
             "Here are the conditions:\n"
             "* The product name should not be a hashtag.\n"
             f"* The product must be made by {content_details.company_name}\n"
-            "* The product cannot be category names like 'Food', 'Beverage', 'AI', 'ATS', 'Staffing Automation' etc.\n"
-            "* The product must be a proper noun.\n"
-            "* The product should not be confused with the name of a campaign.\n"
-            "* The company name or a short form of the company name cannot be a product.\n"
-            "* A company event or conference name cannot be a product.\n"
+            "* The product name cannot be category names like 'Food', 'Beverage', 'AI', 'ATS', 'Staffing Automation' etc.\n"
+            "* The product name must be a proper noun.\n"
+            "* The product name should not be confused with the name of a campaign.\n"
+            "* The product name cannot be the company name or a shortened form of the company name.\n"
+            "* The product name should not be confused with a company event or conference name.\n"
             "\n"
             "Return empty list if it does not specify any products.\n"
         )

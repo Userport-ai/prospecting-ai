@@ -17,6 +17,7 @@ from app.web_page_scraper import (
     LinkedInPostHeadingTagNotFoundException
 )
 from app.activity_parser import LinkedInActivityParser
+from app.lead_insights_gen import LeadInsights
 from app.outreach_template import OutreachTemplateMatcher
 from app.personalization import Personalization
 from app.metrics import Metrics
@@ -535,10 +536,11 @@ class Researcher:
         failed_activities: List[LinkedInActivity] = []
         total_openai_tokens_used = OpenAITokenUsage(
             operation_tag=Researcher.CONTENT_PROCESSING_OPERATION_TAG_NAME, prompt_tokens=0, completion_tokens=0, total_tokens=0, total_cost_in_usd=0)
+        research_request_type: Optional[LeadResearchReport.ResearchRequestType] = lead_research_report.research_request_type
         for activity in linkedin_activities:
             try:
                 tokens_used: Optional[OpenAITokenUsage] = self.process_linkedin_activity(
-                    activity_parser=activity_parser, activity=activity, lead_research_report_id=lead_research_report_id)
+                    activity_parser=activity_parser, activity=activity, lead_research_report_id=lead_research_report_id, research_request_type=research_request_type)
                 logger.info(
                     f"Completed processing for Activity ID: {activity.id} in report ID: {lead_research_report_id} in task num: {task_num}")
                 total_openai_tokens_used.add_tokens(tokens_used)
@@ -551,7 +553,7 @@ class Researcher:
         for failed_activity in failed_activities:
             try:
                 tokens_used: Optional[OpenAITokenUsage] = self.process_linkedin_activity(
-                    activity_parser=activity_parser, activity=failed_activity, lead_research_report_id=lead_research_report_id)
+                    activity_parser=activity_parser, activity=failed_activity, lead_research_report_id=lead_research_report_id, research_request_type=research_request_type)
                 logger.info(
                     f"Completed processing for failed Activity ID: {activity.id} in report ID: {lead_research_report_id} in task num: {task_num}")
                 total_openai_tokens_used.add_tokens(tokens_used)
@@ -573,7 +575,7 @@ class Researcher:
             self.update_content_parsing_tokens_in_db(
                 lead_research_report_id=lead_research_report_id, total_openai_tokens_used=total_openai_tokens_used)
 
-    def process_linkedin_activity(self, activity_parser: LinkedInActivityParser, activity: LinkedInActivity, lead_research_report_id: str) -> Optional[OpenAITokenUsage]:
+    def process_linkedin_activity(self, activity_parser: LinkedInActivityParser, activity: LinkedInActivity, lead_research_report_id: str, research_request_type: Optional[LeadResearchReport.ResearchRequestType]) -> Optional[OpenAITokenUsage]:
         """Process content in given LinkedIn Activity and write to the database. Returns Tokens used in processing or None if activity is already processed."""
         # If activity is already processed, skip. We don't need to search by Company name since activity ID is already unique per lead.
         if self.database.get_content_details_by_activity_id(activity_id=activity.id, projection={"_id": 1}):
@@ -585,8 +587,11 @@ class Researcher:
                 "report_id": lead_research_report_id, "activity_id": activity.id})
             return None
 
-        content_details: ContentDetails = activity_parser.parse(
-            activity=activity)
+        content_details: ContentDetails = None
+        if research_request_type == LeadResearchReport.ResearchRequestType.LINKEDIN_ONLY:
+            content_details = activity_parser.parse_v2(activity=activity)
+        else:
+            content_details = activity_parser.parse(activity=activity)
 
         # Write content details to database.
         self.database.insert_content_details(content_details=content_details)
@@ -801,6 +806,111 @@ class Researcher:
 
         logger.info(f"Done with aggregating report: {lead_research_report_id}")
 
+    def aggregate_only_linkedin_activities(self, lead_research_report_id: str):
+        """Agggregate content from LinkedIn activities for given lead."""
+        # We want to fetch all content for given lead and for given company within given cutoff date.
+        # Then we want to process all of them together to get summary of lead report.
+        research_report: LeadResearchReport = self.database.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id)
+        person_profile: PersonProfile = self.database.get_person_profile(
+            person_profile_id=research_report.person_profile_id)
+
+        time_now: datetime = Utils.create_utc_time_now()
+
+        # Only filter documents from the last 15 months.
+        report_publish_cutoff_date = time_now - relativedelta(months=15)
+
+        stage_filter_content = {
+            "$match": {
+                "$and": [
+                    {"company_profile_id": research_report.company_profile_id},
+                    {"person_profile_id": research_report.person_profile_id},
+                    {"processing_status": ContentDetails.ProcessingStatus.COMPLETE},
+                    {"linkedin_activity_ref_id": {"$ne": None}},
+                    {"publish_date": {"$gt": report_publish_cutoff_date}},
+                ]
+            }
+        }
+
+        results = self.database.get_content_details_collection().aggregate(pipeline=[
+            stage_filter_content])
+        all_content_details: List[ContentDetails] = []
+        for res in results:
+            all_content_details.append(ContentDetails(**res))
+
+        # [1] Process all content to generate insights.
+        li_gen = LeadInsights(lead_research_report_id=lead_research_report_id, person_name=research_report.person_name, company_name=research_report.company_name,
+                              company_description=research_report.company_description, person_role_title=research_report.person_role_title, person_about_me=person_profile.summary)
+        insights: LeadResearchReport.Insights = li_gen.generate(
+            all_content_details=all_content_details)
+
+        # [2] Generate report details and highlights.
+        stage_project_fields = {
+            "$project": {
+                # These next 2 lines will remove _id MongoDB ID and replace with id in our storage.
+                "_id": 0,
+                "id": "$_id",
+                "url": 1,
+                "publish_date": 1,
+                "publish_date_readable_str": 1,
+                "concise_summary": 1,
+                "category_readable_str": "$unsupervised_category",
+                "focus_on_company": 1,
+                "num_linkedin_reactions": 1,
+                "num_linkedin_comments": 1,
+                "num_linkedin_reposts": 1,
+                "hashtags": 1,
+            }
+        }
+
+        # We group the projected fields by unsupervised_category and call them highlights.
+        # https://www.mongodb.com/docs/manual/reference/operator/aggregation/group/#mongodb-pipeline-pipe.-group.
+        stage_group_by_category = {
+            "$group": {
+                # This _id is the group key which is different from MongoDB generated db Ids.
+                "_id": "$category_readable_str",
+                "highlights": {"$push": "$$ROOT"}
+            }
+        }
+
+        stage_final_projection = {
+            "$project": {
+                # Renames _ID to category_readable_str in the final output to match the pydantic class in LeadResearchReport.
+                "_id": 0,
+                "category_readable_str": "$_id",
+                "highlights": 1,
+            }
+        }
+
+        pipeline = [
+            stage_filter_content,
+            stage_project_fields,
+            stage_group_by_category,
+            stage_final_projection
+        ]
+
+        report_details: List[LeadResearchReport.ReportDetail] = []
+        results = self.database.get_content_details_collection().aggregate(pipeline=pipeline)
+        for res in results:
+            detail = LeadResearchReport.ReportDetail(**res)
+            report_details.append(detail)
+
+        # Write [1] insights and [2] report details results to database.
+        setFields = {
+            "status": LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE,
+            "status_before_failure": None,
+            "report_creation_date_readable_str": Utils.to_human_readable_date_str(time_now),
+            "report_publish_cutoff_date": report_publish_cutoff_date,
+            "report_publish_cutoff_date_readable_str": Utils.to_human_readable_date_str(report_publish_cutoff_date),
+            "details": [detail.model_dump() for detail in report_details],
+            "insights": insights.model_dump(),
+        }
+        self.database.update_lead_research_report(
+            lead_research_report_id=lead_research_report_id, setFields=setFields)
+
+        logger.info(
+            f"Done with aggregating linkedin activities report: {lead_research_report_id}")
+
     def choose_template_and_create_emails(self, lead_research_report_id: str):
         """Chooses Email template for the lead automatically based on their persona using LLM.
 
@@ -862,4 +972,5 @@ if __name__ == "__main__":
     # company_profile_id = '66a7a6b5066fac22c378bd75'
 
     rp = Researcher(database=Database())
-    rp.aggregate(lead_research_report_id="672a0c36fceeccf8634f427d")
+    rp.aggregate_only_linkedin_activities(
+        lead_research_report_id="6736c56b71bc3188df5a51d7")

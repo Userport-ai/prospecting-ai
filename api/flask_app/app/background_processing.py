@@ -74,15 +74,23 @@ def enrich_lead_info_in_background(self, user_id: str, lead_research_report_id: 
         f"Creating lead profile for Lead Research report ID: {lead_research_report_id}")
     database = Database()
     try:
+        research_request_type: LeadResearchReport.ResearchRequestType = database.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id, projection={"research_request_type": 1}).research_request_type
+
         rp = Researcher(database=database)
         rp.enrich_lead_info(
             lead_research_report_id=lead_research_report_id)
         logger.info(
             f"Enriched lead successfully in report ID: {lead_research_report_id} for user ID: {user_id}.")
 
-        # Fetch Search Results associated with the given leads.
-        fetch_search_results_in_background.delay(
-            user_id=user_id, lead_research_report_id=lead_research_report_id)
+        if research_request_type == LeadResearchReport.ResearchRequestType.LINKEDIN_ONLY:
+            # No need to fetch web search results. Directly process stored activities next.
+            process_content_in_search_results_and_activities_in_background.delay(
+                user_id=user_id, lead_research_report_id=lead_research_report_id)
+        else:
+            # Fetch Search Results associated with the given leads.
+            fetch_search_results_in_background.delay(
+                user_id=user_id, lead_research_report_id=lead_research_report_id)
 
         # Send event.
         Metrics().capture(user_id=user_id, event_name="report_lead_info_enriched", properties={
@@ -280,14 +288,14 @@ def aggregate_processed_content_results_in_background(self, failed_urls_list: Li
             lead_research_report_id=lead_research_report_id, setFields=setFields)
 
         logger.info(
-            f"Completed aggregation of processed search results for lead report ID: {lead_research_report_id} for user ID: {user_id}")
+            f"Completed aggregation of processed content results for lead report ID: {lead_research_report_id} for user ID: {user_id}")
 
         # Aggregate Report next.
         aggregate_report_in_background.delay(
             user_id=user_id, lead_research_report_id=lead_research_report_id)
 
         # Send event.
-        Metrics().capture(user_id=user_id, event_name="report_search_results_processed", properties={
+        Metrics().capture(user_id=user_id, event_name="report_all_content_results_processed", properties={
             "report_id": lead_research_report_id, "end_time": time.time(), "failed_urls": flattened_urls_list, "num_failed_urls": len(flattened_urls_list)})
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
@@ -319,8 +327,18 @@ def aggregate_report_in_background(self, user_id: str, lead_research_report_id: 
         f"Start lead research report aggregation for report ID: {lead_research_report_id} for user ID: {user_id}")
     database = Database()
     try:
+        research_request_type: LeadResearchReport.ResearchRequestType = database.get_lead_research_report(
+            lead_research_report_id=lead_research_report_id, projection={"research_request_type": 1}).research_request_type
+
         r = Researcher(database=database)
-        r.aggregate(lead_research_report_id=lead_research_report_id)
+        if research_request_type == LeadResearchReport.ResearchRequestType.LINKEDIN_ONLY:
+            # Aggregate only LinkedIn activities.
+            r.aggregate_only_linkedin_activities(
+                lead_research_report_id=lead_research_report_id)
+        else:
+            # Aggregate linkedin activities and web content.
+            r.aggregate(lead_research_report_id=lead_research_report_id)
+
         logger.info(
             f"Completed aggregation of research report complete for report ID: {lead_research_report_id} for user ID: {user_id}")
 
@@ -360,14 +378,18 @@ def choose_template_and_create_emails_in_background(self, user_id: str, lead_res
         total_cost: float = 0.0
         content_processing_cost: float = 0.0
         personalized_emails_generation_cost: float = 0.0
+        insights_generation_cost: float = 0.0
         if lead_report.content_parsing_total_tokens_used:
             content_processing_cost = lead_report.content_parsing_total_tokens_used.total_cost_in_usd
             total_cost += content_processing_cost
         if lead_report.personalized_outreach_messages and lead_report.personalized_outreach_messages.total_tokens_used:
             personalized_emails_generation_cost = lead_report.personalized_outreach_messages.total_tokens_used.total_cost_in_usd
             total_cost += personalized_emails_generation_cost
-        m.capture(user_id=user_id, event_name="report_generation_cost_in_usd", properties={
-                  "report_id": lead_research_report_id, "total_cost_in_usd": total_cost, "content_processing_cost_in_usd": content_processing_cost, "personalized_emails_generation_cost_in_usd": personalized_emails_generation_cost})
+        if lead_report.insights and lead_report.insights.total_tokens_used:
+            insights_generation_cost = lead_report.insights.total_tokens_used.total_cost_in_usd
+            total_cost += insights_generation_cost
+        m.capture(user_id=user_id, event_name="report_generation_cost_in_usd", properties={"report_id": lead_research_report_id, "total_cost_in_usd": total_cost, "content_processing_cost_in_usd":
+                  content_processing_cost, "insights_generation_cost_in_usd": insights_generation_cost, "personalized_emails_generation_cost_in_usd": personalized_emails_generation_cost})
     except Exception as e:
         shared_task_exception_handler(shared_task_obj=self, database=database, user_id=user_id, lead_research_report_id=lead_research_report_id, e=e,
                                       task_name="choose_template_and_create_emails", status_before_failure=LeadResearchReport.Status.RECENT_NEWS_AGGREGATION_COMPLETE)

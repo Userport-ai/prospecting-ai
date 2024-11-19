@@ -303,6 +303,7 @@ def create_lead_report():
     postsHTML: Optional[str] = None
     commentsHTML: Optional[str] = None
     reactionsHTML: Optional[str] = None
+    research_request_type: Optional[str] = None
     try:
         # Remove any leading and trailing whitespaces and trailing slashes.
         person_linkedin_url = Utils.remove_spaces_and_trailing_slashes(
@@ -314,6 +315,7 @@ def create_lead_report():
         postsHTML = request.json.get("postsHTML")
         commentsHTML = request.json.get("commentsHTML")
         reactionsHTML = request.json.get("reactionsHTML")
+        research_request_type = request.json.get("research_request_type")
         if origin == LeadResearchReport.Origin.EXTENSION.value:
             # Origin is Extension, so we expect HTML for posts, comments and reactions to be present.
             if postsHTML == None and commentsHTML == None and reactionsHTML == None:
@@ -346,8 +348,8 @@ def create_lead_report():
 
     try:
         lead_research_report_id: str
-        lead_research_report = LeadResearchReport(
-            user_id=user_id, person_linkedin_url=person_linkedin_url, status=LeadResearchReport.Status.NEW, origin=origin)
+        lead_research_report = LeadResearchReport(user_id=user_id, person_linkedin_url=person_linkedin_url,
+                                                  status=LeadResearchReport.Status.NEW, origin=origin, research_request_type=research_request_type)
         if origin == LeadResearchReport.Origin.WEB.value:
             # Create report in the database and continue updating it in the background.
             lead_research_report_id = db.insert_lead_research_report(

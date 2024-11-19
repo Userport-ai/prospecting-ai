@@ -375,6 +375,8 @@ class ContentDetails(BaseModel):
         default=None, description="LinkedIn URL of the Author (person or company) of the content. If not known, set to None.")
     publish_date: Optional[datetime] = Field(
         default=None, description="Date when this content was published in UTC timezone.")
+    publish_date_readable_str: Optional[str] = Field(
+        default=None, description="Human readable string of the publish date field which will be used in the UI.")
     detailed_summary: Optional[str] = Field(default=None,
                                             description="A detailed summary of the content.")
     concise_summary: Optional[str] = Field(default=None,
@@ -482,6 +484,16 @@ class LeadResearchReport(BaseModel):
                                                              description="Human readable publish date string.")
             url: Optional[str] = Field(
                 default=None, description="URL of the content.")
+            focus_on_company: Optional[bool] = Field(
+                default=False, description="Whether the content is related to the Company.")
+            hashtags: Optional[List[str]] = Field(
+                default=None, description="If content is a LinkedIn Activity, list of hashtags in it and None otherwise.")
+            num_linkedin_reactions: Optional[int] = Field(
+                default=None, description="Number of LinkedIn reactions for a post. Set only for LinkedIn post or LinkedInActivity content and None otherwise.")
+            num_linkedin_comments: Optional[int] = Field(
+                default=None, description="Number of LinkedIn comments for a post. Set only for LinkedIn post or LinkedInActivity content and None otherwise.")
+            num_linkedin_reposts: Optional[int] = Field(
+                default=None, description="Number of LinkedIn reposts for a given post. Set only for LinkedIn post or LinkedInActivity content and None otherwise.")
 
         category: Optional[ContentCategoryEnum] = Field(default=None,
                                                         description="Category of the highlights.")
@@ -506,10 +518,37 @@ class LeadResearchReport(BaseModel):
             count: Optional[int] = Field(
                 default=None, description="Count of the product across all LinkedIn activity.")
 
+        class AreasOfInterest(BaseModel):
+            """Areas of interest of the lead based on activity information."""
+            class Interest(BaseModel):
+                description: Optional[str] = Field(
+                    default=None, description="Description of Interest.")
+                reason: Optional[str] = Field(
+                    default=None, description="Reason for why this is an area of interest")
+            interests: Optional[List[Interest]] = Field(
+                default=None, description="Areas of interests of the lead.")
+
         mentioned_team_members: Optional[List[TeamMemberCount]] = Field(
             default=None, description="List of mentioned team members across all LinkedIn activity. Mentioned also includes members whose content the lead has engaged with (liked, commented etc.). Sorted in descending order by count.")
         potential_product_associations: Optional[List[ProductAssociationCount]] = Field(
             default=None, description="List of potential products the lead is potentailly associated with. Sorted in descending order by count.")
+
+        # New Insights about lead.
+        personality_description: Optional[str] = Field(
+            default=None, description="Personality description of the lead.")
+        areas_of_interest: Optional[AreasOfInterest] = Field(
+            default=None, description="Areas of interest of the lead.")
+        engaged_colleagues: Optional[List[str]] = Field(
+            default=None, description="Colleagues the lead has engaged with over LinkedIn activities in order of most to least important.")
+        engaged_products: Optional[List[str]] = Field(
+            default=None, description="Products the lead has engaged with over LinkedIn activities in order of most to least important.")
+        num_company_related_activities: Optional[int] = Field(
+            default=None, description="Number of company related activities the lead has engaged with.")
+        total_engaged_activities: Optional[int] = Field(
+            default=None, description="Total number of LinkedIn activities the lead has engaged with.")
+
+        total_tokens_used: Optional[OpenAITokenUsage] = Field(
+            default=None, description="Total OpenAI tokens used in generating insights for given lead.")
 
     class ChosenOutreachEmailTemplate(BaseModel):
         """Outreach Template chosen for this Lead. If ID is None, then none of the existing templates were chosen at that time."""
@@ -617,7 +656,7 @@ class LeadResearchReport(BaseModel):
 
     # Content parsing results.
     content_parsing_total_tokens_used: Optional[OpenAITokenUsage] = Field(
-        default=None, description="Total OpenAI tokens used in processing successfully parsed content from the returned search URLs for given lead. Currently it doesn't track tokens used before an exception was thrown but that's ok for now.")
+        default=None, description="Total OpenAI tokens used in processing successfully parsed content from the returned search URLs and LinkedIn activity for given lead. Currently it doesn't track tokens used before an exception was thrown but that's ok for now.")
     content_parsing_failed_urls: Optional[List[str]] = Field(
         default=None, description="Search Result URLs whose contents failed to be parsed by the web scraper.")
 
