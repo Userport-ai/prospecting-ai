@@ -266,7 +266,7 @@ class Personalization:
             subject_line: Optional[str] = Field(
                 default=None, description="Subject Line of the email.")
 
-        llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MODEL,
+        llm = ChatOpenAI(temperature=1.3, model_name=self.OPENAI_GPT_4O_MINI_MODEL,
                          api_key=self.OPENAI_API_KEY, timeout=self.OPENAI_REQUEST_TIMEOUT_SECONDS).with_structured_output(EmailSubjectLine)
 
         chain = prompt | llm

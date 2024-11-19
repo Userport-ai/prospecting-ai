@@ -137,8 +137,9 @@ class LeadInsights:
             [content_detail.one_line_summary for content_detail in all_content_details])
 
         question = (
-            f"Using information from the summaries of activites above, desribe the areas of interest of {self.person_name}.\n"
+            f"Using information from the summaries of activites above, describe up to five areas of interest of {self.person_name}.\n"
             "Cite the reason for why something is an areas of interest.\n"
+            "Order the areas of interest from most to least likely.\n"
         )
         human_message_prompt_template = (
             '"""{combined_summaries}"""'
@@ -360,7 +361,7 @@ if __name__ == "__main__":
     database = Database()
     time_now: datetime = Utils.create_utc_time_now()
 
-    lead_research_report_id = "6736c56b71bc3188df5a51d7"
+    lead_research_report_id = "673c9f75af1ffa0df6417a6c"
 
     # Only filter documents from the last 15 months.
     research_report: LeadResearchReport = database.get_lead_research_report(

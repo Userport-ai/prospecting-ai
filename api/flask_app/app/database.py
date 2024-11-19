@@ -531,12 +531,39 @@ if __name__ == "__main__":
     # db.delete_all_content_details(
     #     find_filter=delete_filter, delete_confirm=False)
 
-    contents = db.list_content_details(
-        filter={"person_name": "Abhishek Jain"})
+    lead_research_report_id = "67399d13989687e2818ba920"
+    lead_report = db.get_lead_research_report(
+        lead_research_report_id=lead_research_report_id)
 
-    for c in contents:
-        res = db.get_content_details_collection().update_one(
-            {"_id": ObjectId(c.id)}, {"$set": {"concise_summary": c.detailed_summary}})
+    activity_ids = lead_report.linkedin_activity_info.activity_ref_ids
+
+    activity_object_ids = Database.get_object_ids(
+        ids=activity_ids)
+    linkedin_activities: List[LinkedInActivity] = db.list_linkedin_activities(
+        filter={"_id": {"$in": activity_object_ids}})
+
+    print("got num activities: ", len(linkedin_activities))
+
+    contents = db.list_content_details(
+        filter={"person_name": lead_report.person_name})
+    content_ids = [cd.id for cd in contents]
+
+    print("got num contents: ", len(contents))
+
+    # Delete flow.
+    # Delete contentDetail, linkedinactivity and then lead report.
+    # db.delete_object_ids(
+    #     collection=db.get_content_details_collection(), ids_to_delete=content_ids)
+    # db.delete_object_ids(
+    #     collection=db.get_linkedin_activities_collection(), ids_to_delete=activity_ids)
+    # db.delete_object_ids(
+    #     collection=db.get_lead_research_report_collection(), ids_to_delete=[lead_research_report_id])
+
+    # print("done deleting")
+
+    # for c in contents:
+    #     res = db.get_content_details_collection().update_one(
+    #         {"_id": ObjectId(c.id)}, {"$set": {"concise_summary": c.detailed_summary}})
 
     # collection = db.get_lead_research_report_collection()
     # data_dict = collection.find_one(
