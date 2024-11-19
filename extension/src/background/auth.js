@@ -26,9 +26,6 @@ export async function getUserObj() {
       email: user.email,
       emailVerified: user.emailVerified,
     });
-
-    // Send event.
-    captureEvent("extension_user_logged_in");
   } else {
     console.log("Auth update: user is logged out");
 

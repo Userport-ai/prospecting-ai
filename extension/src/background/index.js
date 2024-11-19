@@ -31,6 +31,7 @@ import {
 const leadReportStatusSuccess = "complete";
 const leadReportStatusFailed = "failed_with_errors";
 const callOrigin = "extension";
+const researchRequestType = "linkedin_only";
 
 // Helper that creates lead profile from given tab Id, Lead LinkedIn URL and report (can be null) and stores it in storage.
 // It also starts an alarm if the lead status exists but is not in failed or complete status.
@@ -305,6 +306,7 @@ function createLeadReport(tabId) {
                 postsHTML: postsHTML,
                 commentsHTML: commentsHTML,
                 reactionsHTML: reactionsHTML,
+                research_request_type: researchRequestType,
               }),
               headers: {
                 "Content-Type": "application/json",
