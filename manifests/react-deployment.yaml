@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: react
-        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/frontend:v0.0.34
+        image: us-west1-docker.pkg.dev/omega-winter-431704-u5/userport-images-amd64/frontend:v0.0.35
         resources:
           limits:
             cpu: 1000m
