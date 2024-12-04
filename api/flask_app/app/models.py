@@ -1130,7 +1130,7 @@ class PersonProfile(BaseModel):
         # Currently, we will assume that the first element in the experiences array that has end date None is the current employment.
         current_employment: Optional[PersonProfile.Experience] = None
         for exp in self.experiences:
-            if exp.ends_at == None:
+            if exp.company_linkedin_profile_url != None and exp.ends_at == None:
                 # Current employment.
                 current_employment = exp
                 break
