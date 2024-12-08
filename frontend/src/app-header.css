@@ -35,6 +35,13 @@
   justify-content: flex-end;
 }
 
+/* Ensures that the nav menu does not get printed */
+@media print {
+  #nav-header #nav-menu {
+    display: none;
+  }
+}
+
 #nav-header .ant-menu-item {
   color: var(--outline-variant);
 }

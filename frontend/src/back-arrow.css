@@ -3,3 +3,10 @@
   height: 2rem;
   color: var(--primary);
 }
+
+/* Ensures that this back button does not get printed */
+@media print {
+  .anticon-arrow-left svg {
+    display: none;
+  }
+}
