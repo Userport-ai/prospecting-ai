@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Userport",
-    "version": "0.0.0.4",
+    "version": "0.0.0.5",
     "description": "Use AI to research leads and generate personalized outreach. Go to a LinkedIn profile and click 'Start Research', it's that simple!",
     "icons": {
       "16": "logo256.png",
