@@ -130,7 +130,6 @@ Restart rollout of deployment. Used when you need to update something like Secre
 
 Details of installed components in Google Cloud SDK: `gcloud info`
 
-
 ## GKE Debugging
 
 To view all pods in deployment, their status and logs from failures if any.
