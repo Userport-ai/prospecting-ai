@@ -11,15 +11,18 @@
 # production
 /build
 
+# Manifest files are stored separately for dev and prod builds under manifests/ directory.
+# We copy these files over to public/manifest during build. As a result, we don't need to
+# version control this file.
+/public/manifest.json
+
 # misc
 .DS_Store
 .env.local
+.env.dev
 .env.development.local
 .env.test.local
 .env.production.local
-# Rename this file to .env.production.local when you
-# want to build and test the extension locally.
-.env.local.production.local
 
 npm-debug.log*
 yarn-debug.log*
