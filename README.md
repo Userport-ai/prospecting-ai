@@ -161,3 +161,17 @@ List In Use static external IP addresses: `gcloud compute addresses list`
 Send debug request: `curl https://app.userport.ai/api/v1/debug/<report ID>`
 
 Delete report: `curl -X "DELETE" https://app.userport.ai/api/v1/admin/delete/<report ID>/<confirm_deletion>`
+
+## Exporting and importing data from MongoDB
+
+This is useful to get collections data in JSON or CSV format.
+
+You can only export 1 collection at a time. By default the file type export is JSON (CSV also supported).
+
+Export: `mongoexport --db=<db name>  --out=<file path> --uri=<mongodb instance URL in single quotes> --collection=<collection name>`
+
+Similarly, you can only import 1 collection at a time.
+
+Import: `mongoimport --db=<db name> --file=<file path> --uri=<mongodb instance URL in single quotes> --collection=<collection name>`
+
+For more details, check: https://www.mongodb.com/docs/database-tools/mongoexport/ and https://www.mongodb.com/docs/database-tools/mongoimport/
