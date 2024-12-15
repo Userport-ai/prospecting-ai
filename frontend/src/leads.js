@@ -118,9 +118,10 @@ function Leads() {
       <div id="leads-container">
         <div id="title-and-btn-container">
           <h1>Leads</h1>
-          <Button type="primary" onClick={handleAddLeadClick}>
+          {/* Commenting this button since we don't want to add a lead from the UI, only from the chrome extension. */}
+          {/* <Button type="primary" onClick={handleAddLeadClick}>
             Add new lead
-          </Button>
+          </Button> */}
         </div>
         <LeadsTable leads={leads} />
       </div>
