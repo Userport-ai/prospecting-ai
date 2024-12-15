@@ -1,23 +1,22 @@
 ## Get started
 
-1. Use a virtual environment. E.g.:
-```shell
-python3 -m venv usrprt-venv
-pip install -r requirements.txt
+1. Build the docker container using
 ```
-2. Make sure to add it to `.gitignore` like below
-```.gitignore
-usrprt-venv/*
+sowrabh@Sowrabhs-MacBook-Pro django_app % docker build -t userport-app:dev .
 ```
-3. Install requirements
-```shell
-(usrprt-venv) sowrabh@Sowrabhs-MacBook-Pro django_app % pip install requirements.txt
+2. Update `.dev.env` file in `api/django_app/.dev.env` with the latest credentials
+3. Install and run `cloud-sql-proxy` using the right credentials.
+   1. First install gcloud sdk from [here](https://cloud.google.com/sdk/docs/install)
+   2. Run `gcloud auth login` and authenticate
+   3. Install `cloud-sql-proxy` using `curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.2/cloud-sql-proxy.darwin.arm64`
+   3. Run `./cloud-sql-proxy --gcloud-auth omega-winter-431704-u5:us-central1:userport-pg --port 5433`
+  `
+4. Run the docker container using
 ```
-4. (If running first time) Run migrations
-```shell
-python3 manage.py migrate
-```
-5. Run the server
-```shell
-python3 manage.py runserver
+sowrabh@Sowrabhs-MacBook-Pro django_app % docker run -it --rm \
+    -p 8000:8000 \
+    -v $(pwd):/app \
+    --env-file .dev.env \
+    --add-host=host.docker.internal:host-gateway \
+    userport-app:dev
 ```

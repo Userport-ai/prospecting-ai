@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-sy*-3-211i9@b#il3bet@y$@ci!khoejh_$l6t^d@1*9u!kum^'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('USERPORT_DEBUG')
 
 ALLOWED_HOSTS = []
 
@@ -81,8 +81,14 @@ dbpassword = os.environ.get('USERPORT_DEV_DB_PASSWORD')
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'userport',
+        'USER': dbusername,
+        'PASSWORD': dbpassword,
+        'HOST': "127.0.0.1",
+        'PORT': "5432",
+        'ATOMIC_REQUESTS': True,
+        'DEFAULT_SCHEMA': 'public'
     }
 }
 
@@ -122,6 +128,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
