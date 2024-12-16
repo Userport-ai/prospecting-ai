@@ -21,7 +21,7 @@ from app.apis.auth.auth_urls import authurlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/', include([
+    path('api/v2/', include([
         path('', include(authurlpatterns)),
     ])),
 ]

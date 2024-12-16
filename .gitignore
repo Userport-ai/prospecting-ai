@@ -29,3 +29,5 @@ yarn-error.log*
 
 # Generated to manage python path settings locally
 .vscode/
+api/django_app/.dev.env
+*.env

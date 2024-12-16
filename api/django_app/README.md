@@ -17,6 +17,5 @@ sowrabh@Sowrabhs-MacBook-Pro django_app % docker run -it --rm \
     -p 8000:8000 \
     -v $(pwd):/app \
     --env-file .dev.env \
-    --add-host=host.docker.internal:host-gateway \
     userport-app:dev
 ```
