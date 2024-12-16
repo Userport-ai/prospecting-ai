@@ -18,7 +18,7 @@ class UserStatus(models.TextChoices):
     SUSPENDED = 'suspended', 'Suspended'
 
 
-class UserportUserManager(BaseUserManager):
+class AppUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError('Email is required')
@@ -53,7 +53,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseMixin):
     last_login = models.DateTimeField(null=True, blank=True)
     is_staff = models.BooleanField(default=False)
 
-    objects = UserportUserManager()
+    objects = AppUserManager()
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []

@@ -8,6 +8,7 @@ __pycache__/
 
 # secrets
 *.env
+.dev.env
 service-account.json
 
 # C extensions

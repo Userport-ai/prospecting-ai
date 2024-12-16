@@ -16,11 +16,11 @@ RUN apt-get update && apt-get install -y \
     wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.1/cloud-sql-proxy.linux.arm64 -O /usr/local/bin/cloud-sql-proxy && \
     chmod +x /usr/local/bin/cloud-sql-proxy
 
-# Rest of your Dockerfile remains the same
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install gunicorn
 
+# Copy the django app
 COPY . .
 
 RUN chmod +x start.sh && \
