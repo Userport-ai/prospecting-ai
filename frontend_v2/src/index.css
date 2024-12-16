@@ -3,6 +3,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+Default color theme.
+Keeping it so that we can go back in case we mess up.
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -56,6 +60,62 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%
+  }
+} */
+@layer base {
+  :root {
+    --background: rgb(101, 85, 143); /* #65558f */
+    --foreground: rgb(255, 255, 255); /* White */
+    --card: rgb(255, 255, 255); /* White */
+    --card-foreground: rgb(51, 51, 51); /* Dark gray */
+    --popover: rgb(255, 255, 255); /* White */
+    --popover-foreground: rgb(51, 51, 51); /* Dark gray */
+    --primary: rgb(101,85,143); /* #65558f */
+    --primary-foreground: rgb(255, 255, 255); /* White */
+    --secondary: rgb(214, 208, 231); /* Lighter purple */
+    --secondary-foreground: rgb(51, 51, 51); /* Dark gray */
+    --muted: rgb(214, 208, 231); /* Lighter purple */
+    --muted-foreground: rgb(153, 153, 153); /* Light gray */
+    --accent: rgb(214, 208, 231); /* Lighter purple */
+    --accent-foreground: rgb(101, 85, 143); /* #65558f */
+    --destructive: rgb(255, 0, 0); /* Red for destructive actions */
+    --destructive-foreground: rgb(255, 255, 255); /* White */
+    --border: rgb(224, 224, 224); /* Light gray border */
+    --input: rgb(255, 255, 255); /* White background for inputs */
+    --ring: rgb(101, 85, 143); /* #65558f */
+    --chart-1: rgb(255, 0, 0); /* Red */
+    --chart-2: rgb(0, 128, 0); /* Green */
+    --chart-3: rgb(0, 0, 255); /* Blue */
+    --chart-4: rgb(255, 255, 0); /* Yellow */
+    --chart-5: rgb(255, 165, 0); /* Orange */
+    --radius: 8px; /* Border radius */
+  }
+  
+  .dark {
+    --background: rgb(101, 85, 143); /* #65558f */
+    --foreground: rgb(255, 255, 255); /* White */
+    --card: rgb(101, 85, 143); /* #65558f */
+    --card-foreground: rgb(255, 255, 255); /* White */
+    --popover: rgb(101, 85, 143); /* #65558f */
+    --popover-foreground: rgb(255, 255, 255); /* White */
+    --primary: rgb(101, 85, 143); /* #65558f */
+    --primary-foreground: rgb(255, 255, 255); /* White */
+    --secondary: rgb(91, 76, 132); /* Darker purple */
+    --secondary-foreground: rgb(255, 255, 255); /* White */
+    --muted: rgb(91, 76, 132); /* Darker purple */
+    --muted-foreground: rgb(153, 153, 153); /* Light gray */
+    --accent: rgb(91, 76, 132); /* Darker purple */
+    --accent-foreground: rgb(255, 255, 255); /* White */
+    --destructive: rgb(255, 0, 0); /* Red for destructive actions */
+    --destructive-foreground: rgb(255, 255, 255); /* White */
+    --border: rgb(91, 76, 132); /* Dark purple */
+    --input: rgb(91, 76, 132); /* Dark purple background for inputs */
+    --ring: rgb(255, 255, 255); /* White ring */
+    --chart-1: rgb(255, 0, 0); /* Red */
+    --chart-2: rgb(0, 128, 0); /* Green */
+    --chart-3: rgb(0, 0, 255); /* Blue */
+    --chart-4: rgb(255, 255, 0); /* Yellow */
+    --chart-5: rgb(255, 165, 0); /* Orange */
   }
 }
 @layer base {
