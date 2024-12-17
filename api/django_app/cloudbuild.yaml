@@ -21,8 +21,21 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:latest']
 
-# Create/update the database credentials secret
+# Get GKE credentials first
 - name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - 'container'
+  - 'clusters'
+  - 'get-credentials'
+  - 'userport-service-prod'
+  - '--zone=us-west1'
+  - '--project=$PROJECT_ID'
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+
+# Create/update the database credentials secret
+- name: 'gcr.io/cloud-builders/kubectl'
   entrypoint: 'bash'
   args:
   - '-c'
@@ -32,19 +45,6 @@ steps:
       --from-literal=password=${_USERPORT_DEV_DB_PASSWORD} \
       --dry-run=client -o yaml | \
     kubectl apply -f - --validate=false
-  env:
-  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
-
-# Get GKE credentials
-- name: 'gcr.io/cloud-builders/gcloud'
-  args:
-  - 'container'
-  - 'clusters'
-  - 'get-credentials'
-  - 'userport-service-prod'
-  - '--zone=us-west1'
-  - '--project=$PROJECT_ID'
   env:
   - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
   - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
