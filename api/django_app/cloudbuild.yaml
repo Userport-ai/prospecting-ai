@@ -5,6 +5,7 @@ steps:
   args: [
     'build',
     '--platform=linux/amd64',
+    '-f', './api/django_app/Dockerfile',
     '--build-arg', 'USERPORT_DEBUG=${_USERPORT_DEBUG}',
     '--build-arg', 'USERPORT_DEV_DB_USERNAME=${_USERPORT_DEV_DB_USERNAME}',
     '--build-arg', 'USERPORT_DEV_DB_PASSWORD=${_USERPORT_DEV_DB_PASSWORD}',
