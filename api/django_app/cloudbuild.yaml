@@ -15,7 +15,7 @@ steps:
     '--build-arg', 'PORT=${_PORT}',
     '-t', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA',
     '-t', 'gcr.io/$PROJECT_ID/userport-django-app:latest',
-    '.'
+    './api/django_app'
   ]
 
 # Push the container image to Container Registry
