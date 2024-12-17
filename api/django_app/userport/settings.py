@@ -32,7 +32,7 @@ SECRET_KEY = 'django-insecure-sy*-3-211i9@b#il3bet@y$@ci!khoejh_$l6t^d@1*9u!kum^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('USERPORT_DEBUG', '0') == '1'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 # Application definition
 
@@ -100,6 +100,12 @@ WSGI_APPLICATION = 'userport.wsgi.application'
 dbusername = os.environ.get('USERPORT_DEV_DB_USERNAME')
 dbpassword = os.environ.get('USERPORT_DEV_DB_PASSWORD')
 
+if not dbusername or not dbpassword:
+    import logging
+    logger = logging.getLogger('django.db.backends')
+    logger.error(f"Database credentials not properly set: username={'present' if dbusername else 'missing'}, password={'present' if dbpassword else 'missing'}")
+
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -116,16 +122,43 @@ DATABASES = {
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
         },
     },
     'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django.db.backends.schema': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django.db.models': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
         'health': {
             'handlers': ['console'],
-            'level': 'INFO',
-        },
+            'level': 'DEBUG',
+            'propagate': True,
+        }
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
     },
 }
 
