@@ -1,4 +1,5 @@
 # app/models/accounts.py
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import JSONField
 from .common import BaseMixin
@@ -21,6 +22,16 @@ class Account(BaseMixin):
     employee_count = models.IntegerField(null=True, blank=True)
     company_type = models.CharField(max_length=100, null=True, blank=True)
     founded_year = models.IntegerField(null=True, blank=True)
+    customers = ArrayField(
+        models.CharField(max_length=250),
+        null=True,
+        blank=True
+    )
+    competitors = ArrayField(
+        models.CharField(max_length=250),
+        null=True,
+        blank=True
+    )
 
     technologies = JSONField(null=True, blank=True)
     funding_details = JSONField(null=True, blank=True)

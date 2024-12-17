@@ -25,7 +25,6 @@ class Lead(BaseMixin):
         default=EnrichmentStatus.PENDING
     )
     custom_fields = JSONField(null=True, blank=True)
-    linkedin_activity = JSONField(null=True, blank=True)
     score = models.FloatField(null=True, blank=True)
     last_enriched_at = models.DateTimeField(null=True, blank=True)
 
