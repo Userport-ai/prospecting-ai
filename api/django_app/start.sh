@@ -22,5 +22,4 @@ exec gunicorn \
     --bind "0.0.0.0:${GUNICORN_PORT}" \
     --timeout "${GUNICORN_TIMEOUT}" \
     --workers "${GUNICORN_WORKERS}" \
-    --reload \
     userport.wsgi:application
