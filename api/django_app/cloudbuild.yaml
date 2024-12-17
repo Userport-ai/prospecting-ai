@@ -7,8 +7,6 @@ steps:
     '--platform=linux/amd64',
     '-f', './api/django_app/Dockerfile',
     '--build-arg', 'USERPORT_DEBUG=${_USERPORT_DEBUG}',
-    '--build-arg', 'USERPORT_DEV_DB_USERNAME=${_USERPORT_DEV_DB_USERNAME}',
-    '--build-arg', 'USERPORT_DEV_DB_PASSWORD=${_USERPORT_DEV_DB_PASSWORD}',
     '--build-arg', 'ALLOWED_HOSTS=${_ALLOWED_HOSTS}',
     '--build-arg', 'GUNICORN_WORKERS=${_GUNICORN_WORKERS}',
     '--build-arg', 'GUNICORN_TIMEOUT=${_GUNICORN_TIMEOUT}',
@@ -18,11 +16,26 @@ steps:
     './api/django_app'
   ]
 
-# Push the container image to Container Registry
+# Push the container images
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:latest']
+
+# Create/update the database credentials secret
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    kubectl create secret generic db-credentials \
+      --from-literal=username=${_USERPORT_DEV_DB_USERNAME} \
+      --from-literal=password=${_USERPORT_DEV_DB_PASSWORD} \
+      --dry-run=client -o yaml | \
+    kubectl apply -f -
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
 
 # Deploy to GKE
 - name: 'gcr.io/cloud-builders/gke-deploy'
@@ -39,7 +52,6 @@ substitutions:
   _GUNICORN_WORKERS: '4'
   _GUNICORN_TIMEOUT: '120'
   _PORT: '8000'
-
 
 options:
   logging: CLOUD_LOGGING_ONLY
