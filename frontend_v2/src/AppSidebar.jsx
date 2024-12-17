@@ -68,13 +68,14 @@ const onboardingItems = [
     icon: File,
   },
 ];
-
 export function AppSidebar() {
   const navigate = useNavigate();
+
   return (
-    <Sidebar className="shadow-2xl">
-      <SidebarHeader className="hover:bg-secondary hover:cursor-pointer m-2">
-        <div className="w-36">
+    <Sidebar className="shadow-2xl bg-sidebar-background text-sidebar-foreground h-full min-h-screen">
+      {/* Header */}
+      <SidebarHeader className="flex items-center justify-center p-4 hover:bg-secondary hover:cursor-pointer transition">
+        <div className="w-40">
           <img
             className="scale-100"
             src={logo}
@@ -83,40 +84,50 @@ export function AppSidebar() {
           />
         </div>
       </SidebarHeader>
-      <SidebarSeparator className="border-t-2 border-gray-200" />
-      <SidebarContent className="mt-5 px-2">
+      <SidebarSeparator className="border-t-2 border-sidebar-border" />
+
+      {/* Sidebar Content */}
+      <SidebarContent className="mt-5 px-4 space-y-8">
+        {/* App Group */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-gray-500">App</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">
+            App
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="flex flex-col gap-2">
+            <SidebarMenu className="space-y-2">
               {appItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span className="text-gray-600 font-inter font-medium">
-                        {item.title}
-                      </span>
+                    <a
+                      href={item.url}
+                      className="flex items-center gap-4 p-3 rounded-md hover:bg-primary hover:text-primary-foreground transition"
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
+        </SidebarGroup>
 
-          <SidebarGroupLabel className="text-gray-500 mt-10">
+        {/* Getting Started Group */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">
             Getting Started
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-2">
               {onboardingItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span className="text-gray-600 font-inter font-medium">
-                        {item.title}
-                      </span>
+                    <a
+                      href={item.url}
+                      className="flex items-center gap-4 p-3 rounded-md hover:bg-secondary hover:text-secondary-foreground transition"
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -126,30 +137,29 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      {/* Footer */}
+      <SidebarFooter className="mt-auto p-4 border-t border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton>
-                  <User2 />
-                  <p className="text-gray-600 font-inter font-medium">
-                    Addarsh
-                  </p>
+                <SidebarMenuButton className="flex items-center gap-4 p-3 rounded-md hover:bg-muted hover:text-muted-foreground transition">
+                  <User2 className="w-5 h-5" />
+                  <p className="font-medium">Addarsh</p>
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="top"
-                className="w-[--radix-popper-anchor-width]"
+                className="w-[--radix-popper-anchor-width] shadow-lg bg-card text-card-foreground rounded-md p-2"
               >
-                <DropdownMenuItem className="hover:cursor-pointer">
+                <DropdownMenuItem className="hover:bg-muted hover:cursor-pointer rounded-md p-2">
                   <span>Account</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="hover:cursor-pointer">
+                <DropdownMenuItem className="hover:bg-muted hover:cursor-pointer rounded-md p-2">
                   <span>Billing</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="hover:cursor-pointer">
+                <DropdownMenuItem className="hover:bg-muted hover:cursor-pointer rounded-md p-2">
                   <span>Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
