@@ -6,6 +6,8 @@ steps:
     '--platform=linux/amd64',
     '-f', './api/django_app/Dockerfile',
     '--build-arg', 'USERPORT_DEBUG=${_USERPORT_DEBUG}',
+    '--build-arg', 'USERPORT_DEV_DB_USERNAME=${_USERPORT_DEV_DB_USERNAME}',
+    '--build-arg', 'USERPORT_DEV_DB_PASSWORD=${_USERPORT_DEV_DB_PASSWORD}',
     '--build-arg', 'ALLOWED_HOSTS=${_ALLOWED_HOSTS}',
     '--build-arg', 'GUNICORN_WORKERS=${_GUNICORN_WORKERS}',
     '--build-arg', 'GUNICORN_TIMEOUT=${_GUNICORN_TIMEOUT}',
@@ -40,11 +42,14 @@ steps:
   args:
   - '-c'
   - |
+    printf "%s" "${_USERPORT_DEV_DB_PASSWORD}" > password.txt
+    printf "%s" "${_USERPORT_DEV_DB_USERNAME}" > username.txt
     kubectl create secret generic db-credentials \
-      --from-literal=username=${_USERPORT_DEV_DB_USERNAME} \
-      --from-literal=password=${_USERPORT_DEV_DB_PASSWORD} \
+      --from-file=password=password.txt \
+      --from-file=username=username.txt \
       --dry-run=client -o yaml | \
     kubectl apply -f - --validate=false
+    rm password.txt username.txt
   env:
   - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
   - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
