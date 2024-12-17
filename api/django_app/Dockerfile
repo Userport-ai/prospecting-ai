@@ -27,7 +27,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     wget \
-    netcat && \
+    netcat-traditional && \
     rm -rf /var/lib/apt/lists/* && \
     mkdir -p /app/staticfiles && \
     wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.1/cloud-sql-proxy.linux.amd64 -O /usr/local/bin/cloud-sql-proxy && \
