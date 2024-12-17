@@ -1,9 +1,9 @@
-import Header from "./Header";
+import Layout from "./Layout";
 
 function App() {
   return (
-    <div className="flex flex-col items-start min-h-screen bg-slate-100 font-inter">
-      <Header />
+    <div className="flex flex-col items-start min-h-screen bg-background font-inter">
+      <Layout />
     </div>
   );
 }

@@ -64,58 +64,94 @@ Keeping it so that we can go back in case we mess up.
 } */
 @layer base {
   :root {
-    --background: rgb(101, 85, 143); /* #65558f */
-    --foreground: rgb(255, 255, 255); /* White */
-    --card: rgb(255, 255, 255); /* White */
-    --card-foreground: rgb(51, 51, 51); /* Dark gray */
-    --popover: rgb(255, 255, 255); /* White */
-    --popover-foreground: rgb(51, 51, 51); /* Dark gray */
-    --primary: rgb(101,85,143); /* #65558f */
-    --primary-foreground: rgb(255, 255, 255); /* White */
-    --secondary: rgb(214, 208, 231); /* Lighter purple */
-    --secondary-foreground: rgb(51, 51, 51); /* Dark gray */
-    --muted: rgb(214, 208, 231); /* Lighter purple */
-    --muted-foreground: rgb(153, 153, 153); /* Light gray */
-    --accent: rgb(214, 208, 231); /* Lighter purple */
-    --accent-foreground: rgb(101, 85, 143); /* #65558f */
-    --destructive: rgb(255, 0, 0); /* Red for destructive actions */
-    --destructive-foreground: rgb(255, 255, 255); /* White */
-    --border: rgb(224, 224, 224); /* Light gray border */
-    --input: rgb(255, 255, 255); /* White background for inputs */
-    --ring: rgb(101, 85, 143); /* #65558f */
-    --chart-1: rgb(255, 0, 0); /* Red */
-    --chart-2: rgb(0, 128, 0); /* Green */
-    --chart-3: rgb(0, 0, 255); /* Blue */
-    --chart-4: rgb(255, 255, 0); /* Yellow */
-    --chart-5: rgb(255, 165, 0); /* Orange */
-    --radius: 8px; /* Border radius */
+    --background: rgb(235, 232, 242);
+    --foreground: rgb(36, 36, 36);
+
+    --card: rgb(255, 255, 255);
+    --card-foreground: rgb(36, 36, 36);
+
+    --popover: rgb(255, 255, 255);
+    --popover-foreground: rgb(36, 36, 36);
+
+    --primary: rgb(101, 85, 143); /* Maintaining theme color for primary */
+    --primary-foreground: rgb(255, 255, 255);
+
+    --secondary: rgb(214, 208, 231); /* Light lavender for secondary elements */
+    --secondary-foreground: rgb(36, 36, 36); /* Dark text for readability */
+
+    --muted: rgb(214, 208, 231); /* Subtle muted background */
+    --muted-foreground: rgb(101, 101, 101); /* Muted gray for secondary text */
+
+    --accent: rgb(248, 118, 118); /* Retaining the accent color */
+    --accent-foreground: rgb(36, 36, 36); /* Dark text on accent elements */
+
+    --destructive: rgb(255, 102, 102); /* Slightly lighter destructive red */
+    --destructive-foreground: rgb(36, 36, 36); /* Dark text for contrast */
+
+    --border: rgb(214, 208, 231); /* Subtle lavender for borders */
+    --input: rgb(255, 255, 255); /* White for inputs */
+    --ring: rgba(101, 85, 143, 0.5);
+
+    --chart-1: rgb(248, 118, 118); /* Retaining chart colors for consistency */
+    --chart-2: rgb(101, 85, 143);
+    --chart-3: rgb(36, 36, 36);
+    --chart-4: rgb(165, 165, 165);
+    --chart-5: rgb(101, 101, 101);
+
+    /* Sidebar colors */
+    --sidebar-background: rgb(245, 242, 250);
+    --sidebar-foreground: rgb(36, 36, 36); /* Dark text for sidebar items */
+    --sidebar-primary: rgb(101, 85, 143); /* Primary theme color for sidebar */
+    --sidebar-primary-foreground: rgb(255, 255, 255);
+    --sidebar-accent: rgb(214, 208, 231); /* Accent for sidebar elements */
+    --sidebar-accent-foreground: rgb(36, 36, 36);
+    --sidebar-border: rgb(214, 208, 231); /* Subtle border for sidebar */
+    --sidebar-ring: rgb(101, 85, 143); /* Primary color for focus ring */
   }
-  
+
   .dark {
-    --background: rgb(101, 85, 143); /* #65558f */
-    --foreground: rgb(255, 255, 255); /* White */
-    --card: rgb(101, 85, 143); /* #65558f */
-    --card-foreground: rgb(255, 255, 255); /* White */
-    --popover: rgb(101, 85, 143); /* #65558f */
-    --popover-foreground: rgb(255, 255, 255); /* White */
-    --primary: rgb(101, 85, 143); /* #65558f */
-    --primary-foreground: rgb(255, 255, 255); /* White */
-    --secondary: rgb(91, 76, 132); /* Darker purple */
-    --secondary-foreground: rgb(255, 255, 255); /* White */
-    --muted: rgb(91, 76, 132); /* Darker purple */
-    --muted-foreground: rgb(153, 153, 153); /* Light gray */
-    --accent: rgb(91, 76, 132); /* Darker purple */
-    --accent-foreground: rgb(255, 255, 255); /* White */
-    --destructive: rgb(255, 0, 0); /* Red for destructive actions */
-    --destructive-foreground: rgb(255, 255, 255); /* White */
-    --border: rgb(91, 76, 132); /* Dark purple */
-    --input: rgb(91, 76, 132); /* Dark purple background for inputs */
-    --ring: rgb(255, 255, 255); /* White ring */
-    --chart-1: rgb(255, 0, 0); /* Red */
-    --chart-2: rgb(0, 128, 0); /* Green */
-    --chart-3: rgb(0, 0, 255); /* Blue */
-    --chart-4: rgb(255, 255, 0); /* Yellow */
-    --chart-5: rgb(255, 165, 0); /* Orange */
+    --background: rgb(36, 36, 36);
+    --foreground: rgb(235, 232, 242); /* Light lavender for text readability */
+
+    --card: rgb(51, 51, 51); /* Dark card background */
+    --card-foreground: rgb(235, 232, 242); /* Light lavender for contrast */
+
+    --popover: rgb(51, 51, 51); /* Match card background for consistency */
+    --popover-foreground: rgb(235, 232, 242);
+
+    --primary: rgb(101, 85, 143); /* Retaining the primary theme color */
+    --primary-foreground: rgb(255, 255, 255);
+
+    --secondary: rgb(91, 76, 132);
+    --secondary-foreground: rgb(235, 232, 242);
+
+    --muted: rgb(51, 51, 51); /* Muted dark background */
+    --muted-foreground: rgb(165, 165, 165); /* Gray text for subtlety */
+
+    --accent: rgb(248, 118, 118); /* Retaining the accent color */
+    --accent-foreground: rgb(36, 36, 36);
+
+    --destructive: rgb(201, 56, 56);
+    --destructive-foreground: rgb(255, 255, 255); /* White for contrast */
+
+    --border: rgb(91, 76, 132); /* Subtle border for separation */
+    --input: rgb(51, 51, 51); /* Dark input background */
+    --ring: rgba(101, 85, 143, 0.5);
+
+    --chart-1: rgb(248, 118, 118); /* Retaining consistent chart colors */
+    --chart-2: rgb(101, 85, 143);
+    --chart-3: rgb(235, 232, 242);
+    --chart-4: rgb(165, 165, 165);
+    --chart-5: rgb(101, 101, 101);
+
+    --sidebar-background: rgb(24, 24, 24);
+    --sidebar-foreground: rgb(214, 208, 231);
+    --sidebar-primary: rgb(101, 85, 143); /* Primary theme color */
+    --sidebar-primary-foreground: rgb(255, 255, 255); /* White for contrast */
+    --sidebar-accent: rgb(51, 51, 51);
+    --sidebar-accent-foreground: rgb(214, 208, 231);
+    --sidebar-border: rgb(91, 76, 132); /* Subtle purple border for sidebar */
+    --sidebar-ring: rgb(101, 85, 143); /* Primary color for focus ring */
   }
 }
 @layer base {
