@@ -36,17 +36,20 @@ spec:
             cpu: "500m"
         readinessProbe:
           httpGet:
-            path: /api/v2/health/ready
+            path: /api/v2/health/ready/
             port: 8000
-          initialDelaySeconds: 30
+          initialDelaySeconds: 45
+          timeoutSeconds: 5
           periodSeconds: 10
+          failureThreshold: 3
         livenessProbe:
           httpGet:
-            path: /api/v2/health/status
+            path: /api/v2/health/status/
             port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 45
           timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
       volumes:
       - name: cloud-sql-creds
         secret:
