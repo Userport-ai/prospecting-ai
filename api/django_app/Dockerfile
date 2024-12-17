@@ -26,6 +26,6 @@ COPY . .
 RUN chmod +x start.sh && \
     python manage.py collectstatic --noinput
 
-ENV DEBUG=0
+ENV USERPORT_DEBUG=0
 
 CMD ["/bin/bash", "./start.sh"]
