@@ -28,7 +28,7 @@ steps:
 - name: 'gcr.io/cloud-builders/gke-deploy'
   args:
   - run
-  - --filename=k8s/
+  - --filename=api/django_app/
   - --location=us-west1
   - --cluster=userport-service-prod
   - --image=gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA
