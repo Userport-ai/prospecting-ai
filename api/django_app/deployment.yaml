@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: userport-django-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: userport-django-app
+  template:
+    metadata:
+      labels:
+        app: userport-django-app
+    spec:
+      containers:
+      - name: userport-django-app
+        image: gcr.io/omega-winter-431704-u5/userport-django-app:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        - name: GUNICORN_TIMEOUT
+          value: "120"
+
+        volumeMounts:
+        - name: cloud-sql-creds
+          mountPath: /secrets
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /api/v2/health/ready
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/v2/health/status
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: cloud-sql-creds
+        secret:
+          secretName: cloud-sql-creds

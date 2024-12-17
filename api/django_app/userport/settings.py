@@ -13,7 +13,10 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-if os.path.exists('.dev.env'):
+
+if os.path.exists('.env'):
+    load_dotenv('.env')
+elif os.path.exists('.dev.env'):
     load_dotenv('.dev.env')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -27,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-sy*-3-211i9@b#il3bet@y$@ci!khoejh_$l6t^d@1*9u!kum^'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('USERPORT_DEBUG')
+DEBUG = os.environ.get('USERPORT_DEBUG', '0') == '1'
 
 ALLOWED_HOSTS = []
 
