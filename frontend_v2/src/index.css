@@ -99,7 +99,8 @@ Keeping it so that we can go back in case we mess up.
     --chart-5: rgb(101, 101, 101);
 
     /* Sidebar colors */
-    --sidebar-background: rgb(245, 242, 250);
+    /* --sidebar-background: rgb(245, 242, 250); */
+    --sidebar-background: rgb(250, 250, 250);
     --sidebar-foreground: rgb(36, 36, 36); /* Dark text for sidebar items */
     --sidebar-primary: rgb(101, 85, 143); /* Primary theme color for sidebar */
     --sidebar-primary-foreground: rgb(255, 255, 255);

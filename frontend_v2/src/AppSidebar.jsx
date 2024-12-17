@@ -6,6 +6,7 @@ import {
   User2,
   UsersRound,
   NotebookPen,
+  File,
 } from "lucide-react";
 import {
   Sidebar,
@@ -17,18 +18,21 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
-} from "./components/ui/sidebar";
+  SidebarRail,
+  SidebarHeader,
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "./components/ui/dropdown-menu";
-import logo from "./assets/combination_mark_primary.png";
+} from "@/components/ui/dropdown-menu";
+import logo from "./assets/combination_mark_primary_sidebar.png";
 import { useNavigate } from "react-router";
 
-// Menu items.
-const items = [
+// App items.
+const appItems = [
   {
     title: "Accounts",
     url: "#",
@@ -56,30 +60,63 @@ const items = [
   },
 ];
 
+// Onboarding items.
+const onboardingItems = [
+  {
+    title: "Documentation",
+    url: "#",
+    icon: File,
+  },
+];
+
 export function AppSidebar() {
   const navigate = useNavigate();
   return (
-    <Sidebar>
-      <SidebarContent>
+    <Sidebar className="shadow-2xl">
+      <SidebarHeader className="hover:bg-secondary hover:cursor-pointer m-2">
+        <div className="w-36">
+          <img
+            className="scale-100"
+            src={logo}
+            alt="userport-logo"
+            onClick={() => navigate("/accounts")}
+          />
+        </div>
+      </SidebarHeader>
+      <SidebarSeparator className="border-t-2 border-gray-200" />
+      <SidebarContent className="mt-5 px-2">
         <SidebarGroup>
-          <SidebarGroupLabel>
-            <div className="w-40 h-10 -mt-28">
-              <img
-                className="hover:cursor-pointer -mx-2"
-                src={logo}
-                alt="userport-logo"
-                onClick={() => navigate("/accounts")}
-              />
-            </div>
-          </SidebarGroupLabel>
-          <SidebarGroupContent className="mt-10">
-            <SidebarMenu>
-              {items.map((item) => (
+          <SidebarGroupLabel className="text-gray-500">App</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="flex flex-col gap-2">
+              {appItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <a href={item.url}>
                       <item.icon />
-                      <span>{item.title}</span>
+                      <span className="text-gray-600 font-inter font-medium">
+                        {item.title}
+                      </span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+
+          <SidebarGroupLabel className="text-gray-500 mt-10">
+            Getting Started
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {onboardingItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <a href={item.url}>
+                      <item.icon />
+                      <span className="text-gray-600 font-inter font-medium">
+                        {item.title}
+                      </span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -96,7 +133,9 @@ export function AppSidebar() {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton>
                   <User2 />
-                  Addarsh
+                  <p className="text-gray-600 font-inter font-medium">
+                    Addarsh
+                  </p>
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -118,6 +157,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
