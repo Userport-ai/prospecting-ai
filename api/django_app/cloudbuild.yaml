@@ -32,7 +32,7 @@ steps:
       --from-literal=username=${_USERPORT_DEV_DB_USERNAME} \
       --from-literal=password=${_USERPORT_DEV_DB_PASSWORD} \
       --dry-run=client -o yaml | \
-    kubectl apply -f -
+    kubectl apply -f - --validate=false  
   env:
   - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
   - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
