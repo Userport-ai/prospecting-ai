@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 function ProductForm({ productDetails, step, onNext, onCancel }) {
-  // 1. Define your form.
   const formSchema = z.object({
     name: z.string().min(1),
     description: z.string().min(2),
@@ -33,22 +32,37 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
 
   const nextButtonText = step > 1 ? "Submit" : "Next";
 
+  // Input and textarea base styles
+  const inputClassName =
+    "w-full rounded-lg border border-gray-300 bg-white py-2 px-4 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-400 shadow-sm";
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onNext)} className="space-y-8">
+      <form
+        onSubmit={form.handleSubmit(onNext)}
+        className="space-y-8 rounded-lg border border-gray-200 bg-white p-6 shadow-md"
+      >
+        {/* Form Title */}
+        <h2 className="text-xl font-semibold text-gray-800">Product Details</h2>
+        <p className="text-sm text-gray-500">
+          Fill out the form below to describe your product. Fields marked with
+          an asterisk (*) are required.
+        </p>
+
+        {/* Name Field */}
         <FormField
           control={form.control}
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormDescription>
+              <FormLabel className="text-gray-700">Name *</FormLabel>
+              <FormDescription className="text-sm text-gray-500">
                 The name of the product you are selling.
               </FormDescription>
               <FormControl>
                 <Input
-                  className="border-border rounded-lg placeholder:text-gray-400"
-                  placeholder="Userport"
+                  className={inputClassName}
+                  placeholder="e.g., Userport"
                   {...field}
                 />
               </FormControl>
@@ -56,20 +70,22 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
             </FormItem>
           )}
         />
+
+        {/* Description Field */}
         <FormField
           control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormDescription>
-                Describe the product, what problem it solves and what value it
-                adds for the customer.
+              <FormLabel className="text-gray-700">Description *</FormLabel>
+              <FormDescription className="text-sm text-gray-500">
+                Describe the product, what problem it solves, and its value for
+                the customer.
               </FormDescription>
               <FormControl>
                 <Textarea
-                  className="h-40 border-border rounded-lg placeholder:text-gray-400"
-                  placeholder="Sales platform that uses AI to empower SDRs by conducting account and lead research, delivering actionable insights, and crafting tailored messaging—all perfectly aligned with the the customer's sales playbook."
+                  className={`${inputClassName} h-32`}
+                  placeholder="A sales platform that uses AI to empower SDRs by conducting account and lead research..."
                   {...field}
                 />
               </FormControl>
@@ -77,79 +93,95 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
             </FormItem>
           )}
         />
+
+        {/* Step 2 Fields */}
         {step === 2 && (
-          <FormField
-            control={form.control}
-            name="icp"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>ICP</FormLabel>
-                <FormDescription>
-                  Describe the Ideal Customer Profile you are selling to.
-                </FormDescription>
-                <FormControl>
-                  <Textarea
-                    className="h-40 border-border rounded-lg placeholder:text-gray-400"
-                    placeholder="We are selling to Director of Sales in Series B+ companies with employee counts greater than 100."
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <>
+            {/* ICP Field */}
+            <FormField
+              control={form.control}
+              name="icp"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-gray-700">ICP</FormLabel>
+                  <FormDescription className="text-sm text-gray-500">
+                    Describe the Ideal Customer Profile you are selling to.
+                  </FormDescription>
+                  <FormControl>
+                    <Textarea
+                      className={`${inputClassName} h-28`}
+                      placeholder="e.g., Director of Sales in Series B+ companies with 100+ employees."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Personas Field */}
+            <FormField
+              control={form.control}
+              name="personas"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-gray-700">Personas</FormLabel>
+                  <FormDescription className="text-sm text-gray-500">
+                    Describe the personas within the ICP you will target with
+                    your outreach efforts.
+                  </FormDescription>
+                  <FormControl>
+                    <Textarea
+                      className={`${inputClassName} h-24`}
+                      placeholder="e.g., Director of Sales, VP of Sales, Head of Sales"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Keywords Field */}
+            <FormField
+              control={form.control}
+              name="keywords"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-gray-700">Keywords</FormLabel>
+                  <FormDescription className="text-sm text-gray-500">
+                    List any keywords associated with your product's domain.
+                  </FormDescription>
+                  <FormControl>
+                    <Textarea
+                      className={`${inputClassName} h-20`}
+                      placeholder="e.g., Sales Prospecting, Outbound, Lead Generation"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
         )}
-        {step === 2 && (
-          <FormField
-            control={form.control}
-            name="personas"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Personas</FormLabel>
-                <FormDescription>
-                  Describe the personas within the ICPs who you will need to
-                  target with your outreach efforts.
-                </FormDescription>
-                <FormControl>
-                  <Textarea
-                    className="h-28 border-border rounded-lg placeholder:text-gray-400"
-                    placeholder="Director of Sales, VP of Sales, Head of Sales"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-        {step === 2 && (
-          <FormField
-            control={form.control}
-            name="keywords"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Keywords</FormLabel>
-                <FormDescription>
-                  Describe any keywords that are associated with your product's
-                  domain.
-                </FormDescription>
-                <FormControl>
-                  <Textarea
-                    className="h-20 border-border rounded-lg placeholder:text-gray-400"
-                    placeholder="Sales Prospecting, Outbound, Lead Generation, Cold Outreach"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-        <div className="flex flex-row justify-between">
-          <Button type="button" variant="secondary" onClick={onCancel}>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-lg px-6 py-2 text-gray-700 hover:bg-gray-100"
+            onClick={onCancel}
+          >
             Cancel
           </Button>
-          <Button type="submit">{nextButtonText}</Button>
+          <Button
+            type="submit"
+            className="rounded-lg bg-indigo-600 px-6 py-2 text-white shadow-md hover:bg-indigo-700"
+          >
+            {nextButtonText}
+          </Button>
         </div>
       </form>
     </Form>
@@ -202,9 +234,7 @@ function CreateProduct() {
 function Playbook() {
   return (
     <div className="w-full flex justify-center items-start">
-      <div className="border border-border rounded-lg shadow h-fit p-6 mt-20 bg-card">
-        {<CreateProduct />}
-      </div>
+      <div className="mt-20 mb-10">{<CreateProduct />}</div>
     </div>
   );
 }
