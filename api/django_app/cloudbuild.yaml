@@ -1,4 +1,3 @@
-# cloudbuild.yaml
 steps:
 # Build the container image with build args
 - name: 'gcr.io/cloud-builders/docker'
@@ -32,7 +31,20 @@ steps:
       --from-literal=username=${_USERPORT_DEV_DB_USERNAME} \
       --from-literal=password=${_USERPORT_DEV_DB_PASSWORD} \
       --dry-run=client -o yaml | \
-    kubectl apply -f - --validate=false  
+    kubectl apply -f - --validate=false
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+
+# Get GKE credentials
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - 'container'
+  - 'clusters'
+  - 'get-credentials'
+  - 'userport-service-prod'
+  - '--zone=us-west1'
+  - '--project=$PROJECT_ID'
   env:
   - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
   - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
@@ -45,6 +57,10 @@ steps:
   - --location=us-west1
   - --cluster=userport-service-prod
   - --image=gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+  - 'GCLOUD_PROJECT=$PROJECT_ID'
 
 substitutions:
   _USERPORT_DEBUG: '0'
