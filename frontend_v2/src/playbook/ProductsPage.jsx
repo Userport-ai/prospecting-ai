@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, ExternalLink, Pencil } from "lucide-react";
 import { useNavigate } from "react-router";
+import { Separator } from "@/components/ui/separator";
 
 function ProductDetails({ product }) {
   return (
@@ -123,42 +124,13 @@ export default function ProductsPage() {
     },
     // Add more products...
   ];
+  // const products = [];
+
   const navigate = useNavigate();
 
   const handleAddProduct = () => {
     navigate("/playbook/add-product"); // Adjust route to the product creation page.
   };
-
-  if (products.length === 0) {
-    // No products exist.
-    return (
-      <div className="flex flex-col justify-center">
-        <Card className="max-w-md mx-auto bg-white shadow-xl border border-gray-200 rounded-none">
-          <CardHeader className="flex flex-row justify-center items-center p-2 bg-[rgb(143,118,197)]">
-            <CardTitle className="text-base text-gray-50 tracking-wide">
-              Ready to Get Started?
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <p className="text-gray-600 text-base leading-relaxed text-center">
-              You haven’t added details of any products yet. Click below to add
-              your first product and embark on your journey to successful
-              outreach!
-            </p>
-          </CardContent>
-          <CardFooter className="flex justify-center p-5">
-            <Button
-              variant="primary"
-              className="w-full py-2 bg-primary text-primary-foreground hover:bg-primary focus:ring-2 focus:ring-[rgb(101,85,143)] focus:outline-none transition-all duration-300"
-              onClick={handleAddProduct}
-            >
-              Add Product
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
 
   // Display existing products.
   return (
@@ -176,7 +148,25 @@ export default function ProductsPage() {
           Add Product
         </Button>
       </div>
-      <div className="flex flex-col gap-6 mt-4">
+      <Separator />
+      {products.length === 0 && (
+        <div className="flex flex-col mt-20">
+          <Card className="max-w-md mx-auto bg-white shadow-xl border border-gray-200 rounded-none">
+            <CardHeader className="flex flex-row justify-center items-center bg-[rgb(136,109,195)] p-4">
+              <CardTitle className="text-base text-gray-50 tracking-wide">
+                Ready to Get Started?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <p className="text-gray-600 text-base leading-relaxed text-center">
+                You haven’t added any products yet. Click the button above to
+                add your first product.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      <div className="flex flex-col gap-6 mt-10">
         {products.map((product) => (
           <ProductDetails key={product.id} product={product} />
         ))}
