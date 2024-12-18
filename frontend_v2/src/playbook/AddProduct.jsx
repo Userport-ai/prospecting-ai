@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useNavigate } from "react-router";
 
 function ProductForm({ productDetails, step, onNext, onCancel }) {
   const formSchema = z.object({
@@ -189,7 +190,7 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
 }
 
 // Handle Product creation sequence.
-function CreateProduct() {
+function AddProduct() {
   // Product Details JSON.
   const [productDetails, setProductDetails] = useState({
     name: "",
@@ -198,6 +199,7 @@ function CreateProduct() {
     personas: "",
     keywords: "",
   });
+  const navigate = useNavigate();
 
   // State to manage the current step of the form
   const [step, setStep] = useState(1);
@@ -217,8 +219,10 @@ function CreateProduct() {
   // Handle canceling creating the product.
   function handleCancel() {
     // User has decided to cancel product creation.
-    // TODO: callback.
     setStep(step - 1);
+
+    // Go back to playbook home page.
+    navigate("/playbook");
   }
 
   return (
@@ -231,12 +235,4 @@ function CreateProduct() {
   );
 }
 
-function Playbook() {
-  return (
-    <div className="w-full flex justify-center items-start">
-      <div className="mt-20 mb-10">{<CreateProduct />}</div>
-    </div>
-  );
-}
-
-export default Playbook;
+export default AddProduct;
