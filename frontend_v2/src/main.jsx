@@ -5,7 +5,7 @@ import "./index.css";
 import App from "./App.jsx";
 import Playbook from "./playbook/Playbook";
 import AddProduct from "./playbook/AddProduct";
-import ListProducts from "./playbook/ListProducts";
+import ProductsPage from "./playbook/ProductsPage";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -13,7 +13,7 @@ createRoot(document.getElementById("root")).render(
       <Routes>
         <Route path="/" element={<App />}>
           <Route path="playbook" element={<Playbook />}>
-            <Route index element={<ListProducts />} />
+            <Route index element={<ProductsPage />} />
             <Route path="add-product" element={<AddProduct />} />
           </Route>
         </Route>

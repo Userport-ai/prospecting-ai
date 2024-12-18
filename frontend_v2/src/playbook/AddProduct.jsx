@@ -41,7 +41,7 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onNext)}
-        className="space-y-8 rounded-lg border border-gray-200 bg-white p-6 shadow-md"
+        className="space-y-8 rounded-lg border h-fit border-gray-200 bg-white p-6 shadow-md"
       >
         {/* Form Title */}
         <h2 className="text-xl font-semibold text-gray-800">Product Details</h2>
