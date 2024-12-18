@@ -29,34 +29,38 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import logo from "./assets/combination_mark_primary_sidebar.png";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 // App items.
 const appItems = [
   {
+    key: "accounts",
     title: "Accounts",
-    url: "#",
+    url: "/accounts",
     icon: List,
   },
   {
+    key: "leads",
     title: "Leads",
-    url: "#",
+    url: "/leads",
     icon: UsersRound,
   },
   {
+    key: "playbook",
+    title: "Playbook",
+    url: "/playbook",
+    icon: NotebookPen,
+  },
+  {
+    key: "analytics",
     title: "Analytics",
-    url: "#",
+    url: "/analytics",
     icon: ChartNoAxesColumn,
   },
   {
-    title: "Playbook",
-    url: "#",
-    icon: NotebookPen,
-    isActive: true,
-  },
-  {
+    key: "settings",
     title: "Settings",
-    url: "#",
+    url: "/settings",
     icon: Settings,
   },
 ];
@@ -64,13 +68,21 @@ const appItems = [
 // Onboarding items.
 const onboardingItems = [
   {
+    key: "docs",
     title: "Documentation",
-    url: "#",
+    url: "/docs",
     icon: File,
   },
 ];
 export function AppSidebar() {
   const navigate = useNavigate();
+  const activeItems = appItems.filter((item) =>
+    useLocation().pathname.includes(item.key)
+  );
+  if (activeItems.length > 0) {
+    // Mark the first item as active.
+    activeItems[0].isActive = true;
+  }
 
   return (
     <Sidebar className="shadow-2xl bg-sidebar-background text-sidebar-foreground h-full min-h-screen">
