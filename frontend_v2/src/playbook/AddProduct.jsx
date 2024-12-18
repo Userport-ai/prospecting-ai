@@ -14,8 +14,24 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { WandSparkles } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router";
+
+function GenAIButton({ onClick }) {
+  return (
+    <div>
+      <Button
+        type="button"
+        className="w-fit rounded-xl bg-transparent border"
+        onClick={onClick}
+      >
+        <WandSparkles className="text-purple-400" />
+        <p className="text-purple-400">AI</p>
+      </Button>
+    </div>
+  );
+}
 
 function ProductForm({ productDetails, step, onNext, onCancel }) {
   var formSchema;
@@ -69,9 +85,18 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
   const nextButtonText = step === 6 ? "Submit" : "Next";
   const backButtonText = step === 1 || step === 6 ? "Cancel" : "Back";
 
+  // Handle user request to generate given field (name, value) using AI.
+  function generateUsingAI(field) {
+    // TODO: Fetch from server.
+    console.log("Generate value for field using AI: ", field);
+  }
+
   // Input and textarea base styles
   const inputClassName =
     "w-full rounded-lg border border-gray-300 bg-white py-2 px-4 placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary shadow-sm";
+
+  // AI generation
+  const aiGenContainerClassName = "flex flex-row justify-between items-start";
 
   return (
     <Form {...form}>
@@ -169,10 +194,15 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
             name="icp"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-gray-700">ICP *</FormLabel>
-                <FormDescription className="text-sm text-gray-500">
-                  Describe the Ideal Customer Profile you are selling to.
-                </FormDescription>
+                <div className={aiGenContainerClassName}>
+                  <div>
+                    <FormLabel className="text-gray-700">ICP *</FormLabel>
+                    <FormDescription className="text-sm text-gray-500">
+                      Describe the Ideal Customer Profile you are selling to.
+                    </FormDescription>
+                  </div>
+                  <GenAIButton onClick={() => generateUsingAI(field)} />
+                </div>
                 <FormControl>
                   <Textarea
                     className={`${inputClassName} h-28`}
@@ -193,11 +223,16 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
             name="personas"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-gray-700">Personas *</FormLabel>
-                <FormDescription className="text-sm text-gray-500">
-                  Describe the personas within the ICP you will target with your
-                  outreach efforts.
-                </FormDescription>
+                <div className={aiGenContainerClassName}>
+                  <div>
+                    <FormLabel className="text-gray-700">Personas *</FormLabel>
+                    <FormDescription className="text-sm text-gray-500">
+                      Describe the personas within the ICP you will target with
+                      your outreach efforts.
+                    </FormDescription>
+                  </div>
+                  <GenAIButton onClick={() => generateUsingAI(field)} />
+                </div>
                 <FormControl>
                   <Textarea
                     className={`${inputClassName} h-24`}
