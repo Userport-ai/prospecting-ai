@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 
 function ProductDetails({ product }) {
   return (
-    <Card className=" bg-white shadow-lg rounded-xl border border-gray-200 overflow-hidden transition-transform hover:shadow-2xl">
+    <Card className=" bg-white shadow-lg rounded-none border border-gray-200 overflow-hidden transition-transform hover:shadow-2xl">
       {/* Card Header */}
       <CardHeader className="p-4 bg-gradient-to-r from-[rgb(135,120,169)] to-[rgb(115,99,152)] text-white flex flex-row justify-between items-center">
         <div>

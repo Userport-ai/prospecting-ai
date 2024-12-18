@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -15,27 +14,64 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router";
 
 function ProductForm({ productDetails, step, onNext, onCancel }) {
-  const formSchema = z.object({
-    name: z.string().min(1),
-    description: z.string().min(2),
-    icp: z.string(),
-    personas: z.string(),
-    keywords: z.string(),
-  });
+  var formSchema;
+  if (step === 1) {
+    formSchema = z.object({
+      name: z.string().min(1),
+      description: z.string(),
+      website: z.string(),
+      icp: z.string(),
+      personas: z.string(),
+    });
+  } else if (step === 2) {
+    formSchema = z.object({
+      name: z.string().min(1),
+      description: z.string().min(1),
+      website: z.string(),
+      icp: z.string(),
+      personas: z.string(),
+    });
+  } else if (step === 3) {
+    formSchema = z.object({
+      name: z.string().min(1),
+      description: z.string().min(1),
+      website: z.string().min(1).startsWith("https://"),
+      icp: z.string(),
+      personas: z.string(),
+    });
+  } else if (step === 4) {
+    formSchema = z.object({
+      name: z.string().min(1),
+      description: z.string().min(1),
+      website: z.string().min(1),
+      icp: z.string().min(1),
+      personas: z.string(),
+    });
+  } else if (step >= 5) {
+    formSchema = z.object({
+      name: z.string().min(1),
+      description: z.string().min(1),
+      website: z.string().min(1),
+      icp: z.string().min(1),
+      personas: z.string().min(1),
+    });
+  }
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: productDetails,
   });
 
-  const nextButtonText = step > 1 ? "Submit" : "Next";
+  const nextButtonText = step === 6 ? "Submit" : "Next";
+  const backButtonText = step === 1 || step === 6 ? "Cancel" : "Back";
 
   // Input and textarea base styles
   const inputClassName =
-    "w-full rounded-lg border border-gray-300 bg-white py-2 px-4 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-400 shadow-sm";
+    "w-full rounded-lg border border-gray-300 bg-white py-2 px-4 placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary shadow-sm";
 
   return (
     <Form {...form}>
@@ -43,6 +79,9 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
         onSubmit={form.handleSubmit(onNext)}
         className="space-y-8 rounded-lg border h-fit border-gray-200 bg-white p-6 shadow-md"
       >
+        {/* Progress Indicator */}
+        <Progress value={(step / 6.0) * 100.0} />
+
         {/* Form Title */}
         <h2 className="text-xl font-semibold text-gray-800">Product Details</h2>
         <p className="text-sm text-gray-500">
@@ -51,135 +90,140 @@ function ProductForm({ productDetails, step, onNext, onCancel }) {
         </p>
 
         {/* Name Field */}
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-gray-700">Name *</FormLabel>
-              <FormDescription className="text-sm text-gray-500">
-                The name of the product you are selling.
-              </FormDescription>
-              <FormControl>
-                <Input
-                  className={inputClassName}
-                  placeholder="e.g., Userport"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {(step === 1 || step === 6) && (
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-gray-700">Name *</FormLabel>
+                <FormDescription className="text-sm text-gray-500">
+                  The name of the product you are selling.
+                </FormDescription>
+                <FormControl>
+                  <Input
+                    className={inputClassName}
+                    placeholder="e.g., Userport"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         {/* Description Field */}
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-gray-700">Description *</FormLabel>
-              <FormDescription className="text-sm text-gray-500">
-                Describe the product, what problem it solves, and its value for
-                the customer.
-              </FormDescription>
-              <FormControl>
-                <Textarea
-                  className={`${inputClassName} h-32`}
-                  placeholder="A sales platform that uses AI to empower SDRs by conducting account and lead research..."
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {(step === 2 || step === 6) && (
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-gray-700">Description *</FormLabel>
+                <FormDescription className="text-sm text-gray-500">
+                  Describe the product, what problem it solves, and its value
+                  for the customer.
+                </FormDescription>
+                <FormControl>
+                  <Textarea
+                    className={`${inputClassName} h-32`}
+                    placeholder="A sales platform that uses AI to empower SDRs by conducting account and lead research..."
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
-        {/* Step 2 Fields */}
-        {step === 2 && (
-          <>
-            {/* ICP Field */}
-            <FormField
-              control={form.control}
-              name="icp"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-gray-700">ICP</FormLabel>
-                  <FormDescription className="text-sm text-gray-500">
-                    Describe the Ideal Customer Profile you are selling to.
-                  </FormDescription>
-                  <FormControl>
-                    <Textarea
-                      className={`${inputClassName} h-28`}
-                      placeholder="e.g., Director of Sales in Series B+ companies with 100+ employees."
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        {/* Website Field */}
+        {(step === 3 || step === 6) && (
+          <FormField
+            control={form.control}
+            name="website"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-gray-700">Website *</FormLabel>
+                <FormDescription className="text-sm text-gray-500">
+                  The website of your product.
+                </FormDescription>
+                <FormControl>
+                  <Input
+                    className={inputClassName}
+                    placeholder="e.g., https://www.userport.ai"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
-            {/* Personas Field */}
-            <FormField
-              control={form.control}
-              name="personas"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-gray-700">Personas</FormLabel>
-                  <FormDescription className="text-sm text-gray-500">
-                    Describe the personas within the ICP you will target with
-                    your outreach efforts.
-                  </FormDescription>
-                  <FormControl>
-                    <Textarea
-                      className={`${inputClassName} h-24`}
-                      placeholder="e.g., Director of Sales, VP of Sales, Head of Sales"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        {/* ICP Field */}
+        {(step === 4 || step === 6) && (
+          <FormField
+            control={form.control}
+            name="icp"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-gray-700">ICP *</FormLabel>
+                <FormDescription className="text-sm text-gray-500">
+                  Describe the Ideal Customer Profile you are selling to.
+                </FormDescription>
+                <FormControl>
+                  <Textarea
+                    className={`${inputClassName} h-28`}
+                    placeholder="e.g., Director of Sales in Series B+ companies with 100+ employees."
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
-            {/* Keywords Field */}
-            <FormField
-              control={form.control}
-              name="keywords"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-gray-700">Keywords</FormLabel>
-                  <FormDescription className="text-sm text-gray-500">
-                    List any keywords associated with your product's domain.
-                  </FormDescription>
-                  <FormControl>
-                    <Textarea
-                      className={`${inputClassName} h-20`}
-                      placeholder="e.g., Sales Prospecting, Outbound, Lead Generation"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </>
+        {/* Personas Field */}
+        {(step === 5 || step === 6) && (
+          <FormField
+            control={form.control}
+            name="personas"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-gray-700">Personas *</FormLabel>
+                <FormDescription className="text-sm text-gray-500">
+                  Describe the personas within the ICP you will target with your
+                  outreach efforts.
+                </FormDescription>
+                <FormControl>
+                  <Textarea
+                    className={`${inputClassName} h-24`}
+                    placeholder="e.g., Director of Sales, VP of Sales, Head of Sales"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         )}
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-4">
+        <div className="flex items-center justify-between gap-4">
           <Button
             type="button"
             variant="outline"
             className="rounded-lg px-6 py-2 text-gray-700 hover:bg-gray-100"
             onClick={onCancel}
           >
-            Cancel
+            {backButtonText}
           </Button>
           <Button
             type="submit"
-            className="rounded-lg bg-indigo-600 px-6 py-2 text-white shadow-md hover:bg-indigo-700"
+            className="rounded-lg bg-primary px-6 py-2 text-white shadow-md hover:bg-[rgb(118,102,160)]"
           >
             {nextButtonText}
           </Button>
@@ -195,9 +239,9 @@ function AddProduct() {
   const [productDetails, setProductDetails] = useState({
     name: "",
     description: "",
+    website: "",
     icp: "",
     personas: "",
-    keywords: "",
   });
   const navigate = useNavigate();
 
@@ -206,32 +250,34 @@ function AddProduct() {
 
   // Handle user clicking next on form.
   function handleNext(newProductDetails) {
-    console.log("got new product details: ", newProductDetails);
+    console.log("got updated product details: ", newProductDetails);
     setProductDetails(newProductDetails);
     setStep(step + 1);
-    if (step === 1) {
-      // TODO: We need to fetch the recommended ICP, Personas and Keywords from API fetch.
-    } else {
+    if (step === 6) {
       // TODO: Submit product details to backend.
+      navigate("/playbook");
     }
   }
 
   // Handle canceling creating the product.
   function handleCancel() {
-    // User has decided to cancel product creation.
     setStep(step - 1);
-
-    // Go back to playbook home page.
-    navigate("/playbook");
+    if (step === 1 || step === 6) {
+      // User has decided to cancel product creation.
+      // Go back to playbook home page.
+      navigate("/playbook");
+    }
   }
 
   return (
-    <ProductForm
-      productDetails={productDetails}
-      step={step}
-      onNext={handleNext}
-      onCancel={handleCancel}
-    />
+    <div className="mt-10">
+      <ProductForm
+        productDetails={productDetails}
+        step={step}
+        onNext={handleNext}
+        onCancel={handleCancel}
+      />
+    </div>
   );
 }
 

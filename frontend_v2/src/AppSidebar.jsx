@@ -52,6 +52,7 @@ const appItems = [
     title: "Playbook",
     url: "#",
     icon: NotebookPen,
+    isActive: true,
   },
   {
     title: "Settings",
@@ -97,7 +98,7 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-2">
               {appItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild isActive={item.isActive}>
                     <a
                       href={item.url}
                       className="flex items-center gap-4 p-3 rounded-md hover:bg-primary hover:text-primary-foreground transition"
