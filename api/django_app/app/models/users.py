@@ -35,6 +35,7 @@ class AppUserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin, BaseMixin):
+    firebase_id = models.CharField(max_length=128, unique=True, default=None, null=True)
     email = models.EmailField(max_length=255, unique=True)
     first_name = models.CharField(max_length=100, null=True, blank=True)
     last_name = models.CharField(max_length=100, null=True, blank=True)
@@ -60,6 +61,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseMixin):
         db_table = 'users'
         unique_together = [['tenant', 'email']]
         indexes = [
+            models.Index(fields=['firebase_id']),
             models.Index(fields=['status']),
             models.Index(fields=['email']),
             models.Index(fields=['role'])
@@ -71,3 +73,12 @@ class User(AbstractBaseUser, PermissionsMixin, BaseMixin):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
+    def update_last_login(self):
+        """
+        Updates the last_login timestamp for the user to the current time
+        """
+        from django.utils import timezone
+
+        self.last_login = timezone.now()
+        self.save(update_fields=['last_login'])

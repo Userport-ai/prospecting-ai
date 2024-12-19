@@ -1,5 +1,5 @@
 from .tenants import Tenant
-from .users import User
+from .users import User, UserRole
 from .products import Product
 from .accounts import Account
 from .leads import Lead
