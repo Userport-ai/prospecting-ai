@@ -12,6 +12,7 @@ spec:
       labels:
         app: userport-django-app
     spec:
+      serviceAccountName: userport-ksa
       containers:
       - name: userport-django-app
         image: gcr.io/omega-winter-431704-u5/userport-django-app:latest
@@ -32,11 +33,6 @@ spec:
             secretKeyRef:
               name: db-credentials
               key: password
-
-        volumeMounts:
-        - name: cloud-sql-creds
-          mountPath: /secrets
-          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -60,7 +56,3 @@ spec:
           timeoutSeconds: 60
           periodSeconds: 10
           failureThreshold: 3
-      volumes:
-      - name: cloud-sql-creds
-        secret:
-          secretName: cloud-sql-creds
