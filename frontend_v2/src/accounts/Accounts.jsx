@@ -9,30 +9,39 @@ function getData() {
   return [
     {
       id: "728ed52f",
+      name: "Addarsh Chandrasekar Anantharaman",
+      linkedin_url: "https://www.linkedin.com/in/addarsh-chandrasekar",
       amount: 100,
       status: "pending",
       email: "m@example.com",
+      categories: "Software, AI, SaaS, FinTech",
     },
     {
       id: "72xed52f",
+      name: "Addarsh Chandrasekar Anantharaman",
       amount: 200,
       status: "complete",
       email: "x@example.com",
     },
     {
       id: "728edbb2f",
+      name: "Addarsh Chandrasekar Anantharaman",
       amount: 1005,
       status: "failed",
       email: "r@example.com",
     },
     {
       id: "72oed52f",
+      name: "Addarsh Chandrasekar Anantharaman",
+      linkedin_url: "https://www.linkedin.com/in/addarsh-chandrasekar",
       amount: 200,
       status: "complete",
       email: "l@example.com",
+      categories: "Software, AI, SaaS, FinTech",
     },
     {
       id: "72oed52f",
+      name: "Addarsh Chandrasekar Anantharaman",
       amount: 200,
       status: "complete",
       email: "l@example.com",
@@ -51,9 +60,11 @@ function getData() {
     },
     {
       id: "728edbb2f",
+      name: "Addarsh Chandrasekar Anantharaman",
       amount: 1005,
       status: "failed",
       email: "r@example.com",
+      categories: "Software, AI, SaaS, FinTech",
     },
     {
       id: "72oed52f",

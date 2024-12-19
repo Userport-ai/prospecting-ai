@@ -11,11 +11,28 @@ import {
 
 export const columns = [
   {
+    accessorKey: "name",
+    header: "Name",
+    size: 300,
+  },
+  {
+    accessorKey: "linkedin_url",
+    header: "LinkedinIn URL",
+    size: 380,
+  },
+  {
+    accessorKey: "created_at",
+    header: "Created On",
+    size: 100,
+  },
+  {
     accessorKey: "status",
     header: "Status",
+    size: 100,
   },
   {
     accessorKey: "email",
+    size: 300,
     header: ({ column }) => {
       return (
         <Button
@@ -30,19 +47,21 @@ export const columns = [
   },
   {
     accessorKey: "amount",
-    header: () => <div className="text-right">Amount</div>,
+    header: () => <div>Amount</div>,
+    size: 200,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("amount"));
       const formatted = new Intl.NumberFormat("en-us", {
         style: "currency",
         currency: "USD",
       }).format(amount);
-      return <div className="text-right font-medium">{formatted}</div>;
+      return <div className="font-medium">{formatted}</div>;
     },
   },
   {
     accessorKey: "actions",
     header: "Actions",
+    size: 100,
     cell: ({ row }) => {
       const paymentRow = row.original;
       return (
@@ -67,5 +86,10 @@ export const columns = [
         </DropdownMenu>
       );
     },
+  },
+  {
+    accessorKey: "categories",
+    header: "Categories",
+    size: 400,
   },
 ];

@@ -2,7 +2,7 @@ import AppLayout from "./AppLayout";
 
 function App() {
   return (
-    <div className="flex flex-col items-start min-h-screen bg-gray-50 font-inter">
+    <div className="flex flex-col min-h-screen font-inter">
       <AppLayout />
     </div>
   );

@@ -46,6 +46,14 @@ export function DataTable({ columns, data }) {
     },
   });
 
+  // We use total column width (in pixel values) to set the Table Width in CSS.
+  // We cannot set className as 'w-[total width]px` since TailwindCSS does not
+  // allow for string interpolation created classnames per: https://tailwindcss.com/docs/content-configuration#dynamic-class-names
+  // Instead we set the table width as an inline style per https://stackoverflow.com/questions/76855056/unable-to-set-arbitrary-value-for-a-background-in-tailwindcss.
+  const totalColumnsWidth = table
+    .getAllColumns()
+    .reduce((accumulator, column) => accumulator + column.getSize(), 0);
+
   return (
     <div>
       {/* Filter controls */}
@@ -87,8 +95,8 @@ export function DataTable({ columns, data }) {
       </DropdownMenu>
 
       {/* Table Display */}
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border bg-white overflow-x-auto">
+        <Table style={{ width: `${totalColumnsWidth.toString()}px` }}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -115,7 +123,10 @@ export function DataTable({ columns, data }) {
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      style={{ width: cell.column.getSize() }}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()

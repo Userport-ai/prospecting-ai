@@ -65,7 +65,8 @@ Keeping it so that we can go back in case we mess up.
 @layer base {
   :root {
     /* --background: rgb(235, 232, 242); */
-    --background: rgb(245, 242, 250);
+    /* --background: rgb(245, 242, 250); */
+    --background: rgb(249, 250, 251);
     --foreground: rgb(36, 36, 36);
 
     --card: rgb(255, 255, 255);
