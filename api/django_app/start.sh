@@ -1,9 +1,16 @@
 #!/bin/bash
 
-# Start Cloud SQL Proxy in the background
-cloud-sql-proxy --port=5432 \
-    "omega-winter-431704-u5:us-central1:userport-pg" \
-    --credentials-file=/secrets/service-account.json &
+# Check if we're running locally (using service account JSON) or in GKE (using Workload Identity)
+if [ -f "/secrets/service-account.json" ]; then
+    # Local development with service account JSON
+    cloud-sql-proxy --port=5432 \
+        "omega-winter-431704-u5:us-central1-a:userport-pg" \
+        --credentials-file=/secrets/service-account.json &
+else
+    # Production with Workload Identity
+    cloud-sql-proxy --port=5432 \
+        "omega-winter-431704-u5:us-central1-a:userport-pg" &
+fi
 
 # Wait for the proxy to be ready
 echo "Waiting for Cloud SQL Proxy to be ready..."
