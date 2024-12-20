@@ -60,37 +60,44 @@ export function DataTable({ columns, data }) {
   return (
     <div className="space-y-6">
       {/* Filter Controls */}
-      <div className="flex items-center gap-4 py-4">
-        <Input
-          placeholder="Filter emails..."
-          value={table.getColumn("email")?.getFilterValue() ?? ""}
-          onChange={(event) =>
-            table.getColumn("email")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm shadow-sm border-gray-300 focus:ring-primary focus:border-primary"
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto shadow-sm">
-              Columns
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize text-gray-700"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                >
-                  {column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="flex gap-4 py-4">
+        <div>
+          <Input
+            placeholder="Filter status..."
+            value={table.getColumn("status")?.getFilterValue() ?? ""}
+            onChange={(event) =>
+              table.getColumn("status")?.setFilterValue(event.target.value)
+            }
+            className="max-w-sm shadow-sm border-gray-300 focus:ring-primary focus:border-primary"
+          />
+        </div>
+
+        <div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto shadow-sm">
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize text-gray-700"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Table Container */}
@@ -181,7 +188,7 @@ export function DataTable({ columns, data }) {
       </div>
 
       {/* Pagination Controls */}
-      <div className="flex items-center justify-end space-x-4">
+      <div className="flex items-center justify-start space-x-4">
         <Button
           variant="outline"
           size="sm"
