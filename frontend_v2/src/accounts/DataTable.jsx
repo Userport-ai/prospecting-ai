@@ -31,6 +31,7 @@ import {
 
 import { CirclePlus } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 // Filter for columns that have finite set of values (Enums)
 // like Status, Type of Company etc. The ColumnId should be
@@ -83,13 +84,31 @@ function EnumFilter({ table, columnId, columnFilters }) {
     };
   };
 
+  // Currently selected filters for given column.
+  // 'columnFilters' is of the format:
+  // [{id: "stats", value: ["pending", "complete"]}, {id: "name", value: "Chase"}] etc.
+  const gotFilterArr = columnFilters.filter(
+    (curFilter) => curFilter.id === columnId
+  );
+  const curSelectedFilter = gotFilterArr.length > 0 ? gotFilterArr[0] : null;
+
   return (
     <div>
       <Popover>
-        {/* Trigger Button */}
-        <PopoverTrigger className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300">
-          <CirclePlus size={18} />
-          <span>{colDisplayName}</span>
+        <PopoverTrigger className="flex gap-4 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300">
+          {/* Trigger Button */}
+          <div className="flex gap-2">
+            <CirclePlus size={18} />
+            <span>{colDisplayName}</span>
+          </div>
+
+          {/* Currently Selected Filters.  */}
+          <div className="flex gap-1">
+            {curSelectedFilter &&
+              curSelectedFilter.value.map((filterVal) => (
+                <Badge key={filterVal}>{filterVal}</Badge>
+              ))}
+          </div>
         </PopoverTrigger>
 
         {/* Popover Content */}
