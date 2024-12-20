@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 export const columns = [
   {
     accessorKey: "name",
+    displayName: "Name",
     header: "Name",
     size: 300,
   },
   {
     accessorKey: "status",
+    displayName: "Status",
     header: ({ column }) => {
       return (
         <div className="flex items-center">
@@ -24,44 +26,54 @@ export const columns = [
       );
     },
     size: 100,
+    // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
+    filterFn: "arrIncludesSome",
   },
   {
     accessorKey: "location",
+    displayName: "Location",
     header: "HQ",
     size: 100,
   },
   {
     accessorKey: "employee_count",
+    displayName: "Employee Count",
     header: "Employee Count",
     size: 100,
   },
   {
     accessorKey: "customers",
+    displayName: "Customers",
     header: "Customers",
     size: 200,
   },
   {
     accessorKey: "technologies",
+    displayName: "Technologies",
     header: "Technologies",
     size: 200,
   },
   {
     accessorKey: "competitors",
+    displayName: "Competitors",
     header: "Competitors",
     size: 200,
   },
   {
     accessorKey: "industry",
+    displayName: "Industry",
     header: "Industry",
     size: 200,
   },
   {
     accessorKey: "website",
+    displayName: "Website",
     header: "Website",
     size: 100,
   },
   {
     accessorKey: "linkedin_url",
+    displayName: "LinkedIn URL",
     header: "LinkedIn URL",
     size: 100,
     cell: ({ row }) => {
@@ -83,21 +95,25 @@ export const columns = [
   },
   {
     accessorKey: "company_type",
+    displayName: "Company Type",
     header: "Type",
     size: 100,
   },
   {
     accessorKey: "created_at",
+    displayName: "Created On",
     header: "Created On",
     size: 100,
   },
   {
     accessorKey: "funding_details",
+    displayName: "Funding Details",
     header: "Funding Details",
     size: 100,
   },
   {
     accessorKey: "founded_year",
+    displayName: "Founded Year",
     header: "Founded Year",
     size: 100,
   },

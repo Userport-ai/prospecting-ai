@@ -56,6 +56,7 @@ function getData() {
     },
     {
       id: "72oed52f",
+      name: "Michael Jordan",
       status: "complete",
     },
     {
