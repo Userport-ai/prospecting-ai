@@ -101,7 +101,7 @@ export function DataTable({ columns, data }) {
       </div>
 
       {/* Table Container */}
-      <div className="rounded-md border border-gray-300 bg-white shadow-sm overflow-x-auto">
+      <div className="rounded-md border w-fit border-gray-300 bg-white shadow-sm">
         <Table style={{ width: `${totalColumnsWidth.toString()}px` }}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
