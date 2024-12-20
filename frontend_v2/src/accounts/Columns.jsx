@@ -17,7 +17,7 @@ export const columns = [
   },
   {
     accessorKey: "linkedin_url",
-    header: "LinkedinIn URL",
+    header: "LinkedIn URL",
     size: 300,
   },
   {

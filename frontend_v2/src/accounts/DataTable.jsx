@@ -58,95 +58,89 @@ export function DataTable({ columns, data }) {
   const totalColumnsWidth = table.getCenterTotalSize();
 
   return (
-    <div>
-      {/* Filter controls */}
-      <div className="flex items-center py-4">
+    <div className="space-y-6">
+      {/* Filter Controls */}
+      <div className="flex items-center gap-4 py-4">
         <Input
           placeholder="Filter emails..."
           value={table.getColumn("email")?.getFilterValue() ?? ""}
           onChange={(event) =>
             table.getColumn("email")?.setFilterValue(event.target.value)
           }
-          className="max-w-sm"
+          className="max-w-sm shadow-sm border-gray-300 focus:ring-primary focus:border-primary"
         />
-      </div>
-
-      {/* Column Visibility controls */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="ml-auto">
-            Columns
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {table
-            .getAllColumns()
-            .filter((column) => column.getCanHide())
-            .map((column) => {
-              return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto shadow-sm">
+              Columns
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => (
                 <DropdownMenuCheckboxItem
                   key={column.id}
-                  className="capitalize"
+                  className="capitalize text-gray-700"
                   checked={column.getIsVisible()}
                   onCheckedChange={(value) => column.toggleVisibility(!!value)}
                 >
                   {column.id}
                 </DropdownMenuCheckboxItem>
-              );
-            })}
-        </DropdownMenuContent>
-      </DropdownMenu>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
-      {/* Table Display */}
-      <div className="rounded-md border bg-white overflow-x-auto">
+      {/* Table Container */}
+      <div className="rounded-md border border-gray-300 bg-white shadow-sm overflow-x-auto">
         <Table style={{ width: `${totalColumnsWidth.toString()}px` }}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead
-                      key={header.id}
-                      className="bg-[rgb(104,93,133)] text-primary-foreground"
-                    >
-                      <div className="flex justify-between items-center">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="bg-[rgb(104,93,133)] text-white font-semibold px-4 py-2"
+                  >
+                    <div className="flex justify-between items-center">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
 
-                        <div
-                          {...{
-                            onDoubleClick: () => header.column.resetSize(),
-                            onMouseDown: header.getResizeHandler(),
-                            onTouchStart: header.getResizeHandler(),
-                            className: `resizer ${
-                              table.options.columnResizeDirection
-                            } ${
-                              header.column.getIsResizing() ? "isResizing" : ""
-                            }`,
-                            style: {
-                              transform:
-                                columnResizeMode === "onEnd" &&
-                                header.column.getIsResizing()
-                                  ? `translateX(${
-                                      (table.options.columnResizeDirection ===
-                                      "rtl"
-                                        ? -1
-                                        : 1) *
-                                      (table.getState().columnSizingInfo
-                                        .deltaOffset ?? 0)
-                                    }px)`
-                                  : "",
-                            },
-                          }}
-                        />
-                      </div>
-                    </TableHead>
-                  );
-                })}
+                      <div
+                        {...{
+                          onDoubleClick: () => header.column.resetSize(),
+                          onMouseDown: header.getResizeHandler(),
+                          onTouchStart: header.getResizeHandler(),
+                          className: `resizer ${
+                            table.options.columnResizeDirection
+                          } ${
+                            header.column.getIsResizing() ? "isResizing" : ""
+                          }`,
+                          style: {
+                            transform:
+                              columnResizeMode === "onEnd" &&
+                              header.column.getIsResizing()
+                                ? `translateX(${
+                                    (table.options.columnResizeDirection ===
+                                    "rtl"
+                                      ? -1
+                                      : 1) *
+                                    (table.getState().columnSizingInfo
+                                      .deltaOffset ?? 0)
+                                  }px)`
+                                : "",
+                          },
+                        }}
+                      />
+                    </div>
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
@@ -156,11 +150,13 @@ export function DataTable({ columns, data }) {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="hover:bg-gray-100 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
                       style={{ width: cell.column.getSize() }}
+                      className="text-gray-700 px-4 py-2"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
@@ -174,7 +170,7 @@ export function DataTable({ columns, data }) {
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-24 text-center text-gray-500"
                 >
                   No results.
                 </TableCell>
@@ -184,13 +180,14 @@ export function DataTable({ columns, data }) {
         </Table>
       </div>
 
-      {/* Pagination controls */}
-      <div className="flex items-center justify-end space-x-2 py-4">
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-end space-x-4">
         <Button
           variant="outline"
           size="sm"
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
+          className="shadow-sm border-gray-300"
         >
           Previous
         </Button>
@@ -199,6 +196,7 @@ export function DataTable({ columns, data }) {
           size="sm"
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
+          className="shadow-sm border-gray-300"
         >
           Next
         </Button>
