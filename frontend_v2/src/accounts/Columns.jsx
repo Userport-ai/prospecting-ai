@@ -18,12 +18,12 @@ export const columns = [
   {
     accessorKey: "linkedin_url",
     header: "LinkedinIn URL",
-    size: 380,
+    size: 300,
   },
   {
     accessorKey: "created_at",
     header: "Created On",
-    size: 100,
+    size: 200,
   },
   {
     accessorKey: "status",
@@ -48,7 +48,7 @@ export const columns = [
   {
     accessorKey: "amount",
     header: () => <div>Amount</div>,
-    size: 200,
+    size: 100,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("amount"));
       const formatted = new Intl.NumberFormat("en-us", {
@@ -90,6 +90,6 @@ export const columns = [
   {
     accessorKey: "categories",
     header: "Categories",
-    size: 400,
+    size: 200,
   },
 ];

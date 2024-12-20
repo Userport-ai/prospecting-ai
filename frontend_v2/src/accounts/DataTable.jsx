@@ -28,10 +28,15 @@ export function DataTable({ columns, data }) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
   const [columnVisibility, setColumnVisibility] = useState({});
+  // Following https://tanstack.com/table/v8/docs/framework/react/examples/column-sizing for column resizing
+  const columnResizeMode = "onChange";
+  const columnResizeDirection = "ltr";
 
   const table = useReactTable({
     data,
     columns,
+    columnResizeMode,
+    columnResizeDirection,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -50,9 +55,7 @@ export function DataTable({ columns, data }) {
   // We cannot set className as 'w-[total width]px` since TailwindCSS does not
   // allow for string interpolation created classnames per: https://tailwindcss.com/docs/content-configuration#dynamic-class-names
   // Instead we set the table width as an inline style per https://stackoverflow.com/questions/76855056/unable-to-set-arbitrary-value-for-a-background-in-tailwindcss.
-  const totalColumnsWidth = table
-    .getAllColumns()
-    .reduce((accumulator, column) => accumulator + column.getSize(), 0);
+  const totalColumnsWidth = table.getCenterTotalSize();
 
   return (
     <div>
@@ -102,13 +105,45 @@ export function DataTable({ columns, data }) {
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                    <TableHead
+                      key={header.id}
+                      className="bg-[rgb(104,93,133)] text-primary-foreground"
+                    >
+                      <div className="flex justify-between items-center">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+
+                        <div
+                          {...{
+                            onDoubleClick: () => header.column.resetSize(),
+                            onMouseDown: header.getResizeHandler(),
+                            onTouchStart: header.getResizeHandler(),
+                            className: `resizer ${
+                              table.options.columnResizeDirection
+                            } ${
+                              header.column.getIsResizing() ? "isResizing" : ""
+                            }`,
+                            style: {
+                              transform:
+                                columnResizeMode === "onEnd" &&
+                                header.column.getIsResizing()
+                                  ? `translateX(${
+                                      (table.options.columnResizeDirection ===
+                                      "rtl"
+                                        ? -1
+                                        : 1) *
+                                      (table.getState().columnSizingInfo
+                                        .deltaOffset ?? 0)
+                                    }px)`
+                                  : "",
+                            },
+                          }}
+                        />
+                      </div>
                     </TableHead>
                   );
                 })}
