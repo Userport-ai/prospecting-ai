@@ -139,6 +139,7 @@ function EnumFilter({ table, columnId, columnFilters }) {
 export function DataTable({ columns, data }) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
+  const [rowSelection, setRowSelection] = useState({});
 
   var initialColumnVisibility = {};
   columns.forEach((col) => {
@@ -166,10 +167,12 @@ export function DataTable({ columns, data }) {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
+      rowSelection,
     },
   });
 
@@ -290,7 +293,7 @@ export function DataTable({ columns, data }) {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="hover:bg-gray-100 transition-colors"
+                  className="hover:bg-gray-100 transition-colors data-[state=selected]:bg-purple-50"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
@@ -319,6 +322,14 @@ export function DataTable({ columns, data }) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Selected Rows Information */}
+      {table.getFilteredSelectedRowModel().rows.length > 0 && (
+        <div className="flex p-1 text-sm text-muted-foreground">
+          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredRowModel().rows.length} row(s) selected.
+        </div>
+      )}
 
       {/* Pagination Controls */}
       <div className="flex items-center justify-start space-x-4">

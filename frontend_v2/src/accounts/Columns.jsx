@@ -1,12 +1,38 @@
 import { ArrowUpDown, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const columns = [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        className="bg-white data-[state=checked]:bg-purple-400"
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        className="data-[state=checked]:bg-purple-400"
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+      />
+    ),
+    size: 50,
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     accessorKey: "name",
     displayName: "Name",
     header: "Name",
-    size: 300,
+    size: 100,
     visibleInitially: true,
   },
   {
