@@ -7,6 +7,7 @@ export const columns = [
     displayName: "Name",
     header: "Name",
     size: 300,
+    visibleInitially: true,
   },
   {
     accessorKey: "status",
@@ -28,48 +29,56 @@ export const columns = [
     size: 100,
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
     filterFn: "arrIncludesSome",
+    visibleInitially: true,
   },
   {
     accessorKey: "location",
     displayName: "Location",
     header: "HQ",
     size: 100,
+    visibleInitially: false,
   },
   {
     accessorKey: "employee_count",
     displayName: "Employee Count",
     header: "Employee Count",
     size: 100,
+    visibleInitially: true,
   },
   {
     accessorKey: "customers",
     displayName: "Customers",
     header: "Customers",
     size: 200,
+    visibleInitially: true,
   },
   {
     accessorKey: "technologies",
     displayName: "Technologies",
     header: "Technologies",
     size: 200,
+    visibleInitially: true,
   },
   {
     accessorKey: "competitors",
     displayName: "Competitors",
     header: "Competitors",
     size: 200,
+    visibleInitially: true,
   },
   {
     accessorKey: "industry",
     displayName: "Industry",
     header: "Industry",
     size: 200,
+    visibleInitially: true,
   },
   {
     accessorKey: "website",
     displayName: "Website",
     header: "Website",
     size: 100,
+    visibleInitially: false,
   },
   {
     accessorKey: "linkedin_url",
@@ -92,29 +101,34 @@ export const columns = [
         </a>
       );
     },
+    visibleInitially: false,
   },
   {
     accessorKey: "company_type",
     displayName: "Company Type",
     header: "Type",
     size: 100,
+    visibleInitially: false,
   },
   {
     accessorKey: "created_at",
     displayName: "Created On",
     header: "Created On",
     size: 100,
+    visibleInitially: false,
   },
   {
     accessorKey: "funding_details",
     displayName: "Funding Details",
     header: "Funding Details",
     size: 100,
+    visibleInitially: false,
   },
   {
     accessorKey: "founded_year",
     displayName: "Founded Year",
     header: "Founded Year",
     size: 100,
+    visibleInitially: false,
   },
 ];

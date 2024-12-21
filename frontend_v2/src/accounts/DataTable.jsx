@@ -139,7 +139,17 @@ function EnumFilter({ table, columnId, columnFilters }) {
 export function DataTable({ columns, data }) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
-  const [columnVisibility, setColumnVisibility] = useState({});
+
+  var initialColumnVisibility = {};
+  columns.forEach((col) => {
+    initialColumnVisibility[col.accessorKey] = false;
+    if (col.visibleInitially === true) {
+      initialColumnVisibility[col.accessorKey] = true;
+    }
+  });
+  const [columnVisibility, setColumnVisibility] = useState(
+    initialColumnVisibility
+  );
   // Following https://tanstack.com/table/v8/docs/framework/react/examples/column-sizing for column resizing
   const columnResizeMode = "onChange";
   const columnResizeDirection = "ltr";

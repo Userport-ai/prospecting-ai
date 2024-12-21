@@ -9,74 +9,82 @@ function getData() {
   return [
     {
       id: "728ed52f",
-      name: "Addarsh Chandrasekar Anantharaman",
+      name: "Stripe",
       linkedin_url: "https://www.linkedin.com/in/addarsh-chandrasekar",
       status: "pending",
       industry: "Software, AI, SaaS, FinTech",
     },
     {
       id: "72xed52f",
-      name: "Addarsh Chandrasekar Anantharaman",
+      name: "Google",
       status: "complete",
     },
     {
       id: "728edbb2f",
-      name: "Addarsh Chandrasekar Anantharaman",
+      name: "Rippling",
       status: "failed",
     },
     {
       id: "72oed52f",
-      name: "Addarsh Chandrasekar Anantharaman",
+      name: "Microsoft",
       linkedin_url: "https://www.linkedin.com/in/addarsh-chandrasekar",
       status: "complete",
       industry: "Software, AI, SaaS, FinTech",
     },
     {
       id: "72oed52f",
-      name: "Addarsh Chandrasekar Anantharaman",
+      name: "Dabur",
       status: "complete",
     },
     {
       id: "728ed52f",
+      name: "Databricks",
       status: "pending",
     },
     {
       id: "72xed52f",
+      name: "Snowflake",
       status: "complete",
     },
     {
       id: "728edbb2f",
-      name: "Addarsh Chandrasekar Anantharaman",
+      name: "Zuddl",
       status: "failed",
       industry: "Software, AI, SaaS, FinTech",
     },
     {
       id: "72oed52f",
+      name: "Zomato",
       status: "complete",
     },
     {
       id: "72oed52f",
-      name: "Michael Jordan",
+      name: "Salesforce",
       status: "complete",
     },
     {
       id: "728ed52f",
+      name: "Postman",
       status: "pending",
     },
     {
       id: "72xed52f",
+      name: "Uber",
       status: "complete",
     },
     {
       id: "728edbb2f",
+      name: "Retool",
       status: "failed",
     },
     {
       id: "72oed52f",
+      name: "Zendesk",
       status: "complete",
     },
     {
       id: "72oed52f",
+      name: "Airbnb",
       status: "complete",
     },
     // ...
