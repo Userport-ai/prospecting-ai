@@ -25,6 +25,7 @@ import {
 import { CirclePlus, Eye } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import AddCustomColumn from "./AddCustomColumn";
 
 // Filter for columns that have finite set of values (Enums)
 // like Status, Type of Company etc. The ColumnId should be
@@ -234,6 +235,9 @@ export function DataTable({ columns, data }) {
           </PopoverContent>
         </Popover>
       </div>
+
+      {/* Add custom column */}
+      <AddCustomColumn />
 
       {/* Table Container */}
       <div className="rounded-md border w-fit border-gray-300 bg-white shadow-sm">
