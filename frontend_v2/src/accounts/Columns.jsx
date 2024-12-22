@@ -1,6 +1,13 @@
-import { ArrowUpDown, ExternalLink } from "lucide-react";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  ChevronsUpDown,
+  ChevronUp,
+  ExternalLink,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import SortingDropdown from "./SortingDropDown";
 
 export const accountColumns = [
   {
@@ -31,27 +38,33 @@ export const accountColumns = [
   {
     accessorKey: "name",
     displayName: "Name",
-    header: "Name",
+    header: ({ column }) => {
+      return (
+        <div className="flex justify-between items-center gap-2 mr-2">
+          Name
+          <SortingDropdown
+            onSelect={(val) => {
+              if (val === "asc") {
+                column.toggleSorting(false);
+              } else if (val === "desc") {
+                column.toggleSorting(true);
+              } else if (val === "none") {
+                column.clearSorting();
+              }
+            }}
+          >
+            <ChevronsUpDown size={18} />
+          </SortingDropdown>
+        </div>
+      );
+    },
     size: 100,
     visibleInitially: true,
   },
   {
     accessorKey: "status",
     displayName: "Status",
-    header: ({ column }) => {
-      return (
-        <div className="flex items-center">
-          Status
-          <Button
-            variant="ghost"
-            className="hover:bg-transparent hover:text-white"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            <ArrowUpDown className="ml-2" />
-          </Button>
-        </div>
-      );
-    },
+    header: "Status",
     size: 100,
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
     filterFn: "arrIncludesSome",

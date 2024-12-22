@@ -356,7 +356,7 @@ export function DataTable({ columns, data, onCustomColumnAdded }) {
       <div className="flex items-center justify-start gap-4">
         <div>
           <p className=" text-sm text-gray-600">
-            Page {pagination.pageIndex} of {table.getPageCount()}
+            Page {pagination.pageIndex + 1} of {table.getPageCount()}
           </p>
         </div>
         <Button
