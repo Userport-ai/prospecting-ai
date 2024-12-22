@@ -1,7 +1,5 @@
-// UI for viewing Accounts uploaded by a user.
-// export default function Accounts() {}
-
-import { columns } from "./Columns";
+import { useState } from "react";
+import { accountColumns } from "./Columns";
 import { DataTable } from "./DataTable";
 
 function getData() {
@@ -92,11 +90,43 @@ function getData() {
 }
 
 export default function Accounts() {
-  const data = getData();
+  const [data, setData] = useState(getData());
+  const [columns, setColumns] = useState(accountColumns);
+
+  // Handler for when custom column inputs are provided by the user.
+  const onCustomColumnAdded = (customColumnInfo) => {
+    // TODO: call server to send custom column request instead
+    // of manually updating the columns and rows in the table.
+    const customColumnAccessorKey = "custom_column";
+    setColumns([
+      ...columns,
+      {
+        accessorKey: customColumnAccessorKey,
+        displayName: customColumnInfo.columnName,
+        header: customColumnInfo.columnName,
+        size: 100,
+        filterFn: "arrIncludesSome",
+        visibleInitially: true,
+      },
+    ]);
+    // Update columns for given RowIds with added column value.
+    const rowIds = customColumnInfo.rowIds;
+    var newData = [...data];
+    newData.forEach((row) => {
+      if (rowIds.includes(row.id)) {
+        row[customColumnAccessorKey] = "pending";
+      }
+    });
+    setData(newData);
+  };
 
   return (
     <div className="w-11/12 mx-auto py-10">
-      <DataTable columns={columns} data={data} />
+      <DataTable
+        columns={columns}
+        data={data}
+        onCustomColumnAdded={onCustomColumnAdded}
+      />
     </div>
   );
 }

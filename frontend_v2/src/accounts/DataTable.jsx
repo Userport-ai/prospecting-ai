@@ -137,7 +137,7 @@ function EnumFilter({ table, columnId, columnFilters }) {
   );
 }
 
-export function DataTable({ columns, data }) {
+export function DataTable({ columns, data, onCustomColumnAdded }) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
   const [rowSelection, setRowSelection] = useState({});
@@ -183,6 +183,14 @@ export function DataTable({ columns, data }) {
   // Instead we set the table width as an inline style per https://stackoverflow.com/questions/76855056/unable-to-set-arbitrary-value-for-a-background-in-tailwindcss.
   const totalColumnsWidth = table.getCenterTotalSize();
 
+  const handleCustomColumnAdd = (customColumnInfo) => {
+    // Fetch the rows that need to be enriched. By default,
+    // we fetch all the rows on the current page.
+    const rowIds = table.getRowModel().rows.map((row) => row.original.id);
+    customColumnInfo.rowIds = rowIds;
+    onCustomColumnAdded(customColumnInfo);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* Filter Controls */}
@@ -207,7 +215,7 @@ export function DataTable({ columns, data }) {
         />
       </div>
 
-      {/* Column Visibility */}
+      {/* View visible Columns. */}
       <div>
         <Popover>
           <PopoverTrigger className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300">
@@ -228,7 +236,7 @@ export function DataTable({ columns, data }) {
                     onCheckedChange={(value) => column.toggleVisibility(value)}
                   />
                   <label className="flex justify-between items-center w-full text-sm text-gray-600">
-                    {column.id}
+                    {column.columnDef.displayName}
                   </label>
                 </div>
               ))}
@@ -237,11 +245,12 @@ export function DataTable({ columns, data }) {
       </div>
 
       {/* Add custom column */}
-      <AddCustomColumn />
+      <AddCustomColumn onAdded={handleCustomColumnAdd} />
 
       {/* Table Container */}
       <div className="rounded-md border w-fit border-gray-300 bg-white shadow-sm">
         <Table style={{ width: `${totalColumnsWidth.toString()}px` }}>
+          {/* Header */}
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -291,6 +300,8 @@ export function DataTable({ columns, data }) {
               </TableRow>
             ))}
           </TableHeader>
+
+          {/* Rows */}
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (

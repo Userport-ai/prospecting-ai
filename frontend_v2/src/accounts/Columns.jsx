@@ -2,7 +2,7 @@ import { ArrowUpDown, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export const columns = [
+export const accountColumns = [
   {
     id: "select",
     header: ({ table }) => (
@@ -59,7 +59,7 @@ export const columns = [
   },
   {
     accessorKey: "location",
-    displayName: "Location",
+    displayName: "HQ",
     header: "HQ",
     size: 100,
     visibleInitially: false,
@@ -132,7 +132,7 @@ export const columns = [
   {
     accessorKey: "company_type",
     displayName: "Company Type",
-    header: "Type",
+    header: "Company Type",
     size: 100,
     visibleInitially: false,
   },

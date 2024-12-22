@@ -32,7 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Cpu } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
-function AddCustomColumn() {
+function AddCustomColumn({ onAdded }) {
   const [step, setStep] = useState(1);
   const [open, setOpen] = useState(false);
 
@@ -52,11 +52,11 @@ function AddCustomColumn() {
     },
   });
 
-  const handleNext = (newFormData) => {
+  const handleNext = (updatedFormData) => {
     if (step < 4) {
       setStep(step + 1);
     } else {
-      console.log("Form Submitted:", newFormData);
+      onAdded(updatedFormData);
       form.reset();
       setStep(1);
       setOpen(false);
