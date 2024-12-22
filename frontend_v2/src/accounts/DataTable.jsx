@@ -22,7 +22,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CirclePlus, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, CirclePlus, Eye } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import AddCustomColumn from "./AddCustomColumn";
@@ -141,6 +141,10 @@ export function DataTable({ columns, data, onCustomColumnAdded }) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
   const [rowSelection, setRowSelection] = useState({});
+  const [pagination, setPagination] = useState({
+    pageIndex: 0, //initial page index
+    pageSize: 10, //default page size
+  });
 
   var initialColumnVisibility = {};
   columns.forEach((col) => {
@@ -169,11 +173,13 @@ export function DataTable({ columns, data, onCustomColumnAdded }) {
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
+      pagination,
     },
   });
 
@@ -347,7 +353,12 @@ export function DataTable({ columns, data, onCustomColumnAdded }) {
       )}
 
       {/* Pagination Controls */}
-      <div className="flex items-center justify-start space-x-4">
+      <div className="flex items-center justify-start gap-4">
+        <div>
+          <p className=" text-sm text-gray-600">
+            Page {pagination.pageIndex} of {table.getPageCount()}
+          </p>
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -355,7 +366,7 @@ export function DataTable({ columns, data, onCustomColumnAdded }) {
           disabled={!table.getCanPreviousPage()}
           className="shadow-sm border-gray-300"
         >
-          Previous
+          <ChevronLeft />
         </Button>
         <Button
           variant="outline"
@@ -364,7 +375,7 @@ export function DataTable({ columns, data, onCustomColumnAdded }) {
           disabled={!table.getCanNextPage()}
           className="shadow-sm border-gray-300"
         >
-          Next
+          <ChevronRight />
         </Button>
       </div>
     </div>
