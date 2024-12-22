@@ -34,26 +34,14 @@ import { Progress } from "@/components/ui/progress";
 
 function AddCustomColumn() {
   const [step, setStep] = useState(1);
-  var formSchema;
-  if (step === 1) {
-    formSchema = z.object({
-      query: z.string().min(1),
-      format: z.string(),
-      columnName: z.string(),
-    });
-  } else if (step === 2) {
-    formSchema = z.object({
-      query: z.string().min(1),
-      format: z.string().min(1),
-      columnName: z.string(),
-    });
-  } else if (step >= 3) {
-    formSchema = z.object({
-      query: z.string().min(1),
-      format: z.string().min(1),
-      columnName: z.string().min(1),
-    });
-  }
+  const [open, setOpen] = useState(false);
+
+  // Dynamic Zod schema based on step
+  const formSchema = z.object({
+    query: z.string().min(1, "Query is required"),
+    format: z.string().min(step > 1 ? 1 : 0, "Format is required"),
+    columnName: z.string().min(step > 2 ? 1 : 0, "Column name is required"),
+  });
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -64,17 +52,15 @@ function AddCustomColumn() {
     },
   });
 
-  const [open, setOpen] = useState(false);
-
   const handleNext = (newFormData) => {
     if (step < 4) {
       setStep(step + 1);
-      return;
+    } else {
+      console.log("Form Submitted:", newFormData);
+      form.reset();
+      setStep(1);
+      setOpen(false);
     }
-    // Submit form.
-    console.log("Form data: ", newFormData);
-    // TODO: Call server with given Form data as input.
-    setOpen(false);
   };
 
   const handleBack = () => {
@@ -83,42 +69,49 @@ function AddCustomColumn() {
 
   return (
     <div>
+      {/* Trigger Button */}
       <Button
         onClick={() => setOpen(true)}
-        className="w-fit mt-2 bg-[rgb(136,102,221)]"
+        className="w-fit mt-2 bg-[rgb(136,102,221)] hover:bg-[rgb(122,92,198)] text-white"
       >
-        <Cpu />
+        <Cpu className="mr-2" />
         Ask AI
       </Button>
+
+      {/* Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-gray-600">Ask AI</DialogTitle>
+            <DialogTitle className="text-gray-800 text-lg font-medium">
+              Ask AI
+            </DialogTitle>
             <DialogDescription></DialogDescription>
           </DialogHeader>
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleNext)}>
               {/* Progress Indicator */}
-              <p className="text-sm text-gray-400">Progress</p>
-              <Progress value={(step / 4.0) * 100.0} />
+              <p className="text-sm text-gray-500 mb-2">Progress</p>
+              <Progress value={(step / 4) * 100} className="mb-4" />
 
               {/* Step Content */}
-              <div className="flex flex-col mt-4 gap-4">
+              <div className="flex flex-col gap-6">
+                {/* Step 1: Query */}
                 {(step === 1 || step === 4) && (
                   <FormField
                     control={form.control}
                     name="query"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">Query</FormLabel>
-                        <FormDescription className="text-sm text-gray-500">
-                          Your query will be answered by AI for each row in your
-                          list.
+                        <FormLabel className="text-gray-800">Query</FormLabel>
+                        <FormDescription className="text-gray-500 text-sm">
+                          Enter a query that AI will use to provide answers for
+                          each row.
                         </FormDescription>
                         <FormControl>
                           <Textarea
-                            className="h-24 border border-gray-300"
-                            placeholder="e.g., Has the company launched any products recently? Has this person attended any events recently?"
+                            placeholder="e.g., What is the company's latest product?"
+                            className="border-gray-300 rounded-md"
                             {...field}
                           />
                         </FormControl>
@@ -128,55 +121,45 @@ function AddCustomColumn() {
                   />
                 )}
 
+                {/* Step 2: Format */}
                 {(step === 2 || step === 4) && (
                   <FormField
                     control={form.control}
                     name="format"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">
+                        <FormLabel className="text-gray-800">
                           Answer Format
                         </FormLabel>
-                        <FormDescription className="text-sm text-gray-500">
-                          Select the desired format of the answer.
+                        <FormDescription className="text-gray-500 text-sm">
+                          Choose the desired format for the answer.
                         </FormDescription>
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger className="w-[10rem]">
+                            <SelectTrigger className="w-48 border-border">
                               <SelectValue placeholder="Select Format" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="text">Text</SelectItem>
-                            <SelectItem value="yes-no">Yes or No</SelectItem>
+                            <SelectItem value="yes-no">Yes/No</SelectItem>
                             <SelectItem value="number">Number</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
 
-                        {/* Helper message for selected option */}
-                        {field.value === "text" && (
-                          <p className="text-sm text-gray-500">
-                            Each row will be populated with a one ore more lines
-                            of text as the answer. If AI could not find an
-                            answer, you will see the answer as Unknown.
-                          </p>
-                        )}
-                        {field.value === "yes-no" && (
-                          <p className="text-sm text-gray-500">
-                            Each row will be populated with a Yes or No as the
-                            answer. If AI could not find an answer, you will see
-                            the answer as Unknown.
-                          </p>
-                        )}
-                        {field.value === "number" && (
-                          <p className="text-sm text-gray-500">
-                            Each row will be populated with a Number as the
-                            answer. If AI could not find an answer, you will see
-                            the answer as Unknown.
+                        {/* Format Helper Text */}
+                        {field.value && (
+                          <p className="text-gray-500 text-sm mt-2">
+                            {field.value === "text" &&
+                              "Answers will be in text format. If AI can't find an answer, you'll see 'Unknown'."}
+                            {field.value === "yes-no" &&
+                              "Answers will be 'Yes' or 'No'. If AI can't find an answer, you'll see 'Unknown'."}
+                            {field.value === "number" &&
+                              "Answers will be numeric values. If AI can't find an answer, you'll see 'Unknown'."}
                           </p>
                         )}
                       </FormItem>
@@ -184,23 +167,23 @@ function AddCustomColumn() {
                   />
                 )}
 
+                {/* Step 3: Column Name */}
                 {step >= 3 && (
                   <FormField
                     control={form.control}
                     name="columnName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">
+                        <FormLabel className="text-gray-800">
                           Column Name
                         </FormLabel>
-                        <FormDescription className="text-sm text-gray-500">
-                          Enter the name of the new column in the table that
-                          will store the answers.
+                        <FormDescription className="text-gray-500 text-sm">
+                          Specify a name for the new column in the table.
                         </FormDescription>
                         <FormControl>
                           <Input
-                            className="border border-gray-300"
-                            placeholder="e.g., Events held, Products launched etc."
+                            placeholder="e.g., Product Launches"
+                            className="border-gray-300 rounded-md"
                             {...field}
                           />
                         </FormControl>
@@ -211,15 +194,10 @@ function AddCustomColumn() {
                 )}
               </div>
 
-              {/* Dialog Footer */}
-              <DialogFooter className="mt-4">
-                {step === 1 && (
-                  <div className="justify-end">
-                    <Button type="submit">Next</Button>
-                  </div>
-                )}
-                {step > 1 && (
-                  <div className="w-full flex justify-between">
+              {/* Footer Navigation */}
+              <DialogFooter className="mt-6">
+                <div className="flex justify-between w-full">
+                  {step > 1 && (
                     <Button
                       type="button"
                       variant="secondary"
@@ -227,11 +205,9 @@ function AddCustomColumn() {
                     >
                       Back
                     </Button>
-                    <Button type="submit">
-                      {step < 4 ? "Next" : "Submit"}
-                    </Button>
-                  </div>
-                )}
+                  )}
+                  <Button type="submit">{step < 4 ? "Next" : "Submit"}</Button>
+                </div>
               </DialogFooter>
             </form>
           </Form>
