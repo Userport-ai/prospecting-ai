@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { accountColumns } from "./Columns";
 import { DataTable } from "./DataTable";
+import AddAccounts from "./AddAccounts";
 
 function getData() {
+  // When there is no data.
+  return [];
+
   // Fetch data from your API here.
   return [
     {
@@ -195,11 +199,22 @@ export default function Accounts() {
   return (
     <div className="w-11/12 mx-auto py-2">
       <h1 className="font-bold text-gray-700 text-2xl mb-5">Accounts</h1>
-      <DataTable
-        columns={columns}
-        data={data}
-        onCustomColumnAdded={onCustomColumnAdded}
-      />
+      {data.length === 0 && (
+        <div className="flex flex-col gap-2 items-center justify-center h-64 text-center bg-gray-50 border border-dashed border-gray-300 rounded-md p-6">
+          <div className="text-gray-600 mb-4">
+            <div className="text-xl font-semibold">No Data Available</div>
+            <div className="text-sm">Add Accounts to start Outreach.</div>
+          </div>
+          <AddAccounts />
+        </div>
+      )}
+      {data.length > 0 && (
+        <DataTable
+          columns={columns}
+          data={data}
+          onCustomColumnAdded={onCustomColumnAdded}
+        />
+      )}
     </div>
   );
 }

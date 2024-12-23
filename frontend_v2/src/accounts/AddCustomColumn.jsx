@@ -72,9 +72,9 @@ function AddCustomColumn({ onAdded }) {
       {/* Trigger Button */}
       <Button
         onClick={() => setOpen(true)}
-        className="w-fit mt-2 bg-[rgb(136,102,221)] hover:bg-[rgb(122,92,198)] text-white"
+        className=" flex gap-2 py-2 px-3 w-fit h-full shadow-md bg-[rgb(136,102,221)] hover:bg-[rgb(122,92,198)] text-white"
       >
-        <Cpu className="mr-2" />
+        <Cpu />
         Ask AI
       </Button>
 
