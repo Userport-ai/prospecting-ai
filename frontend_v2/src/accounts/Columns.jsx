@@ -1,11 +1,4 @@
-import {
-  ArrowUpDown,
-  ChevronDown,
-  ChevronsUpDown,
-  ChevronUp,
-  ExternalLink,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronsUpDown, ExternalLink } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "./SortingDropDown";
 
