@@ -11,23 +11,28 @@ import { Button } from "@/components/ui/button";
 import { DialogDescription } from "@radix-ui/react-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 
 // Component to let user upload a file from their computer.
 export function FileUpload({ onFileUpload }) {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [dragging, setDragging] = useState(false);
-  const { toast } = useToast();
+
+  // Returns true if valid file type and false otherwise.
+  const isValidFileType = (file) => {
+    return file.type === "text/csv" ? true : false;
+  };
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
-      setSelectedFile(file);
-      onFileUpload(file);
-      toast({
-        title: "File Selected",
-        description: `You selected: ${file.name}`,
-      });
+      if (!isValidFileType(file)) {
+        setErrorMessage(`Error! ${file.name} has invalid file type!`);
+        setSelectedFile(null);
+      } else {
+        setSelectedFile(file);
+        setErrorMessage(null);
+      }
     }
   };
 
@@ -45,18 +50,24 @@ export function FileUpload({ onFileUpload }) {
     setDragging(false);
     const file = event.dataTransfer.files[0];
     if (file) {
-      setSelectedFile(file);
-      onFileUpload(file);
-      toast({
-        title: "File Uploaded",
-        description: `You uploaded: ${file.name}`,
-      });
+      if (!isValidFileType(file)) {
+        setErrorMessage(`Error! ${file.name} has invalid file type!`);
+        setSelectedFile(null);
+      } else {
+        setSelectedFile(file);
+        setErrorMessage(null);
+      }
     }
+  };
+
+  // Handle Submit of uploaded file.
+  const handleSubmit = () => {
+    return onFileUpload(selectedFile);
   };
 
   return (
     <div className="flex flex-col gap-4">
-      {/* File Input */}
+      {/* When no file is not uploaded yet. */}
       {!selectedFile && (
         <div
           className={`border-2 ${
@@ -88,6 +99,10 @@ export function FileUpload({ onFileUpload }) {
         </div>
       )}
 
+      {/* Display error if any. */}
+      {errorMessage && <Label className="text-red-600">{errorMessage}</Label>}
+
+      {/* When file is successfully uploaded. */}
       {selectedFile && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4 border border-gray-200 bg-gray-50 rounded-md px-4 py-2">
@@ -107,12 +122,7 @@ export function FileUpload({ onFileUpload }) {
           <div className="flex justify-center gap-2">
             <Button
               disabled={!selectedFile}
-              onClick={() =>
-                toast({
-                  title: "File Submitted",
-                  description: "Your file has been processed.",
-                })
-              }
+              onClick={handleSubmit}
               className="shadow-sm"
             >
               Submit
@@ -125,13 +135,16 @@ export function FileUpload({ onFileUpload }) {
 }
 
 // Dialog that enables user to import CSV
-function ImportCSV({ open, setOpen }) {
+function ImportCSV({ open, onOpenChange, onImported }) {
   const handleFileUpload = (file) => {
     console.log("Uploaded file:", file);
-    // Further processing here...
+    // TODO: Send file to server to validate.
+    // Once it is validated, close the dialog.
+    onImported();
   };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex flex-col gap-6">
         <DialogTitle>Upload a CSV</DialogTitle>
         <DialogDescription className="text-sm text-gray-500">
@@ -160,6 +173,19 @@ export default function AddAccounts() {
     }
   };
 
+  // User initiated dialog mode change.
+  const handleDialogOpenChamge = (newOpen) => {
+    setOpen(newOpen);
+  };
+
+  // CSV imported successfully, close the dialog now.
+  const handleCSVImported = () => {
+    // Close the dialog.
+    setOpen(false);
+
+    // TODO: callback to accounts table to fetch uploaded rows.
+  };
+
   const itemClassName =
     "flex hover:cursor-pointer focus:bg-gray-300 text-md text-gray-600";
   return (
@@ -185,7 +211,11 @@ export default function AddAccounts() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ImportCSV open={open} setOpen={setOpen} />
+      <ImportCSV
+        open={open}
+        onOpenChange={handleDialogOpenChamge}
+        onImported={handleCSVImported}
+      />
     </div>
   );
 }
