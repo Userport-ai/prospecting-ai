@@ -193,7 +193,8 @@ export default function Accounts() {
   };
 
   return (
-    <div className="w-11/12 mx-auto py-10">
+    <div className="w-11/12 mx-auto py-2">
+      <h1 className="font-bold text-gray-700 text-2xl mb-5">Accounts</h1>
       <DataTable
         columns={columns}
         data={data}
