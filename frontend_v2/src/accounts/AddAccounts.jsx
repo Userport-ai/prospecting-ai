@@ -1,16 +1,191 @@
-import { Plus } from "lucide-react";
+import { useState } from "react";
+import { Plus, Upload, FileIcon, XCircle } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogTitle, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { DialogDescription } from "@radix-ui/react-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+
+// Component to let user upload a file from their computer.
+export function FileUpload({ onFileUpload }) {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const { toast } = useToast();
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      onFileUpload(file);
+      toast({
+        title: "File Selected",
+        description: `You selected: ${file.name}`,
+      });
+    }
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    setDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragging(false);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files[0];
+    if (file) {
+      setSelectedFile(file);
+      onFileUpload(file);
+      toast({
+        title: "File Uploaded",
+        description: `You uploaded: ${file.name}`,
+      });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* File Input */}
+      {!selectedFile && (
+        <div
+          className={`border-2 ${
+            dragging
+              ? "border-blue-500 bg-blue-50"
+              : "border-gray-300 bg-gray-50"
+          } rounded-md p-4 text-center transition-all duration-300`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <Input
+            id="file-upload"
+            type="file"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <Label
+            htmlFor="file-upload"
+            className="flex flex-col items-center justify-center gap-2 cursor-pointer text-gray-500 hover:text-gray-700"
+          >
+            <Upload className="w-6 h-6" />
+            <span className="text-sm">
+              {selectedFile
+                ? selectedFile.name
+                : "Drag & Drop or Click to Upload"}
+            </span>
+          </Label>
+        </div>
+      )}
+
+      {selectedFile && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-4 border border-gray-200 bg-gray-50 rounded-md px-4 py-2">
+            <FileIcon className="text-gray-600" size={24} />
+            <span className="text-sm text-gray-700">{selectedFile.name}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedFile(null)}
+              className="text-red-500 hover:bg-red-50"
+            >
+              <XCircle size={18} />
+              Remove
+            </Button>
+          </div>
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-2">
+            <Button
+              disabled={!selectedFile}
+              onClick={() =>
+                toast({
+                  title: "File Submitted",
+                  description: "Your file has been processed.",
+                })
+              }
+              className="shadow-sm"
+            >
+              Submit
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Dialog that enables user to import CSV
+function ImportCSV({ open, setOpen }) {
+  const handleFileUpload = (file) => {
+    console.log("Uploaded file:", file);
+    // Further processing here...
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="flex flex-col gap-6">
+        <DialogTitle>Upload a CSV</DialogTitle>
+        <DialogDescription className="text-sm text-gray-500">
+          Make sure the CSV file has atleast one column that contains the
+          Account website. We will use the website identify and enrich accounts.
+        </DialogDescription>
+
+        <div className="w-full flex justify-center">
+          {/* <Button className="w-fit p-2">Upload CSV</Button> */}
+          <FileUpload onFileUpload={handleFileUpload} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function AddAccounts() {
+  const importCSVOption = "Import CSV";
+  const addManuallyOption = "Add Manually";
+  const [open, setOpen] = useState(false);
+
+  const handleSelection = (e) => {
+    const val = e.target.innerText;
+    if (val === importCSVOption) {
+      setOpen(true);
+    }
+  };
+
+  const itemClassName =
+    "flex hover:cursor-pointer focus:bg-gray-300 text-md text-gray-600";
   return (
     <div className="flex">
-      <Button
-        onClick={() => console.log("add row top")}
-        className="flex items-center px-3 py-2 gap-2 bg-[rgb(136,102,221)]  hover:bg-[rgb(122,92,198)] text-white shadow-md"
-      >
-        <Plus size={18} />
-        Add Accounts
-      </Button>
+      <DropdownMenu modal={!open}>
+        <DropdownMenuTrigger className="flex items-center px-3 py-2 gap-2 bg-[rgb(136,102,221)]  hover:bg-[rgb(122,92,198)] text-white shadow-md">
+          <Plus size={18} />
+          <p>Add Accounts</p>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-[10rem]">
+          <DropdownMenuItem
+            className={itemClassName}
+            onSelect={handleSelection}
+          >
+            {importCSVOption}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className={itemClassName}
+            onSelect={handleSelection}
+          >
+            {addManuallyOption}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <ImportCSV open={open} setOpen={setOpen} />
     </div>
   );
 }
