@@ -6,11 +6,28 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogTitle, DialogContent } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { DialogDescription } from "@radix-ui/react-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 
 // Component to let user upload a file from their computer.
 export function FileUpload({ onFileUpload }) {
@@ -161,36 +178,114 @@ function ImportCSV({ open, onOpenChange, onImported }) {
   );
 }
 
+// Dialog that enables user to add an account manually.
+function AddAccountManually({ open, onOpenChange, onSuccessfulAdd }) {
+  const formSchema = z.object({
+    website: z.string().min(1).startsWith("https://"),
+  });
+
+  const form = useForm({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      website: "",
+    },
+  });
+
+  const onSubmit = (updatedForm) => {
+    form.reset();
+    return onSuccessfulAdd(updatedForm.website);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex flex-col gap-6">
+        <DialogTitle>Upload a CSV</DialogTitle>
+        <DialogDescription className="text-sm text-gray-500">
+          Make sure the CSV file has atleast one column that contains the
+          Account website. We will use the website identify and enrich accounts.
+        </DialogDescription>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="flex flex-col gap-6">
+              <FormField
+                control={form.control}
+                name="website"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-800">Website</FormLabel>
+                    <FormDescription className="text-gray-500 text-sm">
+                      Enter the website of the account.
+                    </FormDescription>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., https://www.google.com"
+                        className="border-gray-300 rounded-md"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Footer Navigation */}
+            <DialogFooter className="mt-6">
+              <Button type="submit">Submit</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Main component to allow users to input accounts.
 export default function AddAccounts() {
   const importCSVOption = "Import CSV";
   const addManuallyOption = "Add Manually";
-  const [open, setOpen] = useState(false);
+  const [openCSVDialog, setOpenCSVDialog] = useState(false);
+  const [openManualDialog, setOpenManualDialog] = useState(false);
 
   const handleSelection = (e) => {
     const val = e.target.innerText;
     if (val === importCSVOption) {
-      setOpen(true);
+      setOpenCSVDialog(true);
+    } else if (val === addManuallyOption) {
+      setOpenManualDialog(true);
     }
   };
 
   // User initiated dialog mode change.
-  const handleDialogOpenChamge = (newOpen) => {
-    setOpen(newOpen);
+  const handleCSVDialogOpenChamge = (newOpen) => {
+    setOpenCSVDialog(newOpen);
   };
 
   // CSV imported successfully, close the dialog now.
   const handleCSVImported = () => {
     // Close the dialog.
-    setOpen(false);
+    setOpenCSVDialog(false);
 
     // TODO: callback to accounts table to fetch uploaded rows.
+  };
+
+  // User initiated dialog mode change.
+  const handleManualDialogOpenChamge = (newOpen) => {
+    setOpenManualDialog(newOpen);
+  };
+
+  const handleAccountAddedManually = (website) => {
+    console.log("account website: ", website);
+    setOpenManualDialog(false);
+    // TODO: call server with this information.
   };
 
   const itemClassName =
     "flex hover:cursor-pointer focus:bg-gray-300 text-md text-gray-600";
   return (
     <div className="flex">
-      <DropdownMenu modal={!open}>
+      <DropdownMenu modal={!(openCSVDialog || openManualDialog)}>
         <DropdownMenuTrigger className="flex items-center px-3 py-2 gap-2 bg-[rgb(136,102,221)]  hover:bg-[rgb(122,92,198)] text-white shadow-md">
           <Plus size={18} />
           <p>Add Accounts</p>
@@ -212,9 +307,15 @@ export default function AddAccounts() {
       </DropdownMenu>
 
       <ImportCSV
-        open={open}
-        onOpenChange={handleDialogOpenChamge}
+        open={openCSVDialog}
+        onOpenChange={handleCSVDialogOpenChamge}
         onImported={handleCSVImported}
+      />
+
+      <AddAccountManually
+        open={openManualDialog}
+        onOpenChange={handleManualDialogOpenChamge}
+        onSuccessfulAdd={handleAccountAddedManually}
       />
     </div>
   );
