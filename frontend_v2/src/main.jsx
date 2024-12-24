@@ -6,6 +6,7 @@ import App from "./App.jsx";
 import Playbook from "./playbook/Playbook";
 import AddProduct from "./playbook/AddProduct";
 import ProductsPage from "./playbook/ProductsPage";
+import Accounts from "./accounts/Accounts";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")).render(
             <Route index element={<ProductsPage />} />
             <Route path="add-product" element={<AddProduct />} />
           </Route>
+          <Route path="accounts" element={<Accounts />}></Route>
         </Route>
       </Routes>
     </BrowserRouter>

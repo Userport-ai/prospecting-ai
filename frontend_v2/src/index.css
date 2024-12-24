@@ -4,6 +4,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Resizer class to ensure columns can be resized in the UI by user.
+These CSS classes have been taken from https://tanstack.com/table/v8/docs/framework/react/examples/column-sizing */
+
+.resizer {
+  height: 1.2rem;
+  width: 5px;
+  background: white;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.resizer.isResizing {
+  background: white;
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .resizer {
+    opacity: 0;
+  }
+
+  *:hover > .resizer {
+    opacity: 1;
+  }
+}
+
 /*
 Default color theme.
 Keeping it so that we can go back in case we mess up.
@@ -65,7 +92,8 @@ Keeping it so that we can go back in case we mess up.
 @layer base {
   :root {
     /* --background: rgb(235, 232, 242); */
-    --background: rgb(245, 242, 250);
+    /* --background: rgb(245, 242, 250); */
+    --background: rgb(249, 250, 251);
     --foreground: rgb(36, 36, 36);
 
     --card: rgb(255, 255, 255);
