@@ -7,11 +7,13 @@ import Playbook from "./playbook/Playbook";
 import AddProduct from "./playbook/AddProduct";
 import ProductsPage from "./playbook/ProductsPage";
 import Accounts from "./accounts/Accounts";
+import { LoginForm } from "./auth/LoginForm";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
+        <Route path="/login" element={<LoginForm />} />
         <Route path="/" element={<App />}>
           <Route path="playbook" element={<Playbook />}>
             <Route index element={<ProductsPage />} />
