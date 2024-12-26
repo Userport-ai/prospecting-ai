@@ -5,7 +5,7 @@ import logging
 import psutil
 import time
 
-from rest_framework.decorators import permission_classes, api_view
+from rest_framework.decorators import permission_classes, api_view, authentication_classes
 from rest_framework.permissions import AllowAny
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,7 @@ def check_system_resources():
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def health_check(request):
     """
     Main health check endpoint that returns the status of various components.
@@ -94,6 +95,7 @@ def db_readiness_check(request):
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def liveness_check(request):
     """
     Liveness check endpoint to determine if the application is running.
