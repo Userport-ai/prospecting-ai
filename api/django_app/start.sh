@@ -4,12 +4,12 @@
 if [ -f "/secrets/service-account.json" ]; then
     # Local development with service account JSON
     cloud-sql-proxy --port=5432 \
-        "omega-winter-431704-u5:us-central1-a:userport-pg" \
+        "omega-winter-431704-u5:us-central1:userport-pg" \
         --credentials-file=/secrets/service-account.json &
 else
     # Production with Workload Identity
     cloud-sql-proxy --port=5432 \
-        "omega-winter-431704-u5:us-central1-a:userport-pg" &
+        "omega-winter-431704-u5:us-central1:userport-pg" &
 fi
 
 # Wait for the proxy to be ready
