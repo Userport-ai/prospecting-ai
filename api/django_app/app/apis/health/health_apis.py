@@ -77,6 +77,7 @@ def health_check(request):
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def db_readiness_check(request):
     """
     Readiness check endpoint to determine if the application is ready to serve traffic.
