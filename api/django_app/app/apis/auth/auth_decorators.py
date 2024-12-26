@@ -1,5 +1,5 @@
 from functools import wraps
-from rest_framework.exceptions import ValidationError, PermissionDenied
+from rest_framework.exceptions import ValidationError
 from app.services import FirebaseAuthService
 import logging
 
