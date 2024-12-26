@@ -31,6 +31,9 @@ class FirebaseAuthService:
                     })
                 # Log the final initialized app's project ID
                 logger.debug(f"Firebase app initialized with project ID: {firebase_app.project_id}")
+            except Exception as e:
+                logger.error(f"Firebase initialization error: {str(e)}")
+                raise
 
     @staticmethod
     def verify_and_get_user(id_token: str):
