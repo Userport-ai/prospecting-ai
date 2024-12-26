@@ -1,73 +1,45 @@
-from django.http import HttpRequest
+from functools import wraps
 from rest_framework.exceptions import ValidationError, PermissionDenied
-from app.models import Tenant
+from app.services import FirebaseAuthService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-class TenantMiddleware:
-    """
-    Middleware to handle tenant context based on X-Tenant-Id header
-    """
+def login_required(view_func):
+    """Decorator to verify Firebase authentication token"""
 
-    def __init__(self, get_response):
-        self.get_response = get_response
+    @wraps(view_func)
+    def wrapped_view(request, *args, **kwargs):
+        auth_header = request.headers.get('Authorization')
 
-    def __call__(self, request: HttpRequest):
-        # Skip tenant check for certain paths if needed
-        if TenantMiddleware._is_path_exempt(request.path):
-            return self.get_response(request)
-
-        tenant_id = request.headers.get('X-Tenant-Id')
-
-        if not tenant_id:
-            raise ValidationError({
-                'error': 'AUTH_FAILED',
-                'message': 'X-Tenant-Id header is required'
-            })
+        if not auth_header:
+            logger.error("No Authorization header found")
+            raise ValidationError({"error": "UNAUTHORIZED", "message": "Authorization header is required"})
 
         try:
-            tenant = Tenant.objects.get(id=tenant_id)
+            auth_type, token = auth_header.split(' ')
+            logger.debug(f"Auth type: {auth_type}")
 
-            # Verify tenant is active
-            if tenant.status != 'active':
-                raise PermissionDenied({
-                    'error': 'AUTH_FAILED',
-                    'message': f'Tenant {tenant_id} is not active'
-                })
-
-            # Add tenant to request
-            request.tenant = tenant
-
-            # If user is authenticated, verify tenant access
-            if hasattr(request, 'user') and request.user.is_authenticated:
-                if request.user.tenant_id != tenant.id:
-                    raise PermissionDenied({
-                        'error': 'AUTH_FAILED',
-                        'message': 'User does not have access to this tenant'
-                    })
-
-        except Tenant.DoesNotExist:
-            raise ValidationError({
-                'error': 'AUTH_FAILED',
-                'message': f'Tenant {tenant_id} not found'
-            })
+            if auth_type.lower() != 'bearer':
+                logger.error(f"Invalid auth type: {auth_type}")
+                raise ValidationError({"error": "INVALID_AUTH_TYPE", "message": "Invalid authorization type"})
         except ValueError:
-            raise ValidationError({
-                'error': 'AUTH_FAILED',
-                'message': 'Invalid tenant ID format'
-            })
+            logger.error("Could not split auth header into type and token")
+            raise ValidationError({"error": "INVALID_AUTH_HEADER", "message": "Invalid authorization header format"})
 
-        response = self.get_response(request)
-        return response
+        try:
+            firebase_auth = FirebaseAuthService()
+            logger.debug("Firebase auth service initialized")
 
-    @staticmethod
-    def _get_exempt_paths() -> list[str]:
-        """Paths that don't require tenant verification"""
-        return [
-            '/api/v2/health',
-            '/api/v2/auth',
-        ]
+            user = firebase_auth.verify_and_get_user(token)
+            logger.debug(f"User authenticated: {user.email}")
 
-    @staticmethod
-    def _is_path_exempt(path: str) -> bool:
-        """Check if the current path is exempt from tenant verification"""
-        return any(path.startswith(exempt_path) for exempt_path in TenantMiddleware._get_exempt_paths())
+            request.user = user
+        except Exception as e:
+            logger.error(f"Firebase authentication failed: {str(e)}")
+            raise ValidationError({"error": "AUTH_FAILED", "message": str(e)})
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapped_view
