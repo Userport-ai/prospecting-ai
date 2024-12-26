@@ -15,7 +15,6 @@ class FirebaseAuthService:
             # First try to get existing app
             firebase_app = get_app()
         except ValueError:
-            # App doesn't exist, initialize it
             try:
                 # Check for local service account file first
                 local_creds_path = os.getenv('FIREBASE_CREDS_PATH', '/secrets/service-account.json')
@@ -23,18 +22,13 @@ class FirebaseAuthService:
                     # Use the local service account file if it exists
                     firebase_app = initialize_app(credentials.Certificate(local_creds_path))
                 else:
-                    # If local file doesn't exist, try to get default credentials (Workload Identity)
-                    creds, project = default()
-                    # Convert credentials to Certificate
-                    cert_dict = {
-                        "type": "service_account",
-                        "project_id": project,
-                        "private_key": creds.private_key,
-                        "client_email": creds.service_account_email,
-                        "token_uri": creds.token_uri,
-                    }
-                    firebase_app = initialize_app(credentials.Certificate(cert_dict))
-            except (DefaultCredentialsError, AttributeError):
+                    # If local file doesn't exist, use Application Default Credentials
+                    cred = credentials.ApplicationDefault()
+                    firebase_app = initialize_app(cred, {
+                        'projectId': 'omega-winter-431704-u5'  # Your project ID
+                    })
+            except (DefaultCredentialsError, AttributeError) as e:
+                print(f"Firebase initialization error: {str(e)}", file=sys.stderr)  # Add debug logging
                 raise
 
     @staticmethod
