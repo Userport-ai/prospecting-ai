@@ -1,8 +1,6 @@
+# syntax=docker/dockerfile:1
 FROM python:3.10
 
-# Accept build args
-ARG BUILDPLATFORM=linux/amd64
-ARG TARGETPLATFORM=linux/amd64
 ARG USERPORT_DEBUG
 ARG USERPORT_DEV_DB_USERNAME
 ARG USERPORT_DEV_DB_PASSWORD
@@ -33,8 +31,9 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/* && \
     mkdir -p /app/staticfiles
 
-# Install cloud-sql-proxy based on architecture
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+# Install cloud-sql-proxy, defaulting to amd64 if architecture isn't specified
+RUN ARCH=$(uname -m); \
+    if [ "$ARCH" = "aarch64" ]; then \
         CLOUD_SQL_PROXY_ARCH="arm64"; \
     else \
         CLOUD_SQL_PROXY_ARCH="amd64"; \
