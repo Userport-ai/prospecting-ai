@@ -57,6 +57,10 @@ class BasePermission(PermissionLoggingMixin, permissions.BasePermission):
 class IsTenantAdmin(BasePermission):
     """Permission check for tenant admin role"""
 
+    def has_object_permission(self, request, view, obj):
+        # Add object-level permission check
+        return request.user and request.user.role == UserRole.TENANT_ADMIN.value
+
     def has_permission(self, request, view):
         return self.check_role(request, required_role=UserRole.TENANT_ADMIN.value)
 
@@ -64,12 +68,20 @@ class IsTenantAdmin(BasePermission):
 class IsInternalAdmin(BasePermission):
     """Permission check for internal admin role"""
 
+    def has_object_permission(self, request, view, obj):
+        # Add object-level permission check
+        return request.user and request.user.role == UserRole.INTERNAL_ADMIN.value
+
     def has_permission(self, request, view):
         return self.check_role(request, required_role=UserRole.INTERNAL_ADMIN.value)
 
 
 class IsInternalCS(BasePermission):
     """Permission check for internal CS role"""
+
+    def has_object_permission(self, request, view, obj):
+        # Add object-level permission check
+        return request.user and request.user.role == UserRole.INTERNAL_CS.value
 
     def has_permission(self, request, view):
         return self.check_role(request, required_role=UserRole.INTERNAL_CS)
