@@ -1,6 +1,8 @@
-FROM --platform=linux/amd64 python:3.10
+FROM --platform=$BUILDPLATFORM python:3.10
 
 # Accept build args
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
 ARG USERPORT_DEBUG
 ARG USERPORT_DEV_DB_USERNAME
 ARG USERPORT_DEV_DB_PASSWORD
@@ -23,14 +25,21 @@ ENV USERPORT_DEBUG=$USERPORT_DEBUG \
 
 WORKDIR /app
 
-# Install system dependencies, create static files directory, and install cloud-sql-proxy
+# Install system dependencies and create static files directory
 RUN apt-get update && apt-get install -y \
     gcc \
     wget \
     netcat-traditional && \
     rm -rf /var/lib/apt/lists/* && \
-    mkdir -p /app/staticfiles && \
-    wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.1/cloud-sql-proxy.linux.amd64 -O /usr/local/bin/cloud-sql-proxy && \
+    mkdir -p /app/staticfiles
+
+# Install cloud-sql-proxy based on architecture
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+        CLOUD_SQL_PROXY_ARCH="arm64"; \
+    else \
+        CLOUD_SQL_PROXY_ARCH="amd64"; \
+    fi && \
+    wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.1/cloud-sql-proxy.linux.${CLOUD_SQL_PROXY_ARCH} -O /usr/local/bin/cloud-sql-proxy && \
     chmod +x /usr/local/bin/cloud-sql-proxy
 
 COPY requirements.txt .
