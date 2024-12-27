@@ -20,12 +20,14 @@ from django.urls import path, include
 from app.apis.auth.auth_urls import authurlpatterns
 from app.apis.health.health_urls import healthurlpatterns
 from app.apis.tenants.tenant_urls import urlpatterns as tenanturlpatterns
+from app.apis.products import urlpatterns as producturlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v2/', include([
         path('', include(authurlpatterns)),
         path('', include(healthurlpatterns)),
-        path('', include(tenanturlpatterns))
+        path('', include(tenanturlpatterns)),
+        path('', include(producturlpatterns))
     ])),
 ]
