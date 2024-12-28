@@ -21,6 +21,8 @@ from app.apis.auth.auth_urls import authurlpatterns
 from app.apis.health.health_urls import healthurlpatterns
 from app.apis.tenants.tenant_urls import urlpatterns as tenanturlpatterns
 from app.apis.products import urlpatterns as producturlpatterns
+from app.apis.leads import urlpatterns as leadsurlpatterns
+from app.apis.accounts import urlpatterns as accountsurlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,6 +30,8 @@ urlpatterns = [
         path('', include(authurlpatterns)),
         path('', include(healthurlpatterns)),
         path('', include(tenanturlpatterns)),
-        path('', include(producturlpatterns))
+        path('', include(producturlpatterns)),
+        path('', include(leadsurlpatterns)),
+        path('', include(accountsurlpatterns)),
     ])),
 ]

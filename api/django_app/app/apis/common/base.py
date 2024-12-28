@@ -10,12 +10,14 @@ class TenantScopedViewSet(viewsets.ModelViewSet):
     """
     Base ViewSet that automatically scopes all queries to the current tenant
     and provides common functionality for all viewsets.
+    Handles soft deletion by using the SoftDeleteManager's default queryset.
     """
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """
         Filter queryset by tenant and handle soft deletes.
+        Uses the model's default manager which already filters out soft-deleted records.
         Override this method in child classes if additional filtering is needed.
         """
         base_queryset = self.queryset if self.queryset is not None else self.get_serializer().Meta.model.objects
@@ -33,7 +35,7 @@ class TenantScopedViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def perform_destroy(self, instance):
         """
-        Implement soft delete by default
+        Implement soft delete using the existing mixin functionality
         """
         instance.delete(hard=False)
 
