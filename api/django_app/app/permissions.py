@@ -59,10 +59,11 @@ class IsTenantAdmin(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         # Add object-level permission check
-        return request.user and request.user.role == UserRole.TENANT_ADMIN.value
+        return request.user and (request.user.role == UserRole.TENANT_ADMIN.value or
+                                 request.user.role == UserRole.INTERNAL_ADMIN)
 
     def has_permission(self, request, view):
-        return self.check_role(request, required_role=UserRole.TENANT_ADMIN.value)
+        return self.check_role(request, allowed_roles=[UserRole.TENANT_ADMIN.value, UserRole.INTERNAL_ADMIN.value])
 
 
 class IsInternalAdmin(BasePermission):
