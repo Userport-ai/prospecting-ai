@@ -92,12 +92,11 @@ export function Login() {
                             <FormLabel className="text-gray-800">
                               Email
                             </FormLabel>
-                            <FormDescription className="text-gray-500 text-sm">
-                              {/* Enter the website of the account. */}
-                            </FormDescription>
+                            <FormDescription></FormDescription>
                             <FormControl>
                               <Input
-                                className="border-gray-300 rounded-md"
+                                placeholder="m@example.com"
+                                className="border-gray-300 border-0 rounded-md"
                                 {...field}
                               />
                             </FormControl>
@@ -115,13 +114,12 @@ export function Login() {
                             <FormLabel className="text-gray-800">
                               Password
                             </FormLabel>
-                            <FormDescription className="text-gray-500 text-sm">
-                              {/* Enter the website of the account. */}
-                            </FormDescription>
+                            <FormDescription></FormDescription>
                             <FormControl>
                               <Input
                                 type="password"
-                                className="border-gray-300 rounded-md"
+                                placeholder="password"
+                                className="border-gray-300 border-0 rounded-md"
                                 {...field}
                               />
                             </FormControl>
