@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import logo from "./assets/combination_mark_primary_sidebar.png";
 import { useLocation, useNavigate } from "react-router";
+import { handleLogout } from "./auth/AuthProvider";
 
 // App items.
 const appItems = [
@@ -74,6 +75,7 @@ const onboardingItems = [
     icon: File,
   },
 ];
+
 export function AppSidebar() {
   const navigate = useNavigate();
   const activeItems = appItems.filter((item) =>
@@ -83,6 +85,17 @@ export function AppSidebar() {
     // Mark the first item as active.
     activeItems[0].isActive = true;
   }
+
+  const accountOptionText = "Account";
+  const billingOptionText = "Billing";
+  const logoutOptionText = "Log Out";
+  const handleFooterMenuSelection = (e) => {
+    const selectedOption = e.target.innerText;
+    if (selectedOption === logoutOptionText) {
+      // Logout user.
+      handleLogout();
+    }
+  };
 
   return (
     <Sidebar className="shadow-2xl bg-sidebar-background text-sidebar-foreground h-full min-h-screen">
@@ -166,14 +179,23 @@ export function AppSidebar() {
                 side="top"
                 className="w-[--radix-popper-anchor-width] shadow-lg bg-card text-card-foreground rounded-md p-2"
               >
-                <DropdownMenuItem className="hover:bg-muted hover:cursor-pointer rounded-md p-2">
-                  <span>Account</span>
+                <DropdownMenuItem
+                  className="hover:bg-muted hover:cursor-pointer rounded-md p-2"
+                  onSelect={handleFooterMenuSelection}
+                >
+                  <span>{accountOptionText}</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="hover:bg-muted hover:cursor-pointer rounded-md p-2">
-                  <span>Billing</span>
+                <DropdownMenuItem
+                  className="hover:bg-muted hover:cursor-pointer rounded-md p-2"
+                  onSelect={handleFooterMenuSelection}
+                >
+                  <span>{billingOptionText}</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="hover:bg-muted hover:cursor-pointer rounded-md p-2">
-                  <span>Sign out</span>
+                <DropdownMenuItem
+                  className="hover:bg-muted hover:cursor-pointer rounded-md p-2"
+                  onSelect={handleFooterMenuSelection}
+                >
+                  <span>{logoutOptionText}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

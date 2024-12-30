@@ -1,6 +1,8 @@
 import AppLayout from "./AppLayout";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorFallback } from "./ErrorFallBack";
+import { useAuthContext } from "./auth/AuthProvider";
+import { Navigate } from "react-router";
 
 // Error Logging Function
 function logErrorToService(error, info) {
@@ -8,6 +10,12 @@ function logErrorToService(error, info) {
 }
 
 function App() {
+  const user = useAuthContext();
+  if (!user) {
+    // User is logged out.
+    return <Navigate to="/login" />;
+  }
+
   return (
     <ErrorBoundary
       FallbackComponent={ErrorFallback}
