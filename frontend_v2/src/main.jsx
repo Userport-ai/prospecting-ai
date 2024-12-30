@@ -7,23 +7,26 @@ import Playbook from "./playbook/Playbook";
 import AddProduct from "./playbook/AddProduct";
 import ProductsPage from "./playbook/ProductsPage";
 import Accounts from "./accounts/Accounts";
-import { LoginForm } from "./auth/LoginForm";
-import { SignUpForm } from "./auth/SignUpForm";
+import { Login } from "./auth/Login";
+import { SignUp } from "./auth/SignUp";
+import AuthProvider from "./auth/AuthProvider";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginForm />} />
-        <Route path="/signup" element={<SignUpForm />} />
-        <Route path="/" element={<App />}>
-          <Route path="playbook" element={<Playbook />}>
-            <Route index element={<ProductsPage />} />
-            <Route path="add-product" element={<AddProduct />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<SignUp />} />
+          <Route path="/" element={<App />}>
+            <Route path="playbook" element={<Playbook />}>
+              <Route index element={<ProductsPage />} />
+              <Route path="add-product" element={<AddProduct />} />
+            </Route>
+            <Route path="accounts" element={<Accounts />}></Route>
           </Route>
-          <Route path="accounts" element={<Accounts />}></Route>
-        </Route>
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   </StrictMode>
 );
