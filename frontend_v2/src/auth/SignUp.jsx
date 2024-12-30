@@ -18,6 +18,9 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { handleGoogleSignIn } from "./GoogleAuth";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth } from "./BaseAuth";
+import { useState } from "react";
 
 export function SignUp() {
   const user = useAuthContext();
@@ -25,6 +28,7 @@ export function SignUp() {
     // User is logged in already, redirect to app.
     return <Navigate to="/accounts" />;
   }
+  const [errorMessage, setErrorMessage] = useState(null);
 
   const formSchema = z.object({
     firstName: z.string().min(1),
@@ -43,7 +47,38 @@ export function SignUp() {
   });
 
   const handleSignUp = async (inputDetails) => {
-    console.log("input details: ", inputDetails);
+    const firstName = inputDetails.firstName;
+    const lastName = inputDetails.lastName;
+    const email = inputDetails.email;
+    const password = inputDetails.password;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      // Update display Name.
+      const displayName = `${firstName} ${lastName}`;
+      await updateProfile(user, { displayName: displayName });
+
+      setErrorMessage(null);
+    } catch (error) {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      if (errorCode === "auth/email-already-in-use") {
+        setErrorMessage("Email already in use with existing account");
+      } else if (errorCode === "auth/network-request-failed") {
+        setErrorMessage(
+          "You are offline right now, please try again after you are online."
+        );
+      } else if (errorCode === "auth/invalid-display-name") {
+        setErrorMessage("First or Last Name is invalid.");
+      }
+      console.error("Sign Up Error Code:", errorCode);
+      console.error("Sign Up Error Message: ", errorMessage);
+    }
   };
 
   return (
@@ -151,6 +186,11 @@ export function SignUp() {
                         )}
                       />
                     </div>
+                    {errorMessage && (
+                      <p className="text-sm  text-destructive">
+                        {errorMessage}
+                      </p>
+                    )}
                     <Button type="submit" className="w-full">
                       Sign Up
                     </Button>

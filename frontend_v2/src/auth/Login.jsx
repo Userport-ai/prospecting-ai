@@ -49,21 +49,22 @@ export function Login() {
     const password = inputDetails.password;
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // Successful login, navigate to app.
+      // Successful login!
       setErrorMessage(null);
-      navigate("/accounts");
     } catch (error) {
-      if (error.code === "auth/invalid-credential") {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      if (errorCode === "auth/invalid-credential") {
         setErrorMessage("Invalid Login Credentials");
-      } else if (error.code === "auth/email-already-in-use") {
-        setErrorMessage("Email already in use with another account");
-      } else if (error.code === "auth/network-request-failed") {
+      } else if (errorCode === "auth/email-already-in-use") {
+        setErrorMessage("Email already in use with existing account");
+      } else if (errorCode === "auth/network-request-failed") {
         setErrorMessage(
           "You are offline right now, please try again after you are online."
         );
       }
-      console.error("Login Error:", error.code);
-      console.error("login message: ", error.message);
+      console.error("Login Error:", errorCode);
+      console.error("login message: ", errorMessage);
     }
   };
 
