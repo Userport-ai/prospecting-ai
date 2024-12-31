@@ -1,9 +1,10 @@
 # app/models/tenants.py
 import uuid
 
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.db.models import JSONField
-from django.contrib.postgres.indexes import GinIndex
+
 from .common import AuditMixin, SoftDeleteMixin
 
 
@@ -36,5 +37,5 @@ class Tenant(AuditMixin, SoftDeleteMixin):
         return f"{self.name} ({self.website})"
 
     def save(self, *args, **kwargs):
-        self.validate_json_schema('settings', self.settings)
+        # TODO(Sowrabh): Validate JSON schema etc.
         super().save(*args, **kwargs)

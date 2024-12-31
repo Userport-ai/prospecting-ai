@@ -1,0 +1,81 @@
+steps:
+# Build the container image with build args
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'build',
+    '-f', './api/django_app/Dockerfile',
+    '--build-arg', 'USERPORT_DEBUG=${_USERPORT_DEBUG}',
+    '--build-arg', 'USERPORT_DEV_DB_USERNAME=${_USERPORT_DEV_DB_USERNAME}',
+    '--build-arg', 'USERPORT_DEV_DB_PASSWORD=${_USERPORT_DEV_DB_PASSWORD}',
+    '--build-arg', 'ALLOWED_HOSTS=${_ALLOWED_HOSTS}',
+    '--build-arg', 'GUNICORN_WORKERS=${_GUNICORN_WORKERS}',
+    '--build-arg', 'GUNICORN_TIMEOUT=${_GUNICORN_TIMEOUT}',
+    '--build-arg', 'PORT=${_PORT}',
+    '-t', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA',
+    '-t', 'gcr.io/$PROJECT_ID/userport-django-app:latest',
+    './api/django_app'
+  ]
+
+# Push the container images
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:latest']
+
+# Get GKE credentials first
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - 'container'
+  - 'clusters'
+  - 'get-credentials'
+  - 'userport-service-prod'
+  - '--zone=us-west1'
+  - '--project=$PROJECT_ID'
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+
+# Create/update the database credentials secret
+- name: 'gcr.io/cloud-builders/kubectl'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    printf "%s" "${_USERPORT_DEV_DB_PASSWORD}" > password.txt
+    printf "%s" "${_USERPORT_DEV_DB_USERNAME}" > username.txt
+    kubectl create secret generic db-credentials \
+      --from-file=password=password.txt \
+      --from-file=username=username.txt \
+      --dry-run=client -o yaml | \
+    kubectl apply -f - --validate=false
+    rm password.txt username.txt
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+
+# Deploy to GKE
+- name: 'gcr.io/cloud-builders/gke-deploy'
+  args:
+  - run
+  - --filename=api/django_app/k8s/
+  - --location=us-west1
+  - --cluster=userport-service-prod
+  - --image=gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+  - 'GCLOUD_PROJECT=$PROJECT_ID'
+
+substitutions:
+  _USERPORT_DEBUG: '0'
+  _ALLOWED_HOSTS: '*'
+  _GUNICORN_WORKERS: '4'
+  _GUNICORN_TIMEOUT: '120'
+  _PORT: '8000'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+- 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA'
+- 'gcr.io/$PROJECT_ID/userport-django-app:latest'

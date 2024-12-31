@@ -18,10 +18,20 @@ from django.contrib import admin
 from django.urls import path, include
 
 from app.apis.auth.auth_urls import authurlpatterns
+from app.apis.health.health_urls import healthurlpatterns
+from app.apis.tenants.tenant_urls import urlpatterns as tenanturlpatterns
+from app.apis.products import urlpatterns as producturlpatterns
+from app.apis.leads import urlpatterns as leadsurlpatterns
+from app.apis.accounts import urlpatterns as accountsurlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v2/', include([
         path('', include(authurlpatterns)),
+        path('', include(healthurlpatterns)),
+        path('', include(tenanturlpatterns)),
+        path('', include(producturlpatterns)),
+        path('', include(leadsurlpatterns)),
+        path('', include(accountsurlpatterns)),
     ])),
 ]
