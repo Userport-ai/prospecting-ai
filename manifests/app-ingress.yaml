@@ -1,45 +1,52 @@
-# Following the official guide: https://cloud.google.com/kubernetes-engine/docs/how-to/load-balance-ingress#create-ingress.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: userport-ingress
   annotations:
-    # Reference: https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs
-    # gce for external application load balancer.
     kubernetes.io/ingress.class: "gce"
-    # Global State External IP Name.
     kubernetes.io/ingress.global-static-ip-name: userport-prod
-    # Google Managed SSL Certificate.
     networking.gke.io/managed-certificates: managed-cert-v3
-    # Disable HTTP traffic to the Ingress.
     kubernetes.io/ingress.allow-http: "false"
 spec:
   rules:
-  - host: "flower.userport.ai"
-    http:
-      paths:
-      - path: /*
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: flower-service
-            port:
-              number: 80
-  # TODO: Add userport.ai and www.userport.ai domains once website is ready.
-  - host: "app.userport.ai"
-    http:
-      paths:
-      - path: /*
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: react-service
-            port:
-              number: 80
-      - path: /api/*
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: flask-api-service
-            port:
-              number: 80
+    - host: "flower.userport.ai"
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: flower-service
+                port:
+                  number: 80
+    - host: "app.userport.ai"
+      http:
+        paths:
+          - path: /api/v2/
+            pathType: Prefix
+            backend:
+              service:
+                name: userport-django-service
+                port:
+                  number: 80
+          - path: /api/v1/
+            pathType: Prefix
+            backend:
+              service:
+                name: flask-api-service
+                port:
+                  number: 80
+          - path: /api/
+            pathType: Prefix
+            backend:
+              service:
+                name: userport-django-service
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: react-service
+                port:
+                  number: 80
