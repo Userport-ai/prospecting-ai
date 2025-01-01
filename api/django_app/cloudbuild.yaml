@@ -10,6 +10,7 @@ steps:
     '--build-arg', 'ALLOWED_HOSTS=${_ALLOWED_HOSTS}',
     '--build-arg', 'GUNICORN_WORKERS=${_GUNICORN_WORKERS}',
     '--build-arg', 'GUNICORN_TIMEOUT=${_GUNICORN_TIMEOUT}',
+    '--build-arg', 'CORS_ALLOWED_ORIGINS=${_CORS_ALLOWED_ORIGINS}',
     '--build-arg', 'PORT=${_PORT}',
     '-t', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA',
     '-t', 'gcr.io/$PROJECT_ID/userport-django-app:latest',
