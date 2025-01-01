@@ -276,7 +276,6 @@ export default function AddAccounts() {
   };
 
   const handleAccountAddedManually = (website) => {
-    console.log("account website: ", website);
     setOpenManualDialog(false);
     // TODO: call server with this information.
   };

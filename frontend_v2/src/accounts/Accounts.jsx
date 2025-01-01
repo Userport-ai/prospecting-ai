@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { accountColumns } from "./Columns";
-import { DataTable } from "./DataTable";
+import { Table } from "./Table";
 import AddAccounts from "./AddAccounts";
 
 function getData() {
   // When there is no data.
-  return [];
+  // return [];
 
   // Fetch data from your API here.
   return [
@@ -209,7 +209,7 @@ export default function Accounts() {
         </div>
       )}
       {data.length > 0 && (
-        <DataTable
+        <Table
           columns={columns}
           data={data}
           onCustomColumnAdded={onCustomColumnAdded}

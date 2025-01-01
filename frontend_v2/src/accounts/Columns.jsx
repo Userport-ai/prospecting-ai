@@ -1,6 +1,6 @@
 import { ChevronsUpDown, ExternalLink } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import SortingDropdown from "./SortingDropDown";
+import SortingDropdown from "../table/SortingDropDown";
 
 export const accountColumns = [
   {
