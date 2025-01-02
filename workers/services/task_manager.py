@@ -17,18 +17,25 @@ class TaskManager:
         return self.client.queue_path(self.project, self.location, self.queue)
 
     async def create_task(self, task_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        parent = self._get_queue_path()
+
         task = {
             'http_request': {
                 'http_method': tasks_v2.HttpMethod.POST,
                 'url': f"{self.base_url}/tasks/{task_name}",
                 'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps(payload).encode(),
-                "oidcToken": {"serviceAccountEmail": self.service_account_email}
+                'body': json.dumps(payload).encode()
             }
         }
 
+        if self.service_account_email:
+            task['http_request']['oidc_token'] = {
+                'service_account_email': self.service_account_email,
+                'audience': self.base_url
+            }
+
         response = self.client.create_task(
-            request={"parent": self._get_queue_path(), "task": task}
+            request={"parent": parent, "task": task}
         )
 
         return {
