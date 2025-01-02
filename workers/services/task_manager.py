@@ -1,7 +1,8 @@
-from google.cloud import tasks_v2
-from typing import Dict, Any
-import os
 import json
+import os
+from typing import Dict, Any
+
+from google.cloud import tasks_v2
 
 
 class TaskManager:
@@ -19,21 +20,11 @@ class TaskManager:
     async def create_task(self, task_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         parent = self._get_queue_path()
 
-        task = {
-            'http_request': {
-                'http_method': tasks_v2.HttpMethod.POST,
-                'url': f"{self.base_url}/tasks/{task_name}",
-                'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps(payload).encode()
-            }
-        }
+        task = {'http_request': {'http_method': tasks_v2.HttpMethod.POST, 'url': f"{self.base_url}/tasks/{task_name}",
+                                 'headers': {'Content-Type': 'application/json'}, 'body': json.dumps(payload).encode(),
+                                 'oidc_token': tasks_v2.OidcToken(service_account_email=self.service_account_email,
+                                                                  audience=self.base_url), }}
 
-        response = self.client.create_task(
-            request={"parent": parent, "task": task}
-        )
+        response = self.client.create_task(request={"parent": parent, "task": task})
 
-        return {
-            "status": "scheduled",
-            "task_name": task_name,
-            "task_id": response.name
-        }
+        return {"status": "scheduled", "task_name": task_name, "task_id": response.name}
