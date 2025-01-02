@@ -7,7 +7,6 @@ from services.mocks.mock_task_manager import MockTaskManager
 from services.task_registry import TaskRegistry
 from services.task_manager import TaskManager
 from tasks.account_enhancement import AccountEnhancementTask
-from tasks.hello_world import HelloWorldTask
 
 router = APIRouter()
 
@@ -18,7 +17,6 @@ if os.getenv('ENVIRONMENT') == 'local':
 else:
     task_manager = TaskManager()
 
-task_registry.register(HelloWorldTask)
 task_registry.register(AccountEnhancementTask)
 
 @router.post("/tasks/create/{task_name}")
