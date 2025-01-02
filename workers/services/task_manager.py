@@ -9,7 +9,7 @@ class TaskManager:
         self.client = tasks_v2.CloudTasksClient()
         self.project = os.getenv('GOOGLE_CLOUD_PROJECT')
         self.queue = os.getenv('CLOUD_TASKS_QUEUE')
-        self.location = os.getenv('CLOUD_TASKS_LOCATION', 'us-central1')
+        self.location = os.getenv('CLOUD_TASKS_LOCATION', 'us-west1')
         self.base_url = os.getenv('WORKER_BASE_URL')
 
     def _get_queue_path(self) -> str:
