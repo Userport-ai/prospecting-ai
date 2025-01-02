@@ -1,0 +1,65 @@
+[
+  {
+    "name": "job_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique job identifier"
+  },
+  {
+    "name": "tenant_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "For multi-tenancy"
+  },
+  {
+    "name": "status",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "pending/processing/completed/failed"
+  },
+  {
+    "name": "entity_type",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "account/lead"
+  },
+  {
+    "name": "entity_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Entity we have enriched"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Source from which this was fetched"
+  },
+  {
+    "name": "raw_data",
+    "type": "JSON",
+    "description": "Raw json from the source"
+  },
+  {
+    "name": "processed_data",
+    "type": "STRING",
+    "description": "Processed json by the job"
+  },
+  {
+    "name": "created_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Job creation time"
+  },
+  {
+    "name": "updated_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Last status update"
+  },
+  {
+    "name": "error_details",
+    "type": "JSON",
+    "description": "Any error information"
+  }
+]

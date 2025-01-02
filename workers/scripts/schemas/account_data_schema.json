@@ -1,0 +1,72 @@
+[
+  {
+    "name": "record_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique identifier for raw record"
+  },
+  {
+    "name": "account_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "References PostgreSQL account ID"
+  },
+  {
+    "name": "company_name",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Name"
+  },
+  {
+    "name": "employee_count",
+    "type": "INTEGER",
+    "mode": "NULLABLE",
+    "description": "Employee count"
+  },
+  {
+    "name": "industry",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "Industry"
+  },
+  {
+    "name": "location",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Location"
+  },
+  {
+    "name": "website",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Website"
+  },
+  {
+    "name": "linkedin_url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "LinkedIn URL"
+  },
+  {
+    "name": "technologies",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "Tech stack"
+  },
+  {
+    "name": "funding_details",
+    "type": "JSON",
+    "description": "Funding information"
+  },
+  {
+    "name": "raw_data",
+    "type": "JSON",
+    "description": "Complete raw response for flexibility"
+  },
+  {
+    "name": "fetched_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When data was fetched"
+  }
+]
