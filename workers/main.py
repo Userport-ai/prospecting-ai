@@ -5,18 +5,12 @@ from api.routes import router
 import logging
 from pythonjsonlogger import jsonlogger
 
-# Configure logging
-formatter = jsonlogger.JsonFormatter(
-    fmt='%(asctime)s %(levelname)s %(name)s %(message)s',
-    json_ensure_ascii=False
-)
 
-# Add JSON formatter
+# Configure logging and add JSON formatter
 logHandler = logging.StreamHandler()
 formatter = jsonlogger.JsonFormatter(
-    '%(asctime)s %(levelname)s %(name)s %(message)s',
-    timestamp=True,
-    stack_info=True
+    fmt='%(asctime)s %(levelname)s %(name)s %(message)s %(stack_info)s',
+    json_ensure_ascii=False
 )
 logHandler.setFormatter(formatter)
 logger = logging.getLogger()
