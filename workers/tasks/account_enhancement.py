@@ -42,6 +42,204 @@ class AccountEnhancementTask(BaseTask):
             "job_id": str(uuid.uuid4())
         }
 
+    async def _extract_structured_data(self, company_profile: str) -> Dict[str, Any]:
+        """Extract structured data from company profile using Gemini"""
+        try:
+            # Create extraction prompt for Gemini
+            extraction_prompt = f"""
+            Extract company information into a structured JSON format from the profile below.
+            Follow these rules strictly:
+            1. Return ONLY valid JSON, no extra text or markdown
+            2. Do not include any explanations or notes
+            3. If a field's information is not available, use null
+            4. Use the exact field names and structure shown below
+            5. Ensure all strings are properly quoted
+            6. Arrays should never be null, use empty array [] if no data
+
+            Company Profile:
+            {company_profile}
+
+            Required JSON format:
+            {{
+                "company_name": {{
+                    "legal_name": string,
+                    "trading_name": string or null,
+                    "aliases": [string]
+                }},
+                "industry": {{
+                    "primary": string or null,
+                    "sectors": [string],
+                    "categories": [string]
+                }},
+                "location": {{
+                    "headquarters": {{
+                        "city": string or null,
+                        "state": string or null,
+                        "country": string or null,
+                        "region": string or null
+                    }},
+                    "office_locations": [
+                        {{
+                            "city": string,
+                            "country": string,
+                            "type": string  // e.g., "HQ", "Regional Office", "R&D Center"
+                        }}
+                    ]
+                }},
+                "business_metrics": {{
+                    "employee_count": {{
+                        "total": number or null,
+                        "range": string or null,
+                        "as_of_date": string or null
+                    }},
+                    "year_founded": number or null,
+                    "company_type": string or null // e.g., "public", "private", "non-profit"
+                }},
+                "technology_stack": {{
+                    "programming_languages": [string],
+                    "frameworks": [string],
+                    "databases": [string],
+                    "cloud_services": [string],
+                    "other_tools": [string]
+                }},
+                "business_details": {{
+                    "products": [string],
+                    "services": [string],
+                    "target_markets": [string],
+                    "business_model": string or null,
+                    "revenue_streams": [string]
+                }},
+                "market_position": {{
+                    "competitors": [string],
+                    "partners": [string],
+                    "customers": [string],
+                    "target_industries": [string]
+                }},
+                "financials": {{
+                    "type": "public" or "private",
+                    "public_data": {{
+                        "stock_details": {{
+                            "exchange": string or null,
+                            "ticker": string or null,
+                            "market_cap": {{
+                                "value": number or null,
+                                "currency": string or null,
+                                "as_of_date": string or null
+                            }}
+                        }},
+                        "financial_metrics": {{
+                            "revenue": {{
+                                "value": number or null,
+                                "currency": string or null,
+                                "period": string or null
+                            }},
+                            "net_income": {{
+                                "value": number or null,
+                                "currency": string or null,
+                                "period": string or null
+                            }}
+                        }}
+                    }},
+                    "private_data": {{
+                        "total_funding": {{
+                            "amount": number or null,
+                            "currency": string or null,
+                            "as_of_date": string or null
+                        }},
+                        "funding_rounds": [
+                            {{
+                                "series": string or null,
+                                "amount": number or null,
+                                "currency": string or null,
+                                "date": string or null,
+                                "lead_investors": [string],
+                                "other_investors": [string],
+                                "valuation": {{
+                                    "amount": number or null,
+                                    "currency": string or null,
+                                    "type": string or null
+                                }}
+                            }}
+                        ]
+                    }}
+                }},
+                "recent_developments": [
+                    {{
+                        "type": string,  // e.g., "Product Launch", "Acquisition", "Partnership", "Funding"
+                        "date": string or null,
+                        "title": string,
+                        "description": string
+                    }}
+                ],
+                "key_metrics": {{
+                    "growth": {{
+                        "employee_growth_rate": number or null,
+                        "revenue_growth_rate": number or null,
+                        "period": string or null
+                    }},
+                    "market_presence": {{
+                        "global_presence": boolean,
+                        "regions_served": [string],
+                        "languages_supported": [string]
+                    }}
+                }},
+                "compliance_and_certifications": [
+                    {{
+                        "name": string,
+                        "issuer": string or null,
+                        "valid_until": string or null
+                    }}
+                ],
+                "digital_presence": {{
+                    "website": string or null,
+                    "social_media": {{
+                        "linkedin": string or null,
+                        "twitter": string or null,
+                        "facebook": string or null
+                    }},
+                    "app_store_presence": {{
+                        "ios": boolean,
+                        "android": boolean,
+                        "ratings": {{
+                            "ios_rating": number or null,
+                            "android_rating": number or null
+                        }}
+                    }}
+                }}
+            }}"""
+
+            logger.debug(f"Sending extraction prompt to Gemini: {extraction_prompt}")
+
+            # Get structured data
+            structure_response = self.model.generate_content(extraction_prompt)
+
+            if not structure_response or not structure_response.parts:
+                logger.error("Empty response from Gemini")
+                raise ValueError("Empty response from Gemini AI")
+
+            raw_text = structure_response.parts[0].text
+            logger.debug(f"Raw text from Gemini: {raw_text}")
+
+            # Clean and parse the structured data
+            cleaned_text = raw_text.strip()
+            if cleaned_text.startswith("```json"):
+                cleaned_text = cleaned_text[7:]
+            if cleaned_text.endswith("```"):
+                cleaned_text = cleaned_text[:-3]
+            cleaned_text = cleaned_text.strip()
+
+            logger.debug(f"Cleaned text before JSON parse: {cleaned_text}")
+
+            try:
+                return json.loads(cleaned_text)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error. Text: '{cleaned_text}'. Error: {str(e)}")
+                raise ValueError(f"Failed to parse Gemini response as JSON: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Error extracting structured data: {str(e)}")
+            raise
+
     async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             company_name = payload.get('company_name')
@@ -52,6 +250,7 @@ class AccountEnhancementTask(BaseTask):
                 return {"status": "failed", "error": "Missing required payload fields"}
 
             # Call the Jina API
+            logger.info(f"Fetching company profile for: {company_name}")
             jina_url = f"https://s.jina.ai/{company_name}+company+profile"
             jina_headers = {
                 "Authorization": f"Bearer {self.jina_api_token}",
@@ -60,31 +259,19 @@ class AccountEnhancementTask(BaseTask):
             jina_response = requests.get(jina_url, headers=jina_headers)
             jina_response.raise_for_status()
             company_profile = jina_response.text
+            logger.debug(f"Received company profile from Jina: {company_profile}")
 
-            # Create extraction prompt for Gemini
-            extraction_prompt = f"""
-            Extract company information into a structured JSON format from the profile below.
-            [Previous extraction prompt content...]
-            """
-
-            # Get structured data
-            structure_response = self.model.generate_content(extraction_prompt)
-            raw_text = structure_response.parts[0].text if structure_response.parts else ""
-
-            # Clean and parse the structured data
-            cleaned_text = raw_text.strip()
-            if cleaned_text.startswith("```json"):
-                cleaned_text = cleaned_text[7:]
-            if cleaned_text.endswith("```"):
-                cleaned_text = cleaned_text[:-3]
-            cleaned_text = cleaned_text.strip()
-
-            structured_data = json.loads(cleaned_text)
+            # Extract structured data
+            structured_data = await self._extract_structured_data(company_profile)
 
             # Get analysis from Gemini
             analysis_prompt = f"""
-            You're a Business Development rep working on profiling companies.
-            [Previous analysis prompt content...]
+            Analyze this company profile and provide a concise business summary.
+            Focus on key metrics, market position, and recent developments.
+            Keep it factual and data-driven.
+
+            Company Profile:
+            {company_profile}
             """
 
             analysis_response = self.model.generate_content(analysis_prompt)
@@ -110,7 +297,6 @@ class AccountEnhancementTask(BaseTask):
                 processed_data=structured_data
             )
 
-            # Return combined response
             return {
                 "status": "completed",
                 "account_id": account_id,
@@ -141,7 +327,7 @@ class AccountEnhancementTask(BaseTask):
                 "job_id": job_id
             }
 
-    async def _store_error_state(self, job_id: str, tenant_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
+    async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
         """Store error state in BigQuery"""
         try:
             await self.bq_service.insert_enrichment_raw_data(
