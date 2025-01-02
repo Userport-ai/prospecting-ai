@@ -23,7 +23,6 @@ class AccountEnhancementTask(BaseTask):
 
         # Configure Gemini
         genai.configure(api_key=self.google_api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash-exp")
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
     @property
