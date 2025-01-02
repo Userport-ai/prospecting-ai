@@ -178,6 +178,7 @@ export function SignUp() {
                                 type="password"
                                 placeholder="password"
                                 className="border-0 rounded-md"
+                                autoComplete="new-password"
                                 {...field}
                               />
                             </FormControl>
