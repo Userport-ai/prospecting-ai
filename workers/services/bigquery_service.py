@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 from datetime import datetime
 from typing import Dict, Any
 from google.cloud import bigquery
@@ -33,6 +34,13 @@ class BigQueryService:
             tech_data = structured_data.get('technology_stack', {})
             financial_data = structured_data.get('financials', {})
 
+            # Convert arrays to lists for JSON serialization
+            technologies = (
+                    tech_data.get('programming_languages', []) +
+                    tech_data.get('frameworks', []) +
+                    tech_data.get('cloud_services', [])
+            )
+
             # Prepare row for insertion
             row = {
                 'record_id': record_id,
@@ -43,9 +51,9 @@ class BigQueryService:
                 'location': f"{location_data.get('city', '')}, {location_data.get('country', '')}".strip(', '),
                 'website': structured_data.get('digital_presence', {}).get('website'),
                 'linkedin_url': structured_data.get('digital_presence', {}).get('social_media', {}).get('linkedin'),
-                'technologies': tech_data.get('programming_languages', []) + tech_data.get('frameworks', []) + tech_data.get('cloud_services', []),
-                'funding_details': financial_data.get('private_data', {}),  
-                'raw_data': structured_data,  
+                'technologies': technologies,
+                'funding_details': json.dumps(financial_data.get('private_data', {})),
+                'raw_data': json.dumps(structured_data),
                 'fetched_at': datetime.utcnow().isoformat()
             }
 
@@ -63,7 +71,6 @@ class BigQueryService:
         except Exception as e:
             logger.error(f"Error storing account data in BigQuery: {str(e)}")
             raise
-
 
     async def insert_enrichment_raw_data(self,
                                          job_id: str,
