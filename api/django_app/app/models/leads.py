@@ -31,10 +31,13 @@ class Lead(BaseMixin):
     class Meta:
         db_table = 'leads'
         indexes = [
+            models.Index(fields=['tenant']),
             models.Index(fields=['email']),
             models.Index(fields=['linkedin_url']),
             models.Index(fields=['role_title']),
             models.Index(fields=['enrichment_status']),
+            models.Index(fields=['account']),
+            models.Index(fields=['created_by']),
             models.Index(fields=['score']),
         ]
 

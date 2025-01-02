@@ -27,6 +27,7 @@ class Settings(BaseMixin):
     class Meta:
         db_table = 'settings'
         indexes = [
+            models.Index(fields=['tenant']),
             models.Index(fields=['key']),
             models.Index(fields=['tenant', 'user']),
         ]

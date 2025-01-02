@@ -26,6 +26,7 @@ class Product(BaseMixin):
     class Meta:
         db_table = 'products'
         indexes = [
+            models.Index(fields=['tenant']),
             models.Index(fields=['name']),
             models.Index(fields=['created_by']),
         ]

@@ -55,8 +55,10 @@ class Account(BaseMixin):
     class Meta:
         db_table = 'accounts'
         indexes = [
+            models.Index(fields=['tenant']),
             models.Index(fields=['name']),
             models.Index(fields=['website']),
+            models.Index(fields=['created_by']),
         ]
 
     def __str__(self):

@@ -16,7 +16,7 @@ class AccountsViewSet(TenantScopedViewSet):
     serializer_class = AccountDetailsSerializer
     queryset = Account.objects.all()
     filter_backends = [DjangoFilterBackend]
-    filterset_fields =['id', 'website', 'linkedin_url']
+    filterset_fields =['id', 'website', 'linkedin_url', 'created_by']
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,

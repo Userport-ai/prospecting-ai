@@ -61,6 +61,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseMixin):
         db_table = 'users'
         unique_together = [['tenant', 'email']]
         indexes = [
+            models.Index(fields=['tenant']),
             models.Index(fields=['firebase_id']),
             models.Index(fields=['status']),
             models.Index(fields=['email']),
