@@ -11,6 +11,7 @@ class TaskManager:
         self.queue = os.getenv('CLOUD_TASKS_QUEUE')
         self.location = os.getenv('CLOUD_TASKS_LOCATION', 'us-west1')
         self.base_url = os.getenv('WORKER_BASE_URL')
+        self.service_account_email = os.getenv('CLOUD_TASKS_SERVICE_ACCOUNT_EMAIL')
 
     def _get_queue_path(self) -> str:
         return self.client.queue_path(self.project, self.location, self.queue)
@@ -21,7 +22,8 @@ class TaskManager:
                 'http_method': tasks_v2.HttpMethod.POST,
                 'url': f"{self.base_url}/tasks/{task_name}",
                 'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps(payload).encode()
+                'body': json.dumps(payload).encode(),
+                "oidcToken": {"serviceAccountEmail": self.service_account_email}
             }
         }
 
