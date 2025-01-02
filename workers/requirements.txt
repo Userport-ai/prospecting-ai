@@ -4,5 +4,6 @@ google-cloud-tasks==2.14.2
 python-dotenv==1.0.1
 google-cloud-bigquery==3.27.0
 google-generativeai==0.3.2  # For Gemini AI
-requests==2.31.0  # For making HTTP requests to Jina AI
+urllib3==2.2.1
+requests==2.31.0
 python-json-logger==2.0.7  # For better JSON logging
