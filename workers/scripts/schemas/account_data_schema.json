@@ -15,31 +15,31 @@
     "name": "company_name",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "Name"
+    "description": "Company legal name"
   },
   {
     "name": "employee_count",
     "type": "INTEGER",
     "mode": "NULLABLE",
-    "description": "Employee count"
+    "description": "Number of employees"
   },
   {
     "name": "industry",
     "type": "STRING",
     "mode": "REPEATED",
-    "description": "Industry"
+    "description": "Industry sectors"
   },
   {
     "name": "location",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "Location"
+    "description": "Primary location"
   },
   {
     "name": "website",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "Website"
+    "description": "Company website"
   },
   {
     "name": "linkedin_url",
@@ -51,17 +51,17 @@
     "name": "technologies",
     "type": "STRING",
     "mode": "REPEATED",
-    "description": "Tech stack"
+    "description": "Technology stack"
   },
   {
     "name": "funding_details",
     "type": "JSON",
-    "description": "Funding information"
+    "description": "Funding information as JSON"
   },
   {
     "name": "raw_data",
     "type": "JSON",
-    "description": "Complete raw response for flexibility"
+    "description": "Complete raw response as JSON"
   },
   {
     "name": "fetched_at",

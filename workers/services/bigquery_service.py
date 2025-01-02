@@ -1,6 +1,5 @@
 import os
 import uuid
-import json
 from datetime import datetime
 from typing import Dict, Any
 from google.cloud import bigquery
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 class BigQueryService:
     def __init__(self):
         self.client = bigquery.Client()
-        self.dataset = os.getenv('BIGQUERY_DATASET', 'enrichment_data')
+        self.dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
         self.project = os.getenv('GOOGLE_CLOUD_PROJECT')
 
     def _get_table_ref(self, table_name: str) -> str:
@@ -45,8 +44,8 @@ class BigQueryService:
                 'website': structured_data.get('digital_presence', {}).get('website'),
                 'linkedin_url': structured_data.get('digital_presence', {}).get('social_media', {}).get('linkedin'),
                 'technologies': tech_data.get('programming_languages', []) + tech_data.get('frameworks', []) + tech_data.get('cloud_services', []),
-                'funding_details': json.dumps(financial_data.get('private_data', {})),
-                'raw_data': json.dumps(structured_data),
+                'funding_details': financial_data.get('private_data', {}),  
+                'raw_data': structured_data,  
                 'fetched_at': datetime.utcnow().isoformat()
             }
 
@@ -64,6 +63,7 @@ class BigQueryService:
         except Exception as e:
             logger.error(f"Error storing account data in BigQuery: {str(e)}")
             raise
+
 
     async def insert_enrichment_raw_data(self,
                                          job_id: str,
