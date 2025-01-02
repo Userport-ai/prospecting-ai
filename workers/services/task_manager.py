@@ -28,12 +28,6 @@ class TaskManager:
             }
         }
 
-        if self.service_account_email:
-            task['http_request']['oidc_token'] = {
-                'service_account_email': self.service_account_email,
-                'audience': self.base_url
-            }
-
         response = self.client.create_task(
             request={"parent": parent, "task": task}
         )
