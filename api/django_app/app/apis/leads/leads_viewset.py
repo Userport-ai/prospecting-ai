@@ -16,7 +16,7 @@ class LeadsViewSet(TenantScopedViewSet):
     serializer_class = LeadDetailsSerializer
     queryset = Lead.objects.all()
     filter_backends = [DjangoFilterBackend]
-    filterset_fields =['id', 'account', 'email', 'phone', ]
+    filterset_fields =['id', 'account', 'email', 'phone', 'created_by']
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
