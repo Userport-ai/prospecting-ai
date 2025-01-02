@@ -1,3 +1,4 @@
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
@@ -14,17 +15,14 @@ from app.permissions import HasRole
 class AccountsViewSet(TenantScopedViewSet):
     serializer_class = AccountDetailsSerializer
     queryset = Account.objects.all()
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields =['id', 'website', 'linkedin_url']
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
-        return queryset
+
 
     @action(detail=False, methods=['post'])
     def bulk_create(self, request):

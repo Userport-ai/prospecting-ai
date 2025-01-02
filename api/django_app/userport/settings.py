@@ -70,6 +70,9 @@ AUTH_USER_MODEL = 'app.User'
 
 # Rest framework settings
 REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend'
+    ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'app.middleware.FirebaseAuthMiddleware'
     ],
@@ -82,7 +85,6 @@ REST_FRAMEWORK = {
 }
 
 ROOT_URLCONF = 'userport.urls'
-
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -220,6 +222,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

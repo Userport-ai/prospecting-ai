@@ -1,4 +1,6 @@
 from .accounts import Account
+from .app_settings import Settings
+from .config import ConfigScope, Config
 from .leads import Lead
 from .products import Product
 from .tenants import Tenant
@@ -11,5 +13,8 @@ __all__ = [
     'UserStatus',
     'Product',
     'Account',
-    'Lead'
+    'Lead',
+    'Config',
+    'Settings',
+    'ConfigScope',
 ]

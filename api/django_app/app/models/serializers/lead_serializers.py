@@ -34,6 +34,7 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
+        depth=1
 
     def get_account_details(self, obj):
         """

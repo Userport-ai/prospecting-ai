@@ -23,6 +23,7 @@ from app.apis.tenants.tenant_urls import urlpatterns as tenanturlpatterns
 from app.apis.products import urlpatterns as producturlpatterns
 from app.apis.leads import urlpatterns as leadsurlpatterns
 from app.apis.accounts import urlpatterns as accountsurlpatterns
+from app.apis.config import urlpatterns as configandsettingsurlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -33,5 +34,6 @@ urlpatterns = [
         path('', include(producturlpatterns)),
         path('', include(leadsurlpatterns)),
         path('', include(accountsurlpatterns)),
+        path('', include(configandsettingsurlpatterns))
     ])),
 ]
