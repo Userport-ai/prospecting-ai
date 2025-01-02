@@ -6,9 +6,9 @@ import logging
 from pythonjsonlogger import jsonlogger
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(name)s %(message)s %(exc_info)s'
+formatter = jsonlogger.JsonFormatter(
+    fmt='%(asctime)s %(levelname)s %(name)s %(message)s',
+    json_ensure_ascii=False
 )
 
 # Add JSON formatter
