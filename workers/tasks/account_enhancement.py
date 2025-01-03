@@ -178,13 +178,31 @@ class PromptTemplates:
     }}"""
 
     ANALYSIS_PROMPT = """
-    Analyze this company profile and provide a concise business summary.
-    Focus on key metrics, market position, and recent developments.
-    Keep it factual and data-driven.
+Provide a direct business summary in this format:
 
-    Company Profile:
-    {company_profile}
-    """
+**[Company Name]**
+
+*Core Business:* Single sentence description of main business focus.
+
+*Key Metrics:*
+- Revenue and financial data if available
+- Market position and competitive standing
+- Employee count and growth metrics
+
+*Product & Services:*
+Key offerings and capabilities
+
+*Recent Developments:*
+Latest significant changes or announcements
+
+*Market Position:*
+Competitive landscape and market standing
+
+Company Profile for analysis:
+{company_profile}
+
+Important: Start directly with the company name header. Do not include any introductory phrases like "Here's a summary" or "Let me provide".
+"""
 
 class AccountEnhancementTask(BaseTask):
     """Task for enhancing account data with AI-powered company information."""
