@@ -29,7 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import logo from "./assets/combination_mark_primary_sidebar.png";
-import { useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { handleLogout } from "./auth/AuthProvider";
 
 // App items.
@@ -90,6 +90,13 @@ export function AppSidebar() {
     // Mark the first item as active.
     activeItems[0].isActive = true;
   }
+  appItems.forEach((item) => {
+    if (useLocation().pathname.includes(item.key)) {
+      item.isActive = true;
+    } else {
+      item.isActive = false;
+    }
+  });
 
   const accountOptionText = "Account";
   const billingOptionText = "Billing";
@@ -129,13 +136,13 @@ export function AppSidebar() {
               {appItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={item.isActive}>
-                    <a
-                      href={item.url}
+                    <Link
+                      to={item.url}
                       className="flex items-center gap-4 p-3 rounded-md hover:bg-primary hover:text-primary-foreground transition"
                     >
                       <item.icon className="w-5 h-5" />
                       <span className="font-medium">{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -153,13 +160,13 @@ export function AppSidebar() {
               {onboardingItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a
-                      href={item.url}
+                    <Link
+                      to={item.url}
                       className="flex items-center gap-4 p-3 rounded-md hover:bg-secondary hover:text-secondary-foreground transition"
                     >
                       <item.icon className="w-5 h-5" />
                       <span className="font-medium">{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

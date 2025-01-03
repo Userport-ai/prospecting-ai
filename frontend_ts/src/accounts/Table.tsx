@@ -25,7 +25,11 @@ interface TableProps {
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
 }
 
-export const Table: React.FC<TableProps> = ({ columns, data, onCustomColumnAdded }) => {
+export const Table: React.FC<TableProps> = ({
+  columns,
+  data,
+  onCustomColumnAdded,
+}) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
   const [rowSelection, setRowSelection] = useState({});
@@ -36,7 +40,8 @@ export const Table: React.FC<TableProps> = ({ columns, data, onCustomColumnAdded
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
-    const accessoryKey = (col as AccessorKeyColumnDefBase<AccountTableRow>).accessorKey;
+    const accessoryKey = (col as AccessorKeyColumnDefBase<AccountTableRow>)
+      .accessorKey;
     initialColumnVisibility[accessoryKey] = false;
     if ((col.meta as CustomColumnMeta).visibleInitially === true) {
       initialColumnVisibility[accessoryKey] = true;
@@ -63,6 +68,8 @@ export const Table: React.FC<TableProps> = ({ columns, data, onCustomColumnAdded
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onPaginationChange: setPagination,
+    // Needed to solve this error: https://github.com/TanStack/table/issues/5026.
+    autoResetPageIndex: false,
     state: {
       sorting,
       columnFilters,
@@ -75,7 +82,9 @@ export const Table: React.FC<TableProps> = ({ columns, data, onCustomColumnAdded
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
     // we fetch all the rows on the current page.
-    const rowIds = table.getRowModel().rows.map((row) => (row.original as AccountTableRow).id ?? "");
+    const rowIds = table
+      .getRowModel()
+      .rows.map((row) => (row.original as AccountTableRow).id ?? "");
     customColumnInfo.rowIds = rowIds;
     onCustomColumnAdded(customColumnInfo);
   };
@@ -120,4 +129,4 @@ export const Table: React.FC<TableProps> = ({ columns, data, onCustomColumnAdded
       />
     </div>
   );
-}
+};
