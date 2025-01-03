@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from api.routes import router
@@ -15,6 +17,9 @@ formatter = jsonlogger.JsonFormatter(
 logHandler.setFormatter(formatter)
 logger = logging.getLogger()
 logger.handlers = [logHandler]
+
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+logger.setLevel(getattr(logging, log_level))
 
 app = FastAPI(title="Workers API")
 
