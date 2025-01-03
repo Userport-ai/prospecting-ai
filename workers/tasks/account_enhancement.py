@@ -236,6 +236,23 @@ class AccountEnhancementTask(BaseTask):
 
     async def create_task_payload(self, **kwargs) -> Dict[str, Any]:
         """Create a standardized task payload."""
+        # Check if this is a bulk request
+        if 'accounts' in kwargs:
+            accounts = kwargs['accounts']
+            if not accounts or not isinstance(accounts, list):
+                raise ValueError("'accounts' must be a non-empty list")
+
+            for account in accounts:
+                if not all(k in account for k in ['account_id', 'company_name']):
+                    raise ValueError("Each account must have 'account_id' and 'company_name'")
+
+            return {
+                "accounts": accounts,
+                "job_id": str(uuid.uuid4()),
+                "is_bulk": True
+            }
+
+        # Single account case
         required_fields = ['account_id', 'company_name']
         missing_fields = [field for field in required_fields if field not in kwargs]
 
@@ -243,9 +260,110 @@ class AccountEnhancementTask(BaseTask):
             raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
 
         return {
-            "account_id": kwargs["account_id"],
-            "company_name": kwargs["company_name"],
-            "job_id": str(uuid.uuid4())
+            "accounts": [{
+                "account_id": kwargs["account_id"],
+                "company_name": kwargs["company_name"]
+            }],
+            "job_id": str(uuid.uuid4()),
+            "is_bulk": False
+        }
+
+
+    async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the account enhancement task."""
+        job_id = payload.get('job_id')
+        accounts = payload.get('accounts', [])
+        is_bulk = payload.get('is_bulk', False)
+
+        if not accounts:
+            return {
+                "status": "failed",
+                "error": "No accounts provided",
+                "job_id": job_id
+            }
+
+        results = []
+        has_failures = False
+
+        for account in accounts:
+            try:
+                account_id = account.get('account_id')
+                company_name = account.get('company_name')
+
+                if not all([company_name, account_id]):
+                    error_details = {'error_type': 'validation_error', 'message': "Missing required fields"}
+                    await self._store_error_state(job_id, account_id, error_details)
+                    results.append({
+                        "status": "failed",
+                        "account_id": account_id,
+                        "error": "Missing required fields"
+                    })
+                    has_failures = True
+                    continue
+
+                # Fetch and process company data
+                company_profile = await self._fetch_company_profile(company_name)
+                structured_data = await self._extract_structured_data(company_profile)
+                analysis_text = await self._generate_analysis(company_profile)
+
+                # Store processed data
+                await self.bq_service.insert_account_data(
+                    account_id=account_id,
+                    structured_data=structured_data,
+                    raw_profile=company_profile
+                )
+
+                # Store raw enrichment data
+                await self.bq_service.insert_enrichment_raw_data(
+                    job_id=job_id,
+                    entity_id=account_id,
+                    source='jina_ai',
+                    raw_data={
+                        'jina_response': company_profile,
+                        'gemini_structured': structured_data,
+                        'gemini_analysis': analysis_text
+                    },
+                    processed_data=structured_data
+                )
+
+                results.append({
+                    "status": "completed",
+                    "account_id": account_id,
+                    "company_name": company_name,
+                    "enrichment_data": {
+                        "structured_data": structured_data,
+                        "ai_analysis": analysis_text
+                    }
+                })
+
+            except requests.exceptions.RequestException as e:
+                error_details = {'error_type': 'jina_api_error', 'message': str(e)}
+                await self._store_error_state(job_id, account.get('account_id'), error_details)
+                results.append({
+                    "status": "failed",
+                    "account_id": account.get('account_id'),
+                    "error": f"Jina API error: {str(e)}"
+                })
+                has_failures = True
+
+            except Exception as e:
+                error_details = {'error_type': 'unexpected_error', 'message': str(e)}
+                await self._store_error_state(job_id, account.get('account_id'), error_details)
+                results.append({
+                    "status": "failed",
+                    "account_id": account.get('account_id'),
+                    "error": str(e)
+                })
+                has_failures = True
+
+        return {
+            "status": "completed" if not has_failures else "partially_completed",
+            "job_id": job_id,
+            "is_bulk": is_bulk,
+            "total_accounts": len(accounts),
+            "successful_accounts": len([r for r in results if r["status"] == "completed"]),
+            "failed_accounts": len([r for r in results if r["status"] == "failed"]),
+            "results": results
         }
 
     async def _fetch_company_profile(self, company_name: str) -> str:
@@ -282,6 +400,7 @@ class AccountEnhancementTask(BaseTask):
         except Exception as e:
             logger.error(f"Error extracting structured data from response, error: {str(e)}")
             raise
+
 
     def _parse_gemini_response(self, response_text: str) -> Dict[str, Any]:
         """Parse and clean Gemini AI response."""
@@ -320,71 +439,3 @@ class AccountEnhancementTask(BaseTask):
             )
         except Exception as e:
             logger.error(f"Error storing error state in BigQuery: {str(e)}")
-
-    async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute the account enhancement task."""
-        try:
-            # Validate payload
-            company_name = payload.get('company_name')
-            account_id = payload.get('account_id')
-            job_id = payload.get('job_id')
-
-            if not all([company_name, account_id, job_id]):
-                return {"status": "failed", "error": "Missing required payload fields"}
-
-            # Fetch and process company data
-            company_profile = await self._fetch_company_profile(company_name)
-            logger.debug(f"Jina Profile. Text: '{company_profile}'")
-            structured_data = await self._extract_structured_data(company_profile)
-            logger.debug(f"structured_data: '{structured_data}'")
-            analysis_text = await self._generate_analysis(company_profile)
-
-            # Store processed data
-            await self.bq_service.insert_account_data(
-                account_id=account_id,
-                structured_data=structured_data,
-                raw_profile=company_profile
-            )
-
-            # Store raw enrichment data
-            await self.bq_service.insert_enrichment_raw_data(
-                job_id=job_id,
-                entity_id=account_id,
-                source='jina_ai',
-                raw_data={
-                    'jina_response': company_profile,
-                    'gemini_structured': structured_data,
-                    'gemini_analysis': analysis_text
-                },
-                processed_data=structured_data
-            )
-
-            return {
-                "status": "completed",
-                "account_id": account_id,
-                "job_id": job_id,
-                "company_name": company_name,
-                "enrichment_data": {
-                    "structured_data": structured_data,
-                    "ai_analysis": analysis_text
-                }
-            }
-
-        except requests.exceptions.RequestException as e:
-            error_details = {'error_type': 'jina_api_error', 'message': str(e)}
-            logger.error(f"RequestException. Text: '{error_details}'. Error: {str(e)}")
-            await self._store_error_state(job_id, account_id, error_details)
-            return {
-                "status": "failed",
-                "error": f"Jina API error: {str(e)}",
-                "job_id": job_id
-            }
-        except Exception as e:
-            error_details = {'error_type': 'unexpected_error', 'message': str(e)}
-            logger.error(f"Exception during execution. Text: '{error_details}'. Error: {str(e)}")
-            await self._store_error_state(job_id, account_id, error_details)
-            return {
-                "status": "failed",
-                "error": str(e),
-                "job_id": job_id
-            }
