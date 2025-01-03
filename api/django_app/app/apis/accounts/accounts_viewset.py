@@ -10,6 +10,7 @@ from app.models.serializers.account_serializers import (
     AccountBulkCreateSerializer
 )
 from app.permissions import HasRole
+from app.services.worker_service import WorkerService
 
 
 class AccountsViewSet(TenantScopedViewSet):
@@ -21,6 +22,34 @@ class AccountsViewSet(TenantScopedViewSet):
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
+
+    def _trigger_enrichment(self, accounts):
+        """Helper method to trigger enrichment for accounts"""
+        worker_service = WorkerService()
+
+        accounts_list = accounts if isinstance(accounts, list) else [accounts]
+
+        enrichment_data = [
+            {"account_id": str(account.id), "company_name": account.name}
+            for account in accounts_list
+        ]
+
+        try:
+            return worker_service.trigger_account_enrichment(enrichment_data)
+        except Exception as e:
+            print(f"Failed to trigger enrichment: {str(e)}")
+            return {"status": "failed", "error": str(e)}
+
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+
+        if response.status_code == status.HTTP_201_CREATED:
+            account = self.get_queryset().get(id=response.data['id'])
+            enrichment_response = self._trigger_enrichment(account)
+            response.data['enrichment_status'] = enrichment_response
+
+        return response
 
 
 
@@ -71,14 +100,13 @@ class AccountsViewSet(TenantScopedViewSet):
 
                 created_accounts = Account.objects.bulk_create(accounts)
 
-                # Trigger enrichment for created accounts
-                account_ids = [account.id for account in created_accounts]
-                # TODO: Trigger enrichment job
+                enrichment_response = self._trigger_enrichment(created_accounts)
 
                 response_data = {
                     "message": "Accounts created successfully",
                     "account_count": len(created_accounts),
-                    "accounts": AccountDetailsSerializer(created_accounts, many=True).data
+                    "accounts": AccountDetailsSerializer(created_accounts, many=True).data,
+                    "enrichment_status": enrichment_response,
                 }
 
                 return Response(response_data, status=status.HTTP_201_CREATED)
