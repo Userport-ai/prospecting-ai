@@ -65,7 +65,8 @@ class TenantMiddleware:
         return [
             '/api/v2/health',
             '/api/v2/auth',
-            '/api/v2/tenants'
+            '/api/v2/tenants',
+            '/api/v2/context',
         ]
 
     @staticmethod
