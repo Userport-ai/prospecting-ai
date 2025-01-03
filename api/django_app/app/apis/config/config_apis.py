@@ -123,7 +123,7 @@ def perform_destroy(self, instance):
                     target_user = user
 
                 setting, created = Settings.objects.update_or_create(
-                    tenant=request.tenant,
+                    tenant=request.user.tenant,
                     user=target_user,
                     key=item['key'],
                     defaults={'value': item['value']}
@@ -144,7 +144,7 @@ def get_merged_context(request):
     and tenant configs override global configs
     """
     user = request.user
-    tenant = request.tenant
+    tenant = request.user.tenant
 
     # Collect all configs
     merged_config = {}
