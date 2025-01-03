@@ -1,23 +1,54 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { auth } from "./BaseAuth";
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { signOut } from "firebase/auth";
+import { fetchUserContext, UserContext } from "@/services/UserContext";
 
-const AuthContext = createContext<User | null>(null);
+// Define Context that will be provided to children nodes.
+interface AuthContextType {
+  firebaseUser: FirebaseUser | null;
+  userContext: UserContext | null;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  firebaseUser: null,
+  userContext: null,
+});
+
+export const useAuthContext = () => {
+  return useContext(AuthContext);
+};
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User| null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [userContext, setUserContext] = useState<UserContext | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    // Firebase listener for change in auth status.
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
+      setFirebaseUser(user);
+      if (!user) {
+        // User is logged out.
+        setUserContext(null);
+        setLoading(false);
+      }
+
+      // Fetch user context.
+      fetchUserContext(user!)
+        .then((userContext) => {
+          setUserContext(userContext);
+        })
+        .catch((error) => {
+          setError(new Error(`Failed to fetch user context: ${error.message}`));
+        })
+        .finally(() => setLoading(false));
     });
 
     return () => unsubscribe();
@@ -28,11 +59,18 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return <div></div>;
   }
 
-  return <AuthContext.Provider value={user}>{children}</AuthContext.Provider>;
-};
+  if (error) {
+    // Rethrow error to be caught by ErrorBoundary.
+    throw error;
+  }
 
-export const useAuthContext = () => {
-  return useContext(AuthContext);
+  return (
+    <AuthContext.Provider
+      value={{ firebaseUser: firebaseUser, userContext: userContext }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 // Handles user logout, there is no need to navigate

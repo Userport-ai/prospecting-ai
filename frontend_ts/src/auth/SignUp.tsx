@@ -18,13 +18,18 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { handleGoogleSignIn } from "./GoogleAuth";
-import { createUserWithEmailAndPassword, updateProfile, AuthError, AuthErrorCodes } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  AuthError,
+  AuthErrorCodes,
+} from "firebase/auth";
 import { auth } from "./BaseAuth";
 import { useState } from "react";
 
 export function SignUp() {
-  const user = useAuthContext();
-  if (user) {
+  const { firebaseUser } = useAuthContext();
+  if (firebaseUser) {
     // User is logged in already, redirect to app.
     return <Navigate to="/accounts" />;
   }
@@ -65,8 +70,8 @@ export function SignUp() {
 
       setErrorMessage(null);
     } catch (error) {
-       // Ensure the error is properly typed as Firebase's AuthError
-            const firebaseError = error as AuthError;
+      // Ensure the error is properly typed as Firebase's AuthError
+      const firebaseError = error as AuthError;
       const errorCode = firebaseError.code;
       const errorMessage = firebaseError.message;
       if (errorCode === AuthErrorCodes.EMAIL_EXISTS) {

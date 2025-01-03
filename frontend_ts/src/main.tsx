@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { ErrorInfo, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router";
 import "./index.css";
@@ -11,24 +11,37 @@ import { Login } from "./auth/Login";
 import { SignUp } from "./auth/SignUp";
 import AuthProvider from "./auth/AuthProvider";
 import Leads from "./leads/Leads";
+import { ErrorBoundary } from "react-error-boundary";
+import { ErrorFallback } from "./ErrorFallback.js";
+
+// Error Logging Function
+function logErrorToService(error: Error, info: ErrorInfo) {
+  // Log error to server.
+  console.error("Error in React app: ", error, " with info: ", info);
+}
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/" element={<App />}>
-            <Route path="playbook" element={<Playbook />}>
-              <Route index element={<ProductsPage />} />
-              <Route path="add-product" element={<AddProduct />} />
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onError={logErrorToService}
+    >
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/" element={<App />}>
+              <Route path="playbook" element={<Playbook />}>
+                <Route index element={<ProductsPage />} />
+                <Route path="add-product" element={<AddProduct />} />
+              </Route>
+              <Route path="accounts" element={<Accounts />}></Route>
+              <Route path="leads" element={<Leads />}></Route>
             </Route>
-            <Route path="accounts" element={<Accounts />}></Route>
-            <Route path="leads" element={<Leads />}></Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   </StrictMode>
 );

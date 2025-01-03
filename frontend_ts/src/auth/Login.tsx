@@ -4,7 +4,11 @@ import { Input } from "@/components/ui/input";
 import logo from "../assets/Primary_Mark_500px_500px.png";
 import { GoogleLogo, MicrosoftLogo } from "./SocialAuthLogos";
 import { useState } from "react";
-import { AuthError, signInWithEmailAndPassword, AuthErrorCodes } from "firebase/auth";
+import {
+  AuthError,
+  signInWithEmailAndPassword,
+  AuthErrorCodes,
+} from "firebase/auth";
 import { auth } from "./BaseAuth";
 import { Navigate } from "react-router";
 import { z } from "zod";
@@ -23,8 +27,8 @@ import { handleGoogleSignIn } from "./GoogleAuth";
 import { useAuthContext } from "./AuthProvider";
 
 export function Login() {
-  const user = useAuthContext();
-  if (user) {
+  const { firebaseUser } = useAuthContext();
+  if (firebaseUser) {
     // User is logged in already.
     return <Navigate to="/accounts" />;
   }
