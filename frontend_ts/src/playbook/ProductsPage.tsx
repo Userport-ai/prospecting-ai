@@ -128,19 +128,6 @@ const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
         {/* Personas */}
         <div>
           <h3 className="text-sm font-semibold text-gray-600 mb-2">Personas</h3>
-
-          {/* <div className="flex flex-wrap gap-2">
-            {product.persona_role_titles.buyers &&
-              product.persona_role_titles.buyers.map((role, index) => (
-                <Badge
-                  key={index}
-                  variant="outline"
-                  className="bg-gray-100 text-gray-800 font-medium px-3 py-1 rounded-full shadow-sm"
-                >
-                  {role}
-                </Badge>
-              ))}
-          </div> */}
           <PersonasDisplay product={product} />
         </div>
       </CardContent>
