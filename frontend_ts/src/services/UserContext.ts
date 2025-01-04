@@ -1,5 +1,6 @@
 import { User as FirebaseUser } from "firebase/auth";
 import axios from "axios";
+import { handleAPIError } from "./Api";
 
 // User Context as returned by the backend API.
 export interface UserContext {
@@ -36,24 +37,7 @@ export const fetchUserContext = async (user: FirebaseUser) => {
     const userContext: UserContext = response.data;
     return userContext;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      if (error.response.headers["content-type"] === "application/json") {
-        // Convert JSON from error response back to string.
-        const errorMessage = `${error.message}: ${JSON.stringify(
-          error.response.data
-        )}`;
-        throw new Error(errorMessage);
-      }
-      // The error message will always contain the status code.
-      var errorMessage: string = `${error.message}: `;
-      if (error.response.headers["content-type"] === "application/json") {
-        errorMessage += JSON.stringify(error.response.data);
-      } else {
-        errorMessage += error.response.data;
-      }
-      throw new Error(errorMessage);
-    } else {
-      throw error;
-    }
+    handleAPIError(error);
+    throw new Error("This line is unreachable but ensures strict typing.");
   }
 };

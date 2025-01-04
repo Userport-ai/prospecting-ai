@@ -11,22 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, ExternalLink, Pencil } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Separator } from "@/components/ui/separator";
+import { useEffect, useState } from "react";
+import { fetchProducts, Product } from "@/services/Products";
+import { useAuthContext } from "@/auth/AuthProvider";
 
-// Should be a subset of 'Products' Model in the backend.
-interface ProductDetails {
-  id: string;
-  name: string;
-  description: string;
-  website: string,
-  icp_description: string;
-  persona_role_titles: {
-    roles: string[];
-  }
-  created_at: string; // ISO 8601 date string
-  updated_at: string; // ISO 8601 date string
-}
-
-const ProductDetailsDisplay: React.FC<{product: ProductDetails}> = ({ product }) => {
+const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
   return (
     <Card className=" bg-white shadow-lg rounded-none border border-gray-200 overflow-hidden transition-transform hover:shadow-2xl">
       {/* Card Header */}
@@ -105,26 +94,29 @@ const ProductDetailsDisplay: React.FC<{product: ProductDetails}> = ({ product })
       </CardFooter>
     </Card>
   );
-}
+};
 
 export default function ProductsPage() {
-  // Mock data for demonstration purposes.
-  // Replace with products fetched from API call.
-  const products: Readonly<ProductDetails[]> = [
-    {
-      id: "1",
-      name: "Userport AI",
-      description:
-        "An AI-powered platform to supercharge your sales by conducting account and lead research, delivering actionable insights, and crafting tailored messaging.",
-      website: "https://www.userport.ai",
-      icp_description: "Sales teams at Series B+ companies",
-      persona_role_titles: {roles: ["VP of Sales", "Director of Sales", "Account Executive"]},
-      created_at: "2023-06-01",
-      updated_at: "2024-12-10",
-    },
-    // Add more products...
-  ];
-  // const products = [];
+  const { firebaseUser, userContext } = useAuthContext();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    fetchProducts(firebaseUser, userContext)
+      .then((products) => setProducts(products))
+      .catch((error) =>
+        setError(new Error(`Failed to fetch Products: ${error.message}`))
+      )
+      .finally(() => setLoading(false));
+  }, [firebaseUser, userContext]);
+
+  if (loading) {
+    return <div></div>;
+  }
+  if (error) {
+    throw error;
+  }
 
   const navigate = useNavigate();
 
