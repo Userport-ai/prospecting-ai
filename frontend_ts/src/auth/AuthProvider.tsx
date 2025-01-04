@@ -6,12 +6,12 @@ import { signOut } from "firebase/auth";
 import { fetchUserContext, UserContext } from "@/services/UserContext";
 
 // Define Context that will be provided to children nodes.
-interface AuthContextType {
+export interface AuthContext {
   firebaseUser: FirebaseUser | null;
   userContext: UserContext | null;
 }
 
-const AuthContext = createContext<AuthContextType>({
+const AuthContext = createContext<AuthContext>({
   firebaseUser: null,
   userContext: null,
 });

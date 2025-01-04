@@ -1,6 +1,7 @@
 import { User as FirebaseUser } from "firebase/auth";
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { UserContext } from "./UserContext";
+import { AuthContext } from "@/auth/AuthProvider";
 
 // Create Axios API instance that will be used for all outbound
 // APIs to the backend.
@@ -67,11 +68,12 @@ interface ClientMethod<T> {
 // Simple scaffolding around API call to ensure clients can just write the business logic and leave
 // creating API client and handling error to it.
 export const apiCall = async <T>(
-  firebaseUser: FirebaseUser | null,
-  userContext: UserContext | null,
+  authContext: AuthContext,
   clientMethod: ClientMethod<T>
 ) => {
   try {
+    const firebaseUser = authContext.firebaseUser;
+    const userContext = authContext.userContext;
     if (!firebaseUser || !userContext) {
       throw Error("Missing credentials for making an API call.");
     }

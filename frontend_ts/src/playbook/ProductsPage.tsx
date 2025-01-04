@@ -213,7 +213,7 @@ const ZeroStateDisplay = () => {
 
 // Component to display all products.
 const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
-  const { firebaseUser, userContext } = useAuthContext();
+  const authContext = useAuthContext();
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -230,7 +230,7 @@ const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
   const onDelete = async (id: string) => {
     try {
       setLoading(true);
-      await deleteProduct(firebaseUser, userContext, id);
+      await deleteProduct(authContext, id);
     } catch (error: any) {
       setError(new Error(`Failed to delete product: ${error.message}`));
     } finally {
@@ -266,20 +266,20 @@ const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
 };
 
 export default function ProductsPage() {
-  const { firebaseUser, userContext } = useAuthContext();
+  const authContext = useAuthContext();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    listProducts(firebaseUser, userContext)
+    listProducts(authContext)
       .then((products) => setProducts(products))
       .catch((error) =>
         setError(new Error(`Failed to fetch Products: ${error.message}`))
       )
       .finally(() => setLoading(false));
-  }, [firebaseUser, userContext]);
+  }, [authContext]);
 
   if (loading) {
     return <ScreenLoader />;

@@ -345,7 +345,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
 // Handle Product creation sequence.
 function AddProduct() {
-  const { firebaseUser, userContext } = useAuthContext();
+  const authContext = useAuthContext();
   // Product Details JSON.
   const [product, setProduct] = useState<Product>({
     name: "",
@@ -369,7 +369,7 @@ function AddProduct() {
     if (step === 6) {
       // Submit form.
       try {
-        await addProduct(firebaseUser, userContext, addedProduct);
+        await addProduct(authContext, addedProduct);
         setError(null);
         navigate("/playbook");
       } catch (error: any) {

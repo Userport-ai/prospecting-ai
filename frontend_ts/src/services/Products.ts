@@ -1,6 +1,7 @@
 import { User as FirebaseUser } from "firebase/auth";
 import { apiCall, checkDeletionSuccessful, ListObjectsResponse } from "./Api";
 import { UserContext } from "./UserContext";
+import { AuthContext } from "@/auth/AuthProvider";
 
 const PRODUCTS_ENDPOINT = "/products/";
 
@@ -24,47 +25,36 @@ type ListProductsResponse = ListObjectsResponse<Product>;
 
 // Fetch all products.
 export const listProducts = async (
-  firebaseUser: FirebaseUser | null,
-  userContext: UserContext | null
+  authContext: AuthContext
 ): Promise<Product[]> => {
-  return await apiCall<Product[]>(
-    firebaseUser,
-    userContext,
-    async (apiClient) => {
-      const response = await apiClient.get<ListProductsResponse>(
-        PRODUCTS_ENDPOINT
-      );
-      return response.data.results;
-    }
-  );
+  return await apiCall<Product[]>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListProductsResponse>(
+      PRODUCTS_ENDPOINT
+    );
+    return response.data.results;
+  });
 };
 
 // Add a new product.
 export const addProduct = async (
-  firebaseUser: FirebaseUser | null,
-  userContext: UserContext | null,
+  authContext: AuthContext,
   newProduct: Product
 ): Promise<Product> => {
-  return await apiCall<Product>(
-    firebaseUser,
-    userContext,
-    async (apiClient) => {
-      const response = await apiClient.post<Product>(
-        PRODUCTS_ENDPOINT,
-        newProduct
-      );
-      return response.data;
-    }
-  );
+  return await apiCall<Product>(authContext, async (apiClient) => {
+    const response = await apiClient.post<Product>(
+      PRODUCTS_ENDPOINT,
+      newProduct
+    );
+    return response.data;
+  });
 };
 
 // Fetch all products.
 export const deleteProduct = async (
-  firebaseUser: FirebaseUser | null,
-  userContext: UserContext | null,
+  authContext: AuthContext,
   id: string
 ): Promise<void> => {
-  return await apiCall<void>(firebaseUser, userContext, async (apiClient) => {
+  return await apiCall<void>(authContext, async (apiClient) => {
     const response = await apiClient.delete(`${PRODUCTS_ENDPOINT}${id}`);
     checkDeletionSuccessful(response);
   });
