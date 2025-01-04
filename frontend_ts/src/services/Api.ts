@@ -1,5 +1,5 @@
 import { User as FirebaseUser } from "firebase/auth";
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { UserContext } from "./UserContext";
 
 // Create Axios API instance that will be used for all outbound
@@ -95,3 +95,12 @@ export interface ListObjectsResponse<T> {
   // A list containing the serialized representations of the objects. The structure of each object within the results list depends on your model and serializer definitions.
   results: T[];
 }
+
+// Helper that checks if deletion request was successful
+export const checkDeletionSuccessful = (response: AxiosResponse) => {
+  // Check if the response status is 204 (No Content), which indicates successful deletion.
+  if (response.status === 204) {
+    return;
+  }
+  throw new Error(`Unxpected status: ${response.status} when deleting Product`);
+};

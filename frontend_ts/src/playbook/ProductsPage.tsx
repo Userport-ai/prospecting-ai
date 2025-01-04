@@ -8,14 +8,35 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ExternalLink, Pencil } from "lucide-react";
+import { Plus, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
-import { listProducts, Product } from "@/services/Products";
+import { deleteProduct, listProducts, Product } from "@/services/Products";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { formatDate } from "@/common/utils";
 import ScreenLoader from "@/common/ScreenLoader";
+
+// Component Displaying Page Header.
+const PageHeader: React.FC<{ handleAddProduct: () => void }> = ({
+  handleAddProduct,
+}) => {
+  return (
+    <div className="flex justify-between items-end mb-4">
+      <h1 className="text-2xl font-semibold text-gray-600 tracking-tight">
+        Your Products
+      </h1>
+      <Button
+        variant={"default"}
+        className="bg-primary text-primary-foreground hover:bg-primary shadow-md px-4 py-2 transition-all duration-300"
+        onClick={handleAddProduct}
+      >
+        <Plus className="mr-2" size={16} />
+        Add Product
+      </Button>
+    </div>
+  );
+};
 
 // Returns component to display Personas.
 const PersonasDisplay: React.FC<{ product: Product }> = ({ product }) => {
@@ -79,11 +100,22 @@ const PersonasDisplay: React.FC<{ product: Product }> = ({ product }) => {
   );
 };
 
-const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
+interface SingleProductDetailsProps {
+  product: Product;
+  onDelete: (arg0: string) => void;
+  onEdit: (arg0: string) => void;
+}
+
+// Component to display a a single product's details.
+const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
+  product,
+  onDelete,
+  onEdit,
+}) => {
   return (
     <Card className=" bg-white shadow-lg rounded-none border border-gray-200 overflow-hidden transition-transform hover:shadow-2xl">
       {/* Card Header */}
-      <CardHeader className="p-4 bg-gradient-to-r from-[rgb(135,120,169)] to-[rgb(115,99,152)] text-white flex flex-row justify-between items-center">
+      <CardHeader className="p-4 bg-gradient-to-r from-[rgb(135,120,169)] to-[rgb(115,99,152)] text-white flex flex-row justify-between items-end">
         <div>
           <CardTitle className="text-xl font-bold tracking-wide">
             {product.name}
@@ -99,10 +131,14 @@ const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
             </a>
           </CardDescription>
         </div>
-        <div>
+        <div className="flex">
           <Pencil
-            className="pr-4 size-10 hover:cursor-pointer"
-            onClick={() => console.log("edit clicked")}
+            className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300"
+            onClick={() => onEdit(product.id!)}
+          />
+          <Trash2
+            className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300"
+            onClick={() => onDelete(product.id!)}
           />
         </div>
       </CardHeader>
@@ -154,6 +190,81 @@ const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
   );
 };
 
+// Display when there are no products found on the server.
+const ZeroStateDisplay = () => {
+  return (
+    <div className="flex flex-col mt-20">
+      <Card className="max-w-md mx-auto bg-white shadow-xl border border-gray-200 rounded-none">
+        <CardHeader className="flex flex-row justify-center items-center bg-[rgb(136,109,195)] p-4">
+          <CardTitle className="text-base text-gray-50 tracking-wide">
+            Ready to Get Started?
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <p className="text-gray-600 text-base leading-relaxed text-center">
+            You haven’t added any products yet. Click the button above to add
+            your first product.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Component to display all products.
+const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
+  const { firebaseUser, userContext } = useAuthContext();
+  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  if (products.length === 0) {
+    return <ZeroStateDisplay />;
+  }
+
+  // Handler when user wants to edit a product.
+  const onEdit = (id: string) => {
+    console.log("going to edit: ", id);
+  };
+
+  // Handler when user wants to delete a product.
+  const onDelete = async (id: string) => {
+    try {
+      setLoading(true);
+      await deleteProduct(firebaseUser, userContext, id);
+    } catch (error: any) {
+      setError(new Error(`Failed to delete product: ${error.message}`));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mt-20">
+        <ScreenLoader />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      {error && (
+        <p className="text-destructive font-medium mt-2">{error.message}</p>
+      )}
+      <div className="flex flex-col gap-16 mt-10">
+        {products.map((product) => (
+          <SingleProductDetails
+            key={product.id}
+            product={product}
+            onDelete={onDelete}
+            onEdit={onEdit}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function ProductsPage() {
   const { firebaseUser, userContext } = useAuthContext();
   const [products, setProducts] = useState<Product[]>([]);
@@ -175,7 +286,11 @@ export default function ProductsPage() {
   }
 
   if (error) {
-    throw error;
+    return (
+      <div className="w-10/12 flex justify-center mt-10 bg-red-100 p-4 rounded-md shadow-md">
+        <p className="text-destructive text-lg font-medium">{error.message}</p>
+      </div>
+    );
   }
 
   const handleAddProduct = () => {
@@ -185,42 +300,9 @@ export default function ProductsPage() {
   // Display existing products.
   return (
     <div className="w-11/12 flex flex-col">
-      <div className="flex justify-between items-end mb-4">
-        <h1 className="text-2xl font-semibold text-gray-600 tracking-tight">
-          Your Products
-        </h1>
-        <Button
-          variant={"default"}
-          className="bg-primary text-primary-foreground hover:bg-primary shadow-md px-4 py-2 transition-all duration-300"
-          onClick={handleAddProduct}
-        >
-          <Plus className="mr-2" size={16} />
-          Add Product
-        </Button>
-      </div>
+      <PageHeader handleAddProduct={handleAddProduct} />
       <Separator />
-      {products.length === 0 && (
-        <div className="flex flex-col mt-20">
-          <Card className="max-w-md mx-auto bg-white shadow-xl border border-gray-200 rounded-none">
-            <CardHeader className="flex flex-row justify-center items-center bg-[rgb(136,109,195)] p-4">
-              <CardTitle className="text-base text-gray-50 tracking-wide">
-                Ready to Get Started?
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <p className="text-gray-600 text-base leading-relaxed text-center">
-                You haven’t added any products yet. Click the button above to
-                add your first product.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      <div className="flex flex-col gap-16 mt-10">
-        {products.map((product) => (
-          <ProductDetailsDisplay key={product.id} product={product} />
-        ))}
-      </div>
+      <AllProducts products={products} />
     </div>
   );
 }

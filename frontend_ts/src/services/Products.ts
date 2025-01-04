@@ -1,5 +1,5 @@
 import { User as FirebaseUser } from "firebase/auth";
-import { apiCall, ListObjectsResponse } from "./Api";
+import { apiCall, checkDeletionSuccessful, ListObjectsResponse } from "./Api";
 import { UserContext } from "./UserContext";
 
 const PRODUCTS_ENDPOINT = "/products/";
@@ -56,4 +56,16 @@ export const addProduct = async (
       return response.data;
     }
   );
+};
+
+// Fetch all products.
+export const deleteProduct = async (
+  firebaseUser: FirebaseUser | null,
+  userContext: UserContext | null,
+  id: string
+): Promise<void> => {
+  return await apiCall<void>(firebaseUser, userContext, async (apiClient) => {
+    const response = await apiClient.delete(`${PRODUCTS_ENDPOINT}${id}`);
+    checkDeletionSuccessful(response);
+  });
 };
