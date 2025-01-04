@@ -13,7 +13,6 @@ class ProductViewSet(TenantScopedViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields =['id']
 
-
-def get_permissions(self):
-        return [HasRole(allowed_roles=[UserRole.TENANT_ADMIN.value, UserRole.INTERNAL_ADMIN.value])]
+    def get_permissions(self):
+            return [HasRole(allowed_roles=[UserRole.TENANT_ADMIN.value, UserRole.INTERNAL_ADMIN.value])]
 
