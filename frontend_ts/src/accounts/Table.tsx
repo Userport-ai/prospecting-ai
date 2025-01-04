@@ -16,8 +16,21 @@ import CommonTable from "@/table/CommonTable";
 import EnumFilter from "@/table/EnumFilter";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
-import { AccountTableRow } from "./Columns";
+import { accountColumns, AccountTableRow } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
+import { getData } from "./MockData";
+
+const ZeroStateDisplay = () => {
+  return (
+    <div className="flex flex-col gap-2 items-center justify-center h-64 text-center bg-gray-50 border border-dashed border-gray-300 rounded-md p-6">
+      <div className="text-gray-600 mb-4">
+        <div className="text-xl font-semibold">No Data Available</div>
+        <div className="text-sm">Add Accounts to start Outreach.</div>
+      </div>
+      <AddAccounts />
+    </div>
+  );
+};
 
 interface TableProps {
   columns: ColumnDef<AccountTableRow>[];
@@ -25,7 +38,8 @@ interface TableProps {
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
 }
 
-export const Table: React.FC<TableProps> = ({
+// Component to display Accounts Table.
+const Table: React.FC<TableProps> = ({
   columns,
   data,
   onCustomColumnAdded,
@@ -79,6 +93,11 @@ export const Table: React.FC<TableProps> = ({
     },
   });
 
+  if (data.length === 0) {
+    // No accounts found.
+    return <ZeroStateDisplay />;
+  }
+
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
     // we fetch all the rows on the current page.
@@ -130,3 +149,53 @@ export const Table: React.FC<TableProps> = ({
     </div>
   );
 };
+
+export default function Accounts() {
+  const [data, setData] = useState<AccountTableRow[]>(getData());
+  const [columns, setColumns] =
+    useState<ColumnDef<AccountTableRow>[]>(accountColumns);
+
+  // Handler for when custom column inputs are provided by the user.
+  const onCustomColumnAdded = (customColumnInfo: CustomColumnInput) => {
+    // TODO: call server to send custom column request instead
+    // of manually updating the columns and rows in the table.
+    const customColumnAccessorKey = "custom_column";
+    setColumns([
+      ...columns,
+      {
+        accessorKey: customColumnAccessorKey,
+        header: customColumnInfo.columnName,
+        size: 100,
+        filterFn: "arrIncludesSome",
+        meta: {
+          displayName: customColumnInfo.columnName,
+          visibleInitially: true,
+        },
+      },
+    ]);
+    // Update columns for given RowIds with added column value.
+    const rowIds = customColumnInfo.rowIds;
+    if (!rowIds) {
+      console.error("Error! No rows selected!");
+      return;
+    }
+    var newData = [...data];
+    newData.forEach((row) => {
+      if (row.id && rowIds.includes(row.id)) {
+        row[customColumnAccessorKey] = "pending";
+      }
+    });
+    setData(newData);
+  };
+
+  return (
+    <div className="w-11/12 mx-auto py-2">
+      <h1 className="font-bold text-gray-700 text-2xl mb-5">Accounts</h1>
+      <Table
+        columns={columns}
+        data={data}
+        onCustomColumnAdded={onCustomColumnAdded}
+      />
+    </div>
+  );
+}

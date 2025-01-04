@@ -1,11 +1,4 @@
-import { useState } from "react";
-import { accountColumns, AccountTableRow } from "./Columns";
-import { Table } from "./Table";
-import AddAccounts from "./AddAccounts";
-import { CustomColumnInput } from "@/table/AddCustomColumn";
-import { ColumnDef } from "@tanstack/react-table";
-
-function getData() {
+export function getData() {
   // When there is no data.
   // return [];
 
@@ -165,64 +158,4 @@ function getData() {
     },
     // ...
   ];
-}
-
-export default function Accounts() {
-  const [data, setData] = useState<AccountTableRow[]>(getData());
-  const [columns, setColumns] = useState<ColumnDef<AccountTableRow>[]>(accountColumns);
-
-  // Handler for when custom column inputs are provided by the user.
-  const onCustomColumnAdded = (customColumnInfo: CustomColumnInput) => {
-    // TODO: call server to send custom column request instead
-    // of manually updating the columns and rows in the table.
-    const customColumnAccessorKey = "custom_column";
-    setColumns([
-      ...columns,
-      {
-        accessorKey: customColumnAccessorKey,
-        header: customColumnInfo.columnName,
-        size: 100,
-        filterFn: "arrIncludesSome",
-        meta: {
-          displayName: customColumnInfo.columnName,
-          visibleInitially: true,
-        }
-      },
-    ]);
-    // Update columns for given RowIds with added column value.
-    const rowIds = customColumnInfo.rowIds;
-    if(!rowIds) {
-      console.error("Error! No rows selected!")
-      return;
-    }
-    var newData = [...data];
-    newData.forEach((row) => {
-      if (row.id && rowIds.includes(row.id)) {
-        row[customColumnAccessorKey] = "pending";
-      }
-    });
-    setData(newData);
-  };
-
-  return (
-    <div className="w-11/12 mx-auto py-2">
-      <h1 className="font-bold text-gray-700 text-2xl mb-5">Accounts</h1>
-      {data.length === 0 && (
-        <div className="flex flex-col gap-2 items-center justify-center h-64 text-center bg-gray-50 border border-dashed border-gray-300 rounded-md p-6">
-          <div className="text-gray-600 mb-4">
-            <div className="text-xl font-semibold">No Data Available</div>
-            <div className="text-sm">Add Accounts to start Outreach.</div>
-          </div>
-          <AddAccounts />
-        </div>
-      )}
-      {data.length > 0 && (
-        <Table
-          columns={columns}
-          data={data}
-          onCustomColumnAdded={onCustomColumnAdded}
-        />
-      )}
-    </div>
-  );
 }

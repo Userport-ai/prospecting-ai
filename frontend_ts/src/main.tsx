@@ -6,7 +6,7 @@ import App from "./App.jsx";
 import Playbook from "./playbook/Playbook";
 import AddProduct from "./playbook/AddProduct";
 import ProductsPage from "./playbook/ProductsPage";
-import Accounts from "./accounts/Accounts";
+import Accounts from "./accounts/Table.js";
 import { Login } from "./auth/Login";
 import { SignUp } from "./auth/SignUp";
 import AuthProvider from "./auth/AuthProvider";

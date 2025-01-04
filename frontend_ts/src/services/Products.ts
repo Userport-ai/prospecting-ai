@@ -1,6 +1,4 @@
-import { User as FirebaseUser } from "firebase/auth";
 import { apiCall, checkDeletionSuccessful, ListObjectsResponse } from "./Api";
-import { UserContext } from "./UserContext";
 import { AuthContext } from "@/auth/AuthProvider";
 
 const PRODUCTS_ENDPOINT = "/products/";
