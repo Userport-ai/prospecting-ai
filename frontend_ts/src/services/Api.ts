@@ -9,7 +9,7 @@ export const createAPI = (
   userContext: UserContext
 ) => {
   const api = axios.create({
-    baseURL: import.meta.env.VITE_API_HOSTNAME,
+    baseURL: `${import.meta.env.VITE_API_HOSTNAME}/api/v2`,
   });
 
   // Add a request interceptor to include the Firebase ID token
@@ -83,3 +83,15 @@ export const apiCall = async <T>(
     throw new Error("This line is unreachable but ensures strict typing.");
   }
 };
+
+// Schema of List API responses from the server.
+export interface ListObjectsResponse<T> {
+  // An integer representing the total number of objects in the entire result set.
+  count: number;
+  // A URL string pointing to the next page and previoys page of results.
+  // Only present if pagination is enabled.
+  next: string | null;
+  previous: string | null;
+  // A list containing the serialized representations of the objects. The structure of each object within the results list depends on your model and serializer definitions.
+  results: T[];
+}

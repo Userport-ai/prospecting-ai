@@ -12,8 +12,72 @@ import { Plus, ExternalLink, Pencil } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
-import { fetchProducts, Product } from "@/services/Products";
+import { listProducts, Product } from "@/services/Products";
 import { useAuthContext } from "@/auth/AuthProvider";
+import { formatDate } from "@/common/utils";
+import ScreenLoader from "@/common/ScreenLoader";
+
+// Returns component to display Personas.
+const PersonasDisplay: React.FC<{ product: Product }> = ({ product }) => {
+  const buyersComp = product.persona_role_titles.buyers && (
+    <div className="flex items-center gap-2">
+      <p className="text-gray-600 text-sm font-medium">Buyers:</p>
+      <div className="flex flex-wrap gap-2">
+        {product.persona_role_titles.buyers.map((role, index) => (
+          <Badge
+            key={index}
+            variant="outline"
+            className="bg-gray-100 text-gray-800 font-medium px-3 py-1 rounded-full shadow-sm"
+          >
+            {role}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+
+  const influencersComp = product.persona_role_titles.influencers && (
+    <div className="flex items-center gap-2">
+      <p className="text-gray-600 text-sm font-medium">Influencers:</p>
+      <div className="flex flex-wrap gap-2">
+        {product.persona_role_titles.influencers.map((role, index) => (
+          <Badge
+            key={index}
+            variant="outline"
+            className="bg-gray-100 text-gray-800 font-medium px-3 py-1 rounded-full shadow-sm"
+          >
+            {role}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+
+  const endUsersComp = product.persona_role_titles.end_users && (
+    <div className="flex items-center gap-2">
+      <p className="text-gray-600 text-sm font-medium">End Users:</p>
+      <div className="flex flex-wrap gap-2">
+        {product.persona_role_titles.end_users.map((role, index) => (
+          <Badge
+            key={index}
+            variant="outline"
+            className="bg-gray-100 text-gray-800 font-medium px-3 py-1 rounded-full shadow-sm"
+          >
+            {role}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      {buyersComp}
+      {influencersComp}
+      {endUsersComp}
+    </div>
+  );
+};
 
 const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
   return (
@@ -63,18 +127,21 @@ const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
 
         {/* Personas */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-600 mb-1">Personas</h3>
-          <div className="flex flex-wrap gap-2">
-            {product.persona_role_titles.roles.map((role, index) => (
-              <Badge
-                key={index}
-                variant="outline"
-                className="bg-gray-100 text-gray-800 font-medium px-3 py-1 rounded-full shadow-sm"
-              >
-                {role}
-              </Badge>
-            ))}
-          </div>
+          <h3 className="text-sm font-semibold text-gray-600 mb-2">Personas</h3>
+
+          {/* <div className="flex flex-wrap gap-2">
+            {product.persona_role_titles.buyers &&
+              product.persona_role_titles.buyers.map((role, index) => (
+                <Badge
+                  key={index}
+                  variant="outline"
+                  className="bg-gray-100 text-gray-800 font-medium px-3 py-1 rounded-full shadow-sm"
+                >
+                  {role}
+                </Badge>
+              ))}
+          </div> */}
+          <PersonasDisplay product={product} />
         </div>
       </CardContent>
 
@@ -84,11 +151,15 @@ const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
         <div className="text-sm text-gray-500 space-y-1">
           <p>
             <span className="font-semibold">Created on:</span>{" "}
-            <span className="text-gray-800">{product.created_at}</span>
+            <span className="text-gray-800">
+              {formatDate(product.created_at)}
+            </span>
           </p>
           <p>
             <span className="font-semibold">Last Updated:</span>{" "}
-            <span className="text-gray-800">{product.updated_at}</span>
+            <span className="text-gray-800">
+              {formatDate(product.updated_at)}
+            </span>
           </p>
         </div>
       </CardFooter>
@@ -101,9 +172,10 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchProducts(firebaseUser, userContext)
+    listProducts(firebaseUser, userContext)
       .then((products) => setProducts(products))
       .catch((error) =>
         setError(new Error(`Failed to fetch Products: ${error.message}`))
@@ -112,13 +184,12 @@ export default function ProductsPage() {
   }, [firebaseUser, userContext]);
 
   if (loading) {
-    return <div></div>;
+    return <ScreenLoader />;
   }
+
   if (error) {
     throw error;
   }
-
-  const navigate = useNavigate();
 
   const handleAddProduct = () => {
     navigate("/playbook/add-product"); // Adjust route to the product creation page.
