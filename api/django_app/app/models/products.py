@@ -9,6 +9,7 @@ class Product(BaseMixin):
     name = models.CharField(max_length=255)
     description = models.TextField()
     icp_description = models.TextField(null=True, blank=True)
+    website=models.URLField(null=True)
     persona_role_titles = JSONField()
     keywords = ArrayField(
         models.CharField(max_length=100),

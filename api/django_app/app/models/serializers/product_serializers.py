@@ -17,6 +17,7 @@ class ProductDetailsSerializer(serializers.ModelSerializer):
             'id',
             'name',
             'description',
+            'website',
             'icp_description',
             'persona_role_titles',
             'keywords',
