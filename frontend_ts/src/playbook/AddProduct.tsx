@@ -17,17 +17,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { WandSparkles } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router";
+import { addProduct, Product } from "@/services/Products";
+import { useAuthContext } from "@/auth/AuthProvider";
 
-
-interface ProductDetails {
-  name: string;
-  description: string;
-  website: string;
-  icp: string;
-  personas: string;
-} 
-
-const GenAIButton: React.FC<{onClick: () => void}> =  ({ onClick }) => {
+const GenAIButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
   return (
     <div>
       <Button
@@ -40,33 +33,51 @@ const GenAIButton: React.FC<{onClick: () => void}> =  ({ onClick }) => {
       </Button>
     </div>
   );
-}
+};
 
 interface ProductFormProps {
-  productDetails: ProductDetails;
+  product: Product;
   step: number;
-  onNext: (details: ProductDetails) => void; // Type for the onClick callback
+  onNext: (addedProduct: Product) => void; // Type for the onClick callback
   onCancel: () => void;
 }
 
-const  ProductForm: React.FC<ProductFormProps> = ({ productDetails, step, onNext, onCancel }) => {
+const ProductForm: React.FC<ProductFormProps> = ({
+  product,
+  step,
+  onNext,
+  onCancel,
+}) => {
   const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
     description: z.string().min(step > 1 ? 1 : 0, "Description is required"),
-    website: z.string().min(step > 2? 1: 0).startsWith("https://", "Website is required"),
-    icp: z.string().min(step > 3 ? 1: 0, "ICP is required"),
-    personas: z.string().min(step > 4 ? 1: 0, "Personas are required"),
+    website:
+      step > 2
+        ? z.string().startsWith("https://", "Website must start with https://")
+        : z.string(),
+    icp_description: z.string().min(step > 3 ? 1 : 0, "ICP is required"),
+    persona_role_titles: z.object({
+      buyers: z
+        .array(z.string())
+        .min(step > 4 ? 1 : 0, "Buyers input is required"),
+      influencers: z
+        .array(z.string())
+        .min(step > 4 ? 1 : 0, "Influencers input is required"),
+      end_users: z
+        .array(z.string())
+        .min(step > 4 ? 1 : 0, "End Users input is required"),
+    }),
   });
   const form = useForm({
     resolver: zodResolver(formSchema),
-    defaultValues: productDetails,
+    defaultValues: product,
   });
 
   const nextButtonText = step === 6 ? "Submit" : "Next";
   const backButtonText = step === 1 || step === 6 ? "Cancel" : "Back";
 
   // Handle user request to generate given field (name, value) using AI.
-  function generateUsingAI(field: ControllerRenderProps<ProductDetails>) {
+  function generateUsingAI(field: ControllerRenderProps<Product>) {
     // TODO: Fetch from server.
     console.log("Generate value for field using AI: ", field);
   }
@@ -81,7 +92,9 @@ const  ProductForm: React.FC<ProductFormProps> = ({ productDetails, step, onNext
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(onNext)}
+        onSubmit={form.handleSubmit(onNext, (err) =>
+          console.log("error: ", err)
+        )}
         className="space-y-8 rounded-lg border h-fit border-gray-200 bg-white p-6 shadow-md"
       >
         {/* Progress Indicator */}
@@ -171,7 +184,7 @@ const  ProductForm: React.FC<ProductFormProps> = ({ productDetails, step, onNext
         {(step === 4 || step === 6) && (
           <FormField
             control={form.control}
-            name="icp"
+            name="icp_description"
             render={({ field }) => (
               <FormItem>
                 <div className={aiGenContainerClassName}>
@@ -186,7 +199,7 @@ const  ProductForm: React.FC<ProductFormProps> = ({ productDetails, step, onNext
                 <FormControl>
                   <Textarea
                     className={`${inputClassName} h-28`}
-                    placeholder="e.g., Director of Sales in Series B+ companies with 100+ employees."
+                    placeholder="e.g., Sales teams in B2B SaaS companies with 100+ employees and ideally Series B+."
                     {...field}
                   />
                 </FormControl>
@@ -198,32 +211,114 @@ const  ProductForm: React.FC<ProductFormProps> = ({ productDetails, step, onNext
 
         {/* Personas Field */}
         {(step === 5 || step === 6) && (
-          <FormField
-            control={form.control}
-            name="personas"
-            render={({ field }) => (
-              <FormItem>
-                <div className={aiGenContainerClassName}>
-                  <div>
-                    <FormLabel className="text-gray-700">Personas *</FormLabel>
-                    <FormDescription className="text-sm text-gray-500">
-                      Describe the personas within the ICP you will target with
-                      your outreach efforts.
-                    </FormDescription>
+          <div className="flex flex-col gap-10">
+            <FormField
+              control={form.control}
+              name="persona_role_titles.buyers"
+              render={({ field }) => (
+                <FormItem>
+                  <div className={aiGenContainerClassName}>
+                    <div>
+                      <FormLabel className="text-gray-700">Buyers *</FormLabel>
+                      <FormDescription className="text-sm text-gray-500">
+                        Provide role titles and use commas to separate multiple
+                        personas.
+                      </FormDescription>
+                    </div>
+                    <GenAIButton onClick={() => generateUsingAI(field)} />
                   </div>
-                  <GenAIButton onClick={() => generateUsingAI(field)} />
-                </div>
-                <FormControl>
-                  <Textarea
-                    className={`${inputClassName} h-24`}
-                    placeholder="e.g., Director of Sales, VP of Sales, Head of Sales"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  <FormControl>
+                    <Input
+                      className={`${inputClassName}`}
+                      placeholder="e.g., Director of Sales, VP of Sales, Head of Sales"
+                      onBlur={(e) => {
+                        const inputValue = e.target.value;
+                        // Convert the string to an array of strings.
+                        const arrayValue = inputValue
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean); // Remove empty strings
+                        field.onChange(arrayValue); // Pass the array to the form state
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="persona_role_titles.influencers"
+              render={({ field }) => (
+                <FormItem>
+                  <div className={aiGenContainerClassName}>
+                    <div>
+                      <FormLabel className="text-gray-700">
+                        Influencers *
+                      </FormLabel>
+                      <FormDescription className="text-sm text-gray-500">
+                        Provide role titles and use commas to separate multiple
+                        personas.
+                      </FormDescription>
+                    </div>
+                    <GenAIButton onClick={() => generateUsingAI(field)} />
+                  </div>
+                  <FormControl>
+                    <Input
+                      className={`${inputClassName}`}
+                      placeholder="e.g., Sales Development Manager, Business Development Manager"
+                      onBlur={(e) => {
+                        const inputValue = e.target.value;
+                        // Convert the string to an array of strings.
+                        const arrayValue = inputValue
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean); // Remove empty strings
+                        field.onChange(arrayValue); // Pass the array to the form state
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="persona_role_titles.end_users"
+              render={({ field }) => (
+                <FormItem>
+                  <div className={aiGenContainerClassName}>
+                    <div>
+                      <FormLabel className="text-gray-700">
+                        End Users *
+                      </FormLabel>
+                      <FormDescription className="text-sm text-gray-500">
+                        Provide role titles and use commas to separate multiple
+                        personas.
+                      </FormDescription>
+                    </div>
+                    <GenAIButton onClick={() => generateUsingAI(field)} />
+                  </div>
+                  <FormControl>
+                    <Input
+                      className={`${inputClassName}`}
+                      placeholder="e.g., Sales Development Representatives, Account Executives"
+                      onBlur={(e) => {
+                        const inputValue = e.target.value;
+                        // Convert the string to an array of strings.
+                        const arrayValue = inputValue
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean); // Remove empty strings
+                        field.onChange(arrayValue); // Pass the array to the form state
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         )}
 
         {/* Action Buttons */}
@@ -246,33 +341,45 @@ const  ProductForm: React.FC<ProductFormProps> = ({ productDetails, step, onNext
       </form>
     </Form>
   );
-}
+};
 
 // Handle Product creation sequence.
 function AddProduct() {
+  const { firebaseUser, userContext } = useAuthContext();
   // Product Details JSON.
-  const [productDetails, setProductDetails] = useState<ProductDetails>({
+  const [product, setProduct] = useState<Product>({
     name: "",
     description: "",
     website: "",
-    icp: "",
-    personas: "",
+    icp_description: "",
+    persona_role_titles: {
+      buyers: [],
+      influencers: [],
+      end_users: [],
+    },
   });
-  const navigate = useNavigate();
-
   // State to manage the current step of the form
   const [step, setStep] = useState(1);
+  const [error, setError] = useState<Error | null>(null);
+  const navigate = useNavigate();
 
   // Handle user clicking next on form.
-  function handleNext(newProductDetails: ProductDetails) {
-    console.log("got updated product details: ", newProductDetails);
-    setProductDetails(newProductDetails);
-    setStep(step + 1);
+  const handleNext = async (addedProduct: Product) => {
+    setProduct(addedProduct);
     if (step === 6) {
-      // TODO: Submit product details to backend.
-      navigate("/playbook");
+      // Submit form.
+      try {
+        await addProduct(firebaseUser, userContext, addedProduct);
+        setError(null);
+        navigate("/playbook");
+      } catch (error: any) {
+        setError(new Error(`Failed to Add product: ${error.message}`));
+      }
+    } else {
+      // Go to next step.
+      setStep(step + 1);
     }
-  }
+  };
 
   // Handle canceling creating the product.
   function handleCancel() {
@@ -285,9 +392,10 @@ function AddProduct() {
   }
 
   return (
-    <div className="mt-10">
+    <div className="mt-10 flex flex-col gap-4">
+      {error && <p className="text-sm text-red-500">{error.message}</p>}
       <ProductForm
-        productDetails={productDetails}
+        product={product}
         step={step}
         onNext={handleNext}
         onCancel={handleCancel}

@@ -27,7 +27,7 @@ export const fetchUserContext = async (user: FirebaseUser) => {
   try {
     const idToken = await user.getIdToken();
     const response = await axios.get(
-      `${import.meta.env.VITE_API_HOSTNAME}/api/v2/context`,
+      `${import.meta.env.VITE_API_HOSTNAME}/api/v2/context/`,
       {
         headers: {
           Authorization: `Bearer ${idToken}`,

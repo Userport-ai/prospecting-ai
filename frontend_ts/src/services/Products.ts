@@ -2,7 +2,7 @@ import { User as FirebaseUser } from "firebase/auth";
 import { apiCall, ListObjectsResponse } from "./Api";
 import { UserContext } from "./UserContext";
 
-const PRODUCTS_ENDPOINT = "/products";
+const PRODUCTS_ENDPOINT = "/products/";
 
 // Product as returned by the backend API.
 export interface Product {
@@ -16,8 +16,8 @@ export interface Product {
     end_users: string[];
     influencers: string[];
   };
-  created_at: string; // ISO 8601 format date string.
-  updated_at: string; // ISO 8601 format date string.
+  created_at?: string; // ISO 8601 format date string.
+  updated_at?: string; // ISO 8601 format date string.
 }
 
 type ListProductsResponse = ListObjectsResponse<Product>;

@@ -139,13 +139,13 @@ const ProductDetailsDisplay: React.FC<{ product: Product }> = ({ product }) => {
           <p>
             <span className="font-semibold">Created on:</span>{" "}
             <span className="text-gray-800">
-              {formatDate(product.created_at)}
+              {product.created_at ? formatDate(product.created_at) : "Unknown"}
             </span>
           </p>
           <p>
             <span className="font-semibold">Last Updated:</span>{" "}
             <span className="text-gray-800">
-              {formatDate(product.updated_at)}
+              {product.updated_at ? formatDate(product.updated_at) : "Unknown"}
             </span>
           </p>
         </div>
@@ -216,7 +216,7 @@ export default function ProductsPage() {
           </Card>
         </div>
       )}
-      <div className="flex flex-col gap-6 mt-10">
+      <div className="flex flex-col gap-16 mt-10">
         {products.map((product) => (
           <ProductDetailsDisplay key={product.id} product={product} />
         ))}
