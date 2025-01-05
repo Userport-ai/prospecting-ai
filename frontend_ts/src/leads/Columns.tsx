@@ -1,37 +1,17 @@
 import { ChevronsUpDown, ExternalLink } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
-import { ReactNode } from "react";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { ColumnDef, Table } from "@tanstack/react-table";
+import { Lead as LeadRow } from "@/services/Leads";
+import { formatDate } from "@/common/utils";
+import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 
-interface BaseLeadTableRow {
-  id: string;
-  select?: ReactNode;
-  name: string;
-  linkedin_url: string;
-  status: string;
-  company_name: string;
-  role_title: string;
-  duration_at_company: string;
-  email: string;
-  phone: string;
-  created_at?: string;
-  linkedin_activity_status?: string;
-}
-
-// This generic type creates a new interface that extends the provided type T and adds a property [key: string]: any.
-// [key: string]: any allows for the addition of arbitrary properties with string keys and any value type.
-// Used to add custom column rows to the table.
-type Extendable<T> = T & Record<string, any>; 
-
-export interface LeadTableRow extends Extendable<BaseLeadTableRow>{};
-
-// Columns used by Leads Table.
-export const leadsColumns: ColumnDef<LeadTableRow>[] = [
+// Base Lead Columns that we know will exist in the table and are statically defined.
+export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   {
     id: "select",
-    header: ({table}: {table: Table<LeadTableRow> })  => (
+    header: ({ table }: { table: Table<LeadRow> }) => (
       <Checkbox
         className="bg-white data-[state=checked]:bg-purple-400"
         checked={
@@ -56,10 +36,11 @@ export const leadsColumns: ColumnDef<LeadTableRow>[] = [
     meta: {
       displayName: "",
       visibleInitially: true,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "name",
+    id: "name",
+    accessorFn: (row) => `${row.first_name} ${row.last_name}`,
     header: ({ column }) => {
       return (
         <div className="flex justify-between items-center gap-2 mr-2">
@@ -84,14 +65,15 @@ export const leadsColumns: ColumnDef<LeadTableRow>[] = [
     meta: {
       displayName: "Name",
       visibleInitially: true,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "linkedin_url",
+    id: "linkedin_url",
+    accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
     size: 100,
-    cell: ({ row }) => {
-      const url: string|undefined = row.getValue("linkedin_url");
+    cell: (info) => {
+      const url = info.getValue() as string | null;
       if (!url) {
         return <div></div>;
       }
@@ -109,80 +91,125 @@ export const leadsColumns: ColumnDef<LeadTableRow>[] = [
     meta: {
       displayName: "LinkedIn URL",
       visibleInitially: true,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "status",
-    header: "Status",
+    id: "enrichment_status",
+    accessorFn: (row) => row.enrichment_status,
+    header: "Enrichment Status",
     size: 100,
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
     filterFn: "arrIncludesSome",
     meta: {
-      displayName: "Status",
+      displayName: "Enrichment Status",
       visibleInitially: true,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "company_name",
+    id: "company_name",
+    accessorFn: (row) => row.account_details.name,
     header: "Company Name",
     size: 100,
     meta: {
       displayName: "Company Name",
       visibleInitially: true,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "role_title",
+    id: "role_title",
+    accessorFn: (row) => row.role_tile,
     header: "Role Title",
     size: 100,
     meta: {
       displayName: "Role Title",
       visibleInitially: true,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "duration_at_company",
+    id: "duration_at_company",
     header: "Duration at Company",
     size: 100,
     meta: {
       displayName: "Duration at Company",
       visibleInitially: true,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "email",
+    id: "email",
+    accessorFn: (row) => row.email,
     header: "Email",
     size: 100,
     meta: {
       displayName: "Email",
       visibleInitially: false,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "phone",
+    id: "phone",
+    accessorFn: (row) => row.phone,
     header: "Phone Number",
     size: 100,
     meta: {
       displayName: "Phone Number",
       visibleInitially: false,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "created_at",
+    id: "created_at",
+    accessorFn: (row) => formatDate(row.created_at),
     header: "Created On",
     size: 100,
     meta: {
       displayName: "Created On",
       visibleInitially: false,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
   {
-    accessorKey: "linkedin_activity_status",
+    id: "linkedin_activity_status",
     header: "LinkedIn Activity Enrichment Status",
     size: 100,
     meta: {
       displayName: "LinkedIn Activity Enrichment Status",
       visibleInitially: false,
-    } as CustomColumnMeta
+    } as CustomColumnMeta,
   },
 ];
+
+// Fetches the final Column definition for the given set of rows
+// by adding Custom Columns to base static column definition using
+// information from the given Lead Rows.
+export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
+  // Get custom columns.
+  var customColumnKeys = new Set<string>();
+  for (const row of rows) {
+    if (!row.custom_fields) {
+      continue;
+    }
+    const customFields: string[] = Object.keys(row.custom_fields);
+    customFields.forEach((cf) => customColumnKeys.add(cf));
+  }
+
+  var finalColumns: ColumnDef<LeadRow>[] = [...baseLeadColumns];
+  customColumnKeys.forEach((columnKey) => {
+    finalColumns.push({
+      id: columnKey,
+      accessorFn: (row) => row.custom_fields,
+      header: getCustomColumnDisplayName(columnKey),
+      cell: (info) => {
+        const customFields = info.getValue() as Record<string, any> | null;
+        if (customFields && columnKey in customFields) {
+          // Return value of the custom fiel.
+          return customFields[columnKey];
+        }
+        return null;
+      },
+      size: 100,
+      filterFn: "arrIncludesSome",
+      meta: {
+        displayName: getCustomColumnDisplayName(columnKey),
+        visibleInitially: true,
+      },
+    });
+  });
+  return finalColumns;
+};

@@ -10,7 +10,7 @@ import Accounts from "./accounts/Table.js";
 import { Login } from "./auth/Login";
 import { SignUp } from "./auth/SignUp";
 import AuthProvider from "./auth/AuthProvider";
-import Leads from "./leads/Leads";
+import Leads from "./leads/Table.js";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorFallback } from "./ErrorFallback.js";
 

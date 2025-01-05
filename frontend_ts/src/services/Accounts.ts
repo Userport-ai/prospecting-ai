@@ -1,15 +1,8 @@
 import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall, ListObjectsResponse } from "./Api";
+import { EnrichmentStatus } from "./Common";
 
 const ACCOUNTS_ENDPOINT = "/accounts/";
-
-// Account Enrichment status as set by the backend.
-enum EnrichmentStatus {
-  PENDING = "pending",
-  IN_PROGRESS = "in_progress",
-  COMPLETED = "completed",
-  FAILED = "failed",
-}
 
 // Account as returned by the backend API.
 export interface Account {

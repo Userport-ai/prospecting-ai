@@ -3,7 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { ColumnDef, Table } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Account, Account as AccountRow } from "@/services/Accounts";
+import { Account as AccountRow } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 
@@ -277,7 +277,9 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
 // Fetches the final Column definition for the given set of rows
 // by adding Custom Columns to base static column definition using
 // information from the given Account Rows.
-export const getAccountColumns = (rows: Account[]): ColumnDef<AccountRow>[] => {
+export const getAccountColumns = (
+  rows: AccountRow[]
+): ColumnDef<AccountRow>[] => {
   // Get custom columns.
   var customColumnKeys = new Set<string>();
   for (const row of rows) {

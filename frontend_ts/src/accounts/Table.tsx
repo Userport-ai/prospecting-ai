@@ -124,7 +124,7 @@ const Table: React.FC<TableProps> = ({
           {/* Status Filter */}
           <EnumFilter
             table={table}
-            columnId={"status"}
+            columnId={"enrichment_status"}
             columnFilters={columnFilters}
           />
         </div>

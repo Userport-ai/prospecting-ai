@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getCoreRowModel,
   useReactTable,
@@ -6,7 +6,6 @@ import {
   getSortedRowModel,
   getFilteredRowModel,
   ColumnDef,
-  AccessorKeyColumnDefBase,
   ColumnSort,
   ColumnFilter,
 } from "@tanstack/react-table";
@@ -15,12 +14,26 @@ import CommonTable from "@/table/CommonTable";
 import EnumFilter from "@/table/EnumFilter";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
-import { LeadTableRow } from "./Columns";
+import { getLeadColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
+import { Lead as LeadRow, listLeads } from "@/services/Leads";
+import { useAuthContext } from "@/auth/AuthProvider";
+import ScreenLoader from "@/common/ScreenLoader";
+
+const ZeroStateDisplay = () => {
+  return (
+    <div className="flex flex-col gap-2 items-center justify-center h-64 text-center bg-gray-50 border border-dashed border-gray-300 rounded-md p-6">
+      <div className="text-gray-600 mb-4">
+        <div className="text-xl font-semibold">No Data Available</div>
+        <div className="text-sm">Start by adding Accounts to prospect.</div>
+      </div>
+    </div>
+  );
+};
 
 interface TableProps {
-  columns: ColumnDef<LeadTableRow>[];
-  data: LeadTableRow[];
+  columns: ColumnDef<LeadRow>[];
+  data: LeadRow[];
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
 }
 
@@ -39,11 +52,12 @@ export const Table: React.FC<TableProps> = ({
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
-    const accessoryKey = (col as AccessorKeyColumnDefBase<LeadTableRow>)
-      .accessorKey;
-    initialColumnVisibility[accessoryKey] = false;
+    if (!col.id) {
+      return;
+    }
+    initialColumnVisibility[col.id] = false;
     if ((col.meta as CustomColumnMeta).visibleInitially === true) {
-      initialColumnVisibility[accessoryKey] = true;
+      initialColumnVisibility[col.id] = true;
     }
   });
   const [columnVisibility, setColumnVisibility] = useState(
@@ -78,6 +92,11 @@ export const Table: React.FC<TableProps> = ({
     },
   });
 
+  if (data.length === 0) {
+    // No accounts found.
+    return <ZeroStateDisplay />;
+  }
+
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
     // we fetch all the rows on the current page.
@@ -100,7 +119,7 @@ export const Table: React.FC<TableProps> = ({
           {/* Status Filter */}
           <EnumFilter
             table={table}
-            columnId={"status"}
+            columnId={"enrichment_status"}
             columnFilters={columnFilters}
           />
         </div>
@@ -126,3 +145,47 @@ export const Table: React.FC<TableProps> = ({
     </div>
   );
 };
+
+export default function Leads() {
+  const authContext = useAuthContext();
+  const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [columns, setColumns] = useState<ColumnDef<LeadRow>[]>([]);
+  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    listLeads(authContext)
+      .then((leads) => {
+        setLeads(leads);
+        setColumns(getLeadColumns(leads));
+      })
+      .catch((error) =>
+        setError(new Error(`Failed to fetch Accounts: ${error.message}`))
+      )
+      .finally(() => setLoading(false));
+  }, [authContext]);
+
+  if (loading) {
+    return <ScreenLoader />;
+  }
+
+  if (error) {
+    throw error;
+  }
+
+  // Handler for when custom column inputs are provided by the user.
+  const onCustomColumnAdded = (customColumnInfo: CustomColumnInput) => {
+    // TODO: call server to send custom column request instead.
+  };
+
+  return (
+    <div className="w-11/12 mx-auto py-2">
+      <h1 className="font-bold text-gray-700 text-2xl mb-5">Leads</h1>
+      <Table
+        columns={columns}
+        data={leads}
+        onCustomColumnAdded={onCustomColumnAdded}
+      />
+    </div>
+  );
+}
