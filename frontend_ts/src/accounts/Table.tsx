@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getCoreRowModel,
   useReactTable,
@@ -8,7 +8,6 @@ import {
   ColumnDef,
   ColumnSort,
   ColumnFilter,
-  AccessorKeyColumnDefBase,
 } from "@tanstack/react-table";
 import AddCustomColumn, { CustomColumnInput } from "@/table/AddCustomColumn";
 import AddAccounts from "./AddAccounts";
@@ -16,9 +15,11 @@ import CommonTable from "@/table/CommonTable";
 import EnumFilter from "@/table/EnumFilter";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
-import { accountColumns, AccountTableRow } from "./Columns";
+import { getAccountColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { getData } from "./MockData";
+import { Account as AccountRow, listAccounts } from "@/services/Accounts";
+import { useAuthContext } from "@/auth/AuthProvider";
+import ScreenLoader from "@/common/ScreenLoader";
 
 const ZeroStateDisplay = () => {
   return (
@@ -33,8 +34,8 @@ const ZeroStateDisplay = () => {
 };
 
 interface TableProps {
-  columns: ColumnDef<AccountTableRow>[];
-  data: AccountTableRow[];
+  columns: ColumnDef<AccountRow>[];
+  data: AccountRow[];
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
 }
 
@@ -54,11 +55,12 @@ const Table: React.FC<TableProps> = ({
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
-    const accessoryKey = (col as AccessorKeyColumnDefBase<AccountTableRow>)
-      .accessorKey;
-    initialColumnVisibility[accessoryKey] = false;
+    if (!col.id) {
+      return;
+    }
+    initialColumnVisibility[col.id] = false;
     if ((col.meta as CustomColumnMeta).visibleInitially === true) {
-      initialColumnVisibility[accessoryKey] = true;
+      initialColumnVisibility[col.id] = true;
     }
   });
   const [columnVisibility, setColumnVisibility] = useState(
@@ -103,7 +105,7 @@ const Table: React.FC<TableProps> = ({
     // we fetch all the rows on the current page.
     const rowIds = table
       .getRowModel()
-      .rows.map((row) => (row.original as AccountTableRow).id ?? "");
+      .rows.map((row) => (row.original as AccountRow).id ?? "");
     customColumnInfo.rowIds = rowIds;
     onCustomColumnAdded(customColumnInfo);
   };
@@ -151,41 +153,35 @@ const Table: React.FC<TableProps> = ({
 };
 
 export default function Accounts() {
-  const [data, setData] = useState<AccountTableRow[]>(getData());
-  const [columns, setColumns] =
-    useState<ColumnDef<AccountTableRow>[]>(accountColumns);
+  const authContext = useAuthContext();
+  const [loading, setLoading] = useState<boolean>(true);
+  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [columns, setColumns] = useState<ColumnDef<AccountRow>[]>([]);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    listAccounts(authContext)
+      .then((accounts) => {
+        setAccounts(accounts);
+        setColumns(getAccountColumns(accounts));
+      })
+      .catch((error) =>
+        setError(new Error(`Failed to fetch Accounts: ${error.message}`))
+      )
+      .finally(() => setLoading(false));
+  }, [authContext]);
+
+  if (loading) {
+    return <ScreenLoader />;
+  }
+
+  if (error) {
+    throw error;
+  }
 
   // Handler for when custom column inputs are provided by the user.
   const onCustomColumnAdded = (customColumnInfo: CustomColumnInput) => {
     // TODO: call server to send custom column request instead
-    // of manually updating the columns and rows in the table.
-    const customColumnAccessorKey = "custom_column";
-    setColumns([
-      ...columns,
-      {
-        accessorKey: customColumnAccessorKey,
-        header: customColumnInfo.columnName,
-        size: 100,
-        filterFn: "arrIncludesSome",
-        meta: {
-          displayName: customColumnInfo.columnName,
-          visibleInitially: true,
-        },
-      },
-    ]);
-    // Update columns for given RowIds with added column value.
-    const rowIds = customColumnInfo.rowIds;
-    if (!rowIds) {
-      console.error("Error! No rows selected!");
-      return;
-    }
-    var newData = [...data];
-    newData.forEach((row) => {
-      if (row.id && rowIds.includes(row.id)) {
-        row[customColumnAccessorKey] = "pending";
-      }
-    });
-    setData(newData);
   };
 
   return (
@@ -193,7 +189,7 @@ export default function Accounts() {
       <h1 className="font-bold text-gray-700 text-2xl mb-5">Accounts</h1>
       <Table
         columns={columns}
-        data={data}
+        data={accounts}
         onCustomColumnAdded={onCustomColumnAdded}
       />
     </div>

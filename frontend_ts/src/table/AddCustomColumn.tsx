@@ -39,7 +39,18 @@ export interface CustomColumnInput {
   rowIds?: string[];
 }
 
-const AddCustomColumn: React.FC<{onAdded: (formInput:  CustomColumnInput) => void}> = ({ onAdded }) => {
+// Get Display Name of the given custom column's key.
+// For example, if the key is "target_market", we return "Target Market".
+export const getCustomColumnDisplayName = (columnKey: string) => {
+  return columnKey
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
+const AddCustomColumn: React.FC<{
+  onAdded: (formInput: CustomColumnInput) => void;
+}> = ({ onAdded }) => {
   const [step, setStep] = useState(1);
   const [open, setOpen] = useState(false);
 
@@ -223,6 +234,6 @@ const AddCustomColumn: React.FC<{onAdded: (formInput:  CustomColumnInput) => voi
       </Dialog>
     </div>
   );
-}
+};
 
 export default AddCustomColumn;
