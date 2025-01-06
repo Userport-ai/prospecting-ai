@@ -15,6 +15,9 @@ frontend/coverage
 # production
 frontend/build
 
+# Cloud SQL proxy binary.
+cloud-sql-proxy
+
 # misc
 .DS_Store
 .env.local

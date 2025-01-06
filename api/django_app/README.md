@@ -9,7 +9,8 @@ sowrabh@Sowrabhs-MacBook-Pro django_app % docker build -t userport-app:dev .
    1. First install gcloud sdk from [here](https://cloud.google.com/sdk/docs/install)
    2. Run `gcloud auth login` and authenticate
    3. Install `cloud-sql-proxy` using `curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.2/cloud-sql-proxy.darwin.arm64`
-   3. Run `./cloud-sql-proxy --gcloud-auth omega-winter-431704-u5:us-central1:userport-pg --port 5433`
+   4. Make it executable: `chmod +x cloud-sql-proxy`
+   5. Run `./cloud-sql-proxy --gcloud-auth omega-winter-431704-u5:us-central1:userport-pg --port 5433`
   `
 4. Run the docker container using
 ```

@@ -2,7 +2,8 @@ import { ChevronsUpDown, ExternalLink } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropDown";
 
-export const accountColumns = [
+// Columns used by Leads Table.
+export const leadsColumns = [
   {
     id: "select",
     header: ({ table }) => (
@@ -55,64 +56,6 @@ export const accountColumns = [
     visibleInitially: true,
   },
   {
-    accessorKey: "status",
-    displayName: "Status",
-    header: "Status",
-    size: 100,
-    // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
-    filterFn: "arrIncludesSome",
-    visibleInitially: true,
-  },
-  {
-    accessorKey: "location",
-    displayName: "HQ",
-    header: "HQ",
-    size: 100,
-    visibleInitially: false,
-  },
-  {
-    accessorKey: "employee_count",
-    displayName: "Employee Count",
-    header: "Employee Count",
-    size: 100,
-    visibleInitially: true,
-  },
-  {
-    accessorKey: "customers",
-    displayName: "Customers",
-    header: "Customers",
-    size: 200,
-    visibleInitially: true,
-  },
-  {
-    accessorKey: "technologies",
-    displayName: "Technologies",
-    header: "Technologies",
-    size: 200,
-    visibleInitially: true,
-  },
-  {
-    accessorKey: "competitors",
-    displayName: "Competitors",
-    header: "Competitors",
-    size: 200,
-    visibleInitially: true,
-  },
-  {
-    accessorKey: "industry",
-    displayName: "Industry",
-    header: "Industry",
-    size: 200,
-    visibleInitially: true,
-  },
-  {
-    accessorKey: "website",
-    displayName: "Website",
-    header: "Website",
-    size: 100,
-    visibleInitially: false,
-  },
-  {
     accessorKey: "linkedin_url",
     displayName: "LinkedIn URL",
     header: "LinkedIn URL",
@@ -136,9 +79,46 @@ export const accountColumns = [
     visibleInitially: false,
   },
   {
-    accessorKey: "company_type",
-    displayName: "Company Type",
-    header: "Company Type",
+    accessorKey: "status",
+    displayName: "Status",
+    header: "Status",
+    size: 100,
+    // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
+    filterFn: "arrIncludesSome",
+    visibleInitially: true,
+  },
+  {
+    accessorKey: "company_name",
+    displayName: "Company Name",
+    header: "Company Name",
+    size: 100,
+    visibleInitially: true,
+  },
+  {
+    accessorKey: "role_title",
+    displayName: "Role Title",
+    header: "Role Title",
+    size: 100,
+    visibleInitially: true,
+  },
+  {
+    accessorKey: "duration_at_company",
+    displayName: "Duration at Company",
+    header: "Duration at Company",
+    size: 100,
+    visibleInitially: true,
+  },
+  {
+    accessorKey: "email",
+    displayName: "Email",
+    header: "Email",
+    size: 100,
+    visibleInitially: false,
+  },
+  {
+    accessorKey: "phone",
+    displayName: "Phone Number",
+    header: "Phone Number",
     size: 100,
     visibleInitially: false,
   },
@@ -150,16 +130,9 @@ export const accountColumns = [
     visibleInitially: false,
   },
   {
-    accessorKey: "funding_details",
-    displayName: "Funding Details",
-    header: "Funding Details",
-    size: 100,
-    visibleInitially: false,
-  },
-  {
-    accessorKey: "founded_year",
-    displayName: "Founded Year",
-    header: "Founded Year",
+    accessorKey: "linkedin_activity_status",
+    displayName: "LinkedIn Activity Enrichment Status",
+    header: "LinkedIn Activity Enrichment Status",
     size: 100,
     visibleInitially: false,
   },
