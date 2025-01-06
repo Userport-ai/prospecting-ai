@@ -70,7 +70,6 @@ steps:
 
 substitutions:
   _USERPORT_DEBUG: '0'
-  _ALLOWED_HOSTS: '*'
   _GUNICORN_WORKERS: '4'
   _GUNICORN_TIMEOUT: '120'
   _PORT: '8000'
