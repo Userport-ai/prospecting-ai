@@ -33,6 +33,10 @@ spec:
             secretKeyRef:
               name: db-credentials
               key: password
+        - name: USERPORT_DEBUG
+          value: "1"
+        - name: CORS_ALLOWED_ORIGINS
+          value: "https://prospecting-ai-l1oz.vercel.app,http://localhost:5173,https://app.userport.ai"
         resources:
           requests:
             memory: "512Mi"
