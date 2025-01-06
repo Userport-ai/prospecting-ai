@@ -40,7 +40,6 @@ import { parse, ParseResult } from "papaparse";
 import { Product } from "@/services/Products";
 import { Account, createAccounts } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
-import { create } from "domain";
 import ScreenLoader from "@/common/ScreenLoader";
 
 // Component that lets the user select a product.
@@ -271,9 +270,6 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
             (row) => row[expectedAccountNameHeader] as string
           );
 
-          console.log("Account names: ", accountNames);
-          console.log("selected product: ", selectedProduct);
-
           enrichAccounts(accountNames, selectedProduct);
         },
         error: (error: any) => {
@@ -459,6 +455,8 @@ const AddAccounts: React.FC<{ products: Product[] }> = ({ products }) => {
 
   // CSV imported successfully, close the dialog now.
   const handleCSVImported = (createdAccounts: Account[]) => {
+    console.log("created accounts: ", createdAccounts);
+
     // Close the dialog.
     setOpenCSVDialog(false);
 

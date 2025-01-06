@@ -176,6 +176,7 @@ export default function Leads() {
   // Handler for when custom column inputs are provided by the user.
   const onCustomColumnAdded = (customColumnInfo: CustomColumnInput) => {
     // TODO: call server to send custom column request instead.
+    console.log("custom colum info: ", customColumnInfo);
   };
 
   return (
