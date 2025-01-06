@@ -210,14 +210,16 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
 
   // Calls backend API to enrich the given accounts.
   const enrichAccounts = (accountNames: string[], productId: string) => {
-    const accounts = accountNames.map((name) => {
-      return {
-        name: name,
-      };
-    });
-
+    const createAccountsRequest = {
+      accounts: accountNames.map((name) => {
+        return {
+          name: name,
+        };
+      }),
+      product: productId,
+    };
     setLoading(true);
-    createAccounts(authContext, { accounts: accounts, product: productId })
+    createAccounts(authContext, createAccountsRequest)
       .then((createdAccounts) => onImported(createdAccounts))
       .catch((error) =>
         setErrorMessage(`Failed to Import Accounts: ${error.message}`)
@@ -339,7 +341,7 @@ interface AddAccountManuallyProps {
   products: Product[];
   open: DialogProps["open"];
   onOpenChange: DialogProps["onOpenChange"];
-  onSuccessfulAdd: (arg0: string) => void;
+  onSuccessfulAdd: (arg0: Account[]) => void;
 }
 
 // Dialog that enables user to add an account manually.
@@ -349,6 +351,10 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   onOpenChange,
   onSuccessfulAdd,
 }) => {
+  const authContext = useAuthContext();
+  const [loading, setLoading] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const formSchema = z.object({
     accountName: z.string().min(1),
     productId: z.string().min(1),
@@ -364,9 +370,17 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
 
   const onSubmit = (updatedForm: z.infer<typeof formSchema>) => {
     form.reset();
-    // TODO: call server to create product.
-    console.log("updated form: ", updatedForm);
-    return onSuccessfulAdd(updatedForm.accountName);
+    const createAccountsRequest = {
+      accounts: [{ name: updatedForm.accountName }],
+      product: updatedForm.productId,
+    };
+    setLoading(true);
+    createAccounts(authContext, createAccountsRequest)
+      .then((createdAccounts) => onSuccessfulAdd(createdAccounts))
+      .catch((error) =>
+        setErrorMessage(`Failed to Enrich account: ${error.message}`)
+      )
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -376,6 +390,10 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
         <DialogDescription className="text-sm text-gray-500">
           Enter the Account name and select the product to use for prospecting.
         </DialogDescription>
+
+        {errorMessage && (
+          <Label className="text-destructive">{errorMessage}</Label>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -423,8 +441,12 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
 
             {/* Footer Navigation */}
             <DialogFooter className="mt-6">
-              <Button type="submit">Submit</Button>
+              <Button type="submit" disabled={loading}>
+                Submit
+              </Button>
             </DialogFooter>
+
+            {loading && <ScreenLoader />}
           </form>
         </Form>
       </DialogContent>
@@ -468,10 +490,9 @@ const AddAccounts: React.FC<{ products: Product[] }> = ({ products }) => {
     setOpenManualDialog(newOpen);
   };
 
-  const handleAccountAddedManually = (accountName: string) => {
+  const handleAccountAddedManually = (createdAccounts: Account[]) => {
+    console.log("Created manual accounts: ", createdAccounts);
     setOpenManualDialog(false);
-    // TODO: call server with this information.
-    console.log("account name: ", accountName);
   };
 
   const itemClassName =
