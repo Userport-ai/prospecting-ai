@@ -39,6 +39,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // User is logged out.
         setUserContext(null);
         setLoading(false);
+        return;
       }
 
       // Fetch user context.
