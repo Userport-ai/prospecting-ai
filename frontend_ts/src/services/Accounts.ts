@@ -42,3 +42,29 @@ export const listAccounts = async (
     return response.data.results;
   });
 };
+
+export interface CreateAccountsRequest {
+  product: string; // ID of the product accounts are enriched for.
+  accounts: { name: string }[];
+}
+
+interface CreateAccountsResponse {
+  message: string;
+  account_count: number;
+  accounts: Account[];
+  enrichment_status: Record<string, any>;
+}
+
+// Create Accounts for enrichment.
+export const createAccounts = async (
+  authContext: AuthContext,
+  request: CreateAccountsRequest
+): Promise<Account[]> => {
+  return await apiCall<Account[]>(authContext, async (apiClient) => {
+    const response = await apiClient.post<CreateAccountsResponse>(
+      ACCOUNTS_ENDPOINT,
+      request
+    );
+    return response.data.accounts;
+  });
+};

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { signOut } from "firebase/auth";
 import { fetchUserContext, UserContext } from "@/services/UserContext";
+import ScreenLoader from "@/common/ScreenLoader";
 
 // Define Context that will be provided to children nodes.
 export interface AuthContext {
@@ -54,7 +55,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   if (loading) {
     // Auth is loading, do nothing.
-    return <div></div>;
+    return <ScreenLoader />;
   }
 
   if (error) {
