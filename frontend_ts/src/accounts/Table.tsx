@@ -20,15 +20,16 @@ import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Account as AccountRow, listAccounts } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
+import { listProducts, Product } from "@/services/Products";
 
-const ZeroStateDisplay = () => {
+const ZeroStateDisplay: React.FC<{ products: Product[] }> = ({ products }) => {
   return (
     <div className="flex flex-col gap-2 items-center justify-center h-64 text-center bg-gray-50 border border-dashed border-gray-300 rounded-md p-6">
       <div className="text-gray-600 mb-4">
         <div className="text-xl font-semibold">No Data Available</div>
         <div className="text-sm">Add Accounts to start Outreach.</div>
       </div>
-      <AddAccounts />
+      <AddAccounts products={products} />
     </div>
   );
 };
@@ -36,6 +37,7 @@ const ZeroStateDisplay = () => {
 interface TableProps {
   columns: ColumnDef<AccountRow>[];
   data: AccountRow[];
+  products: Product[];
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
 }
 
@@ -43,6 +45,7 @@ interface TableProps {
 const Table: React.FC<TableProps> = ({
   columns,
   data,
+  products,
   onCustomColumnAdded,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
@@ -97,7 +100,7 @@ const Table: React.FC<TableProps> = ({
 
   if (data.length === 0) {
     // No accounts found.
-    return <ZeroStateDisplay />;
+    return <ZeroStateDisplay products={products} />;
   }
 
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
@@ -135,7 +138,7 @@ const Table: React.FC<TableProps> = ({
 
       <div className="flex mt-2 gap-6">
         {/* Add Accounts to the table. */}
-        <AddAccounts />
+        <AddAccounts products={products} />
 
         {/* Add custom column */}
         <AddCustomColumn onAdded={handleCustomColumnAdd} />
@@ -156,14 +159,17 @@ export default function Accounts() {
   const authContext = useAuthContext();
   const [loading, setLoading] = useState<boolean>(true);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [columns, setColumns] = useState<ColumnDef<AccountRow>[]>([]);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     listAccounts(authContext)
-      .then((accounts) => {
+      .then(async (accounts) => {
+        const products = await listProducts(authContext);
         setAccounts(accounts);
         setColumns(getAccountColumns(accounts));
+        setProducts(products);
       })
       .catch((error) =>
         setError(new Error(`Failed to fetch Accounts: ${error.message}`))
@@ -190,6 +196,7 @@ export default function Accounts() {
       <Table
         columns={columns}
         data={accounts}
+        products={products}
         onCustomColumnAdded={onCustomColumnAdded}
       />
     </div>

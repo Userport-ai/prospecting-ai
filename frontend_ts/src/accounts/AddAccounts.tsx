@@ -22,6 +22,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,27 +37,57 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { DialogProps } from "@radix-ui/react-dialog";
 import { parse, ParseResult } from "papaparse";
+import { Product } from "@/services/Products";
+import { Account, createAccounts } from "@/services/Accounts";
+import { useAuthContext } from "@/auth/AuthProvider";
+import { create } from "domain";
+import ScreenLoader from "@/common/ScreenLoader";
+
+// Component that lets the user select a product.
+const ProductSelection: React.FC<{
+  // field: ControllerRenderProps<any>;
+  defaultValue: string | undefined;
+  onValueChange: (arg0: string) => void;
+  products: Product[];
+}> = ({ defaultValue, onValueChange, products }) => {
+  return (
+    <Select onValueChange={onValueChange} defaultValue={defaultValue}>
+      <SelectTrigger className="border-gray-300">
+        <SelectValue placeholder="Select a Product" />
+      </SelectTrigger>
+      <SelectContent>
+        {products.map((product) => (
+          <SelectItem key={product.id} value={product.id!}>
+            {product.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+};
 
 // Component to let user upload a file from their computer.
 export const FileUpload: React.FC<{
-  onFileUpload: (arg0: Record<string, any>[]) => void;
+  onFileUpload: (arg0: File | null) => void;
 }> = ({ onFileUpload }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
   // Validates that the uploaded file is a CSV file.
-  // If so, it updated the selected file to given file.
-  const validateUploadedFileIsCSV = (file: File) => {
+  // If so, the file is sent to the parent.
+  const validateUploadedFileAndDispath = (file: File) => {
     if (file.type !== "text/csv") {
       setErrorMessage(`Error! Invalid file type, expected CSV!`);
-      setSelectedFile(null);
       return;
     }
 
-    // File is valid.
-    setSelectedFile(file);
+    // File is valid CSV.
     setErrorMessage(null);
+    setSelectedFile(file);
+
+    // Callback parent.
+    onFileUpload(file);
   };
 
   // Handle when the file is uploaded via Input.
@@ -59,7 +96,8 @@ export const FileUpload: React.FC<{
       setErrorMessage("Error! No File uploaded!");
       return;
     }
-    validateUploadedFileIsCSV(event.target.files[0]);
+    const file = event.target.files[0];
+    validateUploadedFileAndDispath(file);
   };
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -72,46 +110,21 @@ export const FileUpload: React.FC<{
   };
 
   // Hande when a file is dragged and dropped to the component.
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+  const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragging(false);
     if (!event.dataTransfer) {
       setErrorMessage("Error! No File was dropped!");
       return;
     }
-    validateUploadedFileIsCSV(event.dataTransfer.files[0]);
+    const file = event.dataTransfer.files[0];
+    validateUploadedFileAndDispath(file);
   };
 
-  // Handle Submit of uploaded file.
-  const handleSubmit = () => {
-    if (!selectedFile) {
-      setErrorMessage("Please upload a file first!");
-      return;
-    }
-    const reader = new FileReader();
-
-    // Read the file as text
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-
-      // Parse the CSV using Papaparse
-      parse(text, {
-        header: true, // Treat the first row as headers
-        skipEmptyLines: true,
-        complete: (results: ParseResult<Record<string, any>>) => {
-          onFileUpload(results.data); // Send parsed data to the parent component
-        },
-        error: (error: any) => {
-          setErrorMessage(`Failed to process file: ${error.message}`);
-        },
-      });
-    };
-
-    reader.onerror = () => {
-      setErrorMessage("Error reading the file. Please try again.");
-    };
-
-    reader.readAsText(selectedFile);
+  // Handle uploaded file removal for user.
+  const handleFileRemoval = () => {
+    setSelectedFile(null);
+    onFileUpload(null);
   };
 
   return (
@@ -130,7 +143,7 @@ export const FileUpload: React.FC<{
           } rounded-md p-4 text-center transition-all duration-300`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          onDrop={handleFileDrop}
         >
           <Input
             id="file-upload"
@@ -157,21 +170,11 @@ export const FileUpload: React.FC<{
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSelectedFile(null)}
+              onClick={handleFileRemoval}
               className="text-purple-700 hover:bg-red-50"
             >
               <XCircle size={18} />
               Remove
-            </Button>
-          </div>
-          {/* Action Buttons */}
-          <div className="flex justify-center gap-2">
-            <Button
-              disabled={!selectedFile}
-              onClick={handleSubmit}
-              className="shadow-sm"
-            >
-              Submit
             </Button>
           </div>
         </div>
@@ -181,44 +184,109 @@ export const FileUpload: React.FC<{
 };
 
 interface ImportCSVProps {
+  products: Product[];
   open: DialogProps["open"];
   onOpenChange: (open: boolean) => void;
-  onImported: () => void;
+  onImported: (createdAccounts: Account[]) => void;
 }
 
 // Dialog that enables user to import CSV
-const ImportCSV: React.FC<ImportCSVProps> = ({ open, onOpenChange }) => {
+const ImportCSV: React.FC<ImportCSVProps> = ({
+  products,
+  open,
+  onOpenChange,
+  onImported,
+}) => {
+  const authContext = useAuthContext();
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Handles Business logic of validating CSV data, hence moved out of
-  // CSV Upload component.
-  const handleFileUpload = (data: Record<string, any>[]) => {
-    // Validate the uploaded CSV.
-    if (data.length === 0) {
-      setErrorMessage(`Error! File is empty with no data!`);
+  // CSV File is uploaded. Will validate contents during submit.
+  const handleFileUpload = (file: File | null) => {
+    setUploadedFile(file);
+    setErrorMessage(null);
+  };
+
+  // Calls backend API to enrich the given accounts.
+  const enrichAccounts = (accountNames: string[], productId: string) => {
+    const accounts = accountNames.map((name) => {
+      return {
+        name: name,
+      };
+    });
+
+    setLoading(true);
+    createAccounts(authContext, { accounts: accounts, product: productId })
+      .then((createdAccounts) => onImported(createdAccounts))
+      .catch((error) =>
+        setErrorMessage(`Failed to Import Accounts: ${error.message}`)
+      )
+      .finally(() => setLoading(false));
+  };
+
+  // Handle user submitting CSV and production selection.
+  const handleSubmit = () => {
+    if (!uploadedFile) {
+      setErrorMessage("Please upload a file first!");
       return;
     }
-    const expectedAccountNameHeader = "Company Name";
-    if (!(expectedAccountNameHeader in data[0])) {
-      setErrorMessage(
-        `"Company Name" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
-      );
+    if (!selectedProduct) {
+      setErrorMessage("Please select a product!");
       return;
     }
-    if (data.length > 20) {
-      setErrorMessage(
-        `Error! More than 20 accounts uploaded, please retry with fewer accounts!`
-      );
-      return;
-    }
-    // Gather all Account Names.
-    const accountNames: string[] = data.map(
-      (row) => row[expectedAccountNameHeader] as string
-    );
+    const reader = new FileReader();
 
-    console.log("Account names: ", accountNames);
+    // Read the file as text
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
 
-    // onImported();
+      // Parse the CSV using Papaparse
+      parse(text, {
+        header: true, // Treat the first row as headers
+        skipEmptyLines: true,
+        complete: (results: ParseResult<Record<string, any>>) => {
+          const data: Record<string, any>[] = results.data;
+          // Validate the uploaded CSV.
+          if (data.length === 0) {
+            setErrorMessage(`Error! File is empty with no data!`);
+            return;
+          }
+          const expectedAccountNameHeader = "Company Name";
+          if (!(expectedAccountNameHeader in data[0])) {
+            setErrorMessage(
+              `"Company Name" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
+            );
+            return;
+          }
+          if (data.length > 20) {
+            setErrorMessage(
+              `Error! More than 20 accounts uploaded, please retry with fewer accounts!`
+            );
+            return;
+          }
+          // Gather all Account Names.
+          const accountNames: string[] = data.map(
+            (row) => row[expectedAccountNameHeader] as string
+          );
+
+          console.log("Account names: ", accountNames);
+          console.log("selected product: ", selectedProduct);
+
+          enrichAccounts(accountNames, selectedProduct);
+        },
+        error: (error: any) => {
+          setErrorMessage(`Failed to process file: ${error.message}`);
+        },
+      });
+    };
+
+    reader.onerror = () => {
+      setErrorMessage("Error reading the file. Please try again.");
+    };
+
+    reader.readAsText(uploadedFile);
   };
 
   return (
@@ -243,8 +311,28 @@ const ImportCSV: React.FC<ImportCSVProps> = ({ open, onOpenChange }) => {
           <Label className="text-destructive">{errorMessage}</Label>
         )}
 
-        <div className="w-full flex justify-center">
+        <div className="w-full flex flex-col justify-center gap-6">
           <FileUpload onFileUpload={handleFileUpload} />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm text-gray-500">
+              Select the product to use for prospecting
+            </p>
+            <ProductSelection
+              defaultValue=""
+              onValueChange={setSelectedProduct}
+              products={products}
+            />
+          </div>
+          <div className="flex justify-center gap-2">
+            <Button
+              disabled={!uploadedFile || loading}
+              onClick={handleSubmit}
+              className="shadow-sm"
+            >
+              Submit
+            </Button>
+          </div>
+          {loading && <ScreenLoader />}
         </div>
       </DialogContent>
     </Dialog>
@@ -252,6 +340,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({ open, onOpenChange }) => {
 };
 
 interface AddAccountManuallyProps {
+  products: Product[];
   open: DialogProps["open"];
   onOpenChange: DialogProps["onOpenChange"];
   onSuccessfulAdd: (arg0: string) => void;
@@ -259,23 +348,28 @@ interface AddAccountManuallyProps {
 
 // Dialog that enables user to add an account manually.
 const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
+  products,
   open,
   onOpenChange,
   onSuccessfulAdd,
 }) => {
   const formSchema = z.object({
     accountName: z.string().min(1),
+    productId: z.string().min(1),
   });
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       accountName: "",
+      productId: "",
     },
   });
 
   const onSubmit = (updatedForm: z.infer<typeof formSchema>) => {
     form.reset();
+    // TODO: call server to create product.
+    console.log("updated form: ", updatedForm);
     return onSuccessfulAdd(updatedForm.accountName);
   };
 
@@ -298,6 +392,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
                     <FormLabel className="text-gray-800">
                       Account Name
                     </FormLabel>
+                    <FormDescription></FormDescription>
                     <FormControl>
                       <Input
                         placeholder="e.g., Stripe, Rippling"
@@ -305,6 +400,25 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
                         {...field}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="productId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-800">Product</FormLabel>
+                    <FormDescription>
+                      Select the Product that you are prospecting for.
+                    </FormDescription>
+                    <ProductSelection
+                      defaultValue={field.value}
+                      onValueChange={field.onChange}
+                      products={products}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -323,7 +437,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
 };
 
 // Main component to allow users to input accounts.
-export default function AddAccounts() {
+const AddAccounts: React.FC<{ products: Product[] }> = ({ products }) => {
   const importCSVOption = "Import CSV";
   const addManuallyOption = "Add Manually";
   const [openCSVDialog, setOpenCSVDialog] = useState(false);
@@ -344,7 +458,7 @@ export default function AddAccounts() {
   };
 
   // CSV imported successfully, close the dialog now.
-  const handleCSVImported = () => {
+  const handleCSVImported = (createdAccounts: Account[]) => {
     // Close the dialog.
     setOpenCSVDialog(false);
 
@@ -388,16 +502,20 @@ export default function AddAccounts() {
       </DropdownMenu>
 
       <ImportCSV
+        products={products}
         open={openCSVDialog}
         onOpenChange={handleCSVDialogOpenChamge}
         onImported={handleCSVImported}
       />
 
       <AddAccountManually
+        products={products}
         open={openManualDialog}
         onOpenChange={handleManualDialogOpenChamge}
         onSuccessfulAdd={handleAccountAddedManually}
       />
     </div>
   );
-}
+};
+
+export default AddAccounts;
