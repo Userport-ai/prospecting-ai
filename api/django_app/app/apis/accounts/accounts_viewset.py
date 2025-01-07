@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
@@ -16,7 +17,7 @@ from app.services.worker_service import WorkerService
 class AccountsViewSet(TenantScopedViewSet):
     serializer_class = AccountDetailsSerializer
     queryset = Account.objects.all()
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields =['id', 'website', 'linkedin_url', 'created_by']
     ordering_fields = ['name', 'created_at', 'updated_at']
     ordering = ['-created_at']  # Default sorting

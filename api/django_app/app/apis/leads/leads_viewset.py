@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
@@ -15,7 +16,7 @@ from app.permissions import HasRole
 class LeadsViewSet(TenantScopedViewSet):
     serializer_class = LeadDetailsSerializer
     queryset = Lead.objects.all()
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields =['id', 'account', 'email', 'phone', 'created_by']
     ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at']
     ordering = ['-created_at']  # Default sorting
