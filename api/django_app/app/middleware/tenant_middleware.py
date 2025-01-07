@@ -67,6 +67,7 @@ class TenantMiddleware:
             '/api/v2/auth',
             '/api/v2/tenants',
             '/api/v2/context',
+            '/api/v2/internal',
         ]
 
     @staticmethod
