@@ -17,6 +17,8 @@ class LeadsViewSet(TenantScopedViewSet):
     queryset = Lead.objects.all()
     filter_backends = [DjangoFilterBackend]
     filterset_fields =['id', 'account', 'email', 'phone', 'created_by']
+    ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at']
+    ordering = ['-created_at']  # Default sorting
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,

@@ -18,6 +18,9 @@ class AccountsViewSet(TenantScopedViewSet):
     queryset = Account.objects.all()
     filter_backends = [DjangoFilterBackend]
     filterset_fields =['id', 'website', 'linkedin_url', 'created_by']
+    ordering_fields = ['name', 'created_at', 'updated_at']
+    ordering = ['-created_at']  # Default sorting
+
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
