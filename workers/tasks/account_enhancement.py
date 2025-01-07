@@ -277,7 +277,10 @@ class AccountEnhancementTask(BaseTask):
         is_bulk = payload.get('is_bulk', False)
         callback_service = CallbackService()
 
+        logger.info(f"Starting execution for job_id: {job_id}, is_bulk: {is_bulk}, total accounts: {len(accounts)}")
+
         if not accounts:
+            logger.error(f"Job {job_id}: No accounts provided in payload")
             return {
                 "status": "failed",
                 "error": "No accounts provided",
@@ -286,21 +289,33 @@ class AccountEnhancementTask(BaseTask):
 
         results = []
         has_failures = False
+        processed_count = 0
+        total_accounts = len(accounts)
 
         for account in accounts:
-            try:
-                account_id = account.get('account_id')
-                company_name = account.get('company_name')
+            processed_count += 1
+            account_id = account.get('account_id')
+            company_name = account.get('company_name')
 
+            logger.info(f"Processing account {processed_count}/{total_accounts}: ID {account_id}, Company: {company_name}")
+
+            try:
                 if not all([company_name, account_id]):
+                    logger.error(f"Job {job_id}, Account {account_id}: Missing required fields")
                     error_details = {'error_type': 'validation_error', 'message': "Missing required fields"}
+
+                    # Store error state
                     await self._store_error_state(job_id, account_id, error_details)
+
+                    # Send validation failure callback
                     await callback_service.send_callback(
                         job_id=job_id,
                         account_id=account_id,
                         status='failed',
-                        error_details=error_details
+                        error_details=error_details,
+                        completion_percentage=int((processed_count / total_accounts) * 100)
                     )
+
                     results.append({
                         "status": "failed",
                         "account_id": account_id,
@@ -309,26 +324,45 @@ class AccountEnhancementTask(BaseTask):
                     has_failures = True
                     continue
 
-                # Update status to processing
+                # Initial processing callback
+                logger.info(f"Job {job_id}, Account {account_id}: Starting processing")
                 await callback_service.send_callback(
                     job_id=job_id,
                     account_id=account_id,
-                    status='processing'
+                    status='processing',
+                    completion_percentage=int((processed_count - 0.5) / total_accounts * 100)
                 )
 
-                # Fetch and process company data
+                # Fetch company profile
+                logger.debug(f"Job {job_id}, Account {account_id}: Fetching company profile from Jina AI")
                 company_profile = await self._fetch_company_profile(company_name)
+
+                # Send intermediate callback after profile fetch
+                await callback_service.send_callback(
+                    job_id=job_id,
+                    account_id=account_id,
+                    status='processing',
+                    is_partial=True,
+                    completion_percentage=int((processed_count - 0.25) / total_accounts * 100)
+                )
+
+                # Extract structured data
+                logger.debug(f"Job {job_id}, Account {account_id}: Extracting structured data using Gemini")
                 structured_data = await self._extract_structured_data(company_profile)
+
+                # Generate analysis
+                logger.debug(f"Job {job_id}, Account {account_id}: Generating analysis")
                 analysis_text = await self._generate_analysis(company_profile)
 
-                # Store processed data in BigQuery
+                # Store data in BigQuery
+                logger.debug(f"Job {job_id}, Account {account_id}: Storing processed data in BigQuery")
                 await self.bq_service.insert_account_data(
                     account_id=account_id,
                     structured_data=structured_data,
                     raw_profile=company_profile
                 )
 
-                # Store enrichment raw data
+                # Process and format enrichment data
                 processed_data = {
                     'company_name': structured_data.get('company_name', {}).get('legal_name'),
                     'employee_count': structured_data.get('business_metrics', {}).get('employee_count', {}).get('total'),
@@ -346,6 +380,8 @@ class AccountEnhancementTask(BaseTask):
                     }
                 }
 
+                # Store enrichment raw data
+                logger.debug(f"Job {job_id}, Account {account_id}: Storing enrichment raw data")
                 await self.bq_service.insert_enrichment_raw_data(
                     job_id=job_id,
                     entity_id=account_id,
@@ -359,12 +395,14 @@ class AccountEnhancementTask(BaseTask):
                 )
 
                 # Send success callback
+                logger.info(f"Job {job_id}, Account {account_id}: Processing completed successfully")
                 await callback_service.send_callback(
                     job_id=job_id,
                     account_id=account_id,
                     status='completed',
                     raw_data=structured_data,
-                    processed_data=processed_data
+                    processed_data=processed_data,
+                    completion_percentage=int((processed_count / total_accounts) * 100)
                 )
 
                 results.append({
@@ -375,36 +413,65 @@ class AccountEnhancementTask(BaseTask):
 
             except Exception as e:
                 has_failures = True
+                logger.error(f"Job {job_id}, Account {account_id}: Processing failed - {str(e)}", exc_info=True)
+
                 error_details = {
                     'error_type': type(e).__name__,
                     'message': str(e),
                     'retryable': True
                 }
 
-                # Store error state
-                await self._store_error_state(job_id, account.get('account_id'), error_details)
+                try:
+                    # Store error state
+                    logger.debug(f"Job {job_id}, Account {account_id}: Storing error state")
+                    await self._store_error_state(job_id, account_id, error_details)
 
-                # Send failure callback
-                await callback_service.send_callback(
-                    job_id=job_id,
-                    account_id=account.get('account_id'),
-                    status='failed',
-                    error_details=error_details
-                )
+                    # Send failure callback
+                    await callback_service.send_callback(
+                        job_id=job_id,
+                        account_id=account_id,
+                        status='failed',
+                        error_details=error_details,
+                        completion_percentage=int((processed_count / total_accounts) * 100)
+                    )
+                except Exception as callback_error:
+                    logger.error(f"Job {job_id}, Account {account_id}: Failed to send error callback - {str(callback_error)}", exc_info=True)
 
                 results.append({
                     "status": "failed",
-                    "account_id": account.get('account_id'),
+                    "account_id": account_id,
                     "error": str(e)
                 })
 
+        # Final status determination
+        successful_accounts = len([r for r in results if r["status"] == "completed"])
+        failed_accounts = len([r for r in results if r["status"] == "failed"])
+
+        final_status = "completed" if not has_failures else "partially_completed"
+        logger.info(f"Job {job_id} finished. Status: {final_status}, "
+                    f"Success: {successful_accounts}, Failed: {failed_accounts}")
+
+        # # Send final bulk job callback if it's a bulk operation
+        # if is_bulk:
+        #     await callback_service.send_callback(
+        #         job_id=job_id,
+        #         account_id="bulk_job",
+        #         status=final_status,
+        #         completion_percentage=100,
+        #         processed_data={
+        #             "total_accounts": total_accounts,
+        #             "successful_accounts": successful_accounts,
+        #             "failed_accounts": failed_accounts
+        #         }
+        #     )
+
         return {
-            "status": "completed" if not has_failures else "partially_completed",
+            "status": final_status,
             "job_id": job_id,
             "is_bulk": is_bulk,
-            "total_accounts": len(accounts),
-            "successful_accounts": len([r for r in results if r["status"] == "completed"]),
-            "failed_accounts": len([r for r in results if r["status"] == "failed"]),
+            "total_accounts": total_accounts,
+            "successful_accounts": successful_accounts,
+            "failed_accounts": failed_accounts,
             "results": results
         }
 
