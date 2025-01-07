@@ -3,6 +3,7 @@ import { apiCall, ListObjectsResponse } from "./Api";
 import { EnrichmentStatus } from "./Common";
 
 const ACCOUNTS_ENDPOINT = "/accounts/";
+const BULK_CREATE_ACCOUNTS_ENDPOINT = "/accounts/bulk_create/";
 
 // Account as returned by the backend API.
 export interface Account {
@@ -43,26 +44,49 @@ export const listAccounts = async (
   });
 };
 
-export interface CreateAccountsRequest {
+export interface CreateAccountRequest {
+  name: string;
+  website: string;
   product: string; // ID of the product accounts are enriched for.
-  accounts: { name: string }[];
 }
 
-interface CreateAccountsResponse {
+// Create Single Account for enrichment.
+export const createAccount = async (
+  authContext: AuthContext,
+  request: CreateAccountRequest
+): Promise<Account> => {
+  return await apiCall<Account>(authContext, async (apiClient) => {
+    const response = await apiClient.post<Account>(ACCOUNTS_ENDPOINT, request);
+    return response.data;
+  });
+};
+
+// Account information request in creation request.
+export interface AccountInfo {
+  name: string;
+  website: string;
+}
+
+export interface CreateBulkAccountsRequest {
+  product: string; // ID of the product accounts are enriched for.
+  accounts: AccountInfo[];
+}
+
+interface CreateBulkAccountsResponse {
   message: string;
   account_count: number;
   accounts: Account[];
   enrichment_status: Record<string, any>;
 }
 
-// Create Accounts for enrichment.
-export const createAccounts = async (
+// Create Accounts in Bulk for enrichment.
+export const createBulkAccounts = async (
   authContext: AuthContext,
-  request: CreateAccountsRequest
+  request: CreateBulkAccountsRequest
 ): Promise<Account[]> => {
   return await apiCall<Account[]>(authContext, async (apiClient) => {
-    const response = await apiClient.post<CreateAccountsResponse>(
-      ACCOUNTS_ENDPOINT,
+    const response = await apiClient.post<CreateBulkAccountsResponse>(
+      BULK_CREATE_ACCOUNTS_ENDPOINT,
       request
     );
     return response.data.accounts;

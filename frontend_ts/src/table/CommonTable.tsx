@@ -6,25 +6,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ColumnDef, flexRender } from "@tanstack/react-table";
+import { ColumnDef, flexRender, Row } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Table as TanstackTable } from "@tanstack/react-table";
 
-interface CommonTableProps {
-  table: TanstackTable<any>;
-  columns: ColumnDef<any>[];
+interface CommonTableProps<T> {
+  table: TanstackTable<T>;
+  columns: ColumnDef<T>[];
   columnResizeMode: string;
-  pagination: {pageIndex: number};
+  pagination: { pageIndex: number };
+  onRowClick: (arg0: Row<T>) => void;
 }
 
 // Common Table component that renders a common table used by Accounts and Leads.
 // Takes a Tanstack table object, columns, resize mode and paginations as inputs to populate the data.
-const CommonTable: React.FC<CommonTableProps> = ({
+const CommonTable: React.FC<CommonTableProps<any>> = ({
   table,
   columns,
   columnResizeMode,
   pagination,
+  onRowClick,
 }) => {
   // We use total column width (in pixel values) to set the Table Width in CSS.
   // We cannot set className as 'w-[total width]px` since TailwindCSS does not
@@ -94,7 +96,8 @@ const CommonTable: React.FC<CommonTableProps> = ({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="hover:bg-gray-100 transition-colors data-[state=selected]:bg-purple-50"
+                  className="hover:bg-gray-100 hover:cursor-pointer transition-colors data-[state=selected]:bg-purple-50"
+                  onClick={() => onRowClick(row)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
@@ -160,6 +163,6 @@ const CommonTable: React.FC<CommonTableProps> = ({
       </div>
     </div>
   );
-}
+};
 
 export default CommonTable;

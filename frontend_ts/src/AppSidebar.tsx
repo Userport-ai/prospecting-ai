@@ -83,18 +83,18 @@ const onboardingItems = [
 
 export function AppSidebar() {
   const navigate = useNavigate();
-  const activeItems = appItems.filter((item) =>
-    useLocation().pathname.includes(item.key)
-  );
-  if (activeItems.length > 0) {
-    // Mark the first item as active.
-    activeItems[0].isActive = true;
-  }
+  const location = useLocation();
+  var activeItemMarked = false;
   appItems.forEach((item) => {
-    if (useLocation().pathname.includes(item.key)) {
-      item.isActive = true;
-    } else {
+    if (activeItemMarked || !location.pathname.includes(item.key)) {
+      // When there are multiple active items e.g. accounts/:id/leads,
+      // we only want to mark the first one as active. All other items
+      // should be marked inactive so that sidebar only has 1 active items
+      // at a time.
       item.isActive = false;
+    } else {
+      item.isActive = true;
+      activeItemMarked = true;
     }
   });
 
@@ -112,7 +112,7 @@ export function AppSidebar() {
   return (
     <Sidebar className="shadow-2xl bg-sidebar-background text-sidebar-foreground h-full min-h-screen">
       {/* Header */}
-      <SidebarHeader className="flex items-center justify-center p-4 hover:bg-secondary hover:cursor-pointer transition">
+      <SidebarHeader className="flex items-center justify-center p-4 hover:cursor-pointer transition">
         <div className="w-40">
           <img
             className="scale-100"

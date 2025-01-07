@@ -38,7 +38,12 @@ import { useForm } from "react-hook-form";
 import { DialogProps } from "@radix-ui/react-dialog";
 import { parse, ParseResult } from "papaparse";
 import { Product } from "@/services/Products";
-import { Account, createAccounts } from "@/services/Accounts";
+import {
+  Account,
+  AccountInfo,
+  createAccount,
+  createBulkAccounts,
+} from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 
@@ -201,6 +206,8 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const AccountNameColumnHeader = "Name";
+  const AccountWebsiteColumnHeader = "Website";
 
   // CSV File is uploaded. Will validate contents during submit.
   const handleFileUpload = (file: File | null) => {
@@ -208,18 +215,60 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
     setErrorMessage(null);
   };
 
+  // Validate the uploaded CSV file and if successful, calls backend to enrich the accounts.
+  const validateCSVFile = (data: Record<string, any>[]) => {
+    if (data.length === 0) {
+      setErrorMessage(`Error! File is empty with no data!`);
+      return;
+    }
+    if (!(AccountNameColumnHeader in data[0])) {
+      setErrorMessage(
+        `"${AccountNameColumnHeader}" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
+      );
+      return;
+    }
+    if (!(AccountWebsiteColumnHeader in data[0])) {
+      setErrorMessage(
+        `"${AccountWebsiteColumnHeader}" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
+      );
+      return;
+    }
+    // Validate that website rows all start with https://
+    for (const row of data) {
+      const websiteVal = row[AccountWebsiteColumnHeader] as string;
+      if (!websiteVal.startsWith("https://")) {
+        setErrorMessage(
+          `Invalid data! Atleast one Row under ${AccountWebsiteColumnHeader} column does not start with 'https://'`
+        );
+        return;
+      }
+    }
+    if (data.length > 20) {
+      setErrorMessage(
+        `Error! More than 20 accounts uploaded, please retry with fewer accounts!`
+      );
+      return;
+    }
+    // Gather all Account names and websites.
+    const accountsInfo = data.map((row) => {
+      return {
+        name: row[AccountNameColumnHeader] as string,
+        website: row[AccountWebsiteColumnHeader] as string,
+      };
+    });
+
+    // Call backend to enrich these accounts.
+    enrichAccounts(accountsInfo, selectedProduct!);
+  };
+
   // Calls backend API to enrich the given accounts.
-  const enrichAccounts = (accountNames: string[], productId: string) => {
-    const createAccountsRequest = {
-      accounts: accountNames.map((name) => {
-        return {
-          name: name,
-        };
-      }),
+  const enrichAccounts = (accountsInfo: AccountInfo[], productId: string) => {
+    const createBulkAccountsRequest = {
+      accounts: accountsInfo,
       product: productId,
     };
     setLoading(true);
-    createAccounts(authContext, createAccountsRequest)
+    createBulkAccounts(authContext, createBulkAccountsRequest)
       .then((createdAccounts) => onImported(createdAccounts))
       .catch((error) =>
         setErrorMessage(`Failed to Import Accounts: ${error.message}`)
@@ -249,30 +298,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
         skipEmptyLines: true,
         complete: (results: ParseResult<Record<string, any>>) => {
           const data: Record<string, any>[] = results.data;
-          // Validate the uploaded CSV.
-          if (data.length === 0) {
-            setErrorMessage(`Error! File is empty with no data!`);
-            return;
-          }
-          const expectedAccountNameHeader = "Company Name";
-          if (!(expectedAccountNameHeader in data[0])) {
-            setErrorMessage(
-              `"Company Name" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
-            );
-            return;
-          }
-          if (data.length > 20) {
-            setErrorMessage(
-              `Error! More than 20 accounts uploaded, please retry with fewer accounts!`
-            );
-            return;
-          }
-          // Gather all Account Names.
-          const accountNames: string[] = data.map(
-            (row) => row[expectedAccountNameHeader] as string
-          );
-
-          enrichAccounts(accountNames, selectedProduct);
+          validateCSVFile(data);
         },
         error: (error: any) => {
           setErrorMessage(`Failed to process file: ${error.message}`);
@@ -298,19 +324,34 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
         onOpenChange(open);
       }}
     >
-      <DialogContent className="flex flex-col gap-6">
+      <DialogContent className="flex flex-col">
         <DialogTitle>Upload a CSV</DialogTitle>
-        <DialogDescription className="text-sm text-gray-500">
-          Ensure the uploaded CSV file has a column named "Company Name" which
-          contains the names of the Accounts. You can upload a maximum of 20
-          accounts at once.
-        </DialogDescription>
+        <DialogDescription />
+        <div className="flex flex-col gap-2 text-sm text-gray-500">
+          <p>Ensure the uploaded CSV file has columns named:</p>
+          <p className="ml-4">
+            1. <span className="font-bold">{AccountNameColumnHeader}</span>{" "}
+            which contains the names of the Accounts
+          </p>
+          <p className="ml-4">
+            2. <span className="font-bold">{AccountWebsiteColumnHeader}</span>{" "}
+            which contains the names of the Accounts
+          </p>
+          <p>
+            You can upload a maximum of{" "}
+            <span className="font-bold">20 accounts</span> at once.
+          </p>
+        </div>
+
         {errorMessage && (
           <Label className="text-destructive">{errorMessage}</Label>
         )}
 
-        <div className="w-full flex flex-col justify-center gap-6">
+        <div className="w-full flex flex-col justify-center mt-4 gap-6">
+          {/* Upload file */}
           <FileUpload onFileUpload={handleFileUpload} />
+
+          {/* Select product */}
           <div className="flex flex-col gap-1">
             <p className="text-sm text-gray-500">
               Select the product to use for prospecting
@@ -321,6 +362,8 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
               products={products}
             />
           </div>
+
+          {/* Submit button */}
           <div className="flex justify-center gap-2">
             <Button
               disabled={!uploadedFile || loading}
@@ -341,7 +384,7 @@ interface AddAccountManuallyProps {
   products: Product[];
   open: DialogProps["open"];
   onOpenChange: DialogProps["onOpenChange"];
-  onSuccessfulAdd: (arg0: Account[]) => void;
+  onSuccessfulAdd: (arg0: Account) => void;
 }
 
 // Dialog that enables user to add an account manually.
@@ -356,8 +399,9 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const formSchema = z.object({
-    accountName: z.string().min(1),
-    productId: z.string().min(1),
+    accountName: z.string().min(1, "Account Name is required"),
+    productId: z.string().min(1, "Product is required"),
+    website: z.string().min(1).startsWith("https://", "Website is required"),
   });
 
   const form = useForm({
@@ -365,18 +409,23 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
     defaultValues: {
       accountName: "",
       productId: "",
+      website: "",
     },
   });
 
+  // Handle form submission.
   const onSubmit = (updatedForm: z.infer<typeof formSchema>) => {
-    form.reset();
-    const createAccountsRequest = {
-      accounts: [{ name: updatedForm.accountName }],
+    const createAccountRequest = {
+      name: updatedForm.accountName,
+      website: updatedForm.website,
       product: updatedForm.productId,
     };
     setLoading(true);
-    createAccounts(authContext, createAccountsRequest)
-      .then((createdAccounts) => onSuccessfulAdd(createdAccounts))
+    createAccount(authContext, createAccountRequest)
+      .then((createdAccount) => {
+        onSuccessfulAdd(createdAccount);
+        form.reset();
+      })
       .catch((error) =>
         setErrorMessage(`Failed to Enrich account: ${error.message}`)
       )
@@ -421,6 +470,25 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
 
               <FormField
                 control={form.control}
+                name="website"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-800">Website</FormLabel>
+                    <FormDescription></FormDescription>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., https://www.stripe.com"
+                        className="border-gray-300 rounded-md"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="productId"
                 render={({ field }) => (
                   <FormItem>
@@ -454,8 +522,16 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   );
 };
 
+interface AddAccountsProps {
+  products: Product[];
+  onAccountsAdded: (arg0: Account[]) => void;
+}
+
 // Main component to allow users to input accounts.
-const AddAccounts: React.FC<{ products: Product[] }> = ({ products }) => {
+const AddAccounts: React.FC<AddAccountsProps> = ({
+  products,
+  onAccountsAdded,
+}) => {
   const importCSVOption = "Import CSV";
   const addManuallyOption = "Add Manually";
   const [openCSVDialog, setOpenCSVDialog] = useState(false);
@@ -477,12 +553,9 @@ const AddAccounts: React.FC<{ products: Product[] }> = ({ products }) => {
 
   // CSV imported successfully, close the dialog now.
   const handleCSVImported = (createdAccounts: Account[]) => {
-    console.log("created accounts: ", createdAccounts);
-
     // Close the dialog.
     setOpenCSVDialog(false);
-
-    // TODO: callback to accounts table to list accounts once again.
+    onAccountsAdded(createdAccounts);
   };
 
   // User initiated dialog mode change.
@@ -490,9 +563,9 @@ const AddAccounts: React.FC<{ products: Product[] }> = ({ products }) => {
     setOpenManualDialog(newOpen);
   };
 
-  const handleAccountAddedManually = (createdAccounts: Account[]) => {
-    console.log("Created manual accounts: ", createdAccounts);
+  const handleAccountAddedManually = (createdAccount: Account) => {
     setOpenManualDialog(false);
+    onAccountsAdded([createdAccount]);
   };
 
   const itemClassName =

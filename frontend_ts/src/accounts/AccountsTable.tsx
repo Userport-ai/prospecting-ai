@@ -8,39 +8,51 @@ import {
   ColumnDef,
   ColumnSort,
   ColumnFilter,
+  Row,
 } from "@tanstack/react-table";
 import AddCustomColumn, { CustomColumnInput } from "@/table/AddCustomColumn";
+import AddAccounts from "./AddAccounts";
 import CommonTable from "@/table/CommonTable";
 import EnumFilter from "@/table/EnumFilter";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
-import { getLeadColumns } from "./Columns";
+import { getAccountColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Lead as LeadRow, listLeads } from "@/services/Leads";
+import { Account as AccountRow, listAccounts } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
+import { listProducts, Product } from "@/services/Products";
 
-const ZeroStateDisplay = () => {
+const ZeroStateDisplay: React.FC<{
+  products: Product[];
+  onAccountsAdded: (createdAccounts: AccountRow[]) => void;
+}> = ({ products, onAccountsAdded }) => {
   return (
     <div className="flex flex-col gap-2 items-center justify-center h-64 text-center bg-gray-50 border border-dashed border-gray-300 rounded-md p-6">
       <div className="text-gray-600 mb-4">
         <div className="text-xl font-semibold">No Data Available</div>
-        <div className="text-sm">Start by adding Accounts to prospect.</div>
+        <div className="text-sm">Add Accounts to start Outreach.</div>
       </div>
+      <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
     </div>
   );
 };
 
 interface TableProps {
-  columns: ColumnDef<LeadRow>[];
-  data: LeadRow[];
+  columns: ColumnDef<AccountRow>[];
+  data: AccountRow[];
+  products: Product[];
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
+  onAccountsAdded: (createdAccounts: AccountRow[]) => void;
 }
 
-export const Table: React.FC<TableProps> = ({
+// Component to display Accounts Table.
+const Table: React.FC<TableProps> = ({
   columns,
   data,
+  products,
   onCustomColumnAdded,
+  onAccountsAdded,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
@@ -94,15 +106,25 @@ export const Table: React.FC<TableProps> = ({
 
   if (data.length === 0) {
     // No accounts found.
-    return <ZeroStateDisplay />;
+    return (
+      <ZeroStateDisplay products={products} onAccountsAdded={onAccountsAdded} />
+    );
   }
 
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
     // we fetch all the rows on the current page.
-    const rowIds = table.getRowModel().rows.map((row) => row.original.id);
+    const rowIds = table
+      .getRowModel()
+      .rows.map((row) => (row.original as AccountRow).id ?? "");
     customColumnInfo.rowIds = rowIds;
     onCustomColumnAdded(customColumnInfo);
+  };
+
+  // Handle clik on a row.
+  const handleRowClick = (row: Row<AccountRow>) => {
+    // We want to navigate to Leads page for the given Account.
+    console.log("row has been clicked: ", row.original.id);
   };
 
   return (
@@ -113,7 +135,7 @@ export const Table: React.FC<TableProps> = ({
           <TextFilter
             table={table}
             columnId={"name"}
-            placeholder={"Filter Lead name..."}
+            placeholder={"Filter Account name..."}
           />
 
           {/* Status Filter */}
@@ -129,7 +151,8 @@ export const Table: React.FC<TableProps> = ({
       </div>
 
       <div className="flex mt-2 gap-6">
-        {/* TODO: Add Leads to the table. */}
+        {/* Add Accounts to the table. */}
+        <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
 
         {/* Add custom column */}
         <AddCustomColumn onAdded={handleCustomColumnAdd} />
@@ -141,23 +164,28 @@ export const Table: React.FC<TableProps> = ({
         columns={columns}
         columnResizeMode={columnResizeMode}
         pagination={pagination}
+        onRowClick={handleRowClick}
       />
     </div>
   );
 };
 
-export default function Leads() {
+// Displays list of accounts in a table format.
+export default function AccountsTable() {
   const authContext = useAuthContext();
-  const [leads, setLeads] = useState<LeadRow[]>([]);
-  const [columns, setColumns] = useState<ColumnDef<LeadRow>[]>([]);
-  const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [columns, setColumns] = useState<ColumnDef<AccountRow>[]>([]);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    listLeads(authContext)
-      .then((leads) => {
-        setLeads(leads);
-        setColumns(getLeadColumns(leads));
+    listAccounts(authContext)
+      .then(async (accounts) => {
+        const products = await listProducts(authContext);
+        setAccounts(accounts);
+        setColumns(getAccountColumns(accounts));
+        setProducts(products);
       })
       .catch((error) =>
         setError(new Error(`Failed to fetch Accounts: ${error.message}`))
@@ -173,19 +201,26 @@ export default function Leads() {
     throw error;
   }
 
+  // Accounts added by the user.
+  const onAccountsAdded = (addedAccounts: AccountRow[]) => {
+    setAccounts([...addedAccounts, ...accounts]);
+  };
+
   // Handler for when custom column inputs are provided by the user.
   const onCustomColumnAdded = (customColumnInfo: CustomColumnInput) => {
-    // TODO: call server to send custom column request instead.
-    console.log("custom colum info: ", customColumnInfo);
+    // TODO: call server to send custom column request instead
+    console.log("custom colum info ", customColumnInfo);
   };
 
   return (
     <div className="w-11/12 mx-auto py-2">
-      <h1 className="font-bold text-gray-700 text-2xl mb-5">Leads</h1>
+      <h1 className="font-bold text-gray-700 text-2xl mb-5">Accounts</h1>
       <Table
         columns={columns}
-        data={leads}
+        data={accounts}
+        products={products}
         onCustomColumnAdded={onCustomColumnAdded}
+        onAccountsAdded={onAccountsAdded}
       />
     </div>
   );
