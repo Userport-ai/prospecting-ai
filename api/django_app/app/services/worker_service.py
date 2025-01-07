@@ -38,15 +38,14 @@ class WorkerService:
                 logger.debug("Using workload identity for authentication")
                 self.credentials, project = default()
 
-                # Create ID token credentials for the audience
-                auth_req = Request()
-                token = id_token.fetch_id_token(auth_req, self.audience)
-                self.credentials = service_account.IDTokenCredentials(
-                    signer=None,
-                    service_account_email=self.credentials.service_account_email,
-                    token=token,
-                    target_audience=self.audience
-                )
+                # Convert credentials to IDTokenCredentials if needed
+                if not isinstance(self.credentials, service_account.IDTokenCredentials):
+                    request = google.auth.transport.requests.Request()
+                    self.credentials = service_account.IDTokenCredentials(
+                        signer=self.credentials.signer,
+                        service_account_email=self.credentials.service_account_email,
+                        target_audience=self.audience
+                    )
 
             logger.debug(f"Credentials initialized. Type: {type(self.credentials)}")
 
@@ -59,25 +58,13 @@ class WorkerService:
         Gets a fresh ID token for Cloud Run authentication
         """
         try:
-            auth_req = Request()
+            request = google.auth.transport.requests.Request()
 
             # Refresh the token if needed
             if not self.credentials.valid:
-                if hasattr(self.credentials, 'refresh'):
-                    self.credentials.refresh(auth_req)
-                else:
-                    # For workload identity, fetch a new token
-                    token = id_token.fetch_id_token(auth_req, self.audience)
-                    self.credentials = service_account.IDTokenCredentials(
-                        signer=None,
-                        service_account_email=self.credentials.service_account_email,
-                        token=token,
-                        target_audience=self.audience
-                    )
+                self.credentials.refresh(request)
 
-            token = self.credentials.token
-            logger.debug(f"Generated fresh ID token of length: {len(token) if token else 'None'}")
-            return token
+            return self.credentials.token
 
         except Exception as e:
             logger.error(f"Failed to get ID token: {str(e)}")

@@ -37,6 +37,8 @@ spec:
           value: "1"
         - name: CORS_ALLOWED_ORIGINS
           value: "https://prospecting-ai-l1oz.vercel.app,http://localhost:5173,https://app.userport.ai"
+        - name: WORKER_API_BASE_URL
+          value: "https://prospecting-ai-116199002084.us-west1.run.app"
         resources:
           requests:
             memory: "512Mi"
