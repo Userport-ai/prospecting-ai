@@ -45,7 +45,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="bg-[rgb(104,93,133)] text-white font-semibold px-4 py-2"
+                    className="bg-[rgb(122,103,171)] text-white font-semibold px-4 py-2"
                   >
                     <div className="flex justify-between items-center">
                       {header.isPlaceholder
@@ -55,7 +55,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                             header.getContext()
                           )}
 
-                      {/* Column resize button */}
+                      {/* Column resize button, CSS in index.css */}
                       <div
                         {...{
                           onDoubleClick: () => header.column.resetSize(),
@@ -128,12 +128,10 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
       </div>
 
       {/* Selected Rows Information */}
-      {table.getFilteredSelectedRowModel().rows.length > 0 && (
-        <div className="flex p-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-      )}
+      <div className="flex p-1 text-sm text-muted-foreground">
+        {table.getFilteredSelectedRowModel().rows.length} of{" "}
+        {table.getFilteredRowModel().rows.length} row(s) selected.
+      </div>
 
       {/* Pagination Controls */}
       <div className="flex items-center justify-start gap-4">

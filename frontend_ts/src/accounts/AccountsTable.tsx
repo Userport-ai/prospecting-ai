@@ -128,8 +128,8 @@ const Table: React.FC<TableProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-4">
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-6">
         {/* Filter Controls */}
         <div className="flex gap-4">
           <TextFilter
@@ -148,11 +148,6 @@ const Table: React.FC<TableProps> = ({
 
         {/* View visible Columns. */}
         <VisibleColumns table={table} />
-      </div>
-
-      <div className="flex mt-2 gap-6">
-        {/* Add Accounts to the table. */}
-        <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
 
         {/* Add custom column */}
         <AddCustomColumn onAdded={handleCustomColumnAdd} />
@@ -213,8 +208,13 @@ export default function AccountsTable() {
   };
 
   return (
-    <div className="w-11/12 mx-auto py-2">
-      <h1 className="font-bold text-gray-700 text-2xl mb-5">Accounts</h1>
+    <div className="w-11/12 mx-auto">
+      <div className="flex items-center gap-4 mb-3">
+        <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
+        {/* Add Accounts to the table. */}
+        <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
+      </div>
+
       <Table
         columns={columns}
         data={accounts}

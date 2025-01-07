@@ -573,11 +573,10 @@ const AddAccounts: React.FC<AddAccountsProps> = ({
   return (
     <div className="flex">
       <DropdownMenu modal={!(openCSVDialog || openManualDialog)}>
-        <DropdownMenuTrigger className="flex items-center px-3 py-2 gap-2 bg-[rgb(136,102,221)]  hover:bg-[rgb(122,92,198)] text-white shadow-md">
+        <DropdownMenuTrigger className="flex items-center px-1 py-1 rounded-xl bg-[rgb(136,102,221)]  hover:bg-[rgb(122,92,198)] text-white shadow-md">
           <Plus size={16} />
-          <p className="text-sm">Add Accounts</p>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-[10rem]">
+        <DropdownMenuContent className="w-[10rem]" align="start">
           <DropdownMenuItem
             className={itemClassName}
             onSelect={handleSelection}

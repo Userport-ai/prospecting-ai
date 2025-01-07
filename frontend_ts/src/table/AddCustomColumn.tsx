@@ -91,7 +91,8 @@ const AddCustomColumn: React.FC<{
       {/* Trigger Button */}
       <Button
         onClick={() => setOpen(true)}
-        className="flex text-sm gap-2 py-2 px-3 w-fit h-full shadow-md bg-[rgb(136,102,221)] hover:bg-[rgb(122,92,198)] text-white"
+        variant={"outline"}
+        className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300 border-gray-200"
       >
         <Cpu />
         Ask AI
