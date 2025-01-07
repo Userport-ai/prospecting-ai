@@ -2,11 +2,12 @@ import os
 import uuid
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 from dataclasses import dataclass
 import requests
 import google.generativeai as genai
 
+from services.django_callback_service import CallbackService
 from .base import BaseTask
 from services.bigquery_service import BigQueryService
 
@@ -274,6 +275,7 @@ class AccountEnhancementTask(BaseTask):
         job_id = payload.get('job_id')
         accounts = payload.get('accounts', [])
         is_bulk = payload.get('is_bulk', False)
+        callback_service = CallbackService()
 
         if not accounts:
             return {
@@ -293,6 +295,12 @@ class AccountEnhancementTask(BaseTask):
                 if not all([company_name, account_id]):
                     error_details = {'error_type': 'validation_error', 'message': "Missing required fields"}
                     await self._store_error_state(job_id, account_id, error_details)
+                    await callback_service.send_callback(
+                        job_id=job_id,
+                        account_id=account_id,
+                        status='failed',
+                        error_details=error_details
+                    )
                     results.append({
                         "status": "failed",
                         "account_id": account_id,
@@ -301,19 +309,43 @@ class AccountEnhancementTask(BaseTask):
                     has_failures = True
                     continue
 
+                # Update status to processing
+                await callback_service.send_callback(
+                    job_id=job_id,
+                    account_id=account_id,
+                    status='processing'
+                )
+
                 # Fetch and process company data
                 company_profile = await self._fetch_company_profile(company_name)
                 structured_data = await self._extract_structured_data(company_profile)
                 analysis_text = await self._generate_analysis(company_profile)
 
-                # Store processed data
+                # Store processed data in BigQuery
                 await self.bq_service.insert_account_data(
                     account_id=account_id,
                     structured_data=structured_data,
                     raw_profile=company_profile
                 )
 
-                # Store raw enrichment data
+                # Store enrichment raw data
+                processed_data = {
+                    'company_name': structured_data.get('company_name', {}).get('legal_name'),
+                    'employee_count': structured_data.get('business_metrics', {}).get('employee_count', {}).get('total'),
+                    'industry': structured_data.get('industry', {}).get('sectors', []),
+                    'location': self._format_location(structured_data.get('location', {})),
+                    'website': structured_data.get('digital_presence', {}).get('website'),
+                    'linkedin_url': structured_data.get('digital_presence', {}).get('social_media', {}).get('linkedin'),
+                    'technologies': self._extract_technologies(structured_data.get('technology_stack', {})),
+                    'funding_details': structured_data.get('financials', {}).get('private_data', {}),
+                    'company_info': {
+                        'company_type': structured_data.get('business_metrics', {}).get('company_type'),
+                        'founded_year': structured_data.get('business_metrics', {}).get('year_founded'),
+                        'customers': structured_data.get('business_details', {}).get('customers', []),
+                        'competitors': structured_data.get('market_position', {}).get('competitors', [])
+                    }
+                }
+
                 await self.bq_service.insert_enrichment_raw_data(
                     job_id=job_id,
                     entity_id=account_id,
@@ -323,38 +355,48 @@ class AccountEnhancementTask(BaseTask):
                         'gemini_structured': structured_data,
                         'gemini_analysis': analysis_text
                     },
-                    processed_data=structured_data
+                    processed_data=processed_data
+                )
+
+                # Send success callback
+                await callback_service.send_callback(
+                    job_id=job_id,
+                    account_id=account_id,
+                    status='completed',
+                    raw_data=structured_data,
+                    processed_data=processed_data
                 )
 
                 results.append({
                     "status": "completed",
                     "account_id": account_id,
-                    "company_name": company_name,
-                    "enrichment_data": {
-                        "structured_data": structured_data,
-                        "ai_analysis": analysis_text
-                    }
+                    "company_name": company_name
                 })
-
-            except requests.exceptions.RequestException as e:
-                error_details = {'error_type': 'jina_api_error', 'message': str(e)}
-                await self._store_error_state(job_id, account.get('account_id'), error_details)
-                results.append({
-                    "status": "failed",
-                    "account_id": account.get('account_id'),
-                    "error": f"Jina API error: {str(e)}"
-                })
-                has_failures = True
 
             except Exception as e:
-                error_details = {'error_type': 'unexpected_error', 'message': str(e)}
+                has_failures = True
+                error_details = {
+                    'error_type': type(e).__name__,
+                    'message': str(e),
+                    'retryable': True
+                }
+
+                # Store error state
                 await self._store_error_state(job_id, account.get('account_id'), error_details)
+
+                # Send failure callback
+                await callback_service.send_callback(
+                    job_id=job_id,
+                    account_id=account.get('account_id'),
+                    status='failed',
+                    error_details=error_details
+                )
+
                 results.append({
                     "status": "failed",
                     "account_id": account.get('account_id'),
                     "error": str(e)
                 })
-                has_failures = True
 
         return {
             "status": "completed" if not has_failures else "partially_completed",
@@ -365,6 +407,27 @@ class AccountEnhancementTask(BaseTask):
             "failed_accounts": len([r for r in results if r["status"] == "failed"]),
             "results": results
         }
+
+    def _format_location(self, location_data: Dict) -> str:
+        """Format location from structured data"""
+        hq = location_data.get('headquarters', {})
+        parts = [
+            hq.get('city'),
+            hq.get('state'),
+            hq.get('country')
+        ]
+        return ', '.join(filter(None, parts)) or None
+
+    def _extract_technologies(self, tech_data: Dict) -> List[str]:
+        """Extract and flatten technology information"""
+        tech_lists = [
+            tech_data.get('programming_languages', []),
+            tech_data.get('frameworks', []),
+            tech_data.get('databases', []),
+            tech_data.get('cloud_services', []),
+            tech_data.get('other_tools', [])
+        ]
+        return list(set(item for sublist in tech_lists for item in sublist if item))
 
     async def _fetch_company_profile(self, company_name: str) -> str:
         """Fetch company profile from Jina AI."""

@@ -20,7 +20,13 @@ class WorkerService:
         # Format the audience URL correctly for Cloud Run
         base_url = self.base_url.rstrip('/')
         parsed_url = urllib.parse.urlparse(base_url)
-        self.audience = f"https://{parsed_url.netloc}"
+        if os.getenv('ENVIRONMENT') == 'local' and settings.DEBUG:
+            # Force HTTP for local development
+            self.audience = f"http://{parsed_url.netloc}"  # Use HTTP for local audience
+        else:
+            # Use HTTPS for non-local environments
+            self.audience = f"https://{parsed_url.netloc}"
+
 
         logger.debug(f"Initializing WorkerService with audience: {self.audience}")
 
@@ -71,8 +77,18 @@ class WorkerService:
         Triggers account enrichment with OIDC token authentication
         """
         try:
-            # Get fresh ID token
-            id_token = self._get_id_token()
+            if os.getenv('ENVIRONMENT') == 'local' and settings.DEBUG:
+                # Skip token auth in local development
+                headers = {
+                    "Content-Type": "application/json"
+                }
+            else:
+                # Get fresh ID token
+                id_token = self._get_id_token()
+                headers = {
+                    "Authorization": f"Bearer {id_token}",
+                    "Content-Type": "application/json"
+                }
 
             logger.debug(f"Making request to: {self.base_url}/api/v1/tasks/create/account_enhancement")
 
@@ -80,9 +96,7 @@ class WorkerService:
             response = requests.post(
                 f"{self.base_url}/api/v1/tasks/create/account_enhancement",
                 json={"accounts": accounts},
-                headers={
-                    "Authorization": f"Bearer {id_token}"
-                },
+                headers=headers,
                 timeout=self.timeout
             )
 
