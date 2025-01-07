@@ -33,19 +33,12 @@ class WorkerService:
                     sa_file,
                     target_audience=self.audience
                 )
+                self._use_workload_identity = False
             else:
                 # Use workload identity in cloud environment
                 logger.debug("Using workload identity for authentication")
-                self.credentials, project = default()
-
-                # Convert credentials to IDTokenCredentials if needed
-                if not isinstance(self.credentials, service_account.IDTokenCredentials):
-                    request = google.auth.transport.requests.Request()
-                    self.credentials = service_account.IDTokenCredentials(
-                        signer=self.credentials.signer,
-                        service_account_email=self.credentials.service_account_email,
-                        target_audience=self.audience
-                    )
+                self.credentials, self.project = default()
+                self._use_workload_identity = True
 
             logger.debug(f"Credentials initialized. Type: {type(self.credentials)}")
 
@@ -60,11 +53,14 @@ class WorkerService:
         try:
             request = google.auth.transport.requests.Request()
 
-            # Refresh the token if needed
-            if not self.credentials.valid:
-                self.credentials.refresh(request)
-
-            return self.credentials.token
+            if self._use_workload_identity:
+                # For workload identity, fetch a new token directly
+                return id_token.fetch_id_token(request, self.audience)
+            else:
+                # For service account credentials, use the built-in refresh mechanism
+                if not self.credentials.valid:
+                    self.credentials.refresh(request)
+                return self.credentials.token
 
         except Exception as e:
             logger.error(f"Failed to get ID token: {str(e)}")
