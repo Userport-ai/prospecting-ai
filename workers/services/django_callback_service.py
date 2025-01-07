@@ -6,16 +6,21 @@ from google.oauth2 import id_token
 from google.oauth2 import service_account
 import httpx
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
 class CallbackService:
     def __init__(self):
         """Initialize the callback service with OIDC auth"""
+        logger.info("Initializing CallbackService")
+
         self.django_base_url = os.environ.get('DJANGO_BASE_URL')
         if not self.django_base_url:
+            logger.error("DJANGO_BASE_URL environment variable is missing")
             raise ValueError("DJANGO_BASE_URL environment variable is required")
 
+        logger.info(f"Using Django base URL: {self.django_base_url}")
         self.callback_path = '/api/v2/internal/enrichment-callback/'
         self.audience = self.django_base_url.rstrip('/')
 
@@ -23,40 +28,47 @@ class CallbackService:
             # Check if running locally with service account file
             sa_file = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', './secrets/service-account.json')
             if os.path.exists(sa_file):
-                logger.debug("Using local service account file for authentication")
+                logger.info(f"Using local service account file for authentication: {sa_file}")
                 self.credentials = service_account.IDTokenCredentials.from_service_account_file(
                     sa_file,
                     target_audience=self.audience
                 )
                 self._use_workload_identity = False
+                logger.info("Successfully initialized service account credentials")
             else:
                 # Use workload identity in cloud environment
-                logger.debug("Using workload identity for authentication")
+                logger.info("Attempting to use workload identity for authentication")
                 self.credentials, self.project = default()
                 self._use_workload_identity = True
+                logger.info(f"Successfully initialized workload identity credentials for project: {self.project}")
 
-            logger.debug(f"Credentials initialized. Type: {type(self.credentials)}")
+            logger.debug(f"Credentials initialized. Type: {type(self.credentials)}, Workload Identity: {self._use_workload_identity}")
 
         except Exception as e:
-            logger.error(f"Failed to initialize credentials: {str(e)}")
+            logger.error(f"Failed to initialize credentials: {str(e)}", exc_info=True)
             raise
 
     async def _get_id_token(self) -> str:
         """Get fresh ID token for Django callback authentication"""
+        logger.debug("Attempting to get fresh ID token")
         try:
             request = Request()
 
             if self._use_workload_identity:
-                # For workload identity, fetch a new token directly
-                return id_token.fetch_id_token(request, self.audience)
+                logger.debug("Fetching ID token using workload identity")
+                token = id_token.fetch_id_token(request, self.audience)
+                logger.debug("Successfully obtained workload identity token")
+                return token
             else:
-                # For service account credentials, use the built-in refresh mechanism
+                logger.debug("Checking service account credentials validity")
                 if not self.credentials.valid:
+                    logger.info("Refreshing expired service account credentials")
                     self.credentials.refresh(request)
+                logger.debug("Successfully obtained service account token")
                 return self.credentials.token
 
         except Exception as e:
-            logger.error(f"Failed to get ID token: {str(e)}")
+            logger.error(f"Failed to get ID token: {str(e)}", exc_info=True)
             raise
 
     async def send_callback(
@@ -73,25 +85,14 @@ class CallbackService:
             attempt_number: Optional[int] = None,
             max_retries: Optional[int] = None
     ) -> bool:
-        """
-        Send callback to Django with enrichment results
+        """Send callback to Django with enrichment results"""
+        logger.info(f"Preparing to send callback for job_id: {job_id}, account_id: {account_id}, status: {status}")
 
-        Args:
-            job_id: Unique identifier for the job
-            account_id: Account being enriched
-            status: Current status (pending/processing/completed/failed)
-            raw_data: Raw enrichment data (optional)
-            processed_data: Processed enrichment data (optional)
-            error_details: Error information if failed (optional)
-            source: Data source identifier
-            is_partial: Whether this is a partial completion
-            completion_percentage: Percentage of job completed
-            attempt_number: Current attempt number
-            max_retries: Maximum retry attempts
-        """
         try:
             # Get fresh OIDC token
+            logger.debug(f"Requesting fresh ID token for job {job_id}")
             id_token = await self._get_id_token()
+            logger.debug(f"Successfully obtained ID token for job {job_id}")
 
             # Prepare callback payload
             callback_data = {
@@ -115,10 +116,16 @@ class CallbackService:
             if max_retries is not None:
                 callback_data["max_retries"] = max_retries
 
+            logger.debug(f"Prepared callback data for job {job_id}: {json.dumps({k: '...' if k in ['raw_data', 'processed_data', 'error_details'] else v for k, v in callback_data.items()})}")
+
             # Make async request to Django
+            callback_url = f"{self.django_base_url}{self.callback_path}"
+            logger.info(f"Sending callback to {callback_url} for job {job_id}")
+
             async with httpx.AsyncClient() as client:
+                logger.debug(f"Making POST request for job {job_id}")
                 response = await client.post(
-                    f"{self.django_base_url}{self.callback_path}",
+                    callback_url,
                     json=callback_data,
                     headers={
                         "Authorization": f"Bearer {id_token}",
@@ -127,11 +134,17 @@ class CallbackService:
                     timeout=30.0
                 )
 
-            response.raise_for_status()
-            logger.info(f"Callback successful for job {job_id}")
-            return True
+                logger.debug(f"Received response for job {job_id}: Status {response.status_code}")
+                response.raise_for_status()
+                logger.info(f"Callback successful for job {job_id} with status code {response.status_code}")
+                return True
 
+        except httpx.TimeoutException as e:
+            logger.error(f"Callback timeout for job {job_id}: {str(e)}", exc_info=True)
+            return False
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Callback HTTP error for job {job_id}: Status {e.response.status_code}, Response: {e.response.text}", exc_info=True)
+            return False
         except Exception as e:
-            logger.error(f"Callback failed for job {job_id}: {str(e)}")
-            # Don't raise the exception - let the task handle the failure
+            logger.error(f"Callback failed for job {job_id}: {str(e)}", exc_info=True)
             return False
