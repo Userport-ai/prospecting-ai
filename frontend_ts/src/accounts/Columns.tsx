@@ -6,6 +6,8 @@ import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Account as AccountRow } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
+import { Link, useLocation, useNavigate } from "react-router";
+import { EnrichmentStatus } from "@/services/Common";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -73,6 +75,28 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "enrichment_status",
     accessorFn: (row) => row.enrichment_status,
     header: "Enrichment Status",
+    cell: (info) => {
+      const enrichmentStatus = info.getValue() as string | null;
+      if (enrichmentStatus) {
+        if (enrichmentStatus === EnrichmentStatus.COMPLETED) {
+          // Enrichment complete, link to Leads table on click.
+          const accountId = info.row.original.id;
+          const url = `/accounts/${accountId}/leads`;
+          return (
+            <Link to={url} className="text-blue-500 underline font-medium">
+              {enrichmentStatus}
+            </Link>
+          );
+        } else if (enrichmentStatus === EnrichmentStatus.FAILED) {
+          return <p className="text-red-700 font-medium">{enrichmentStatus}</p>;
+        } else {
+          return (
+            <p className="text-yellow-600 font-medium">{enrichmentStatus}</p>
+          );
+        }
+      }
+      return null;
+    },
     size: 100,
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
     filterFn: "arrIncludesSome",
@@ -88,7 +112,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     size: 100,
     meta: {
       displayName: "HQ",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
   {
@@ -170,7 +194,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     size: 100,
     meta: {
       displayName: "Website",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
   {
@@ -196,7 +220,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     },
     meta: {
       displayName: "LinkedIn URL",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
   {
@@ -206,7 +230,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     size: 100,
     meta: {
       displayName: "Company Type",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
   {
@@ -216,7 +240,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     size: 200,
     meta: {
       displayName: "Created On",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
   {
@@ -232,7 +256,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     size: 100,
     meta: {
       displayName: "Funding Details",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
   {
@@ -242,7 +266,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     size: 100,
     meta: {
       displayName: "Founded Year",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
   {
@@ -258,7 +282,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     size: 100,
     meta: {
       displayName: "Enrichment Sources",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
   {
@@ -269,7 +293,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     size: 100,
     meta: {
       displayName: "Last Enriched At",
-      visibleInitially: false,
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
 ];

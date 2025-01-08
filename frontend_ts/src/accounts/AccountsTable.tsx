@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   getCoreRowModel,
   useReactTable,
@@ -8,7 +8,6 @@ import {
   ColumnDef,
   ColumnSort,
   ColumnFilter,
-  Row,
 } from "@tanstack/react-table";
 import AddCustomColumn, { CustomColumnInput } from "@/table/AddCustomColumn";
 import AddAccounts from "./AddAccounts";
@@ -22,37 +21,67 @@ import { Account as AccountRow, listAccounts } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import { listProducts, Product } from "@/services/Products";
+import { EnrichmentStatus } from "@/services/Common";
 
-const ZeroStateDisplay: React.FC<{
-  products: Product[];
-  onAccountsAdded: (createdAccounts: AccountRow[]) => void;
-}> = ({ products, onAccountsAdded }) => {
+const ZeroStateDisplay = () => {
   return (
     <div className="flex flex-col gap-2 items-center justify-center h-64 text-center bg-gray-50 border border-dashed border-gray-300 rounded-md p-6">
-      <div className="text-gray-600 mb-4">
+      <div className="text-gray-600 flex flex-col gap-4">
         <div className="text-xl font-semibold">No Data Available</div>
-        <div className="text-sm">Add Accounts to start Outreach.</div>
+        <div className="text-md">Add Accounts to start Outreach.</div>
       </div>
-      <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
     </div>
   );
+};
+
+interface PollPendingAccountsProps {
+  accounts: AccountRow[];
+  onPollingComplete: (accounts: AccountRow[]) => void;
+}
+
+// Component to Poll Accounts that are in pending state.
+const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
+  accounts,
+  onPollingComplete,
+}) => {
+  const authContext = useAuthContext();
+  // Setup polling in the background in case any of the accounts have enrichment
+  // status as pending or in progress.
+  const pollAccountIds: string[] = accounts
+    .filter(
+      (account) =>
+        ![EnrichmentStatus.COMPLETED, EnrichmentStatus.FAILED].includes(
+          account.enrichment_status
+        )
+    )
+    .map((account) => account.id);
+  const POLLING_INTERVAL = 60 * 1000; // Poll every 1 min.
+
+  useEffect(() => {
+    if (pollAccountIds.length === 0) {
+      // No accounts to poll.
+      return;
+    }
+    const intervalId = setInterval(async () => {
+      const newPolledAccounts = await listAccounts(authContext, pollAccountIds);
+      onPollingComplete(newPolledAccounts);
+    }, POLLING_INTERVAL);
+    return () => clearInterval(intervalId);
+  }, [authContext, pollAccountIds]);
+  return null;
 };
 
 interface TableProps {
   columns: ColumnDef<AccountRow>[];
   data: AccountRow[];
-  products: Product[];
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
-  onAccountsAdded: (createdAccounts: AccountRow[]) => void;
 }
 
 // Component to display Accounts Table.
 const Table: React.FC<TableProps> = ({
   columns,
   data,
-  products,
   onCustomColumnAdded,
-  onAccountsAdded,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
@@ -106,9 +135,7 @@ const Table: React.FC<TableProps> = ({
 
   if (data.length === 0) {
     // No accounts found.
-    return (
-      <ZeroStateDisplay products={products} onAccountsAdded={onAccountsAdded} />
-    );
+    return <ZeroStateDisplay />;
   }
 
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
@@ -119,12 +146,6 @@ const Table: React.FC<TableProps> = ({
       .rows.map((row) => (row.original as AccountRow).id ?? "");
     customColumnInfo.rowIds = rowIds;
     onCustomColumnAdded(customColumnInfo);
-  };
-
-  // Handle clik on a row.
-  const handleRowClick = (row: Row<AccountRow>) => {
-    // We want to navigate to Leads page for the given Account.
-    console.log("row has been clicked: ", row.original.id);
   };
 
   return (
@@ -159,7 +180,6 @@ const Table: React.FC<TableProps> = ({
         columns={columns}
         columnResizeMode={columnResizeMode}
         pagination={pagination}
-        onRowClick={handleRowClick}
       />
     </div>
   );
@@ -196,7 +216,21 @@ export default function AccountsTable() {
     throw error;
   }
 
-  // Accounts added by the user.
+  // Handler for when a single polling request is completed.
+  const onPollingComplete = (polledAccounts: AccountRow[]) => {
+    // Stored the polled accounts in a map.
+    const polledAccountsMap: Record<string, AccountRow> = polledAccounts.reduce(
+      (curAccMap, account) => ({ ...curAccMap, [account.id]: account }),
+      {} as Record<string, AccountRow>
+    );
+    // Update only the accounts that were polled.
+    const updatedAccounts = accounts.map((account) =>
+      account.id in polledAccountsMap ? polledAccountsMap[account.id] : account
+    );
+    setAccounts(updatedAccounts);
+  };
+
+  // Accounts added by the user which have been successfully created by the API as well.
   const onAccountsAdded = (addedAccounts: AccountRow[]) => {
     setAccounts([...addedAccounts, ...accounts]);
   };
@@ -209,6 +243,10 @@ export default function AccountsTable() {
 
   return (
     <div className="w-11/12 mx-auto">
+      <PollPendingAccounts
+        accounts={accounts}
+        onPollingComplete={onPollingComplete}
+      />
       <div className="flex items-center gap-4 mb-3">
         <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
         {/* Add Accounts to the table. */}
@@ -218,9 +256,7 @@ export default function AccountsTable() {
       <Table
         columns={columns}
         data={accounts}
-        products={products}
         onCustomColumnAdded={onCustomColumnAdded}
-        onAccountsAdded={onAccountsAdded}
       />
     </div>
   );

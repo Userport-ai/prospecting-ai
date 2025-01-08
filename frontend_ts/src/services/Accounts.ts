@@ -32,13 +32,22 @@ export interface Account {
 type ListAccountsResponse = ListObjectsResponse<Account>;
 
 // Fetch all accounts for given tenant.
-// TODO: Update this to only fetch accounts created by given user.
 export const listAccounts = async (
-  authContext: AuthContext
+  authContext: AuthContext,
+  ids?: string[] // Optional parameter for list of IDs
 ): Promise<Account[]> => {
+  const { userContext } = authContext;
+  var params: Record<string, any> = { created_by: userContext!.user.id };
+
+  if (ids && ids.length > 0) {
+    // Create a comma-separated string for 'id__in' param
+    params["id__in"] = ids.join(",");
+  }
+
   return await apiCall<Account[]>(authContext, async (apiClient) => {
     const response = await apiClient.get<ListAccountsResponse>(
-      ACCOUNTS_ENDPOINT
+      ACCOUNTS_ENDPOINT,
+      { params }
     );
     return response.data.results;
   });

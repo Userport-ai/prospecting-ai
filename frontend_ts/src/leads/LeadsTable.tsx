@@ -142,7 +142,6 @@ export const Table: React.FC<TableProps> = ({
         columns={columns}
         columnResizeMode={columnResizeMode}
         pagination={pagination}
-        onRowClick={() => {}}
       />
     </div>
   );
@@ -157,11 +156,9 @@ export default function LeadsTable() {
   const [loading, setLoading] = useState<boolean>(true);
   const { id } = useParams<{ id?: string }>();
   const accountId: string | null = id ? id : null;
-  // TODO: Fetch leads for given Account ID if present.
-  console.log("account ID: ", accountId);
 
   useEffect(() => {
-    listLeads(authContext)
+    listLeads(authContext, accountId)
       .then((leads) => {
         setLeads(leads);
         setColumns(getLeadColumns(leads));

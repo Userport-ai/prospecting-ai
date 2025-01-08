@@ -27,11 +27,19 @@ export interface Lead {
 
 type ListLeadsResponse = ListObjectsResponse<Lead>;
 
-// Fetch all Leads for a given tenant.
-// TODO: Update this to only fetch leads within accounts created by given user.
-export const listLeads = async (authContext: AuthContext): Promise<Lead[]> => {
+// Fetch all Leads. If Account Id is given, it fetches only leads in the given Account Id.
+export const listLeads = async (
+  authContext: AuthContext,
+  accountId: string | null
+): Promise<Lead[]> => {
+  var params: Record<string, any> = {};
+  if (accountId) {
+    params["account__id"] = accountId;
+  }
   return await apiCall<Lead[]>(authContext, async (apiClient) => {
-    const response = await apiClient.get<ListLeadsResponse>(LEADS_ENDPOINT);
+    const response = await apiClient.get<ListLeadsResponse>(LEADS_ENDPOINT, {
+      params,
+    });
     return response.data.results;
   });
 };
