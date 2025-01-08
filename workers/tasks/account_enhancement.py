@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 import logging
+import datetime
 from typing import Dict, Any, List
 from dataclasses import dataclass
 import requests
@@ -16,8 +17,27 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PromptTemplates:
     """Store prompt templates for AI interactions."""
+    LINKEDIN_EXTRACTION_PROMPT = """
+    Extract the LinkedIn company URL from the search results below.
+    Follow these rules strictly:
+    1. Return ONLY valid JSON with a single field "linkedin_url"
+    2. The URL must be a valid LinkedIn company page URL (starting with https://www.linkedin.com/company/)
+    3. If no valid LinkedIn company URL is found, set the value to null
+    4. Do not include any explanations or notes
+    5. Ensure proper JSON formatting with quotes
+
+    Search Results:
+    {search_results}
+
+    Expected format:
+    {
+        "linkedin_url": "https://www.linkedin.com/company/example" or null
+    }
+    """
+
     EXTRACTION_PROMPT = """
     Extract company information into a structured JSON format from the profile below.
+    Also include any LinkedIn URL if provided in the digital_presence section.
     Follow these rules strictly:
     1. Return ONLY valid JSON, no extra text or markdown
     2. Do not include any explanations or notes
@@ -25,6 +45,7 @@ class PromptTemplates:
     4. Use the exact field names and structure shown below
     5. Ensure all strings are properly quoted
     6. Arrays should never be null, use empty array [] if no data
+    7. If a LinkedIn URL is found, ensure it's properly formatted and included in digital_presence.social_media
 
     Company Profile:
     {company_profile}
@@ -269,7 +290,6 @@ class AccountEnhancementTask(BaseTask):
             "is_bulk": False
         }
 
-
     async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the account enhancement task."""
         job_id = payload.get('job_id')
@@ -333,6 +353,20 @@ class AccountEnhancementTask(BaseTask):
                     completion_percentage=int((processed_count - 0.5) / total_accounts * 100)
                 )
 
+                # Fetch LinkedIn URL first
+                logger.debug(f"Job {job_id}, Account {account_id}: Fetching LinkedIn URL from Jina AI")
+                linkedin_url = await self._fetch_linkedin_url(company_name)
+
+                # Send intermediate callback after LinkedIn URL fetch
+                await callback_service.send_callback(
+                    job_id=job_id,
+                    account_id=account_id,
+                    status='processing',
+                    is_partial=True,
+                    completion_percentage=int((processed_count - 0.75) / total_accounts * 100),
+                    processed_data={'linkedin_url': linkedin_url} if linkedin_url else {}
+                )
+
                 # Fetch company profile
                 logger.debug(f"Job {job_id}, Account {account_id}: Fetching company profile from Jina AI")
                 company_profile = await self._fetch_company_profile(company_name)
@@ -342,13 +376,24 @@ class AccountEnhancementTask(BaseTask):
                     job_id=job_id,
                     account_id=account_id,
                     status='processing',
-                    is_partial=True,
                     completion_percentage=int((processed_count - 0.25) / total_accounts * 100)
                 )
 
                 # Extract structured data
                 logger.debug(f"Job {job_id}, Account {account_id}: Extracting structured data using Gemini")
                 structured_data = await self._extract_structured_data(company_profile)
+
+                # Ensure LinkedIn URL is properly set in structured data
+                if linkedin_url:
+                    if 'digital_presence' not in structured_data:
+                        structured_data['digital_presence'] = {}
+                    if 'social_media' not in structured_data['digital_presence']:
+                        structured_data['digital_presence']['social_media'] = {}
+
+                    # Only update if not already present or if existing URL is invalid
+                    structured_data['digital_presence']['social_media']['linkedin'] = linkedin_url
+                    if not self._is_valid_linkedin_url(linkedin_url):
+                        logger.warning(f"LinkedIn URL - {linkedin_url} is invalid!")
 
                 # Generate analysis
                 logger.debug(f"Job {job_id}, Account {account_id}: Generating analysis")
@@ -451,20 +496,6 @@ class AccountEnhancementTask(BaseTask):
         logger.info(f"Job {job_id} finished. Status: {final_status}, "
                     f"Success: {successful_accounts}, Failed: {failed_accounts}")
 
-        # # Send final bulk job callback if it's a bulk operation
-        # if is_bulk:
-        #     await callback_service.send_callback(
-        #         job_id=job_id,
-        #         account_id="bulk_job",
-        #         status=final_status,
-        #         completion_percentage=100,
-        #         processed_data={
-        #             "total_accounts": total_accounts,
-        #             "successful_accounts": successful_accounts,
-        #             "failed_accounts": failed_accounts
-        #         }
-        #     )
-
         return {
             "status": final_status,
             "job_id": job_id,
@@ -474,6 +505,199 @@ class AccountEnhancementTask(BaseTask):
             "failed_accounts": failed_accounts,
             "results": results
         }
+
+    async def _fetch_linkedin_url(self, company_name: str) -> str:
+        """Fetch LinkedIn URL for a company using Jina AI and Gemini."""
+        try:
+            # Search specifically for LinkedIn company page
+            search_query = f"{company_name} company linkedin page"
+            logger.debug(f"Searching Jina AI for LinkedIn URL with query: {search_query}")
+
+            jina_url = f"https://s.jina.ai/{search_query}"
+            response = requests.get(
+                jina_url,
+                headers={"Authorization": f"Bearer {self.jina_api_token}"},
+                timeout=10  # Add timeout to prevent hanging
+            )
+            response.raise_for_status()
+            search_results = response.text
+
+            if not search_results.strip():
+                logger.warning(f"Empty search results from Jina AI for company: {company_name}")
+                return None
+
+            # Extract LinkedIn URL using Gemini
+            extraction_prompt = self.prompts.LINKEDIN_EXTRACTION_PROMPT.format(
+                search_results=search_results
+            )
+
+            try:
+                logger.debug("Sending LinkedIn URL extraction prompt to Gemini")
+                response = self.model.generate_content(extraction_prompt)
+
+                if not response or not response.parts:
+                    logger.warning(f"Empty response from Gemini AI for LinkedIn URL extraction: {company_name}")
+                    return None
+
+                parsed_response = self._parse_gemini_response(response.parts[0].text)
+                linkedin_url = parsed_response.get("linkedin_url")
+
+                # Validate LinkedIn URL format
+                if linkedin_url and self._is_valid_linkedin_url(linkedin_url):
+                    logger.info(f"Valid LinkedIn URL found for {company_name}: {linkedin_url}")
+                    return linkedin_url
+                else:
+                    logger.warning(f"Invalid or missing LinkedIn URL format for {company_name}: {linkedin_url}")
+                    return None
+
+            except Exception as e:
+                logger.error(f"Error extracting LinkedIn URL with Gemini for {company_name}: {str(e)}", exc_info=True)
+                return None
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Jina API error while fetching LinkedIn URL for {company_name}: {str(e)}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching LinkedIn URL for {company_name}: {str(e)}", exc_info=True)
+            return None
+
+    def _is_valid_linkedin_url(self, url: str) -> bool:
+        """Validate LinkedIn company URL format."""
+        if not url:
+            return False
+
+        try:
+            # Basic validation of LinkedIn company URL format
+            return (
+                    url.startswith('https://www.linkedin.com/company/') and
+                    len(url) > len('https://www.linkedin.com/company/') and
+                    ' ' not in url and
+                    '\n' not in url
+            )
+        except Exception as e:
+            logger.error(f"Error validating LinkedIn URL: {str(e)}")
+            return False
+
+    async def _fetch_company_profile(self, company_name: str) -> str:
+        """Fetch company profile from Jina AI."""
+        try:
+            search_query = f"{company_name}+company+profile"
+            logger.debug(f"Searching Jina AI for company profile with query: {search_query}")
+
+            jina_url = f"https://s.jina.ai/{search_query}"
+            response = requests.get(
+                jina_url,
+                headers={"Authorization": f"Bearer {self.jina_api_token}"},
+                timeout=10
+            )
+            response.raise_for_status()
+
+            if not response.text.strip():
+                raise ValueError(f"Empty response from Jina AI for company: {company_name}")
+
+            return response.text
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Jina API error for company profile: {str(e)}", exc_info=True)
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error fetching company profile: {str(e)}", exc_info=True)
+            raise
+
+    async def _extract_structured_data(self, company_profile: str) -> Dict[str, Any]:
+        """Extract structured data from company profile using Gemini AI."""
+        try:
+            logger.debug("Creating extraction prompt for structured data...")
+            extraction_prompt = self.prompts.EXTRACTION_PROMPT.format(
+                company_profile=company_profile
+            )
+
+            try:
+                logger.debug("Sending structured data extraction prompt to Gemini...")
+                response = self.model.generate_content(extraction_prompt)
+
+                if not response or not response.parts:
+                    raise ValueError("Empty response from Gemini AI for structured data extraction")
+
+                structured_data = self._parse_gemini_response(response.parts[0].text)
+
+                # Validate essential fields
+                if not structured_data.get('company_name', {}).get('legal_name'):
+                    logger.warning("Structured data missing company legal name")
+
+                return structured_data
+
+            except Exception as e:
+                logger.error(f"Gemini API error: {str(e)}", exc_info=True)
+                raise
+
+        except Exception as e:
+            logger.error(f"Error extracting structured data: {str(e)}", exc_info=True)
+            raise
+
+    def _parse_gemini_response(self, response_text: str) -> Dict[str, Any]:
+        """Parse and validate Gemini AI response."""
+        try:
+            cleaned_text = response_text.strip()
+
+            # Remove code block markers if present
+            if cleaned_text.startswith("```json"):
+                cleaned_text = cleaned_text[7:]
+            elif cleaned_text.startswith("```"):
+                cleaned_text = cleaned_text[3:]
+
+            if cleaned_text.endswith("```"):
+                cleaned_text = cleaned_text[:-3]
+
+            cleaned_text = cleaned_text.strip()
+
+            try:
+                parsed_data = json.loads(cleaned_text)
+
+                # Validate basic structure
+                if not isinstance(parsed_data, dict):
+                    raise ValueError("Parsed response is not a dictionary")
+
+                return parsed_data
+
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error. Text: '{cleaned_text[:500]}...'")
+                logger.error(f"JSON error details: {str(e)}")
+                raise ValueError(f"Failed to parse Gemini response as JSON: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Error parsing Gemini response: {str(e)}", exc_info=True)
+            raise
+
+    async def _generate_analysis(self, company_profile: str) -> str:
+        """Generate business analysis using Gemini AI."""
+        try:
+            logger.debug("Creating analysis prompt...")
+            analysis_prompt = self.prompts.ANALYSIS_PROMPT.format(
+                company_profile=company_profile
+            )
+
+            try:
+                logger.debug("Sending analysis prompt to Gemini...")
+                response = self.model.generate_content(analysis_prompt)
+
+                if not response or not response.parts:
+                    raise ValueError("Empty response from Gemini AI for analysis generation")
+
+                analysis_text = response.parts[0].text
+
+                if not analysis_text.strip():
+                    raise ValueError("Generated analysis is empty")
+
+                return analysis_text
+
+            except Exception as e:
+                logger.error(f"Error generating analysis with Gemini: {str(e)}", exc_info=True)
+                raise
+
+        except Exception as e:
+            logger.error(f"Error generating analysis: {str(e)}", exc_info=True)
+            raise
 
     def _format_location(self, location_data: Dict) -> str:
         """Format location from structured data"""
@@ -496,68 +720,24 @@ class AccountEnhancementTask(BaseTask):
         ]
         return list(set(item for sublist in tech_lists for item in sublist if item))
 
-    async def _fetch_company_profile(self, company_name: str) -> str:
-        """Fetch company profile from Jina AI."""
-        try:
-            jina_url = f"https://s.jina.ai/{company_name}+company+profile"
-            response = requests.get(
-                jina_url,
-                headers={"Authorization": f"Bearer {self.jina_api_token}"}
-            )
-            response.raise_for_status()
-            return response.text
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Jina API error: {str(e)}")
-            raise
-
-    async def _extract_structured_data(self, company_profile: str) -> Dict[str, Any]:
-        """Extract structured data from company profile using Gemini AI."""
-        try:
-            logger.debug("Creating extraction prompt...")
-            extraction_prompt = self.prompts.EXTRACTION_PROMPT.format(
-                company_profile=company_profile
-            )
-
-            try:
-                logger.debug("Sending prompt to Gemini...")
-                response = self.model.generate_content(extraction_prompt)
-            except Exception as e:
-                logger.error(f"Gemini call failed: {e}")
-                raise
-            if not response or not response.parts:
-                raise ValueError("Empty response from Gemini AI")
-            return self._parse_gemini_response(response.parts[0].text)
-        except Exception as e:
-            logger.error(f"Error extracting structured data from response, error: {str(e)}")
-            raise
-
-
-    def _parse_gemini_response(self, response_text: str) -> Dict[str, Any]:
-        """Parse and clean Gemini AI response."""
-        cleaned_text = response_text.strip()
-        if cleaned_text.startswith("```json"):
-            cleaned_text = cleaned_text[7:]
-        if cleaned_text.endswith("```"):
-            cleaned_text = cleaned_text[:-3]
-        cleaned_text = cleaned_text.strip()
-
-        try:
-            return json.loads(cleaned_text)
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing error. Text: '{cleaned_text}'. Error: {str(e)}")
-            raise ValueError(f"Failed to parse Gemini response as JSON: {str(e)}")
-
-    async def _generate_analysis(self, company_profile: str) -> str:
-        """Generate business analysis using Gemini AI."""
-        analysis_prompt = self.prompts.ANALYSIS_PROMPT.format(
-            company_profile=company_profile
-        )
-        response = self.model.generate_content(analysis_prompt)
-        return response.parts[0].text if response.parts else ""
-
     async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
         """Store error information in BigQuery."""
         try:
+            if not job_id or not entity_id:
+                logger.error("Missing required fields for error state storage")
+                return
+
+            # Ensure error details are properly formatted
+            formatted_error = {
+                'error_type': error_details.get('error_type', 'unknown_error'),
+                'message': error_details.get('message', 'Unknown error occurred'),
+                'timestamp': datetime.datetime.utcnow().isoformat(),
+                'retryable': error_details.get('retryable', True),
+                'additional_info': error_details.get('additional_info', {})
+            }
+
+            logger.debug(f"Storing error state for job {job_id}, entity {entity_id}")
+
             await self.bq_service.insert_enrichment_raw_data(
                 job_id=job_id,
                 entity_id=entity_id,
@@ -565,7 +745,13 @@ class AccountEnhancementTask(BaseTask):
                 raw_data={},
                 processed_data={},
                 status='failed',
-                error_details=error_details
+                error_details=formatted_error
             )
+
+            logger.info(f"Successfully stored error state for job {job_id}, entity {entity_id}")
+
         except Exception as e:
-            logger.error(f"Error storing error state in BigQuery: {str(e)}")
+            logger.error(
+                f"Failed to store error state in BigQuery for job {job_id}, entity {entity_id}: {str(e)}",
+                exc_info=True
+            )
