@@ -12,8 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Lead } from "@/services/Leads";
 
 interface SuggestedLeadsProps {
-  suggestedLeads: Lead[]; // List of suggested leads
-  onAddLeads: (leads: Lead[]) => void; // Callback to add selected leads to the final Leads Table
+  suggestedLeads: Lead[];
+  onAddLeads: (leads: Lead[]) => void;
 }
 
 const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
@@ -39,34 +39,35 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
       selectedLeads.has(lead.id)
     );
     onAddLeads(leadsToAdd);
-    setSelectedLeads(new Set()); // Clear selection after adding leads
+    setSelectedLeads(new Set());
   };
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-600">
-          Recommended Leads
-        </h2>
-        <Button
-          onClick={handleAddLeads}
-          disabled={selectedLeads.size === 0}
-          className="disabled:bg-gray-600 text-white hover:bg-purple-600"
-        >
-          Add to Leads List
-        </Button>
+        <div className="flex flex-col">
+          <h2 className="text-lg font-semibold text-gray-600">
+            AI Recommeded Leads
+          </h2>
+          <p className="text-gray-500">Based on analyzing the playbook</p>
+        </div>
+
+        {selectedLeads.size > 0 && (
+          <Button onClick={handleAddLeads}>Add Selected Leads</Button>
+        )}
       </div>
 
-      <div className="rounded-md border border-gray-300 bg-white shadow-sm">
+      <div className="min-w-fit rounded-2xl border border-purple-300 p-2 shadow-lg">
         <Table>
           {/* Table Header */}
           <TableHeader>
             <TableRow>
               <TableHead className="w-12"></TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>LinkedIn</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Score</TableHead>
+              <TableHead className="text-purple-800">Name</TableHead>
+              <TableHead className="text-purple-800">LinkedIn</TableHead>
+              <TableHead className="text-purple-800">Role</TableHead>
+              <TableHead className="text-purple-800">Score</TableHead>
+              <TableHead className="text-purple-800">Rationale</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -74,7 +75,10 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
           <TableBody>
             {suggestedLeads.length > 0 ? (
               suggestedLeads.map((lead) => (
-                <TableRow key={lead.id}>
+                <TableRow
+                  key={lead.id}
+                  className="hover:bg-gradient-to-r from-purple-100 to-purple-50 transition-all rounded-md"
+                >
                   <TableCell className="text-center">
                     <Checkbox
                       checked={selectedLeads.has(lead.id)}
@@ -100,11 +104,15 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
                   </TableCell>
                   <TableCell>{lead.role_title || "N/A"}</TableCell>
                   <TableCell>{lead.score || "N/A"}</TableCell>
+                  <TableCell>They fit the ICP well</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-gray-500">
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-gray-500 rounded-b-lg"
+                >
                   No suggested leads available.
                 </TableCell>
               </TableRow>
