@@ -15,7 +15,7 @@ export interface Lead {
   first_name: string | null;
   last_name: string | null;
   enrichment_status: EnrichmentStatus;
-  role_tile: string | null;
+  role_title: string | null;
   linkedin_url: string | null;
   email: string | null;
   phone: string | null;

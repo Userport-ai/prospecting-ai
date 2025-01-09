@@ -138,7 +138,7 @@ export const Table: React.FC<TableProps> = ({
         columns={columns}
         columnResizeMode={columnResizeMode}
         pagination={pagination}
-        headerClassName="bg-[rgb(133,152,84)]"
+        headerClassName="bg-[rgb(180,150,200)]"
       />
     </div>
   );
@@ -181,13 +181,10 @@ export default function LeadsTable() {
   };
 
   return (
-    <div>
-      <h1 className="font-bold text-gray-700 text-2xl mb-5">Leads</h1>
-      <Table
-        columns={columns}
-        data={leads}
-        onCustomColumnAdded={onCustomColumnAdded}
-      />
-    </div>
+    <Table
+      columns={columns}
+      data={leads}
+      onCustomColumnAdded={onCustomColumnAdded}
+    />
   );
 }

@@ -52,7 +52,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                       width: header.getSize(),
                     }}
                     className={cn(
-                      " text-white font-semibold px-2 py-1",
+                      "text-white font-semibold px-2 py-1 border-b border-purple-300",
                       headerClassName
                     )}
                   >
@@ -105,7 +105,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="hover:bg-gray-100 transition-colors data-[state=selected]:bg-purple-50"
+                  className="hover:bg-gray-50 transition-colors data-[state=selected]:bg-purple-50"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
