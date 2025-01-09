@@ -51,7 +51,7 @@ class AccountsViewSet(TenantScopedViewSet):
         if response.status_code == status.HTTP_201_CREATED:
             account = self.get_queryset().get(id=response.data['id'])
             enrichment_response = self._trigger_enrichment(account)
-            response.data['enrichment_status'] = enrichment_response
+            response.data['enrichment_job_response'] = enrichment_response
 
         return response
 
