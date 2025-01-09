@@ -10,6 +10,7 @@ import { ColumnDef, flexRender } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Table as TanstackTable } from "@tanstack/react-table";
+import { cn } from "@/lib/utils";
 
 interface CommonTableProps<T> {
   table: TanstackTable<T>;
@@ -37,13 +38,24 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-md border w-fit border-gray-300 bg-white shadow-sm">
-        <Table style={{ width: `${totalColumnsWidth.toString()}px` }}>
+        <Table style={{ width: totalColumnsWidth }}>
           {/* Header */}
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className={headerClassName}>
+                  <TableHead
+                    key={header.id}
+                    style={{
+                      // When this is not working,
+                      // got to https://github.com/TanStack/table/issues/5115.
+                      width: header.getSize(),
+                    }}
+                    className={cn(
+                      " text-white font-semibold px-2 py-1",
+                      headerClassName
+                    )}
+                  >
                     <div className="flex justify-between items-center">
                       {header.isPlaceholder
                         ? null
@@ -53,7 +65,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                           )}
 
                       {/* Column resize button, CSS in index.css */}
-                      <div
+                      <button
                         {...{
                           onDoubleClick: () => header.column.resetSize(),
                           onMouseDown: header.getResizeHandler(),
@@ -99,7 +111,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                     <TableCell
                       key={cell.id}
                       style={{ width: cell.column.getSize() }}
-                      className="text-gray-700 px-4 py-2"
+                      className="text-gray-700 px-2 py-2"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,

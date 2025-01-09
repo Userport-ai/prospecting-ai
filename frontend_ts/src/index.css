@@ -8,7 +8,7 @@
 These CSS classes have been taken from https://tanstack.com/table/v8/docs/framework/react/examples/column-sizing */
 
 .resizer {
-  margin-left: 1rem;
+  margin-left: 2rem;
   height: 2.4rem;
   width: 5px;
   background: white;

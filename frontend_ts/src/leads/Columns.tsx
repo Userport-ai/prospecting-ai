@@ -11,6 +11,7 @@ import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   {
     id: "select",
+    maxSize: 50,
     header: ({ table }: { table: Table<LeadRow> }) => (
       <Checkbox
         className="bg-white data-[state=checked]:bg-purple-400"
@@ -30,7 +31,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
         aria-label="Select row"
       />
     ),
-    size: 50,
     enableSorting: false,
     enableHiding: false,
     meta: {
@@ -40,6 +40,7 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "name",
+    minSize: 200,
     accessorFn: (row) => `${row.first_name} ${row.last_name}`,
     header: ({ column }) => {
       return (
@@ -61,7 +62,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
         </div>
       );
     },
-    size: 100,
     meta: {
       displayName: "Name",
       visibleInitially: true,
@@ -69,9 +69,9 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "linkedin_url",
+    minSize: 200,
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
-    size: 100,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -97,7 +97,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
     id: "enrichment_status",
     accessorFn: (row) => row.enrichment_status,
     header: "Enrichment Status",
-    size: 100,
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
     filterFn: "arrIncludesSome",
     meta: {
@@ -107,9 +106,9 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "company_name",
+    minSize: 200,
     accessorFn: (row) => row.account_details.name,
     header: "Company Name",
-    size: 100,
     meta: {
       displayName: "Company Name",
       visibleInitially: true,
@@ -117,9 +116,9 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "role_title",
+    minSize: 200,
     accessorFn: (row) => row.role_tile,
     header: "Role Title",
-    size: 100,
     meta: {
       displayName: "Role Title",
       visibleInitially: true,
@@ -128,7 +127,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   {
     id: "duration_at_company",
     header: "Duration at Company",
-    size: 100,
     meta: {
       displayName: "Duration at Company",
       visibleInitially: true,
@@ -136,9 +134,9 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "email",
+    minSize: 200,
     accessorFn: (row) => row.email,
     header: "Email",
-    size: 100,
     meta: {
       displayName: "Email",
       visibleInitially: false,
@@ -148,7 +146,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
     id: "phone",
     accessorFn: (row) => row.phone,
     header: "Phone Number",
-    size: 100,
     meta: {
       displayName: "Phone Number",
       visibleInitially: false,
@@ -158,7 +155,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
     id: "created_at",
     accessorFn: (row) => formatDate(row.created_at),
     header: "Created On",
-    size: 100,
     meta: {
       displayName: "Created On",
       visibleInitially: false,
@@ -167,7 +163,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   {
     id: "linkedin_activity_status",
     header: "LinkedIn Activity Enrichment Status",
-    size: 100,
     meta: {
       displayName: "LinkedIn Activity Enrichment Status",
       visibleInitially: false,
@@ -203,7 +198,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         }
         return null;
       },
-      size: 100,
+      minSize: 200,
       filterFn: "arrIncludesSome",
       meta: {
         displayName: getCustomColumnDisplayName(columnKey),

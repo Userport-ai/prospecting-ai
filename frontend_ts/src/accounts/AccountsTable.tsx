@@ -180,7 +180,7 @@ const Table: React.FC<TableProps> = ({
         columns={columns}
         columnResizeMode={columnResizeMode}
         pagination={pagination}
-        headerClassName="bg-[rgb(122,103,171)] text-white font-semibold px-4 py-2"
+        headerClassName="bg-[rgb(122,103,171)]"
       />
     </div>
   );
@@ -243,7 +243,7 @@ export default function AccountsTable() {
   };
 
   return (
-    <div className="w-11/12 mx-auto">
+    <div>
       <PollPendingAccounts
         accounts={accounts}
         onPollingComplete={onPollingComplete}
