@@ -18,7 +18,10 @@ const VisibleColumns: React.FC<{ table: Table<any> }> = ({ table }) => {
           <Eye size={18} />
           <span>Visible Columns</span>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-fit p-4">
+        <PopoverContent
+          align="start"
+          className="w-fit p-4 max-h-[30rem] overflow-y-scroll"
+        >
           {table
             .getAllColumns()
             .filter((column) => column.getCanHide())

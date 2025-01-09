@@ -108,7 +108,7 @@ export const Table: React.FC<TableProps> = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-4">
+      <div className="flex gap-6">
         {/* Filter Controls */}
         <div className="flex gap-4">
           <TextFilter
@@ -127,10 +127,6 @@ export const Table: React.FC<TableProps> = ({
 
         {/* View visible Columns. */}
         <VisibleColumns table={table} />
-      </div>
-
-      <div className="flex mt-2 gap-6">
-        {/* TODO: Add Leads to the table. */}
 
         {/* Add custom column */}
         <AddCustomColumn onAdded={handleCustomColumnAdd} />
@@ -142,6 +138,7 @@ export const Table: React.FC<TableProps> = ({
         columns={columns}
         columnResizeMode={columnResizeMode}
         pagination={pagination}
+        headerClassName="bg-[rgb(133,152,84)] text-white font-semibold px-4 py-2"
       />
     </div>
   );

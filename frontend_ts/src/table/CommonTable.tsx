@@ -16,6 +16,7 @@ interface CommonTableProps<T> {
   columns: ColumnDef<T>[];
   columnResizeMode: string;
   pagination: { pageIndex: number };
+  headerClassName?: string;
 }
 
 // Common Table component that renders a common table used by Accounts and Leads.
@@ -25,6 +26,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   columns,
   columnResizeMode,
   pagination,
+  headerClassName,
 }) => {
   // We use total column width (in pixel values) to set the Table Width in CSS.
   // We cannot set className as 'w-[total width]px` since TailwindCSS does not
@@ -41,10 +43,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    className="bg-[rgb(122,103,171)] text-white font-semibold px-4 py-2"
-                  >
+                  <TableHead key={header.id} className={headerClassName}>
                     <div className="flex justify-between items-center">
                       {header.isPlaceholder
                         ? null
