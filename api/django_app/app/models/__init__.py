@@ -1,4 +1,5 @@
 from .accounts import Account
+from .account_enrichment import AccountEnrichmentStatus, EnrichmentType, EnrichmentStatus
 from .app_settings import Settings
 from .config import ConfigScope, Config
 from .leads import Lead
@@ -13,6 +14,7 @@ __all__ = [
     'UserStatus',
     'Product',
     'Account',
+    'AccountEnrichmentStatus',
     'Lead',
     'Config',
     'Settings',

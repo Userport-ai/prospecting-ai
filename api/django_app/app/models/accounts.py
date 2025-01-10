@@ -35,11 +35,6 @@ class Account(BaseMixin):
 
     technologies = JSONField(null=True, blank=True)
     funding_details = JSONField(null=True, blank=True)
-    enrichment_status = models.CharField(
-        max_length=50,
-        choices=EnrichmentStatus.choices,
-        default=EnrichmentStatus.PENDING
-    )
     enrichment_sources = JSONField(null=True, blank=True)
     last_enriched_at = models.DateTimeField(null=True, blank=True)
     custom_fields = JSONField(null=True, blank=True)
@@ -51,6 +46,40 @@ class Account(BaseMixin):
         null=True,
         related_name='created_accounts'
     )
+
+    def get_enrichment_summary(self):
+        """Get overall enrichment status summary from prefetched data"""
+        statuses = list(self.enrichment_statuses.all())
+        if not statuses:
+            return {
+                'total_enrichments': 0,
+                'completed': 0,
+                'failed': 0,
+                'in_progress': 0,
+                'pending': 0,
+                'last_update': None,
+                'quality_score': None
+            }
+
+        completed = sum(1 for s in statuses if s.status == EnrichmentStatus.COMPLETED)
+        failed = sum(1 for s in statuses if s.status == EnrichmentStatus.FAILED)
+        in_progress = sum(1 for s in statuses if s.status == EnrichmentStatus.IN_PROGRESS)
+        pending = sum(1 for s in statuses if s.status == EnrichmentStatus.PENDING)
+
+        last_update = max((s.last_attempted_run for s in statuses if s.last_attempted_run), default=None)
+
+        quality_scores = [s.data_quality_score for s in statuses if s.data_quality_score is not None]
+        avg_score = sum(quality_scores) / len(quality_scores) if quality_scores else None
+
+        return {
+            'total_enrichments': len(statuses),
+            'completed': completed,
+            'failed': failed,
+            'in_progress': in_progress,
+            'pending': pending,
+            'last_update': last_update,
+            'quality_score': avg_score
+        }
 
     class Meta:
         db_table = 'accounts'

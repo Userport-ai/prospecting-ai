@@ -6,10 +6,12 @@ from rest_framework import status
 from django.db import transaction
 from app.apis.common.base import TenantScopedViewSet
 from app.models import UserRole, Account
+from app.models.accounts import EnrichmentStatus
 from app.models.serializers.account_serializers import (
     AccountDetailsSerializer,
     AccountBulkCreateSerializer
 )
+from django.db.models import Count, Max, Avg, Q
 from app.permissions import HasRole
 from app.services.worker_service import WorkerService
 
@@ -18,10 +20,16 @@ class AccountsViewSet(TenantScopedViewSet):
     serializer_class = AccountDetailsSerializer
     queryset = Account.objects.all()
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields =['id', 'website', 'linkedin_url', 'created_by']
+    filterset_fields = ['id', 'website', 'linkedin_url', 'created_by']
     ordering_fields = ['name', 'created_at', 'updated_at']
-    ordering = ['-created_at']  # Default sorting
+    ordering = ['-created_at']
 
+    def get_queryset(self):
+        base_queryset = super().get_queryset()
+        return base_queryset.select_related(
+            'product',
+            'created_by'
+        ).prefetch_related('enrichment_statuses')
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,

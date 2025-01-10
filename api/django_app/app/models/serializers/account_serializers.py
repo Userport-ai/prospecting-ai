@@ -2,7 +2,18 @@ from rest_framework import serializers
 from app.models import Account
 
 
+class EnrichmentStatusSerializer(serializers.Serializer):
+    total_enrichments = serializers.IntegerField()
+    completed = serializers.IntegerField()
+    failed = serializers.IntegerField()
+    in_progress = serializers.IntegerField()
+    pending = serializers.IntegerField()
+    last_update = serializers.DateTimeField(allow_null=True)
+    quality_score = serializers.FloatField(allow_null=True)
+
 class AccountDetailsSerializer(serializers.ModelSerializer):
+    enrichment_status = EnrichmentStatusSerializer(source='get_enrichment_summary', read_only=True)
+
     class Meta:
         model = Account
         fields = [
@@ -30,7 +41,6 @@ class AccountDetailsSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id',
-            'enrichment_status',
             'enrichment_sources',
             'last_enriched_at',
             'created_at',
