@@ -76,6 +76,7 @@ class CallbackService:
             job_id: str,
             account_id: str,
             status: str,
+            enrichment_type: str = 'company_info',
             raw_data: Optional[Dict[str, Any]] = None,
             processed_data: Optional[Dict[str, Any]] = None,
             error_details: Optional[Dict[str, Any]] = None,
@@ -99,6 +100,7 @@ class CallbackService:
                 "job_id": job_id,
                 "account_id": account_id,
                 "status": status,
+                "enrichment_type": enrichment_type,  # Add this field
                 "source": source,
                 "is_partial": is_partial,
                 "completion_percentage": completion_percentage

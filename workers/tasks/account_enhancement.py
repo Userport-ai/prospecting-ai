@@ -11,6 +11,7 @@ import google.generativeai as genai
 from services.django_callback_service import CallbackService
 from .base import BaseTask
 from services.bigquery_service import BigQueryService
+from .enrichment_task import AccountEnrichmentTask
 
 logger = logging.getLogger(__name__)
 
@@ -226,8 +227,9 @@ Company Profile for analysis:
 Important: Start directly with the company name header. Do not include any introductory phrases like "Here's a summary" or "Let me provide".
 """
 
-class AccountEnhancementTask(BaseTask):
+class AccountEnhancementTask(AccountEnrichmentTask):
     """Task for enhancing account data with AI-powered company information."""
+    ENRICHMENT_TYPE = 'company_info'
 
     def __init__(self):
         """Initialize the task with required services and configurations."""
@@ -250,6 +252,10 @@ class AccountEnhancementTask(BaseTask):
         """Configure the Gemini AI service."""
         genai.configure(api_key=self.google_api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+
+    @property
+    def enrichment_type(self) -> str:
+        return self.ENRICHMENT_TYPE
 
     @property
     def task_name(self) -> str:
@@ -332,6 +338,7 @@ class AccountEnhancementTask(BaseTask):
                         job_id=job_id,
                         account_id=account_id,
                         status='failed',
+                        enrichment_type='company_info',
                         error_details=error_details,
                         completion_percentage=int((processed_count / total_accounts) * 100)
                     )
@@ -350,6 +357,7 @@ class AccountEnhancementTask(BaseTask):
                     job_id=job_id,
                     account_id=account_id,
                     status='processing',
+                    enrichment_type='company_info',
                     completion_percentage=int((processed_count - 0.5) / total_accounts * 100)
                 )
 
@@ -362,6 +370,7 @@ class AccountEnhancementTask(BaseTask):
                     job_id=job_id,
                     account_id=account_id,
                     status='processing',
+                    enrichment_type='company_info',
                     is_partial=True,
                     completion_percentage=int((processed_count - 0.75) / total_accounts * 100),
                     processed_data={'linkedin_url': linkedin_url} if linkedin_url else {}
@@ -376,6 +385,7 @@ class AccountEnhancementTask(BaseTask):
                     job_id=job_id,
                     account_id=account_id,
                     status='processing',
+                    enrichment_type='company_info',
                     completion_percentage=int((processed_count - 0.25) / total_accounts * 100)
                 )
 
@@ -445,6 +455,7 @@ class AccountEnhancementTask(BaseTask):
                     job_id=job_id,
                     account_id=account_id,
                     status='completed',
+                    enrichment_type='company_info',
                     raw_data=structured_data,
                     processed_data=processed_data,
                     completion_percentage=int((processed_count / total_accounts) * 100)
@@ -476,6 +487,7 @@ class AccountEnhancementTask(BaseTask):
                         job_id=job_id,
                         account_id=account_id,
                         status='failed',
+                        enrichment_type='company_info',
                         error_details=error_details,
                         completion_percentage=int((processed_count / total_accounts) * 100)
                     )

@@ -9,12 +9,14 @@ from services.mocks.mock_task_manager import MockTaskManager
 from services.task_manager import TaskManager
 from services.task_registry import TaskRegistry
 from tasks.account_enhancement import AccountEnhancementTask
+from tasks.generate_leads_task import LeadIdentificationTask
 
 router = APIRouter()
 
 # Initialize task registry and register tasks
 task_registry = TaskRegistry()
 task_registry.register(AccountEnhancementTask)
+task_registry.register(LeadIdentificationTask)
 
 def get_task_manager() -> TaskManager:
     """Dependency injection for task manager."""
