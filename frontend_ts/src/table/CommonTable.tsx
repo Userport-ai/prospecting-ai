@@ -38,101 +38,105 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-md border w-fit border-gray-300 bg-white shadow-sm">
-        <Table style={{ width: totalColumnsWidth }}>
-          {/* Header */}
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    style={{
-                      // When this is not working,
-                      // got to https://github.com/TanStack/table/issues/5115.
-                      width: header.getSize(),
-                    }}
-                    className={cn(
-                      "text-white font-semibold px-2 py-1 border-b border-purple-300",
-                      headerClassName
-                    )}
-                  >
-                    <div className="flex justify-between items-center">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-
-                      {/* Column resize button, CSS in index.css */}
-                      <button
-                        {...{
-                          onDoubleClick: () => header.column.resetSize(),
-                          onMouseDown: header.getResizeHandler(),
-                          onTouchStart: header.getResizeHandler(),
-                          className: `resizer ${
-                            table.options.columnResizeDirection
-                          } ${
-                            header.column.getIsResizing() ? "isResizing" : ""
-                          }`,
-                          style: {
-                            transform:
-                              columnResizeMode === "onEnd" &&
-                              header.column.getIsResizing()
-                                ? `translateX(${
-                                    (table.options.columnResizeDirection ===
-                                    "rtl"
-                                      ? -1
-                                      : 1) *
-                                    (table.getState().columnSizingInfo
-                                      .deltaOffset ?? 0)
-                                  }px)`
-                                : "",
-                          },
-                        }}
-                      />
-                    </div>
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-
-          {/* Rows */}
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className="hover:bg-gray-50 transition-colors data-[state=selected]:bg-purple-50"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      style={{ width: cell.column.getSize() }}
-                      className="text-gray-700 px-2 py-2"
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
+        <div
+          className="max-w-[80rem] min-w-full overflow-x-auto" // Ensures content width adapts dynamically
+        >
+          <Table style={{ width: totalColumnsWidth }}>
+            {/* Header */}
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      style={{
+                        // When this is not working,
+                        // got to https://github.com/TanStack/table/issues/5115.
+                        width: header.getSize(),
+                      }}
+                      className={cn(
+                        "text-white font-semibold px-2 py-1 border-b border-purple-300",
+                        headerClassName
                       )}
-                    </TableCell>
+                    >
+                      <div className="flex justify-between items-center">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+
+                        {/* Column resize button, CSS in index.css */}
+                        <button
+                          {...{
+                            onDoubleClick: () => header.column.resetSize(),
+                            onMouseDown: header.getResizeHandler(),
+                            onTouchStart: header.getResizeHandler(),
+                            className: `resizer ${
+                              table.options.columnResizeDirection
+                            } ${
+                              header.column.getIsResizing() ? "isResizing" : ""
+                            }`,
+                            style: {
+                              transform:
+                                columnResizeMode === "onEnd" &&
+                                header.column.getIsResizing()
+                                  ? `translateX(${
+                                      (table.options.columnResizeDirection ===
+                                      "rtl"
+                                        ? -1
+                                        : 1) *
+                                      (table.getState().columnSizingInfo
+                                        .deltaOffset ?? 0)
+                                    }px)`
+                                  : "",
+                            },
+                          }}
+                        />
+                      </div>
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center text-gray-500"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+
+            {/* Rows */}
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    className="hover:bg-gray-50 transition-colors data-[state=selected]:bg-purple-50"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        style={{ width: cell.column.getSize() }}
+                        className="text-gray-700 px-2 py-2"
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-gray-500"
+                  >
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Selected Rows Information */}
