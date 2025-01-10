@@ -11,8 +11,40 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Lead } from "@/services/Leads";
 
+// TODO: Move this to services/ once available via API.
+interface SuggestedLead {
+  id: string;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  title: string;
+  linkedin_url: string;
+  email: string | null;
+  about_description: string | null;
+  current_role: {
+    title: string;
+    department: string;
+    seniority: string;
+    years_in_role: number | null;
+    description: string | null;
+  };
+  location: string | null;
+  skills: string[];
+  education: {
+    degree: string;
+    institution: string;
+    year: number | null;
+  }[];
+  // AI populated fields.
+  fit_score: number;
+  rationale: string;
+  matching_criteria: string[];
+  persona_match: string | null;
+  recommended_approach: string;
+}
+
 interface RecommendationsViewProps {
-  suggestedLeads: Lead[];
+  suggestedLeads: SuggestedLead[];
   selectedLeads: Set<string>;
   handleSelectLead: (lead: string) => void;
 }
@@ -23,20 +55,25 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
   handleSelectLead,
 }) => {
   return (
-    <div className="min-w-fit rounded-2xl border border-purple-300 p-2 shadow-lg">
+    <div className="rounded-2xl border border-purple-300 p-2 shadow-lg">
       <Table>
-        {/* Table Header */}
         <TableHeader>
           <TableRow>
             <TableHead className="w-12"></TableHead>
-            <TableHead className="text-purple-800">Name</TableHead>
-            <TableHead className="text-purple-800">LinkedIn</TableHead>
-            <TableHead className="text-purple-800">Role</TableHead>
             <TableHead className="text-purple-800">Score</TableHead>
+            <TableHead className="text-purple-800">Name</TableHead>
+            <TableHead className="text-purple-800">Title</TableHead>
+            <TableHead className="text-purple-800">Persona</TableHead>
+            <TableHead className="text-purple-800">LinkedIn</TableHead>
+            <TableHead className="text-purple-800">About</TableHead>
+            <TableHead className="text-purple-800">Years in Role</TableHead>
             <TableHead className="text-purple-800">Rationale</TableHead>
+            <TableHead className="text-purple-800">Matching Criteria</TableHead>
+            <TableHead className="text-purple-800">
+              Recommended Approach
+            </TableHead>
           </TableRow>
         </TableHeader>
-
         {/* Table Body */}
         <TableBody>
           {suggestedLeads.length > 0 ? (
@@ -51,26 +88,27 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                     onCheckedChange={() => handleSelectLead(lead.id)}
                   />
                 </TableCell>
+                <TableCell>{lead.fit_score}</TableCell>
                 <TableCell>
                   {lead.first_name} {lead.last_name}
                 </TableCell>
+                <TableCell>{lead.title}</TableCell>
+                <TableCell>{lead.persona_match}</TableCell>
                 <TableCell>
-                  {lead.linkedin_url ? (
-                    <a
-                      href={lead.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      View Profile
-                    </a>
-                  ) : (
-                    "N/A"
-                  )}
+                  <a
+                    href={lead.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    View Profile
+                  </a>
                 </TableCell>
-                <TableCell>{lead.role_title || "N/A"}</TableCell>
-                <TableCell>{lead.score || "N/A"}</TableCell>
-                <TableCell>They fit the ICP well</TableCell>
+                <TableCell>{lead.about_description}</TableCell>
+                <TableCell>{lead.current_role.years_in_role}</TableCell>
+                <TableCell>{lead.rationale}</TableCell>
+                <TableCell>{lead.matching_criteria}</TableCell>
+                <TableCell>{lead.recommended_approach}</TableCell>
               </TableRow>
             ))
           ) : (
@@ -90,8 +128,8 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
 };
 
 interface SuggestedLeadsProps {
-  suggestedLeads: Lead[];
-  onAddLeads: (leads: Lead[]) => void;
+  suggestedLeads: SuggestedLead[];
+  onAddLeads: () => void;
 }
 
 const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
@@ -100,6 +138,7 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
 }) => {
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
 
+  // Handle if lead is selected or unselected.
   const handleSelectLead = (leadId: string) => {
     setSelectedLeads((prev) => {
       const newSet = new Set(prev);
@@ -112,12 +151,14 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
     });
   };
 
+  // Add selected leads to the main list.
   const handleAddLeads = () => {
-    const leadsToAdd = suggestedLeads.filter((lead) =>
-      selectedLeads.has(lead.id)
-    );
-    onAddLeads(leadsToAdd);
-    setSelectedLeads(new Set());
+    // TODO: call backend.
+
+    // Remove selected leads from the local list after successful call to the backend.
+
+    // Call parent compoennt.
+    onAddLeads();
   };
 
   return (
