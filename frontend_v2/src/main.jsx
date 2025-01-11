@@ -10,6 +10,7 @@ import Accounts from "./accounts/Accounts";
 import { Login } from "./auth/Login";
 import { SignUp } from "./auth/SignUp";
 import AuthProvider from "./auth/AuthProvider";
+import Leads from "./leads/Leads";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -24,6 +25,7 @@ createRoot(document.getElementById("root")).render(
               <Route path="add-product" element={<AddProduct />} />
             </Route>
             <Route path="accounts" element={<Accounts />}></Route>
+            <Route path="leads" element={<Leads />}></Route>
           </Route>
         </Routes>
       </BrowserRouter>

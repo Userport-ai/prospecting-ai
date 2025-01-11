@@ -18,17 +18,22 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { handleGoogleSignIn } from "./GoogleAuth";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  AuthError,
+  AuthErrorCodes,
+} from "firebase/auth";
 import { auth } from "./BaseAuth";
 import { useState } from "react";
 
 export function SignUp() {
-  const user = useAuthContext();
-  if (user) {
+  const { firebaseUser } = useAuthContext();
+  if (firebaseUser) {
     // User is logged in already, redirect to app.
     return <Navigate to="/accounts" />;
   }
-  const [errorMessage, setErrorMessage] = useState(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const formSchema = z.object({
     firstName: z.string().min(1),
@@ -46,7 +51,7 @@ export function SignUp() {
     },
   });
 
-  const handleSignUp = async (inputDetails) => {
+  const handleSignUp = async (inputDetails: z.infer<typeof formSchema>) => {
     const firstName = inputDetails.firstName;
     const lastName = inputDetails.lastName;
     const email = inputDetails.email;
@@ -65,16 +70,18 @@ export function SignUp() {
 
       setErrorMessage(null);
     } catch (error) {
-      const errorCode = error.code;
-      const errorMessage = error.message;
-      if (errorCode === "auth/email-already-in-use") {
+      // Ensure the error is properly typed as Firebase's AuthError
+      const firebaseError = error as AuthError;
+      const errorCode = firebaseError.code;
+      const errorMessage = firebaseError.message;
+      if (errorCode === AuthErrorCodes.EMAIL_EXISTS) {
         setErrorMessage("Email already in use with existing account");
-      } else if (errorCode === "auth/network-request-failed") {
+      } else if (errorCode === AuthErrorCodes.NETWORK_REQUEST_FAILED) {
         setErrorMessage(
           "You are offline right now, please try again after you are online."
         );
-      } else if (errorCode === "auth/invalid-display-name") {
-        setErrorMessage("First or Last Name is invalid.");
+      } else if (errorCode === AuthErrorCodes.TOO_MANY_ATTEMPTS_TRY_LATER) {
+        setErrorMessage("Too many requests, try again in a bit.");
       }
       console.error("Sign Up Error Code:", errorCode);
       console.error("Sign Up Error Message: ", errorMessage);

@@ -1,6 +1,6 @@
 # Workers
 
-Background job workers using Cloud Tasks and Cloud Run.
+Background job workers using Cloud Tasks and Cloud Run
 
 ## Structure
 ```
