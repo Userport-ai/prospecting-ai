@@ -9,8 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Lead } from "@/services/Leads";
-import { startLinkedInActivityParsing } from "@/services/Extension";
+import LeadActivityParser from "./LeadActivityParser";
 
 // TODO: Move this to services/ once available via API.
 interface SuggestedLead {
@@ -162,15 +161,6 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
     onAddLeads();
   };
 
-  const handleLinkedInActivityScrape = async () => {
-    const linkedin_url = "https://www.linkedin.com/in/michaelbrown/";
-    try {
-      startLinkedInActivityParsing(linkedin_url);
-    } catch (error) {
-      // TODO: Display error message to user.
-    }
-  };
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
@@ -193,9 +183,7 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
       />
 
       {/* Testing LinkedIn activity scraper flow, remove after done */}
-      <Button className="w-fit" onClick={handleLinkedInActivityScrape}>
-        Scrape LinkedIn Activity
-      </Button>
+      <LeadActivityParser leadLinkedInUrl="https://www.linkedin.com/in/michaelbrown/" />
     </div>
   );
 };
