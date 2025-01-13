@@ -244,7 +244,8 @@ async def cached_request(
                     "url": url,
                     "method": method,
                     "tenant_id": tenant_id,
-                    "status_code": cached["status_code"]
+                    "status_code": cached["status_code"],
+                    "data": cached["data"]
                 }
             )
             return cached["data"], cached["status_code"]
