@@ -350,7 +350,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
         role_pattern = self.generate_role_search_pattern(product_data.get('persona_role_titles', {}))
 
         search_params = {
-            'company_url': linkedin_url,
+            'url': linkedin_url,
             'page_size': self.PAGE_SIZE,  # Reduced page size for cost optimization
             'role_search': role_pattern,  # Regex pattern based on product personas
         }
