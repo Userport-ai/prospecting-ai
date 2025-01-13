@@ -1,48 +1,75 @@
 import { Button } from "@/components/ui/button";
 import {
-  LinkedInActivityParsingStatus,
+  getLinkedInActivityParsingResult,
+  LinkedInActivityParsingResult,
   startLinkedInActivityParsing,
 } from "@/services/Extension";
 import { useEffect, useState } from "react";
 
 // Parses LinkedIn Activity for given Lead's LinkedIn URL.
-const LeadActivityParser: React.FC<{ leadLinkedInUrl: string }> = ({
-  leadLinkedInUrl,
+const LeadActivityParser: React.FC<{ linkedInUrl: string }> = ({
+  linkedInUrl,
 }) => {
-  const [linkedInUrl, setLinkedInUrl] = useState<string>(leadLinkedInUrl);
-  const [status, setStatus] = useState<LinkedInActivityParsingStatus | null>(
+  const [status, setStatus] = useState<LinkedInActivityParsingResult | null>(
     null
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [tabId, setTabId] = useState<number | null>(null); // LinkedIn Activity Tab Id.
+  const [parsedHTML, setParsedHTML] = useState<{
+    posts_html?: string | null;
+    comments_html?: string | null;
+    reactions_html?: string | null;
+  } | null>(null);
   const POLLING_INTERVAL = 30 * 1000; // Poll every 30s.
 
   const handleClick = () => {
     if (status === null) {
       // Start activity research.
-      setStatus(LinkedInActivityParsingStatus.SCHEDULED);
+      setStatus(LinkedInActivityParsingResult.SCHEDULED);
     }
   };
 
-  console.log("activity status: ", status);
+  if (parsedHTML) {
+    console.log("parsed HTML: ", parsedHTML);
+  }
 
   useEffect(() => {
     switch (status) {
-      case LinkedInActivityParsingStatus.SCHEDULED:
+      case LinkedInActivityParsingResult.SCHEDULED:
         startLinkedInActivityParsing(linkedInUrl)
-          .then((response) => setStatus(response.status))
+          .then((response) => {
+            setStatus(response.status);
+            setTabId(response.tab_id);
+          })
           .catch((error) => {
             setErrorMessage(error);
-            // Reset parsing status.
             setStatus(null);
           });
         break;
-      case LinkedInActivityParsingStatus.IN_PROGRESS:
+      case LinkedInActivityParsingResult.IN_PROGRESS:
+        if (!tabId) {
+          setErrorMessage(
+            `Tab Id missing for URL: ${linkedInUrl}, cannot check parsing status`
+          );
+          return;
+        }
         const intervalId = setTimeout(async () => {
-          //   const newPolledAccounts = await listAccounts(authContext, pollAccountIds);
-          //   onPollingComplete(newPolledAccounts);
+          getLinkedInActivityParsingResult(tabId, linkedInUrl)
+            .then((response) => {
+              if (response.status === LinkedInActivityParsingResult.COMPLETE) {
+                // Parsing is complete.
+                setParsedHTML(response.parsed_data);
+                setStatus(null);
+                setTabId(null);
+                setErrorMessage(null);
+              }
+            })
+            .catch((error) => {
+              setErrorMessage(error);
+              setStatus(null);
+            });
         }, POLLING_INTERVAL);
         return () => clearTimeout(intervalId);
-        break;
       default:
       // Do nothing.
     }

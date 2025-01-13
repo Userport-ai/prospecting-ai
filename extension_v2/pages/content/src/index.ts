@@ -1,5 +1,6 @@
 // Request from Service worker.
 enum RequestType {
+  CLICK_ACTIVITY_BUTTON = 'click_activity_button',
   FETCH_ACTIVITY = 'fetch_activity',
 }
 
@@ -12,16 +13,11 @@ enum ActivityButton {
 
 interface BaseActivityRequest {
   type: RequestType;
-}
-
-// Fetch Activity for given button.
-interface FetchActivityRequest extends BaseActivityRequest {
   name: ActivityButton;
 }
 
 // Fetch Activity Response provides the parsed HTML for given Activity.
-interface FetchActivityResponse {
-  name: ActivityButton;
+interface FetchActivityResponse extends BaseActivityRequest {
   html: string | null;
 }
 
@@ -53,21 +49,6 @@ const getPageActivityElem = (): Element | null => {
   return document.querySelector('div.pv-recent-activity-detail__core-rail div.pv0 ul');
 };
 
-// Helper that returns a promise that resolves after given number of milliseconds to simulate delay.
-// Use to retry DOM fetches that take some time to load.
-// Reference: https://stackoverflow.com/questions/70401067/how-do-you-call-a-function-every-second-in-a-chrome-extension-manifest-v3-backgr.
-async function delay(msToDelay: number) {
-  return new Promise<void>((success, failure) => {
-    const completionTime = new Date().getTime() + msToDelay;
-    while (true) {
-      if (new Date().getTime() >= completionTime) {
-        success();
-        break;
-      }
-    }
-  });
-}
-
 // Main method to listen to messages from Service Worker.
 
 // Reference: https://developer.chrome.com/docs/extensions/develop/concepts/messaging#connect.
@@ -80,27 +61,30 @@ chrome.runtime.onConnect.addListener(port => {
 
   // Handler for listening to messages.
   port.onMessage.addListener((msg: BaseActivityRequest) => {
+    const btnName = msg.name;
     switch (msg.type) {
-      case RequestType.FETCH_ACTIVITY:
-        const btnName = (msg as FetchActivityRequest).name;
+      case RequestType.CLICK_ACTIVITY_BUTTON:
+        // Click activity button to load activity content.
         const btnElem = getButtonElem(btnName);
         if (btnElem === null) {
           // If Button doesn't exist, then return null HTML.
           // Either lead does not have this activity or made it
           // is like "Reactions" which can be hidden under a dropdown.
-          port.postMessage({ name: btnName, html: null } as FetchActivityResponse);
+          port.postMessage({ type: msg.type, name: btnName });
           return;
         }
 
-        // Click on the button and wait for activity to reload with new data.
+        // Click on the button.
         btnElem.click();
-        delay(6000).then(() => {
-          // Fetch activity HTML.
-          const activityElem = getPageActivityElem();
-          const html = activityElem ? activityElem.outerHTML : null;
-          port.postMessage({ name: btnName, html: html });
-        });
-
+        port.postMessage({ type: RequestType.CLICK_ACTIVITY_BUTTON, name: btnName });
+        break;
+      case RequestType.FETCH_ACTIVITY:
+        // Fetch activity HTML now that button has been clicked.
+        // We also assume that the service worker has waited enough
+        // for the activity page to have been loaded.
+        const activityElem = getPageActivityElem();
+        const html = activityElem ? activityElem.outerHTML : null;
+        port.postMessage({ type: msg.type, name: btnName, html: html } as FetchActivityResponse);
         break;
       default:
         // Do nothing.

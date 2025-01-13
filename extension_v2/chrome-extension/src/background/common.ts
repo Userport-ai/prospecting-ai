@@ -1,14 +1,18 @@
-export enum ParsingStatus {
-  NOT_STARTED = 'not_started',
-  FETCHED_ACTIVITY_BUTTONS = 'fetched_activity_buttons',
+export enum ActivityParsingStatus {
+  IN_PROGRESS = 'in_progress',
   COMPLETE = 'complete',
   FAILED = 'failed',
 }
 
 // State we are storing per Tab during activity parsing.
 export interface ActivityData {
-  status: ParsingStatus;
+  status: ActivityParsingStatus;
   url: string;
-  last_status: ParsingStatus | null;
+  last_status: ActivityParsingStatus | null;
   error?: string;
+  parsed_data?: {
+    posts_html?: string | null;
+    comments_html?: string | null;
+    reactions_html?: string | null;
+  };
 }

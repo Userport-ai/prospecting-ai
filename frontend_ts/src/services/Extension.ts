@@ -1,6 +1,6 @@
 // Common interfaces.
 
-export enum LinkedInActivityParsingStatus {
+export enum LinkedInActivityParsingResult {
   SCHEDULED = "scheduled", // Scheduled status only exists on web app (per design).
   IN_PROGRESS = "in_progress",
   COMPLETE = "complete",
@@ -9,6 +9,7 @@ export enum LinkedInActivityParsingStatus {
 
 enum RequestType {
   START_ACTIVITY_PARSING = "start_activity_parsing",
+  GET_ACTIVITY_PARSING_RESULT = "get_activity_parsing_result",
 }
 
 interface BaseRequest {
@@ -35,12 +36,28 @@ interface StartActivityParsingRequst extends BaseRequest {
 }
 
 interface StartActivityParsingResponse extends BaseResponse {
-  status: LinkedInActivityParsingStatus;
+  tab_id: number; // ID of the tab where activity parsing is taking place.
+  status: LinkedInActivityParsingResult;
+}
+
+interface GetActivityParsingResultRequest extends BaseRequest {
+  tab_id: number;
+  linkedin_url: string;
+}
+
+interface GetActivityParsingResultResponse extends BaseResponse {
+  status: LinkedInActivityParsingResult;
+  parsed_data: {
+    posts_html?: string | null;
+    comments_html?: string | null;
+    reactions_html?: string | null;
+  };
 }
 
 const activityParserExtensionId = import.meta.env
   .VITE_ACTIVITY_PARSER_EXTENSION_ID;
 
+// Start LinkedIn Activity Parsing for given URL.
 // Reference: https://developer.chrome.com/docs/extensions/develop/concepts/messaging#external.
 export const startLinkedInActivityParsing = async (
   linkedInUrl: string
@@ -64,13 +81,31 @@ export const startLinkedInActivityParsing = async (
   return response as StartActivityParsingResponse;
 };
 
-// Returns current linkedin activity parsing status.
-export const getLinkedInActivityParsingStatus =
-  (): LinkedInActivityParsingStatus => {
-    validateExtensionExists();
-    // TODO: Fetch status from extension.
-    return LinkedInActivityParsingStatus.IN_PROGRESS;
+// Returns current linkedin activity parsing status and result.
+// If the parsing is still in progress, result with be empty.
+export const getLinkedInActivityParsingResult = async (
+  tabId: number,
+  linkedinUrl: string
+): Promise<GetActivityParsingResultResponse> => {
+  validateExtensionExists();
+
+  const request: GetActivityParsingResultRequest = {
+    request_type: RequestType.GET_ACTIVITY_PARSING_RESULT,
+    tab_id: tabId,
+    linkedin_url: linkedinUrl,
   };
+
+  const response: BaseResponse = await chrome.runtime.sendMessage(
+    activityParserExtensionId,
+    request
+  );
+
+  if (response.type === ResponseType.ERROR) {
+    throw new Error((response as ErrorResponse).message);
+  }
+
+  return response as GetActivityParsingResultResponse;
+};
 
 const validateExtensionExists = () => {
   if (!chrome || !chrome.runtime) {

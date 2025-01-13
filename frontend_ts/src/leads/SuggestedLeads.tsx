@@ -183,7 +183,7 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
       />
 
       {/* Testing LinkedIn activity scraper flow, remove after done */}
-      <LeadActivityParser leadLinkedInUrl="https://www.linkedin.com/in/michaelbrown/" />
+      <LeadActivityParser linkedInUrl="https://www.linkedin.com/in/michaelbrown/" />
     </div>
   );
 };
