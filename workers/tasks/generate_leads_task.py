@@ -353,6 +353,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
             'url': linkedin_url,
             'page_size': self.PAGE_SIZE,  # Reduced page size for cost optimization
             'role_search': role_pattern,  # Regex pattern based on product personas
+            'enrich_profiles': 'enrich',
         }
 
         for attempt in range(max_retries):
