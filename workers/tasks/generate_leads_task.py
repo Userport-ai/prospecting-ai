@@ -359,7 +359,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
             try:
                 employees_data, status_code = await cached_request(
                     cache_service=self.cache_service,
-                    url="https://nubela.co/proxycurl/api/search/people",
+                    url="https://nubela.co/proxycurl/api/linkedin/company/employees",
                     params=search_params,
                     headers={'Authorization': f'Bearer {self.proxycurl_api_key}'},
                     ttl_hours=24
