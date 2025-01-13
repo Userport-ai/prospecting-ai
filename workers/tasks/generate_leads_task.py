@@ -341,24 +341,50 @@ class LeadIdentificationTask(AccountEnrichmentTask):
         # Join all patterns with OR operator
         return f"({'|'.join(regex_patterns)})"
 
-    async def _fetch_employees_with_retry(self, linkedin_url: str, product_data, max_retries: int = 3) -> Tuple[List[Dict[str, Any]], int]:
+    async def _fetch_employees_with_retry(
+            self,
+            linkedin_url: str,
+            product_data: Dict[str, Any],
+            max_retries: int = 3
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Fetch employees using ProxyCurl's Employee Search endpoint with retry mechanism.
-        This endpoint is more cost-effective than the full employee search.
-        """
-        # Generate role search pattern from product data
-        role_pattern = self.generate_role_search_pattern(product_data.get('persona_role_titles', {}))
 
+        Args:
+            linkedin_url: Company's LinkedIn URL
+            product_data: Dictionary containing product and persona information
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            Tuple containing list of transformed employee data and status code
+
+        Raises:
+            ValueError: If LinkedIn URL is missing or invalid
+            Exception: If fetching fails after all retries
+        """
+        if not linkedin_url:
+            raise ValueError("LinkedIn URL is required")
+
+        # Set up search parameters
         search_params = {
             'url': linkedin_url,
-            'page_size': self.PAGE_SIZE,  # Reduced page size for cost optimization
-            'role_search': role_pattern,  # Regex pattern based on product personas
-            'enrich_profiles': 'enrich',
+            'page_size': self.PAGE_SIZE,
+            'role_search': self.generate_role_search_pattern(
+                product_data.get('persona_role_titles', {})
+            ),
+            'enrich_profiles': 'enrich'
         }
 
+        # Attempt to fetch with retries
         for attempt in range(max_retries):
             try:
-                employees_data, status_code = await cached_request(
+                logger.info(
+                    f"Fetching employees attempt {attempt + 1}/{max_retries} "
+                    f"for company: {linkedin_url}"
+                )
+
+                # Make API request
+                response, status_code = await cached_request(
                     cache_service=self.cache_service,
                     url="https://nubela.co/proxycurl/api/linkedin/company/employees",
                     params=search_params,
@@ -367,42 +393,293 @@ class LeadIdentificationTask(AccountEnrichmentTask):
                 )
 
                 if status_code == 200:
-                    # Transform the response to match the original format
-                    transformed_employees = []
-
-                    for person in employees_data.get('people', []):
-                        transformed_employee = {
-                            'profile_url': person.get('linkedin_url'),
-                            'full_name': person.get('full_name'),
-                            'first_name': person.get('first_name'),
-                            'last_name': person.get('last_name'),
-                            'occupation': person.get('occupation'),
-                            'location': person.get('location'),
-                            'company': {
-                                'name': person.get('company_name'),
-                                'location': person.get('company_location')
-                            },
-                            'education': person.get('education', []),
-                            'languages': person.get('languages', []),
-                            'skills': person.get('skills', [])
-                        }
-                        transformed_employees.append(transformed_employee)
-
-                    return transformed_employees, status_code
+                    return await self._process_successful_response(response)
 
                 elif status_code == 429:  # Rate limit
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    wait_time = min(2 ** attempt, 60)  # Cap at 60 seconds
+                    logger.warning(
+                        f"Rate limit exceeded. Waiting {wait_time} seconds before retry"
+                    )
+                    await asyncio.sleep(wait_time)
                     continue
+
+                elif status_code == 404:
+                    raise ValueError(f"Company not found: {linkedin_url}")
+
                 else:
-                    logger.error(f"ProxyCurl API error: {status_code}")
+                    logger.error(f"ProxyCurl API error: Status {status_code}")
                     break
 
             except Exception as e:
-                logger.error(f"Error fetching employees (attempt {attempt + 1}): {str(e)}")
+                logger.error(
+                    f"Error fetching employees (attempt {attempt + 1}): {str(e)}",
+                    exc_info=True
+                )
                 if attempt == max_retries - 1:
                     raise
 
         raise Exception(f"Failed to fetch employees after {max_retries} attempts")
+
+    async def _process_successful_response(
+            self,
+            response: Dict[str, Any]
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Process successful API response and transform employee data."""
+
+        transformed_employees = []
+        employees_data = response.get('employees', [])
+        total_employees = len(employees_data)
+
+        logger.info(f"Processing {total_employees} employees")
+
+        for employee in employees_data:
+            try:
+                transformed = await self._transform_employee_data(
+                    employee,
+                    response.get('next_page')
+                )
+                if transformed:
+                    transformed_employees.append(transformed)
+
+            except Exception as e:
+                logger.error(f"Error transforming employee data: {str(e)}", exc_info=True)
+                continue
+
+        logger.info(
+            f"Successfully transformed {len(transformed_employees)}/{total_employees} "
+            "employee profiles"
+        )
+        return transformed_employees, 200
+
+
+    async def _transform_employee_data(
+            self,
+            employee: Dict[str, Any],
+            next_page_url: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Transform individual employee data with safe handling of missing fields.
+        Returns None if critical data is missing, partial data if some fields are missing.
+        """
+        try:
+            # Get profile data with fallback to empty dict
+            profile = employee.get('profile', {})
+
+            # Check only absolutely critical fields
+            # We only require profile_url as it's our unique identifier
+            if not employee.get('profile_url'):
+                logger.warning("Skipping employee with missing profile URL")
+                return None
+
+            # Get current experience
+            experiences = profile.get('experiences', [])
+            current_experience = {}
+
+            try:
+                current_experience = next(
+                    (exp for exp in experiences
+                     if exp.get('company') == 'Zuddl' and not exp.get('ends_at')),
+                    {}
+                )
+            except Exception as e:
+                logger.warning(f"Error finding current experience: {str(e)}")
+
+            # Build location string
+            location_parts = []
+            if profile.get('city'):
+                location_parts.append(profile.get('city'))
+            if profile.get('state'):
+                location_parts.append(profile.get('state'))
+            if profile.get('country_full_name'):
+                location_parts.append(profile.get('country_full_name'))
+
+            location = ', '.join(location_parts) if location_parts else None
+
+            # Build base profile with required and optional fields
+            transformed = {
+                # Core fields - use safe defaults
+                'profile_url': employee.get('profile_url'),
+                'last_updated': employee.get('last_updated'),
+                'data_source': 'proxycurl',
+                'fetch_timestamp': datetime.utcnow().isoformat(),
+
+                # Basic profile - all optional
+                'full_name': profile.get('full_name'),
+                'first_name': profile.get('first_name'),
+                'last_name': profile.get('last_name'),
+                'headline': profile.get('headline'),
+                'occupation': profile.get('occupation'),
+
+                # Location - all optional
+                'location': location,
+                'country': profile.get('country'),
+                'country_full_name': profile.get('country_full_name'),
+                'city': profile.get('city'),
+                'state': profile.get('state'),
+
+                # Network stats - optional with safe defaults
+                'follower_count': profile.get('follower_count', 0),
+                'connection_count': profile.get('connections', 0)
+            }
+
+            # Add current role if available
+            if current_experience:
+                transformed['current_role'] = {
+                    'company': current_experience.get('company'),
+                    'title': current_experience.get('title'),
+                    'description': current_experience.get('description'),
+                    'location': current_experience.get('location'),
+                    'start_date': current_experience.get('starts_at'),
+                    'company_linkedin_url': current_experience.get('company_linkedin_profile_url'),
+                    'company_facebook_url': current_experience.get('company_facebook_profile_url'),
+                    'logo_url': current_experience.get('logo_url')
+                }
+
+            # Add education if available
+            education = profile.get('education', [])
+            if education:
+                transformed['education'] = []
+                for edu in education:
+                    if edu:  # Check if education entry is not None
+                        edu_entry = {
+                            'school': edu.get('school'),
+                            'degree': edu.get('degree_name'),
+                            'field': edu.get('field_of_study')
+                        }
+
+                        # Optional education fields
+                        if edu.get('starts_at'):
+                            edu_entry['start_date'] = edu.get('starts_at')
+                        if edu.get('ends_at'):
+                            edu_entry['end_date'] = edu.get('ends_at')
+                        if edu.get('description'):
+                            edu_entry['description'] = edu.get('description')
+                        if edu.get('activities_and_societies'):
+                            edu_entry['activities'] = edu.get('activities_and_societies')
+                        if edu.get('grade'):
+                            edu_entry['grade'] = edu.get('grade')
+                        if edu.get('school_linkedin_profile_url'):
+                            edu_entry['school_linkedin_url'] = edu.get('school_linkedin_profile_url')
+
+                        transformed['education'].append(edu_entry)
+
+            # Add experience history if available
+            experiences = profile.get('experiences', [])
+            if experiences:
+                transformed['experience_history'] = []
+                for exp in experiences:
+                    if exp:  # Check if experience entry is not None
+                        exp_entry = {
+                            'company': exp.get('company'),
+                            'title': exp.get('title')
+                        }
+
+                        # Optional experience fields
+                        if exp.get('description'):
+                            exp_entry['description'] = exp.get('description')
+                        if exp.get('location'):
+                            exp_entry['location'] = exp.get('location')
+                        if exp.get('starts_at'):
+                            exp_entry['start_date'] = exp.get('starts_at')
+                        if exp.get('ends_at'):
+                            exp_entry['end_date'] = exp.get('ends_at')
+                        if exp.get('company_linkedin_profile_url'):
+                            exp_entry['company_linkedin_url'] = exp.get('company_linkedin_profile_url')
+
+                        transformed['experience_history'].append(exp_entry)
+
+            # Add skills and languages if available
+            if profile.get('skills'):
+                transformed['skills'] = profile.get('skills', [])
+
+            if profile.get('languages'):
+                transformed['languages'] = profile.get('languages', [])
+
+            if profile.get('languages_and_proficiencies'):
+                transformed['languages_and_proficiencies'] = [
+                    {
+                        'name': lang.get('name'),
+                        'proficiency': lang.get('proficiency')
+                    }
+                    for lang in profile.get('languages_and_proficiencies', [])
+                    if lang and lang.get('name')  # Only include if name exists
+                ]
+
+            # Add optional profile content if available
+            if profile.get('summary'):
+                transformed['summary'] = profile.get('summary')
+
+            if profile.get('articles'):
+                transformed['articles'] = profile.get('articles', [])
+
+            if profile.get('activities'):
+                transformed['activities'] = profile.get('activities', [])
+
+            if profile.get('volunteer_work'):
+                transformed['volunteer_work'] = profile.get('volunteer_work', [])
+
+            # Add accomplishments if any exist
+            accomplishments = {}
+            for acc_type in [
+                'courses', 'honors_awards', 'organisations', 'patents',
+                'projects', 'publications', 'test_scores'
+            ]:
+                key = f'accomplishment_{acc_type}'
+                if profile.get(key):
+                    accomplishments[acc_type] = profile.get(key, [])
+
+            if accomplishments:
+                transformed['accomplishments'] = accomplishments
+
+            # Add other optional sections if they exist
+            if profile.get('certifications'):
+                transformed['certifications'] = profile.get('certifications', [])
+
+            if profile.get('recommendations'):
+                transformed['recommendations'] = profile.get('recommendations', [])
+
+            if profile.get('groups'):
+                transformed['groups'] = [
+                    {
+                        'name': group.get('name'),
+                        'url': group.get('url'),
+                        'profile_pic_url': group.get('profile_pic_url')
+                    }
+                    for group in profile.get('groups', [])
+                    if group and group.get('name')  # Only include if name exists
+                ]
+
+            # Add profile media if available
+            if profile.get('profile_pic_url'):
+                transformed['profile_pic_url'] = profile.get('profile_pic_url')
+
+            if profile.get('background_cover_image_url'):
+                transformed['background_cover_image_url'] = profile.get('background_cover_image_url')
+
+            if profile.get('public_identifier'):
+                transformed['public_identifier'] = profile.get('public_identifier')
+
+            # Add pagination info if available
+            if next_page_url:
+                transformed['next_page_url'] = next_page_url
+
+            return transformed
+
+        except Exception as e:
+            logger.error(f"Error transforming employee data: {str(e)}", exc_info=True)
+
+            # Return basic profile if possible
+            try:
+                return {
+                    'profile_url': employee.get('profile_url'),
+                    'full_name': profile.get('full_name'),
+                    'fetch_timestamp': datetime.utcnow().isoformat(),
+                    'data_source': 'proxycurl',
+                    'error': str(e)
+                }
+            except:
+                logger.error("Could not create basic profile", exc_info=True)
+                return None
 
     async def _extract_structured_leads(self, employee_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Extract structured lead information using Gemini AI."""
