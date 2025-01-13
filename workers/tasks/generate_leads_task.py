@@ -32,18 +32,18 @@ class PromptTemplates:
     {lead_data}
     
     Evaluate each lead and return a JSON response with this structure:
-    {
+    {{
         "evaluated_leads": [
-            {
+            {{
                 "lead_id": string,
                 "fit_score": number (0-1),
                 "rationale": string,
                 "matching_criteria": [string],
                 "persona_match": string or null,
                 "recommended_approach": string
-            }
+            }}
         ]
-    }
+    }}
     """
 
     EXTRACTION_PROMPT = """
@@ -58,9 +58,9 @@ class PromptTemplates:
     {employee_data}
     
     Required JSON format:
-    {
+    {{
         "structured_leads": [
-            {
+            {{
                 "lead_id": string,
                 "full_name": string,
                 "first_name": string,
@@ -69,25 +69,25 @@ class PromptTemplates:
                 "linkedin_url": string,
                 "email": string or null,
                 "about_description": string or null,
-                "current_role": {
+                "current_role": {{
                     "title": string,
                     "department": string,
                     "seniority": string,
                     "years_in_role": number or null,
                     "description": string or null
-                },
+                }},
                 "location": string or null,
                 "skills": [string],
                 "education": [
-                    {
+                    {{
                         "degree": string,
                         "institution": string,
                         "year": number or null
-                    }
+                    }}
                 ]
-            }
+            }}
         ]
-    }
+    }}
     """
 
 class LeadIdentificationTask(AccountEnrichmentTask):
@@ -478,18 +478,44 @@ class LeadIdentificationTask(AccountEnrichmentTask):
     async def _evaluate_leads(self, structured_leads: List[Dict[str, Any]], product_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Evaluate leads using Gemini AI based on product criteria."""
         try:
-            evaluation_prompt = self.prompts.LEAD_EVALUATION_PROMPT.format(
-                product_info=json.dumps(product_data, indent=2),
-                persona_info=json.dumps(product_data.get('persona_role_titles', {}), indent=2),
-                lead_data=json.dumps(structured_leads, indent=2)
-            )
+            if not structured_leads:
+                logger.warning("No structured leads provided for evaluation")
+                return []
 
-            response = self.model.generate_content(evaluation_prompt)
-            if not response or not response.parts:
-                raise ValueError("Empty response from Gemini AI")
+            # Process leads in batches to avoid token limits
+            evaluated_leads = []
+            batch_size = self.BATCH_SIZE
 
-            evaluation_data = self._parse_gemini_response(response.parts[0].text)
-            return evaluation_data.get('evaluated_leads', [])
+            for i in range(0, len(structured_leads), batch_size):
+                batch = structured_leads[i:i + batch_size]
+
+                evaluation_prompt = self.prompts.LEAD_EVALUATION_PROMPT.format(
+                    product_info=json.dumps(product_data, indent=2),
+                    persona_info=json.dumps(product_data.get('persona_role_titles', {}), indent=2),
+                    lead_data=json.dumps(batch, indent=2)
+                )
+
+                response = self.model.generate_content(evaluation_prompt)
+                if not response or not response.parts:
+                    logger.error(f"Empty response from Gemini AI for batch {i//batch_size + 1}")
+                    continue
+
+                try:
+                    batch_results = self._parse_gemini_response(response.parts[0].text)
+                    if batch_results and 'evaluated_leads' in batch_results:
+                        evaluated_leads.extend(batch_results['evaluated_leads'])
+                    else:
+                        logger.error(f"Invalid response structure for batch {i//batch_size + 1}")
+
+                except ValueError as e:
+                    logger.error(f"Error parsing batch {i//batch_size + 1}: {str(e)}")
+                    continue
+
+            # Validate and normalize scores
+            for lead in evaluated_leads:
+                lead['fit_score'] = max(0.0, min(1.0, float(lead.get('fit_score', 0))))
+
+            return evaluated_leads
 
         except Exception as e:
             logger.error(f"Error evaluating leads: {str(e)}", exc_info=True)
