@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class PromptTemplates:
     """Store prompt templates for AI analysis of leads."""
     LEAD_EVALUATION_PROMPT = """
+    You're an experienced SDR tasked with evaluating leads. 
     Evaluate potential leads based on the given product and persona criteria. Rate each lead's fit.
     
     Product Information:
@@ -40,7 +41,8 @@ class PromptTemplates:
                 "rationale": string,
                 "matching_criteria": [string],
                 "persona_match": string or null,
-                "recommended_approach": string
+                "recommended_approach": string,
+                "overall_analysis":[string]
             }}
         ]
     }}
@@ -65,26 +67,73 @@ class PromptTemplates:
                 "full_name": string,
                 "first_name": string,
                 "last_name": string,
-                "title": string,
                 "linkedin_url": string,
-                "email": string or null,
-                "about_description": string or null,
+                "public_identifier": string,
+                "headline": string,
+                "occupation": string,
+                "summary": string or null,
+                "recommendations": [string],
+                
                 "current_role": {{
                     "title": string,
+                    "company": string,
                     "department": string,
                     "seniority": string,
                     "years_in_role": number or null,
-                    "description": string or null
+                    "description": string or null,
+                    "location": string or null,
+                    "start_date": string or null
                 }},
-                "location": string or null,
-                "skills": [string],
+                
+                "career_history": {{
+                    "total_years_experience": number,
+                    "companies_count": number,
+                    "industry_exposure": [string],
+                    "previous_roles": [
+                        {{
+                            "title": string,
+                            "company": string,
+                            "duration_years": number,
+                            "description": string or null,
+                            "start_date": string or null,
+                            "end_date": string or null
+                        }}
+                    ]
+                }},
+                
                 "education": [
                     {{
                         "degree": string,
+                        "field_of_study": string or null,
                         "institution": string,
-                        "year": number or null
+                        "start_date": string or null,
+                        "end_date": string or null,
+                        "logo_url": string or null
                     }}
-                ]
+                ],
+                
+                "professional_info": {{
+                    "skills": [string],
+                    "languages": [{{
+                        "name": string,
+                        "proficiency": string or null
+                    }}],
+                    "certifications": [string],
+                    "volunteer_work": [string]
+                }},
+                
+                "online_presence": {{
+                    "follower_count": number or null,
+                    "connection_count": number or null,
+                    "profile_pic_url": string or null
+                }},
+                
+                "location": {{
+                    "city": string or null,
+                    "state": string or null,
+                    "country": string or null,
+                    "country_full_name": string or null
+                }}
             }}
         ]
     }}
