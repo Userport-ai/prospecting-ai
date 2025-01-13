@@ -67,10 +67,9 @@ chrome.runtime.onConnect.addListener(port => {
         // Click activity button to load activity content.
         const btnElem = getButtonElem(btnName);
         if (btnElem === null) {
-          // If Button doesn't exist, then return null HTML.
-          // Either lead does not have this activity or made it
-          // is like "Reactions" which can be hidden under a dropdown.
-          port.postMessage({ type: msg.type, name: btnName });
+          // If Button doesn't exist, return null HTML directly.
+          // Lead does not have this activity.
+          port.postMessage({ type: msg.type, name: btnName, html: null } as FetchActivityResponse);
           return;
         }
 

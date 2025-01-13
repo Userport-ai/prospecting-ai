@@ -42,7 +42,7 @@ const LeadActivityParser: React.FC<{ linkedInUrl: string }> = ({
             setTabId(response.tab_id);
           })
           .catch((error) => {
-            setErrorMessage(error);
+            setErrorMessage((error as Error).message);
             setStatus(null);
           });
         break;
@@ -65,7 +65,7 @@ const LeadActivityParser: React.FC<{ linkedInUrl: string }> = ({
               }
             })
             .catch((error) => {
-              setErrorMessage(error);
+              setErrorMessage((error as Error).message);
               setStatus(null);
             });
         }, POLLING_INTERVAL);

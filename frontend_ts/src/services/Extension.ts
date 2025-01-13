@@ -26,7 +26,7 @@ interface BaseResponse {
 }
 
 interface ErrorResponse extends BaseResponse {
-  message: string;
+  error_message: string;
 }
 
 // Interfaces specific to each API.
@@ -75,7 +75,7 @@ export const startLinkedInActivityParsing = async (
   );
 
   if (response.type === ResponseType.ERROR) {
-    throw new Error((response as ErrorResponse).message);
+    throw new Error((response as ErrorResponse).error_message);
   }
 
   return response as StartActivityParsingResponse;
@@ -101,7 +101,7 @@ export const getLinkedInActivityParsingResult = async (
   );
 
   if (response.type === ResponseType.ERROR) {
-    throw new Error((response as ErrorResponse).message);
+    throw new Error((response as ErrorResponse).error_message);
   }
 
   return response as GetActivityParsingResultResponse;
