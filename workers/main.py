@@ -54,6 +54,7 @@ logger.addHandler(console_handler)
 
 log_level = os.getenv('LOG_LEVEL', 'DEBUG').upper()
 logger.setLevel(getattr(logging, log_level))
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 app = FastAPI(title="Workers API")
 
