@@ -238,10 +238,26 @@ async def cached_request(
         )
 
         if cached:
-            logger.debug(f"Cache hit for request to {url}")
+            logger.info(
+                "Cache hit for request",
+                extra={
+                    "url": url,
+                    "method": method,
+                    "tenant_id": tenant_id,
+                    "status_code": cached["status_code"]
+                }
+            )
             return cached["data"], cached["status_code"]
 
-    logger.debug(f"Cache miss for request to {url}")
+    logger.info(
+        "Cache miss for request",
+        extra={
+            "url": url,
+            "method": method,
+            "tenant_id": tenant_id,
+            "force_refresh": force_refresh
+        }
+    )
 
     # Make the actual API request
     response = requests.request(
@@ -251,8 +267,28 @@ async def cached_request(
         headers=headers,
         timeout=30
     )
-
     response_data = response.json() if response.content else {}
+    
+    # Log the response
+    log_extra = {
+        "url": url,
+        "method": method,
+        "tenant_id": tenant_id,
+        "status_code": response.status_code,
+        "response_size": len(response.content) if response.content else 0,
+        "response": response_data
+    }
+    
+    if response.status_code >= 400:
+        logger.error(
+            "API request failed",
+            extra=log_extra
+        )
+    # else:
+    #     logger.debug(
+    #         "API request successful", 
+    #         extra=log_extra
+    #     )
 
     # Cache successful responses
     if response.status_code < 400:
