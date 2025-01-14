@@ -24,49 +24,61 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:latest']
 
-# Get GKE credentials first
+  # Get GKE credentials first
 - name: 'gcr.io/cloud-builders/gcloud'
   args:
-  - 'container'
-  - 'clusters'
-  - 'get-credentials'
-  - 'userport-service-prod'
-  - '--zone=us-west1'
-  - '--project=$PROJECT_ID'
+    - 'container'
+    - 'clusters'
+    - 'get-credentials'
+    - 'userport-service-prod'
+    - '--zone=us-west1'
+    - '--project=$PROJECT_ID'
   env:
-  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+    - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
 
-# Create/update the database credentials secret
+  # Set up KSA annotation
+- name: 'gcr.io/cloud-builders/kubectl'
+  args:
+    - 'annotate'
+    - 'serviceaccount'
+    - 'userport-ksa'
+    - 'iam.gke.io/gcp-service-account=userport-worker@omega-winter-431704-u5.iam.gserviceaccount.com'
+    - '--overwrite'
+  env:
+    - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+
+  # Create/update the database credentials secret
 - name: 'gcr.io/cloud-builders/kubectl'
   entrypoint: 'bash'
   args:
-  - '-c'
-  - |
-    printf "%s" "${_USERPORT_DEV_DB_PASSWORD}" > password.txt
-    printf "%s" "${_USERPORT_DEV_DB_USERNAME}" > username.txt
-    kubectl create secret generic db-credentials \
-      --from-file=password=password.txt \
-      --from-file=username=username.txt \
-      --dry-run=client -o yaml | \
-    kubectl apply -f - --validate=false
-    rm password.txt username.txt
+    - '-c'
+    - |
+      printf "%s" "${_USERPORT_DEV_DB_PASSWORD}" > password.txt
+      printf "%s" "${_USERPORT_DEV_DB_USERNAME}" > username.txt
+      kubectl create secret generic db-credentials \
+        --from-file=password=password.txt \
+        --from-file=username=username.txt \
+        --dry-run=client -o yaml | \
+      kubectl apply -f - --validate=false
+      rm password.txt username.txt
   env:
-  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+    - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
 
-# Deploy to GKE
+  # Deploy to GKE last
 - name: 'gcr.io/cloud-builders/gke-deploy'
   args:
-  - run
-  - --filename=api/django_app/k8s/
-  - --location=us-west1
-  - --cluster=userport-service-prod
-  - --image=gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA
+    - run
+    - --filename=api/django_app/k8s/
+    - --location=us-west1
+    - --cluster=userport-service-prod
+    - --image=gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA
   env:
-  - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
-  - 'GCLOUD_PROJECT=$PROJECT_ID'
+    - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+    - 'GCLOUD_PROJECT=$PROJECT_ID'
 
 substitutions:
   _USERPORT_DEBUG: '0'
