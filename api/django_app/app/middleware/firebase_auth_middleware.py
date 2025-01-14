@@ -10,12 +10,16 @@ class FirebaseAuthMiddleware(authentication.BaseAuthentication):
     """
 
     def authenticate(self, request):
+        logger.info(f"FirebaseAuthMiddleware: Processing request for path {request.path}")
+        logger.info(f"Exempt paths: {getattr(settings, 'FIREBASE_AUTH_EXEMPT_PATHS', [])}")
+
         # Skip authentication for paths that don't need it
         if getattr(request, '_skip_firebase_auth', False):
             return None
 
         # Check if path is in exempt list
         if hasattr(settings, 'FIREBASE_AUTH_EXEMPT_PATHS') and request.path in settings.FIREBASE_AUTH_EXEMPT_PATHS:
+            logger.info(f"Path {request.path} is exempt from Firebase auth")
             return None
 
         # Get the auth header
