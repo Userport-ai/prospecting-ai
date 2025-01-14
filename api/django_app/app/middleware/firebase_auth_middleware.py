@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import authentication
 from rest_framework import exceptions
 from app.services import FirebaseAuthService
@@ -11,6 +12,10 @@ class FirebaseAuthMiddleware(authentication.BaseAuthentication):
     def authenticate(self, request):
         # Skip authentication for paths that don't need it
         if getattr(request, '_skip_firebase_auth', False):
+            return None
+
+        # Check if path is in exempt list
+        if hasattr(settings, 'FIREBASE_AUTH_EXEMPT_PATHS') and request.path in settings.FIREBASE_AUTH_EXEMPT_PATHS:
             return None
 
         # Get the auth header

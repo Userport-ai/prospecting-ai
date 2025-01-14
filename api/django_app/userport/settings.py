@@ -91,6 +91,10 @@ CORS_ALLOW_HEADERS = [
 
 AUTH_USER_MODEL = 'app.User'
 
+FIREBASE_AUTH_EXEMPT_PATHS = [
+    '/api/v2/internal/enrichment-callback/'
+]
+
 # Rest framework settings
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
