@@ -40,7 +40,7 @@ spec:
         - name: WORKER_API_BASE_URL
           value: "https://prospecting-ai-116199002084.us-west1.run.app"
         - name: WORKER_SERVICE_ACCOUNT_EMAIL
-          value: "116199002084-compute@developer.gserviceaccount.com"
+          value: "userport-worker@omega-winter-431704-u5.iam.gserviceaccount.com"
         - name: USERPORT_BASE_URL
           value: "https://app.userport.ai"
         resources:

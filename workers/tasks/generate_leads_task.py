@@ -10,7 +10,6 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 
 from services.django_callback_service import CallbackService
 from services.api_cache_service import APICacheService, cached_request
-from .base import BaseTask
 from services.bigquery_service import BigQueryService
 from .enrichment_task import AccountEnrichmentTask
 

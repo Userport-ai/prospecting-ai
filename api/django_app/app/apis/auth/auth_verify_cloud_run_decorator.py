@@ -18,7 +18,9 @@ def verify_cloud_run_token(func: Callable) -> Callable:
         if os.getenv('ENVIRONMENT') == 'local' and settings.DEBUG:
             return func(request, *args, **kwargs)
 
+        logger.info("Received request headers: %s", request.headers)
         auth_header = request.headers.get('Authorization')
+        logger.info("Auth header: %s", auth_header[:20] if auth_header else "None")
         if not auth_header:
             logger.error("No Authorization header in Cloud Run callback")
             raise AuthenticationFailed("Missing Authorization header")
