@@ -93,7 +93,7 @@ class CallbackService:
             # Get fresh OIDC token
             logger.debug(f"Requesting fresh ID token for job {job_id}")
             id_token = await self._get_id_token()
-            logger.debug(f"Successfully obtained ID token for job {job_id}")
+            logger.debug(f"Successfully obtained ID token for job {job_id}. Got token: {id_token[:10]}...")
 
             # Prepare callback payload
             callback_data = {
