@@ -15,6 +15,7 @@ def verify_cloud_run_token(func: Callable) -> Callable:
 
     @wraps(func)
     def wrapper(request, *args, **kwargs):
+        logger.info("=== Cloud Run Token Verification ===")
         if os.getenv('ENVIRONMENT') == 'local' and settings.DEBUG:
             return func(request, *args, **kwargs)
 
@@ -52,6 +53,7 @@ def verify_cloud_run_token(func: Callable) -> Callable:
             expected_sa = os.getenv('WORKER_SERVICE_ACCOUNT_EMAIL')
             if id_info.get('email') != expected_sa:
                 raise AuthenticationFailed("Invalid service account")
+            logger.info(f"Expected service account: {expected_sa}")
 
             # Add verified token info to request
             request.cloud_run_token_info = id_info
