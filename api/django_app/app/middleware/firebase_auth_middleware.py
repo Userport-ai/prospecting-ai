@@ -2,8 +2,9 @@ from django.conf import settings
 from rest_framework import authentication
 from rest_framework import exceptions
 from app.services import FirebaseAuthService
+import logging
 
-
+logger = logging.getLogger(__name__)
 class FirebaseAuthMiddleware(authentication.BaseAuthentication):
     """
     Middleware to authenticate requests using Firebase tokens and match with Django users
