@@ -4,6 +4,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from app.apis.auth.auth_verify_cloud_run_decorator import verify_cloud_run_token
+from app.models import Lead
 from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType
 from app.models.accounts import Account, EnrichmentStatus
 from django.db import transaction
@@ -104,4 +105,102 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
             account.competitors = company_info.get('competitors', [])
         return
 
-    logger.warning(f"Unsupported enrichment type: {enrichment_type}")
+    elif enrichment_type == EnrichmentType.POTENTIAL_LEADS:
+        if not processed_data:
+            return
+
+        # Create leads from processed data
+        leads_data = processed_data.get('qualified_leads', [])
+
+        with transaction.atomic():
+            for lead_data in leads_data:
+                # Using get_or_create to avoid duplicates based on linkedin_url
+                defaults = {
+                    'tenant': account.tenant,
+                    'first_name': lead_data.get('first_name') or None,
+                    'last_name': lead_data.get('last_name') or None,
+                    'role_title': lead_data.get('role_title') or lead_data.get('headline') or None,
+                    'email': lead_data.get('email') or None,
+                    'score': lead_data.get('fit_score', 0.0),  # Default to 0 if no score
+                    'enrichment_status': 'completed',
+                    'last_enriched_at': timezone.now(),
+                    'source': Lead.Source.ENRICHMENT,
+                    'suggestion_status': Lead.SuggestionStatus.SUGGESTED,
+
+                    # Profile data
+                    'headline': lead_data.get('headline') or None,
+                    'location': lead_data.get('location') or None,
+                    'phone': lead_data.get('phone') or None,
+
+                    # Enrichment specific data
+                    'enrichment_data': {
+                        # Evaluation data
+                        'fit_score': lead_data.get('fit_score', 0.0),
+                        'persona_match': lead_data.get('persona_match') or None,
+                        'matching_criteria': lead_data.get('matching_criteria') or [],
+                        'recommended_approach': lead_data.get('recommended_approach') or None,
+                        'analysis': lead_data.get('overall_analysis') or [],
+
+                        # Profile metadata
+                        'profile_url': lead_data.get('profile_url') or None,
+                        'last_updated': lead_data.get('last_updated') or None,
+                        'public_identifier': lead_data.get('public_identifier') or None,
+                        'profile_pic_url': lead_data.get('profile_pic_url') or None,
+
+                        # Professional details
+                        'occupation': lead_data.get('occupation') or None,
+                        'summary': lead_data.get('summary') or None,
+                        'follower_count': lead_data.get('follower_count', 0),
+                        'connection_count': lead_data.get('connection_count', 0),
+
+                        # Current role details
+                        'current_role': lead_data.get('current_role') or {},
+
+                        # Skills and experience
+                        'skills': lead_data.get('skills') or [],
+                        'experience_history': lead_data.get('experience_history') or [],
+                        'education': lead_data.get('education') or [],
+                        'languages': lead_data.get('languages') or [],
+                        'languages_and_proficiencies': lead_data.get('languages_and_proficiencies') or [],
+
+                        # Additional content
+                        'articles': lead_data.get('articles') or [],
+                        'activities': lead_data.get('activities') or [],
+                        'volunteer_work': lead_data.get('volunteer_work') or [],
+
+                        # Location details
+                        'country': lead_data.get('country') or None,
+                        'country_full_name': lead_data.get('country_full_name') or None,
+                        'city': lead_data.get('city') or None,
+                        'state': lead_data.get('state') or None,
+
+                        # Source tracking
+                        'data_source': lead_data.get('data_source', 'proxycurl'),
+
+                        # Timestamp for when this enrichment data was created
+                        'enriched_at': timezone.now().isoformat()
+                    }
+                }
+
+                lead, created = Lead.objects.get_or_create(
+                    account=account,
+                    linkedin_url=lead_data.get('linkedin_url'),
+                    defaults=defaults
+                )
+
+                if not created:
+                    # Update existing lead
+                    for field, value in defaults.items():
+                        setattr(lead, field, value)
+                    lead.save()
+
+        # Update account enrichment status
+        account.enrichment_sources = account.enrichment_sources or {}
+        account.enrichment_sources['lead_generation'] = {
+            'last_run': timezone.now().isoformat(),
+            'leads_found': len(leads_data)
+        }
+        account.save()
+
+    else:
+        logger.warning(f"Unsupported enrichment type: {enrichment_type}")

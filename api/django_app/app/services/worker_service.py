@@ -72,6 +72,41 @@ class WorkerService:
             logger.error(f"Failed to get ID token: {str(e)}")
             raise
 
+    def trigger_lead_generation(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Triggers lead generation with OIDC token authentication
+        """
+        try:
+            if os.getenv('ENVIRONMENT') == 'local' and settings.DEBUG:
+                headers = {
+                    "Content-Type": "application/json"
+                }
+            else:
+                id_token = self._get_id_token()
+                headers = {
+                    "Authorization": f"Bearer {id_token}",
+                    "Content-Type": "application/json"
+                }
+
+            logger.debug(f"Making request to: {self.base_url}/api/v1/tasks/create/lead_identification")
+
+            response = requests.post(
+                f"{self.base_url}/api/v1/tasks/create/lead_identification",
+                json=payload,
+                headers=headers,
+                timeout=self.timeout
+            )
+
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.headers)}")
+
+            response.raise_for_status()
+            return response.json()
+
+        except Exception as e:
+            logger.error(f"Failed to trigger lead generation: {str(e)}")
+            raise Exception(f"Failed to trigger lead generation: {str(e)}")
+
     def trigger_account_enrichment(self, accounts: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Triggers account enrichment with OIDC token authentication

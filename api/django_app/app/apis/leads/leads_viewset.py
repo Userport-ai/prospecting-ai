@@ -1,19 +1,22 @@
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
-from rest_framework import status
-from django.db import transaction
+
 from app.apis.common.base import TenantScopedViewSet
-from app.models import UserRole, Lead
+from app.apis.common.lead_generation_mixin import LeadGenerationMixin
+from app.models import UserRole, Lead, Account
 from app.models.serializers.lead_serializers import (
     LeadDetailsSerializer,
     LeadBulkCreateSerializer
 )
 from app.permissions import HasRole
+from app.services.worker_service import WorkerService
 
 
-class LeadsViewSet(TenantScopedViewSet):
+class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = LeadDetailsSerializer
     queryset = Lead.objects.all()
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -25,6 +28,48 @@ class LeadsViewSet(TenantScopedViewSet):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
 
+    @action(detail=False, methods=['post'])
+    def generate(self, request):
+        """
+        Trigger lead generation for an account
+        """
+        account_id = request.data.get('account')
+        if not account_id:
+            return Response(
+                {"error": "account_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            account = Account.objects.select_related('product').get(
+                id=account_id,
+                tenant=request.tenant
+            )
+
+            if not account.linkedin_url:
+                return Response(
+                    {"error": "Account must have a LinkedIn URL for lead generation"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            response = self._trigger_lead_generation(account)
+
+            return Response({
+                "message": "Lead generation started",
+                "job_id": response.get('job_id'),
+                "account_id": str(account.id)
+            })
+
+        except Account.DoesNotExist:
+            return Response(
+                {"error": "Account not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=['post'])
     def bulk_create(self, request):

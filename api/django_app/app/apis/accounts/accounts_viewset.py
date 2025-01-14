@@ -1,3 +1,5 @@
+import logging
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
@@ -5,18 +7,18 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from app.apis.common.base import TenantScopedViewSet
-from app.models import UserRole, Account
-from app.models.accounts import EnrichmentStatus
+from app.apis.common.lead_generation_mixin import LeadGenerationMixin
+from app.models import UserRole, Account, EnrichmentType
 from app.models.serializers.account_serializers import (
     AccountDetailsSerializer,
     AccountBulkCreateSerializer
 )
-from django.db.models import Count, Max, Avg, Q
 from app.permissions import HasRole
 from app.services.worker_service import WorkerService
 
+logger = logging.getLogger(__name__)
 
-class AccountsViewSet(TenantScopedViewSet):
+class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = AccountDetailsSerializer
     queryset = Account.objects.all()
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -35,35 +37,53 @@ class AccountsViewSet(TenantScopedViewSet):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
 
-    def _trigger_enrichment(self, accounts):
-        """Helper method to trigger enrichment for accounts"""
+    def _trigger_enrichments(self, accounts):
+        """Helper method to trigger all enrichments for accounts"""
         worker_service = WorkerService()
-
         accounts_list = accounts if isinstance(accounts, list) else [accounts]
+        results = []
 
-        enrichment_data = [
-            {"account_id": str(account.id), "company_name": account.name}
-            for account in accounts_list
-        ]
+        for enrichment_type in [EnrichmentType.COMPANY_INFO, EnrichmentType.POTENTIAL_LEADS]:
+            try:
+                if enrichment_type == EnrichmentType.COMPANY_INFO:
+                    enrichment_data = [
+                        {"account_id": str(account.id), "company_name": account.name}
+                        for account in accounts_list
+                    ]
+                    response = worker_service.trigger_account_enrichment(enrichment_data)
 
-        try:
-            return worker_service.trigger_account_enrichment(enrichment_data)
-        except Exception as e:
-            print(f"Failed to trigger enrichment: {str(e)}")
-            return {"status": "failed", "error": str(e)}
+                elif enrichment_type == EnrichmentType.POTENTIAL_LEADS:
+                    response = {
+                        "account_responses": [
+                            self._trigger_lead_generation(account)
+                            for account in accounts_list
+                        ]
+                    }
 
+                results.append({
+                    "enrichment_type": enrichment_type,
+                    "response": response
+                })
+
+            except Exception as e:
+                logger.error(f"Failed to trigger {enrichment_type} enrichment: {str(e)}")
+                results.append({
+                    "enrichment_type": enrichment_type,
+                    "status": "failed",
+                    "error": str(e)
+                })
+
+        return results
 
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
 
         if response.status_code == status.HTTP_201_CREATED:
             account = self.get_queryset().get(id=response.data['id'])
-            enrichment_response = self._trigger_enrichment(account)
-            response.data['enrichment_job_response'] = enrichment_response
+            enrichment_responses = self._trigger_enrichments(account)
+            response.data['enrichment_responses'] = enrichment_responses
 
         return response
-
-
 
     @action(detail=False, methods=['post'])
     def bulk_create(self, request):
@@ -111,14 +131,17 @@ class AccountsViewSet(TenantScopedViewSet):
                     accounts.append(account)
 
                 created_accounts = Account.objects.bulk_create(accounts)
+                created_accounts = list(Account.objects.filter(
+                    id__in=[account.id for account in created_accounts]
+                ).select_related('product'))  # Refresh to get related data
 
-                enrichment_response = self._trigger_enrichment(created_accounts)
+                enrichment_responses = self._trigger_enrichments(created_accounts)
 
                 response_data = {
                     "message": "Accounts created successfully",
                     "account_count": len(created_accounts),
                     "accounts": AccountDetailsSerializer(created_accounts, many=True).data,
-                    "enrichment_status": enrichment_response,
+                    "enrichment_responses": enrichment_responses,
                 }
 
                 return Response(response_data, status=status.HTTP_201_CREATED)
