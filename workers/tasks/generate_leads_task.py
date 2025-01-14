@@ -438,7 +438,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
                     url="https://nubela.co/proxycurl/api/linkedin/company/employees",
                     params=search_params,
                     headers={'Authorization': f'Bearer {self.proxycurl_api_key}'},
-                    ttl_hours=24
+                    ttl_hours=24*30 # 1 month
                 )
 
                 if status_code == 200:
