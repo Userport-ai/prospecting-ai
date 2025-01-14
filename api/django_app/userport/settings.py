@@ -107,7 +107,10 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
+    'PAGE_SIZE': 20,
+    'DEFAULT_AUTHENTICATION_EXEMPT_PATHS': [
+        '/api/v2/internal/enrichment-callback/'
+    ]
     #TODO(Sowrabh) 'EXCEPTION_HANDLER': ''
 }
 
