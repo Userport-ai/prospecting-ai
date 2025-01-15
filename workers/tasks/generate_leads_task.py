@@ -14,7 +14,7 @@ from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from .enrichment_task import AccountEnrichmentTask
 
-FIT_SCORE_THRESHOLD = 0.1
+FIT_SCORE_THRESHOLD = 0.0
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,9 @@ class PromptTemplates:
             }}
         ]
     }}
+    1. Return ONLY valid JSON
+    2. If a field is not available, use null
+    3. Do not include any other information or pleasantries or anything else outside the JSON
     """
 
     EXTRACTION_PROMPT = """
