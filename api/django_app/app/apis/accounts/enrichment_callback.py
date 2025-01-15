@@ -13,9 +13,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+@api_view(['POST'])
 @authentication_classes([])  # Disable default auth
 @permission_classes([AllowAny])
-@api_view(['POST'])
 @verify_cloud_run_token
 def enrichment_callback(request):
     try:
