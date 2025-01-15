@@ -101,7 +101,7 @@ timeout: 1800s
 
 # Enable faster builds with more CPU/memory
 options:
-  machineType: 'E2_HIGHCPU_8'
+  machineType: 'N1_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
   env:
     - 'DOCKER_BUILDKIT=1'
