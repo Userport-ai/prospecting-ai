@@ -14,7 +14,7 @@ from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from .enrichment_task import AccountEnrichmentTask
 
-FIT_SCORE_THRESHOLD = 0.5
+FIT_SCORE_THRESHOLD = 0.1
 
 logger = logging.getLogger(__name__)
 
@@ -878,7 +878,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
             processed_data={
                 'qualified_leads': [
                     lead for lead in evaluated_leads
-                    if lead.get('fit_score', 0) >= 0.7
+                    if lead.get('fit_score', 0) >= FIT_SCORE_THRESHOLD
                 ]
             }
         )
