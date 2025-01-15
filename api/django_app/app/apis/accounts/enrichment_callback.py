@@ -1,24 +1,27 @@
+import logging
 from typing import Dict, Any
 
+from django.db import transaction
+from django.utils import timezone
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
 from app.apis.auth.auth_verify_cloud_run_decorator import verify_cloud_run_token
 from app.models import Lead
 from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType
 from app.models.accounts import Account, EnrichmentStatus
-from django.db import transaction
-from django.utils import timezone
-import logging
 
 logger = logging.getLogger(__name__)
+
 
 @api_view(['POST'])
 @authentication_classes([])  # Disable default auth
 @permission_classes([AllowAny])
 @verify_cloud_run_token
 def enrichment_callback(request):
-    logger.info(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} Full data: {request.data}")
+    logger.info(
+        f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} Full data: {request.data}")
     try:
         data = request.data
         account_id = data.get('account_id')
@@ -170,14 +173,6 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
                 location_data = lead_data.get('location', {})
 
                 enrichment_data = {
-                    # Evaluation data
-                    'fit_score': lead_data.get('fit_score', 0.0),
-                    'persona_match': lead_data.get('persona_match'),
-                    'matching_criteria': lead_data.get('matching_criteria', []),
-                    'recommended_approach': lead_data.get('recommended_approach'),
-                    'analysis': lead_data.get('overall_analysis', []),
-                    'rationale': lead_data.get('rationale'),
-
                     # Profile metadata
                     'profile_url': lead_data.get('linkedin_url'),
                     'public_identifier': lead_data.get('public_identifier'),
@@ -237,6 +232,18 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
                         lead_data.get('headline')
                 )
 
+                custom_fields = {
+                    # Evaluation data
+                    'evaluation': {
+                        'fit_score': lead_data.get('fit_score', 0.0),
+                        'persona_match': lead_data.get('persona_match'),
+                        'matching_criteria': lead_data.get('matching_criteria', []),
+                        'recommended_approach': lead_data.get('recommended_approach'),
+                        'analysis': lead_data.get('overall_analysis', []),
+                        'rationale': lead_data.get('rationale'),
+                    },
+                }
+
                 # Create the defaults dictionary with all available data
                 defaults = {
                     'tenant': account.tenant,
@@ -249,7 +256,8 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
                     'last_enriched_at': timezone.now(),
                     'source': Lead.Source.ENRICHMENT,
                     'suggestion_status': Lead.SuggestionStatus.SUGGESTED,
-                    'enrichment_data': enrichment_data
+                    'enrichment_data': enrichment_data,
+                    'custom_fields': custom_fields,
                 }
 
                 # Remove None values
