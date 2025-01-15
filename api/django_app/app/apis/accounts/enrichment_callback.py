@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 @permission_classes([AllowAny])
 @verify_cloud_run_token
 def enrichment_callback(request):
-    logger.debug(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} Full data: {request.data}")
+    logger.info(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} Full data: {request.data}")
     try:
         data = request.data
         account_id = data.get('account_id')
