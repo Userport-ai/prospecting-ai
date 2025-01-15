@@ -154,7 +154,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
 
     ENRICHMENT_TYPE = 'generate_leads'
     BATCH_SIZE = 2 # Batch size for Gemini processing
-    PAGE_SIZE = 2 # Number of results fetched from ProxyCurl API. Note: Increasing this will bump up our cost significantly
+    PAGE_SIZE = 5 # Number of results fetched from ProxyCurl API. Note: Increasing this will bump up our cost significantly
 
     def __init__(self):
         """Initialize the task with required services and configurations."""
