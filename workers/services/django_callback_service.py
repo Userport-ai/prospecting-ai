@@ -1,5 +1,7 @@
 import os
 from typing import Dict, Any, Optional
+
+import requests
 from google.auth import default
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
@@ -8,9 +10,25 @@ import httpx
 import logging
 import json
 
+from utils.retry_utils import RetryConfig, RetryableError, with_retry
+
 logger = logging.getLogger(__name__)
 
 class CallbackService:
+    CALLBACK_RETRY_CONFIG = RetryConfig(
+        max_attempts=3,
+        base_delay=1.0,
+        max_delay=5.0,
+        # Specific exceptions for callback failures
+        retryable_exceptions=[
+            RetryableError,
+            ConnectionError,
+            TimeoutError,
+            requests.exceptions.RequestException,  # For HTTP callbacks
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError
+        ]
+    )
     def __init__(self):
         """Initialize the callback service with OIDC auth"""
         logger.info("Initializing CallbackService")
@@ -71,7 +89,8 @@ class CallbackService:
             logger.error(f"Failed to get ID token: {str(e)}", exc_info=True)
             raise
 
-    async def send_callback(
+    @with_retry(retry_config=CALLBACK_RETRY_CONFIG, operation_name="send_callback")
+    async def _send_callback_internal(
             self,
             job_id: str,
             account_id: str,
@@ -87,7 +106,7 @@ class CallbackService:
             max_retries: Optional[int] = None
     ) -> bool:
         """Send callback to Django with enrichment results"""
-        logger.info(f"Sending callback for job_id: {job_id}, account_id: {account_id}, status: {status}, processed_data: {processed_data}, error_details: {error_details}")
+        logger.info(f"Sending callback for job_id: {job_id}, account_id: {account_id}, status: {status}")
 
         try:
             # Get fresh OIDC token
@@ -100,7 +119,7 @@ class CallbackService:
                 "job_id": job_id,
                 "account_id": account_id,
                 "status": status,
-                "enrichment_type": enrichment_type,  # Add this field
+                "enrichment_type": enrichment_type,
                 "source": source,
                 "is_partial": is_partial,
                 "completion_percentage": completion_percentage
@@ -137,16 +156,75 @@ class CallbackService:
                 )
 
                 logger.debug(f"Received response for job {job_id}: Status {response.status_code}")
+
+                # Handle different types of HTTP status codes
+                if response.status_code >= 500:
+                    error_text = response.text
+                    logger.error(f"Server error {response.status_code} for job {job_id}: {error_text}")
+                    raise RetryableError(f"Server error {response.status_code}: {error_text}")
+
+                elif response.status_code >= 400:
+                    error_text = response.text
+                    logger.error(f"Client error {response.status_code} for job {job_id}: {error_text}")
+                    # Don't retry client errors
+                    raise ValueError(f"Client error {response.status_code}: {error_text}")
+
                 response.raise_for_status()
                 logger.info(f"Callback successful for job {job_id} with status code {response.status_code}")
                 return True
 
         except httpx.TimeoutException as e:
             logger.error(f"Callback timeout for job {job_id}: {str(e)}", exc_info=True)
-            return False
+            raise RetryableError(f"Timeout error: {str(e)}") from e
+
         except httpx.HTTPStatusError as e:
+            # This will only catch status codes we haven't already handled above
             logger.error(f"Callback HTTP error for job {job_id}: Status {e.response.status_code}, Response: {e.response.text}", exc_info=True)
-            return False
+            raise RetryableError(f"HTTP error {e.response.status_code}: {e.response.text}") from e
+
         except Exception as e:
-            logger.error(f"Callback failed for job {job_id}: {str(e)}", exc_info=True)
+            if isinstance(e, (RetryableError, ValueError)):
+                # Re-raise RetryableError and ValueError as they've already been handled
+                raise
+
+            logger.error(f"Unexpected error in callback for job {job_id}: {str(e)}", exc_info=True)
+            # Make unexpected errors retryable by default
+            raise RetryableError(f"Unexpected error: {str(e)}") from e
+
+    async def send_callback(
+            self,
+            job_id: str,
+            account_id: str,
+            status: str,
+            enrichment_type: str = 'company_info',
+            raw_data: Optional[Dict[str, Any]] = None,
+            processed_data: Optional[Dict[str, Any]] = None,
+            error_details: Optional[Dict[str, Any]] = None,
+            source: str = 'jina_ai',
+            is_partial: bool = False,
+            completion_percentage: int = 100,
+            attempt_number: Optional[int] = None,
+            max_retries: Optional[int] = None
+    ) -> bool:
+        """Public wrapper that maintains backward compatibility"""
+        try:
+            return await self._send_callback_internal(
+                job_id=job_id,
+                account_id=account_id,
+                status=status,
+                enrichment_type=enrichment_type,
+                raw_data=raw_data,
+                processed_data=processed_data,
+                error_details=error_details,
+                source=source,
+                is_partial=is_partial,
+                completion_percentage=completion_percentage,
+                attempt_number=attempt_number,
+                max_retries=max_retries
+            )
+        except Exception as e:
+            logger.error(
+                f"Callback failed after all retries for job {job_id}: {str(e)}",
+                exc_info=True
+            )
             return False
