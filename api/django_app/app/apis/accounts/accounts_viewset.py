@@ -43,7 +43,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         accounts_list = accounts if isinstance(accounts, list) else [accounts]
         results = []
 
-        for enrichment_type in [EnrichmentType.COMPANY_INFO, EnrichmentType.POTENTIAL_LEADS]:
+        for enrichment_type in [EnrichmentType.COMPANY_INFO, EnrichmentType.GENERATE_LEADS]:
             try:
                 if enrichment_type == EnrichmentType.COMPANY_INFO:
                     enrichment_data = [
@@ -52,7 +52,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                     ]
                     response = worker_service.trigger_account_enrichment(enrichment_data)
 
-                elif enrichment_type == EnrichmentType.POTENTIAL_LEADS:
+                elif enrichment_type == EnrichmentType.GENERATE_LEADS:
                     response = {
                         "account_responses": [
                             self._trigger_lead_generation(account)

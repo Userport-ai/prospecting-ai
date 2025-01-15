@@ -5,7 +5,7 @@ from app.models.common import BaseMixin
 
 class EnrichmentType(models.TextChoices):
     COMPANY_INFO = 'company_info', 'Company Information'
-    POTENTIAL_LEADS = 'potential_leads', 'Potential Leads for a particular Account'
+    GENERATE_LEADS = 'generate_leads', 'Potential Leads for a particular Account'
 
 class EnrichmentStatus(models.TextChoices):
     PENDING = 'pending', 'Pending'

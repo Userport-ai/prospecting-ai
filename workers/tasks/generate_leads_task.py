@@ -14,6 +14,8 @@ from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from .enrichment_task import AccountEnrichmentTask
 
+FIT_SCORE_THRESHOLD = 0.5
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -140,10 +142,10 @@ class PromptTemplates:
     }}
     """
 
-class LeadIdentificationTask(AccountEnrichmentTask):
+class GenerateLeadsTask(AccountEnrichmentTask):
     """Task for identifying potential leads for an account using ProxyCurl and AI analysis."""
 
-    ENRICHMENT_TYPE = 'lead_identification'
+    ENRICHMENT_TYPE = 'generate_leads'
     BATCH_SIZE = 2 # Batch size for Gemini processing
     PAGE_SIZE = 2 # Number of results fetched from ProxyCurl API. Note: Increasing this will bump up our cost significantly
 
@@ -283,7 +285,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
 
             # Calculate score distribution for insights
             score_distribution = self._calculate_score_distribution(evaluated_leads)
-            qualified_leads = [l for l in evaluated_leads if l['fit_score'] >= 0.7]
+            qualified_leads = [l for l in evaluated_leads if l['fit_score'] >= FIT_SCORE_THRESHOLD]
 
             # Send success callback
             await callback_service.send_callback(
@@ -294,9 +296,10 @@ class LeadIdentificationTask(AccountEnrichmentTask):
                 status='completed',
                 completion_percentage=100,
                 processed_data={
-                    'total_leads': len(evaluated_leads),
-                    'qualified_leads': len(qualified_leads),
-                    'score_distribution': score_distribution
+                    'score_distribution': score_distribution,
+                    'structured_leads': structured_leads,
+                    'all_leads': evaluated_leads,
+                    'qualified_leads': qualified_leads,
                 }
             )
 

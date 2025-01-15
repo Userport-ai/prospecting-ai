@@ -107,7 +107,7 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
             account.competitors = company_info.get('competitors', [])
         return
 
-    elif enrichment_type == EnrichmentType.POTENTIAL_LEADS:
+    elif enrichment_type == EnrichmentType.GENERATE_LEADS:
         if not processed_data:
             return
         logger.info(f"Updating account {account.id} with suggested leads. "
