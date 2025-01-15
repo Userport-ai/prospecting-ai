@@ -8,6 +8,7 @@ steps:
     args: [
       'build',
       '--build-arg', 'BUILDKIT_INLINE_CACHE=1',
+      '--cache-from', 'gcr.io/$PROJECT_ID/userport-django-app:latest',
       '-f', './api/django_app/Dockerfile',
       '--build-arg', 'USERPORT_DEBUG=${_USERPORT_DEBUG}',
       '--build-arg', 'USERPORT_DEV_DB_USERNAME=${_USERPORT_DEV_DB_USERNAME}',
@@ -33,7 +34,7 @@ steps:
     args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA']
     waitFor: ['build']
 
-  # Get GKE credentials and set up KSA (can run in parallel with pushes)
+  # Get GKE credentials (with proper cluster config)
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'get-credentials'
     args:
@@ -43,8 +44,12 @@ steps:
       - 'userport-service-prod'
       - '--zone=us-west1'
       - '--project=$PROJECT_ID'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
     waitFor: ['build']
 
+  # Set up KSA with proper cluster config
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'setup-ksa'
     args:
@@ -53,9 +58,12 @@ steps:
       - 'userport-ksa'
       - 'iam.gke.io/gcp-service-account=userport-worker@omega-winter-431704-u5.iam.gserviceaccount.com'
       - '--overwrite'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
     waitFor: ['get-credentials']
 
-  # Create DB credentials (can run after get-credentials)
+  # Create DB credentials (with proper cluster config)
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'create-secrets'
     entrypoint: 'bash'
@@ -70,9 +78,12 @@ steps:
           --dry-run=client -o yaml | \
         kubectl apply -f - --validate=false
         rm password.txt username.txt
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
     waitFor: ['get-credentials']
 
-  # Deploy to GKE (needs all previous steps)
+  # Deploy to GKE (with proper cluster config)
   - name: 'gcr.io/cloud-builders/gke-deploy'
     args:
       - run
@@ -80,17 +91,20 @@ steps:
       - --location=us-west1
       - --cluster=userport-service-prod
       - --image=gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
     waitFor: ['push-sha', 'push-latest', 'setup-ksa', 'create-secrets']
 
 # Set a higher timeout for the build
 timeout: 1800s
 
+# Enable faster builds with more CPU/memory
 options:
   machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
   env:
     - 'DOCKER_BUILDKIT=1'
-  # Enable caching for Docker layers
   dynamicSubstitutions: true
 
 images:
