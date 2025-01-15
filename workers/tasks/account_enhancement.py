@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 import json
@@ -9,6 +10,7 @@ import requests
 import google.generativeai as genai
 
 from services.django_callback_service import CallbackService
+from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from .base import BaseTask
 from services.bigquery_service import BigQueryService
 from .enrichment_task import AccountEnrichmentTask
@@ -31,9 +33,9 @@ class PromptTemplates:
     {search_results}
 
     Expected format:
-    {
+    {{
         "linkedin_url": "https://www.linkedin.com/company/example" or null
-    }
+    }}
     """
 
     EXTRACTION_PROMPT = """
@@ -230,6 +232,29 @@ Important: Start directly with the company name header. Do not include any intro
 class AccountEnhancementTask(AccountEnrichmentTask):
     """Task for enhancing account data with AI-powered company information."""
     ENRICHMENT_TYPE = 'company_info'
+
+    API_RETRY_CONFIG = RetryConfig(
+        max_attempts=3,
+        base_delay=1.0,
+        max_delay=5.0,
+        retryable_exceptions=[
+            RetryableError,
+            asyncio.TimeoutError,
+            requests.exceptions.RequestException,
+            ConnectionError
+        ]
+    )
+
+    AI_RETRY_CONFIG = RetryConfig(
+        max_attempts=3,
+        base_delay=2.0,
+        max_delay=8.0,
+        retryable_exceptions=[
+            RetryableError,
+            ValueError,
+            RuntimeError
+        ]
+    )
 
     def __init__(self):
         """Initialize the task with required services and configurations."""
@@ -518,6 +543,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             "results": results
         }
 
+    @with_retry(retry_config=API_RETRY_CONFIG, operation_name="fetch_linkedin_url")
     async def _fetch_linkedin_url(self, company_name: str) -> str:
         """Fetch LinkedIn URL for a company using Jina AI and Gemini."""
         try:
@@ -590,6 +616,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             logger.error(f"Error validating LinkedIn URL: {str(e)}")
             return False
 
+    @with_retry(retry_config=API_RETRY_CONFIG, operation_name="fetch_company_profile")
     async def _fetch_company_profile(self, company_name: str) -> str:
         """Fetch company profile from Jina AI."""
         try:
@@ -600,7 +627,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             response = requests.get(
                 jina_url,
                 headers={"Authorization": f"Bearer {self.jina_api_token}"},
-                timeout=10
+                timeout=30
             )
             response.raise_for_status()
 
@@ -616,6 +643,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             logger.error(f"Unexpected error fetching company profile: {str(e)}", exc_info=True)
             raise
 
+    @with_retry(retry_config=AI_RETRY_CONFIG, operation_name="extract_structured_data")
     async def _extract_structured_data(self, company_profile: str) -> Dict[str, Any]:
         """Extract structured data from company profile using Gemini AI."""
         try:
