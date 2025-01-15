@@ -80,6 +80,7 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
     if enrichment_type == EnrichmentType.COMPANY_INFO:
         if not processed_data:
             return
+        logger.info(f"Updating account {account.id} with company info")
 
         # Update fields from processed_data
         account.name = processed_data.get('company_name') or account.name
@@ -108,6 +109,8 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
     elif enrichment_type == EnrichmentType.POTENTIAL_LEADS:
         if not processed_data:
             return
+        logger.info(f"Updating account {account.id} with suggested leads. "
+                    f"No. of qualified leads: {len(processed_data.get('qualified_leads', []))}")
 
         # Create leads from processed data
         leads_data = processed_data.get('qualified_leads', [])
