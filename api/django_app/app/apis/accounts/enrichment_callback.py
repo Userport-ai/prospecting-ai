@@ -109,11 +109,66 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
         logger.info(f"Updating account {account.id} with suggested leads. "
                     f"No. of qualified leads: {len(processed_data.get('qualified_leads', []))}")
 
-        leads_data = processed_data.get('qualified_leads', [])
+        qualified_leads = processed_data.get('qualified_leads', [])
+        structured_leads = processed_data.get('structured_leads', [])
+        all_leads = processed_data.get('all_leads', [])
 
+        # Create a mapping of lead_id to data from different sections
+        lead_data_mapping = {}
+
+        # Process all_leads section
+        for lead in all_leads:
+            lead_id = lead.get('lead_id')
+            if lead_id:
+                lead_data_mapping[lead_id] = {
+                    'fit_score': lead.get('fit_score'),
+                    'matching_criteria': lead.get('matching_criteria', []),
+                    'overall_analysis': lead.get('overall_analysis', []),
+                    'persona_match': lead.get('persona_match'),
+                    'rationale': lead.get('rationale'),
+                    'recommended_approach': lead.get('recommended_approach')
+                }
+
+        # Process structured_leads section
+        for lead in structured_leads:
+            lead_id = lead.get('lead_id')
+            if lead_id and lead_id in lead_data_mapping:
+                lead_data = lead_data_mapping[lead_id]
+                # Update with career history
+                career_history = lead.get('career_history', {})
+                lead_data.update({
+                    'companies_count': career_history.get('companies_count'),
+                    'industry_exposure': career_history.get('industry_exposure', []),
+                    'total_years_experience': career_history.get('total_years_experience'),
+                    'previous_roles': career_history.get('previous_roles', [])
+                })
+                # Update with other structured fields
+                lead_data.update({
+                    'current_role': lead.get('current_role', {}),
+                    'education': lead.get('education', []),
+                    'first_name': lead.get('first_name'),
+                    'last_name': lead.get('last_name'),
+                    'full_name': lead.get('full_name'),
+                    'headline': lead.get('headline'),
+                    'linkedin_url': lead.get('linkedin_url'),
+                    'location': lead.get('location', {}),
+                    'occupation': lead.get('occupation'),
+                    'public_identifier': lead.get('public_identifier'),
+                    'summary': lead.get('summary'),
+                    'recommendations': lead.get('recommendations', []),
+                    'online_presence': lead.get('online_presence', {}),
+                    'professional_info': lead.get('professional_info', {})
+                })
+
+        # Convert merged data into leads_data format
         with transaction.atomic():
-            for lead_data in leads_data:
+            for lead_id, lead_data in lead_data_mapping.items():
                 # Move profile-specific fields to enrichment_data
+                current_role = lead_data.get('current_role', {})
+                online_presence = lead_data.get('online_presence', {})
+                professional_info = lead_data.get('professional_info', {})
+                location_data = lead_data.get('location', {})
+
                 enrichment_data = {
                     # Evaluation data
                     'fit_score': lead_data.get('fit_score', 0.0),
@@ -121,90 +176,66 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
                     'matching_criteria': lead_data.get('matching_criteria', []),
                     'recommended_approach': lead_data.get('recommended_approach'),
                     'analysis': lead_data.get('overall_analysis', []),
+                    'rationale': lead_data.get('rationale'),
 
                     # Profile metadata
-                    'profile_url': lead_data.get('profile_url'),
+                    'profile_url': lead_data.get('linkedin_url'),
                     'public_identifier': lead_data.get('public_identifier'),
-                    'profile_pic_url': lead_data.get('profile_pic_url'),
-                    'headline': lead_data.get('headline'),  # Moved from direct field
-                    'location': lead_data.get('location'),  # Moved from direct field
+                    'profile_pic_url': online_presence.get('profile_pic_url'),
+                    'headline': lead_data.get('headline'),
+                    'location': location_data,
 
                     # Professional details
                     'occupation': lead_data.get('occupation'),
                     'summary': lead_data.get('summary'),
-                    'follower_count': lead_data.get('follower_count', 0),
-                    'connection_count': lead_data.get('connection_count', 0),
+                    'follower_count': online_presence.get('follower_count', 0),
+                    'connection_count': online_presence.get('connection_count', 0),
+
+                    # Career and experience
+                    'companies_count': lead_data.get('companies_count'),
+                    'industry_exposure': lead_data.get('industry_exposure', []),
+                    'total_years_experience': lead_data.get('total_years_experience'),
+                    'previous_roles': lead_data.get('previous_roles', []),
 
                     # Current role details
-                    'current_role': lead_data.get('current_role', {}),
+                    'current_role': current_role,
 
-                    # Skills and experience
-                    'skills': lead_data.get('skills', []),
-                    'experience_history': lead_data.get('experience_history', []),
+                    # Skills and education
+                    'skills': professional_info.get('skills', []),
+                    'certifications': professional_info.get('certifications', []),
                     'education': lead_data.get('education', []),
-                    'languages': lead_data.get('languages', []),
-                    'languages_and_proficiencies': lead_data.get('languages_and_proficiencies', []),
+                    'languages': professional_info.get('languages', []),
 
                     # Additional content
-                    'articles': lead_data.get('articles', []),
-                    'activities': lead_data.get('activities', []),
-                    'volunteer_work': lead_data.get('volunteer_work', []),
+                    'recommendations': lead_data.get('recommendations', []),
 
                     # Location details
-                    'country': lead_data.get('country'),
-                    'country_full_name': lead_data.get('country_full_name'),
-                    'city': lead_data.get('city'),
-                    'state': lead_data.get('state'),
+                    'country': location_data.get('country'),
+                    'country_full_name': location_data.get('country_full_name'),
+                    'city': location_data.get('city'),
+                    'state': location_data.get('state'),
 
                     # Source tracking
-                    'data_source': lead_data.get('data_source', 'proxycurl'),
+                    'data_source': processed_data.get('source', 'proxycurl'),
 
                     # Timestamp
                     'enriched_at': timezone.now().isoformat()
                 }
 
-                # First, extract all possible data for Lead model fields
-                current_role = lead_data.get('current_role', {})
+                # Extract name fields
+                first_name = lead_data.get('first_name')
+                last_name = lead_data.get('last_name')
+                if not first_name and lead_data.get('full_name'):
+                    name_parts = lead_data.get('full_name', '').split()
+                    first_name = name_parts[0] if name_parts else None
+                    last_name = name_parts[-1] if len(name_parts) > 1 else None
+
+                # Get role title from various sources
                 role_title = (
                         current_role.get('title') or
-                        lead_data.get('role_title') or
-                        lead_data.get('headline') or
-                        lead_data.get('occupation')
+                        lead_data.get('occupation') or
+                        lead_data.get('headline')
                 )
-
-                # Get name fields, trying multiple sources
-                first_name = (
-                        lead_data.get('first_name') or
-                        (lead_data.get('full_name', '').split()[0] if lead_data.get('full_name') else None)
-                )
-                last_name = (
-                        lead_data.get('last_name') or
-                        (lead_data.get('full_name', '').split()[-1] if lead_data.get('full_name') and len(lead_data.get('full_name', '').split()) > 1 else None)
-                )
-
-                # Extract phone with fallbacks
-                phone = (
-                        lead_data.get('phone') or
-                        lead_data.get('mobile') or
-                        current_role.get('phone') or
-                        None
-                )
-
-                # Collect all fields that aren't part of the standard model
-                custom_fields = {}
-                model_fields = {
-                    'first_name', 'last_name', 'email', 'phone', 'linkedin_url',
-                    'fit_score', 'current_role', 'headline', 'role_title', 'score',
-                    'enrichment_status', 'source', 'suggestion_status'
-                }
-
-                for key, value in lead_data.items():
-                    if key not in model_fields and key not in enrichment_data:
-                        custom_fields[key] = value
-
-                # If there's raw data, add it to custom fields
-                if 'raw_data' in lead_data:
-                    custom_fields['raw_data'] = lead_data['raw_data']
 
                 # Create the defaults dictionary with all available data
                 defaults = {
@@ -212,21 +243,19 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
                     'first_name': first_name,
                     'last_name': last_name,
                     'role_title': role_title,
-                    'email': lead_data.get('email'),
-                    'phone': phone,
                     'linkedin_url': lead_data.get('linkedin_url'),
                     'score': lead_data.get('fit_score', 0.0),
                     'enrichment_status': EnrichmentStatus.COMPLETED,
                     'last_enriched_at': timezone.now(),
                     'source': Lead.Source.ENRICHMENT,
                     'suggestion_status': Lead.SuggestionStatus.SUGGESTED,
-                    'enrichment_data': enrichment_data,
-                    'custom_fields': custom_fields
+                    'enrichment_data': enrichment_data
                 }
 
                 # Remove None values
                 defaults = {k: v for k, v in defaults.items() if v is not None}
 
+                # Create or update lead
                 lead, created = Lead.objects.get_or_create(
                     account=account,
                     linkedin_url=lead_data.get('linkedin_url'),
@@ -239,13 +268,11 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
                         setattr(lead, field, value)
                     lead.save()
 
-        # Update account enrichment status
-        account.enrichment_sources = account.enrichment_sources or {}
-        account.enrichment_sources['lead_generation'] = {
-            'last_run': timezone.now().isoformat(),
-            'leads_found': len(leads_data)
-        }
-        account.save()
-    else:
-        logger.warning(f"Unsupported enrichment type: {enrichment_type}")
-        account.save()
+            # Update account enrichment status
+            account.enrichment_sources = account.enrichment_sources or {}
+            account.enrichment_sources['lead_generation'] = {
+                'last_run': timezone.now().isoformat(),
+                'leads_found': len(lead_data_mapping),
+                'score_distribution': processed_data.get('score_distribution', {})
+            }
+            account.save()
