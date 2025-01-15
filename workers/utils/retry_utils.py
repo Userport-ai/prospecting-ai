@@ -5,6 +5,15 @@ from typing import Type, Callable, Union, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
+RETRYABLE_STATUS_CODES = {
+    408,  # Request Timeout
+    429,  # Too Many Requests
+    500,  # Internal Server Error
+    502,  # Bad Gateway
+    503,  # Service Unavailable
+    504,  # Gateway Timeout
+}
+
 class RetryableError(Exception):
     """Base class for errors that can be retried."""
     pass

@@ -1,16 +1,15 @@
+import json
+import logging
 import os
 from typing import Dict, Any, Optional
 
-import requests
+import httpx
 from google.auth import default
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
 from google.oauth2 import service_account
-import httpx
-import logging
-import json
 
-from utils.retry_utils import RetryConfig, RetryableError, with_retry
+from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE_STATUS_CODES
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +21,11 @@ class CallbackService:
         # Specific exceptions for callback failures
         retryable_exceptions=[
             RetryableError,
-            ConnectionError,
-            TimeoutError,
-            requests.exceptions.RequestException,  # For HTTP callbacks
-            requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError
+            httpx.TimeoutException,      # Instead of TimeoutError
+            httpx.ConnectError,          # Instead of ConnectionError
+            httpx.NetworkError,          # For network-related errors
+            httpx.TransportError,        # Base class for transport-related errors
+            httpx.RequestError           # Base class for request-related errors
         ]
     )
     def __init__(self):
@@ -106,7 +105,7 @@ class CallbackService:
             max_retries: Optional[int] = None
     ) -> bool:
         """Send callback to Django with enrichment results"""
-        logger.info(f"Sending callback for job_id: {job_id}, account_id: {account_id}, status: {status}")
+        logger.info(f"Sending callback for job_id: {job_id}, account_id: {account_id}, status: {status}, processed_data: {processed_data}, error_details: {error_details}")
 
         try:
             # Get fresh OIDC token
@@ -157,17 +156,11 @@ class CallbackService:
 
                 logger.debug(f"Received response for job {job_id}: Status {response.status_code}")
 
-                # Handle different types of HTTP status codes
-                if response.status_code >= 500:
-                    error_text = response.text
-                    logger.error(f"Server error {response.status_code} for job {job_id}: {error_text}")
-                    raise RetryableError(f"Server error {response.status_code}: {error_text}")
-
+                # Only adding this new status code check
+                if response.status_code in RETRYABLE_STATUS_CODES:
+                    raise RetryableError(f"Retryable status code {response.status_code}: {response.text}")
                 elif response.status_code >= 400:
-                    error_text = response.text
-                    logger.error(f"Client error {response.status_code} for job {job_id}: {error_text}")
-                    # Don't retry client errors
-                    raise ValueError(f"Client error {response.status_code}: {error_text}")
+                    raise ValueError(f"Non-retryable error status {response.status_code}: {response.text}")
 
                 response.raise_for_status()
                 logger.info(f"Callback successful for job {job_id} with status code {response.status_code}")
@@ -178,17 +171,15 @@ class CallbackService:
             raise RetryableError(f"Timeout error: {str(e)}") from e
 
         except httpx.HTTPStatusError as e:
-            # This will only catch status codes we haven't already handled above
             logger.error(f"Callback HTTP error for job {job_id}: Status {e.response.status_code}, Response: {e.response.text}", exc_info=True)
-            raise RetryableError(f"HTTP error {e.response.status_code}: {e.response.text}") from e
+            if e.response.status_code in RETRYABLE_STATUS_CODES:
+                raise RetryableError(f"Retryable status {e.response.status_code}: {e.response.text}") from e
+            raise ValueError(f"Non-retryable status {e.response.status_code}: {e.response.text}") from e
 
         except Exception as e:
             if isinstance(e, (RetryableError, ValueError)):
-                # Re-raise RetryableError and ValueError as they've already been handled
                 raise
-
-            logger.error(f"Unexpected error in callback for job {job_id}: {str(e)}", exc_info=True)
-            # Make unexpected errors retryable by default
+            logger.error(f"Callback failed for job {job_id}: {str(e)}", exc_info=True)
             raise RetryableError(f"Unexpected error: {str(e)}") from e
 
     async def send_callback(
