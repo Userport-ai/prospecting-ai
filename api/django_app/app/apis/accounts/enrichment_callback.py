@@ -130,26 +130,58 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
                     'enriched_at': timezone.now().isoformat()
                 }
 
+                # First, extract all possible data for Lead model fields
+                current_role = lead_data.get('current_role', {})
+                role_title = (
+                        current_role.get('title') or
+                        lead_data.get('role_title') or
+                        lead_data.get('headline') or
+                        lead_data.get('occupation')
+                )
+
+                # Get name fields, trying multiple sources
+                first_name = (
+                        lead_data.get('first_name') or
+                        (lead_data.get('full_name', '').split()[0] if lead_data.get('full_name') else None)
+                )
+                last_name = (
+                        lead_data.get('last_name') or
+                        (lead_data.get('full_name', '').split()[-1] if lead_data.get('full_name') and len(lead_data.get('full_name', '').split()) > 1 else None)
+                )
+
+                # Extract phone with fallbacks
+                phone = (
+                        lead_data.get('phone') or
+                        lead_data.get('mobile') or
+                        current_role.get('phone') or
+                        None
+                )
+
                 # Collect all fields that aren't part of the standard model
                 custom_fields = {}
+                model_fields = {
+                    'first_name', 'last_name', 'email', 'phone', 'linkedin_url',
+                    'fit_score', 'current_role', 'headline', 'role_title', 'score',
+                    'enrichment_status', 'source', 'suggestion_status'
+                }
+
                 for key, value in lead_data.items():
-                    if key not in [
-                        'first_name', 'last_name', 'email', 'phone', 'linkedin_url',
-                        'fit_score', 'current_role', 'headline'  # Already handled
-                    ] and key not in enrichment_data:  # Don't duplicate enrichment data
+                    if key not in model_fields and key not in enrichment_data:
                         custom_fields[key] = value
 
                 # If there's raw data, add it to custom fields
                 if 'raw_data' in lead_data:
                     custom_fields['raw_data'] = lead_data['raw_data']
 
+                # Create the defaults dictionary with all available data
                 defaults = {
                     'tenant': account.tenant,
-                    'first_name': lead_data.get('first_name'),
-                    'last_name': lead_data.get('last_name'),
-                    'role_title': lead_data.get('current_role', {}).get('title') or lead_data.get('headline'),
+                    'first_name': first_name,
+                    'last_name': last_name,
+                    'role_title': role_title,
                     'email': lead_data.get('email'),
-                    'phone': lead_data.get('phone'),
+                    'phone': phone,
+                    'linkedin_url': lead_data.get('linkedin_url'),
                     'score': lead_data.get('fit_score', 0.0),
                     'enrichment_status': EnrichmentStatus.COMPLETED,
                     'last_enriched_at': timezone.now(),
