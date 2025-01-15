@@ -54,7 +54,7 @@ spec:
           httpGet:
             path: /api/v2/health/ready/
             port: 8000
-          initialDelaySeconds: 90
+          initialDelaySeconds: 45
           timeoutSeconds: 10
           periodSeconds: 15
           failureThreshold: 3
@@ -62,7 +62,7 @@ spec:
           httpGet:
             path: /api/v2/health/status/
             port: 8000
-          initialDelaySeconds: 90
+          initialDelaySeconds: 45
           timeoutSeconds: 10
           periodSeconds: 15
           failureThreshold: 3
