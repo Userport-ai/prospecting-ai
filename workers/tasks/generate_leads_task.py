@@ -1,17 +1,17 @@
-import os
-import re
-import uuid
+import asyncio
 import json
 import logging
-import asyncio
+import os
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
-import google.generativeai as genai
 from typing import Dict, Any, List, Optional, Tuple, Union
 
-from services.django_callback_service import CallbackService
+import google.generativeai as genai
+
 from services.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
+from services.django_callback_service import CallbackService
 from .enrichment_task import AccountEnrichmentTask
 
 logger = logging.getLogger(__name__)
@@ -224,6 +224,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
+                source="proxycurl",
                 status='processing',
                 completion_percentage=10,
                 processed_data={'stage': current_stage}
@@ -240,6 +241,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
+                source="proxycurl",
                 status='processing',
                 completion_percentage=40,
                 processed_data={
@@ -256,6 +258,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
+                source="proxycurl",
                 status='processing',
                 completion_percentage=70,
                 processed_data={
@@ -287,6 +290,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
+                source="proxycurl",
                 status='completed',
                 completion_percentage=100,
                 processed_data={
@@ -322,6 +326,7 @@ class LeadIdentificationTask(AccountEnrichmentTask):
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
+                source="proxycurl",
                 status='failed',
                 error_details=error_details,
                 processed_data={'stage': current_stage}
@@ -804,27 +809,51 @@ class LeadIdentificationTask(AccountEnrichmentTask):
 
 
     async def _evaluate_leads(self, structured_leads: List[Dict[str, Any]], product_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        evaluated_leads = []
-        failed_leads = []
+        """Evaluate leads using Gemini AI based on product criteria."""
+        try:
+            if not structured_leads:
+                logger.warning("No structured leads provided for evaluation")
+                return []
 
-        for batch in self._chunk_leads(structured_leads, self.BATCH_SIZE):
-            try:
-                batch_results = await self._evaluate_lead_batch(batch, product_data)
-                evaluated_leads.extend(batch_results)
-            except Exception as e:
-                logger.error(f"Batch evaluation failed: {str(e)}")
-                failed_leads.extend(batch)
+            # Process leads in batches to avoid token limits
+            evaluated_leads = []
+            batch_size = self.BATCH_SIZE
 
-        if failed_leads:
-            # Attempt recovery with smaller batch size
-            for lead in failed_leads:
+            for i in range(0, len(structured_leads), batch_size):
+                batch = structured_leads[i:i + batch_size]
+
+                evaluation_prompt = self.prompts.LEAD_EVALUATION_PROMPT.format(
+                    product_info=json.dumps(product_data, indent=2),
+                    persona_info=json.dumps(product_data.get('persona_role_titles', {}), indent=2),
+                    lead_data=json.dumps(batch, indent=2)
+                )
+
+                response = self.model.generate_content(evaluation_prompt)
+                if not response or not response.parts:
+                    logger.error(f"Empty response from Gemini AI for batch {i//batch_size + 1}")
+                    continue
+
                 try:
-                    result = await self._evaluate_lead_batch([lead], product_data)
-                    evaluated_leads.extend(result)
-                except Exception as e:
-                    logger.error(f"Single lead evaluation failed: {str(e)}")
+                    batch_results = self._parse_gemini_response(response.parts[0].text)
+                    if batch_results and 'evaluated_leads' in batch_results:
+                        evaluated_leads.extend(batch_results['evaluated_leads'])
+                    else:
+                        logger.error(f"Invalid response structure for batch {i//batch_size + 1}")
 
-        return evaluated_leads
+                except ValueError as e:
+                    logger.error(f"Error parsing batch {i//batch_size + 1}: {str(e)}")
+                    continue
+
+            # Validate and normalize scores
+            for lead in evaluated_leads:
+                lead['fit_score'] = max(0.0, min(1.0, float(lead.get('fit_score', 0))))
+
+            return evaluated_leads
+
+        except Exception as e:
+            logger.error(f"Error evaluating leads: {str(e)}", exc_info=True)
+            raise
+
 
     async def _store_results(
             self,
@@ -852,24 +881,38 @@ class LeadIdentificationTask(AccountEnrichmentTask):
         )
 
     def _parse_gemini_response(self, response_text: str) -> Dict[str, Any]:
+        """Parse and validate Gemini AI response."""
+        logger.debug(f"Parsing Gemini response: {response_text}")
         try:
             cleaned_text = response_text.strip()
-            # Add response text validation
-            if not cleaned_text:
-                raise ValueError("Empty response from Gemini")
 
-            # Pre-process known JSON formatting issues
-            cleaned_text = cleaned_text.replace("'", '"')
-            cleaned_text = re.sub(r'([{,]\s*)(\w+)(:)', r'\1"\2"\3', cleaned_text)
+            # Remove code block markers if present
+            if cleaned_text.startswith("```json"):
+                cleaned_text = cleaned_text[7:]
+            elif cleaned_text.startswith("```"):
+                cleaned_text = cleaned_text[3:]
 
-            # Remove markdown code blocks if present
-            if cleaned_text.startswith("```"):
-                cleaned_text = re.sub(r'^```json?\s*|\s*```\s*$', '', cleaned_text)
+            if cleaned_text.endswith("```"):
+                cleaned_text = cleaned_text[:-3]
 
-            return json.loads(cleaned_text)
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing error. Text: '{cleaned_text[:500]}...'")
-            logger.error(f"Error position: line {e.lineno}, column {e.colno}, char {e.pos}")
+            cleaned_text = cleaned_text.strip()
+
+            try:
+                parsed_data = json.loads(cleaned_text)
+
+                # Validate basic structure
+                if not isinstance(parsed_data, dict):
+                    raise ValueError("Parsed response is not a dictionary")
+
+                return parsed_data
+
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error. Text: '{cleaned_text[:500]}...'")
+                logger.error(f"JSON error details: {str(e)}")
+                raise ValueError(f"Failed to parse Gemini response as JSON: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Error parsing Gemini response: {str(e)}", exc_info=True)
             raise
 
     async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
