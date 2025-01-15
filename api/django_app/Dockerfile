@@ -4,13 +4,12 @@
 FROM python:3.10-slim as python-base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
+    PIP_NO_CACHE_DIR=0 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     STATIC_ROOT=/app/staticfiles
 
 # ---- Dependencies ----
 FROM python-base as builder
-WORKDIR /app
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,9 +17,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+WORKDIR /wheels
+
+# Copy requirements files
 COPY requirements.txt .
-RUN pip wheel --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+# Build wheels for ALL dependencies (including sub-dependencies)
+RUN pip wheel --wheel-dir=/wheels \
+    --requirement requirements.txt \
+    --wheel-dir=/wheels \
+    gunicorn \
+    && pip wheel asgiref>=3.8.1
 
 # ---- Final stage ----
 FROM python-base
@@ -61,12 +68,14 @@ RUN ARCH=$(uname -m); \
     wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.1/cloud-sql-proxy.linux.${CLOUD_SQL_PROXY_ARCH} -O /usr/local/bin/cloud-sql-proxy && \
     chmod +x /usr/local/bin/cloud-sql-proxy
 
-# Copy wheels from builder stage and install
-COPY --from=builder /app/wheels /app/wheels
+# Copy wheels from builder stage
+COPY --from=builder /wheels /wheels
 COPY requirements.txt .
-RUN pip install --no-index --find-links=/app/wheels -r requirements.txt \
-    && pip install gunicorn \
-    && rm -rf /app/wheels
+
+# Install Python packages from wheels
+RUN pip install --no-index --find-links=/wheels -r requirements.txt \
+    && pip install --no-index --find-links=/wheels gunicorn \
+    && rm -rf /wheels
 
 # Copy application code
 COPY . .
