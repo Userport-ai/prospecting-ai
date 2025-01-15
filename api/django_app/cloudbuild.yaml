@@ -1,94 +1,100 @@
 steps:
-# Build the container image with build args
-- name: 'gcr.io/cloud-builders/docker'
-  args: [
-    'build',
-    '-f', './api/django_app/Dockerfile',
-    '--build-arg', 'USERPORT_DEBUG=${_USERPORT_DEBUG}',
-    '--build-arg', 'USERPORT_DEV_DB_USERNAME=${_USERPORT_DEV_DB_USERNAME}',
-    '--build-arg', 'USERPORT_DEV_DB_PASSWORD=${_USERPORT_DEV_DB_PASSWORD}',
-    '--build-arg', 'ALLOWED_HOSTS=${_ALLOWED_HOSTS}',
-    '--build-arg', 'GUNICORN_WORKERS=${_GUNICORN_WORKERS}',
-    '--build-arg', 'GUNICORN_TIMEOUT=${_GUNICORN_TIMEOUT}',
-    '--build-arg', 'CORS_ALLOWED_ORIGINS=${_CORS_ALLOWED_ORIGINS}',
-    '--build-arg', 'PORT=${_PORT}',
-    '--build-arg', 'WORKER_API_BASE_URL=${_WORKER_API_BASE_URL}',
-    '-t', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA',
-    '-t', 'gcr.io/$PROJECT_ID/userport-django-app:latest',
-    './api/django_app'
-  ]
+  # Build the container image with BuildKit enabled
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+      - 'BUILDKIT_PROGRESS=plain'
+    args: [
+      'build',
+      '--build-arg', 'BUILDKIT_INLINE_CACHE=1',
+      '-f', './api/django_app/Dockerfile',
+      '--build-arg', 'USERPORT_DEBUG=${_USERPORT_DEBUG}',
+      '--build-arg', 'USERPORT_DEV_DB_USERNAME=${_USERPORT_DEV_DB_USERNAME}',
+      '--build-arg', 'USERPORT_DEV_DB_PASSWORD=${_USERPORT_DEV_DB_PASSWORD}',
+      '--build-arg', 'ALLOWED_HOSTS=${_ALLOWED_HOSTS}',
+      '--build-arg', 'GUNICORN_WORKERS=${_GUNICORN_WORKERS}',
+      '--build-arg', 'GUNICORN_TIMEOUT=${_GUNICORN_TIMEOUT}',
+      '--build-arg', 'CORS_ALLOWED_ORIGINS=${_CORS_ALLOWED_ORIGINS}',
+      '--build-arg', 'PORT=${_PORT}',
+      '--build-arg', 'WORKER_API_BASE_URL=${_WORKER_API_BASE_URL}',
+      '-t', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA',
+      '-t', 'gcr.io/$PROJECT_ID/userport-django-app:latest',
+      './api/django_app'
+    ]
 
-# Push the container images
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:latest']
+  # Push images in parallel
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-latest'
+    args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:latest']
+    waitFor: ['build']
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-sha'
+    args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA']
+    waitFor: ['build']
 
-  # Get GKE credentials first
-- name: 'gcr.io/cloud-builders/gcloud'
-  args:
-    - 'container'
-    - 'clusters'
-    - 'get-credentials'
-    - 'userport-service-prod'
-    - '--zone=us-west1'
-    - '--project=$PROJECT_ID'
-  env:
-    - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
-    - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+  # Get GKE credentials and set up KSA (can run in parallel with pushes)
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'get-credentials'
+    args:
+      - 'container'
+      - 'clusters'
+      - 'get-credentials'
+      - 'userport-service-prod'
+      - '--zone=us-west1'
+      - '--project=$PROJECT_ID'
+    waitFor: ['build']
 
-  # Set up KSA annotation
-- name: 'gcr.io/cloud-builders/kubectl'
-  args:
-    - 'annotate'
-    - 'serviceaccount'
-    - 'userport-ksa'
-    - 'iam.gke.io/gcp-service-account=userport-worker@omega-winter-431704-u5.iam.gserviceaccount.com'
-    - '--overwrite'
-  env:
-    - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
-    - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'setup-ksa'
+    args:
+      - 'annotate'
+      - 'serviceaccount'
+      - 'userport-ksa'
+      - 'iam.gke.io/gcp-service-account=userport-worker@omega-winter-431704-u5.iam.gserviceaccount.com'
+      - '--overwrite'
+    waitFor: ['get-credentials']
 
-  # Create/update the database credentials secret
-- name: 'gcr.io/cloud-builders/kubectl'
-  entrypoint: 'bash'
-  args:
-    - '-c'
-    - |
-      printf "%s" "${_USERPORT_DEV_DB_PASSWORD}" > password.txt
-      printf "%s" "${_USERPORT_DEV_DB_USERNAME}" > username.txt
-      kubectl create secret generic db-credentials \
-        --from-file=password=password.txt \
-        --from-file=username=username.txt \
-        --dry-run=client -o yaml | \
-      kubectl apply -f - --validate=false
-      rm password.txt username.txt
-  env:
-    - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
-    - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
+  # Create DB credentials (can run after get-credentials)
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'create-secrets'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        printf "%s" "${_USERPORT_DEV_DB_PASSWORD}" > password.txt
+        printf "%s" "${_USERPORT_DEV_DB_USERNAME}" > username.txt
+        kubectl create secret generic db-credentials \
+          --from-file=password=password.txt \
+          --from-file=username=username.txt \
+          --dry-run=client -o yaml | \
+        kubectl apply -f - --validate=false
+        rm password.txt username.txt
+    waitFor: ['get-credentials']
 
-  # Deploy to GKE last
-- name: 'gcr.io/cloud-builders/gke-deploy'
-  args:
-    - run
-    - --filename=api/django_app/k8s/
-    - --location=us-west1
-    - --cluster=userport-service-prod
-    - --image=gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA
-  env:
-    - 'CLOUDSDK_COMPUTE_ZONE=us-west1'
-    - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
-    - 'GCLOUD_PROJECT=$PROJECT_ID'
+  # Deploy to GKE (needs all previous steps)
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    args:
+      - run
+      - --filename=api/django_app/k8s/
+      - --location=us-west1
+      - --cluster=userport-service-prod
+      - --image=gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA
+    waitFor: ['push-sha', 'push-latest', 'setup-ksa', 'create-secrets']
 
-substitutions:
-  _USERPORT_DEBUG: '0'
-  _GUNICORN_WORKERS: '4'
-  _GUNICORN_TIMEOUT: '120'
-  _PORT: '8000'
+# Set a higher timeout for the build
+timeout: 1800s
 
 options:
+  machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
+  env:
+    - 'DOCKER_BUILDKIT=1'
+  # Enable caching for Docker layers
+  dynamicSubstitutions: true
+  workerPool:
+    'projects/${PROJECT_ID}/locations/us-west1/workerPools/docker-cache'
 
 images:
-- 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA'
-- 'gcr.io/$PROJECT_ID/userport-django-app:latest'
+  - 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/userport-django-app:latest'
