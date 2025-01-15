@@ -70,7 +70,40 @@ def enrichment_callback(request):
 
 
 def _update_account_from_enrichment(account: Account, enrichment_type: str, processed_data: Dict[str, Any]) -> None:
-    if enrichment_type == EnrichmentType.GENERATE_LEADS:
+    """
+     Updates account fields based on enrichment data
+     Args:
+         account: Account instance to update
+         enrichment_type: Type of enrichment
+         processed_data: Dictionary containing processed enrichment data and raw_data
+     """
+    if enrichment_type == EnrichmentType.COMPANY_INFO:
+        if not processed_data:
+            return
+        logger.info(f"Updating account {account.id} with company info")
+        # Update fields from processed_data
+        account.name = processed_data.get('company_name') or account.name
+        account.employee_count = processed_data.get('employee_count')
+        account.industry = processed_data.get('industry', [None])[0]  # Take first industry if list
+        account.location = processed_data.get('location')
+        account.website = processed_data.get('website')
+        account.linkedin_url = processed_data.get('linkedin_url')
+        # Handle array/JSON fields
+        if 'technologies' in processed_data:
+            account.technologies = processed_data['technologies']
+        if 'funding_details' in processed_data:
+            account.funding_details = processed_data['funding_details']
+        # Handle company info from raw_data
+        raw_data = processed_data.get('raw_data', {})
+        if isinstance(raw_data, dict):
+            company_info = raw_data.get('company_info', {})
+            account.company_type = company_info.get('company_type')
+            account.founded_year = company_info.get('founded_year')
+            account.customers = company_info.get('customers', [])
+            account.competitors = company_info.get('competitors', [])
+        account.save()
+        return
+    elif enrichment_type == EnrichmentType.GENERATE_LEADS:
         if not processed_data:
             return
         logger.info(f"Updating account {account.id} with suggested leads. "
@@ -212,4 +245,7 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
             'last_run': timezone.now().isoformat(),
             'leads_found': len(leads_data)
         }
+        account.save()
+    else:
+        logger.warning(f"Unsupported enrichment type: {enrichment_type}")
         account.save()

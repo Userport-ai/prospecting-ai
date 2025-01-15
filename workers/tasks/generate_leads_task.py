@@ -24,6 +24,10 @@ class PromptTemplates:
     LEAD_EVALUATION_PROMPT = """
     You're an experienced SDR tasked with evaluating leads. 
     Evaluate potential leads based on the given product and persona criteria. Rate each lead's fit.
+    1. Evaluate each lead independently, without referring to the other leads.
+    2. Use the given product and persona information to evaluate each lead.
+    3. You can assume that the account is already qualified and have a good potential fit, you're only evaluating leads.
+    4. Rationale and analysis should highlight and quote specific instances from the data that supports the score.
     
     Product Information:
     {product_info}
