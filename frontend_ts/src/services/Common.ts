@@ -1,7 +1,10 @@
 // Account Enrichment status as set by the backend.
-export enum EnrichmentStatus {
-  PENDING = "pending",
-  IN_PROGRESS = "in_progress",
-  COMPLETED = "completed",
-  FAILED = "failed",
+export interface EnrichmentStatus {
+  total_enrichments: number;
+  completed: number;
+  failed: number;
+  in_progress: number;
+  pending: number;
+  last_update: string; // ISO Date string.
+  quality_score: number;
 }

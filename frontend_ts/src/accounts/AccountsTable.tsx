@@ -50,9 +50,8 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
   const pollAccountIds: string[] = accounts
     .filter(
       (account) =>
-        ![EnrichmentStatus.COMPLETED, EnrichmentStatus.FAILED].includes(
-          account.enrichment_status
-        )
+        account.enrichment_status.in_progress > 0 ||
+        account.enrichment_status.pending > 0
     )
     .map((account) => account.id);
   const POLLING_INTERVAL = 60 * 1000; // Poll every 1 min.

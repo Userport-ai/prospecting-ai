@@ -6,8 +6,9 @@ import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Account as AccountRow } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { EnrichmentStatus } from "@/services/Common";
+import { Progress } from "@/components/ui/progress";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -76,22 +77,31 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     accessorFn: (row) => row.enrichment_status,
     header: "Enrichment Status",
     cell: (info) => {
-      const enrichmentStatus = info.getValue() as string | null;
+      const enrichmentStatus = info.getValue() as EnrichmentStatus | null;
       if (enrichmentStatus) {
-        if (enrichmentStatus === EnrichmentStatus.COMPLETED) {
+        if (enrichmentStatus.total_enrichments === enrichmentStatus.completed) {
           // Enrichment complete, link to Leads table on click.
           const accountId = info.row.original.id;
           const url = `/accounts/${accountId}/leads`;
           return (
             <Link to={url} className="text-blue-500 underline font-medium">
-              {enrichmentStatus}
+              Complete
             </Link>
           );
-        } else if (enrichmentStatus === EnrichmentStatus.FAILED) {
-          return <p className="text-red-700 font-medium">{enrichmentStatus}</p>;
+        } else if (enrichmentStatus.failed > 0) {
+          return <p className="text-red-700 font-medium">Failed</p>;
         } else {
           return (
-            <p className="text-yellow-600 font-medium">{enrichmentStatus}</p>
+            <div>
+              <p className="text-yellow-600 font-medium">In Progress</p>
+              <Progress
+                value={
+                  (enrichmentStatus.completed /
+                    enrichmentStatus.total_enrichments) *
+                  100
+                }
+              />
+            </div>
           );
         }
       }
