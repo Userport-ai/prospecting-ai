@@ -92,8 +92,6 @@ options:
     - 'DOCKER_BUILDKIT=1'
   # Enable caching for Docker layers
   dynamicSubstitutions: true
-  workerPool:
-    'projects/${PROJECT_ID}/locations/us-west1/workerPools/docker-cache'
 
 images:
   - 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA'
