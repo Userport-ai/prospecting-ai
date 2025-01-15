@@ -45,13 +45,15 @@ interface GetActivityParsingResultRequest extends BaseRequest {
   linkedin_url: string;
 }
 
+export interface ParsedHTML {
+  posts_html?: string | null;
+  comments_html?: string | null;
+  reactions_html?: string | null;
+}
+
 interface GetActivityParsingResultResponse extends BaseResponse {
   status: LinkedInActivityParsingResult;
-  parsed_data: {
-    posts_html?: string | null;
-    comments_html?: string | null;
-    reactions_html?: string | null;
-  };
+  parsed_data: ParsedHTML;
 }
 
 const activityParserExtensionId = import.meta.env

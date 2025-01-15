@@ -1,88 +1,103 @@
-import { Button } from "@/components/ui/button";
 import {
   getLinkedInActivityParsingResult,
   LinkedInActivityParsingResult,
+  ParsedHTML,
   startLinkedInActivityParsing,
 } from "@/services/Extension";
 import { useEffect, useState } from "react";
 
-// Parses LinkedIn Activity for given Lead's LinkedIn URL.
-const LeadActivityParser: React.FC<{ linkedInUrl: string }> = ({
+interface LeadActivityParserProps {
+  leadId: string;
+  linkedInUrl: string;
+  startParsing: boolean;
+  onComplete: (leadId: string, parsedHTML: ParsedHTML) => void;
+  onError: (leadId: string, errorMessage: string) => void;
+}
+
+// Parses LinkedIn Activity for the given Lead.
+const LeadActivityParser: React.FC<LeadActivityParserProps> = ({
+  leadId,
   linkedInUrl,
+  startParsing,
+  onComplete,
+  onError,
 }) => {
+  const initialStatus = startParsing
+    ? LinkedInActivityParsingResult.SCHEDULED
+    : null;
   const [status, setStatus] = useState<LinkedInActivityParsingResult | null>(
-    null
+    initialStatus
   );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tabId, setTabId] = useState<number | null>(null); // LinkedIn Activity Tab Id.
-  const [parsedHTML, setParsedHTML] = useState<{
-    posts_html?: string | null;
-    comments_html?: string | null;
-    reactions_html?: string | null;
-  } | null>(null);
-  const POLLING_INTERVAL = 30 * 1000; // Poll every 30s.
+  const POLLING_INTERVAL = 10 * 1000; // Poll every 10s.
 
-  const handleClick = () => {
-    if (status === null) {
-      // Start activity research.
-      setStatus(LinkedInActivityParsingResult.SCHEDULED);
+  // Update status whenever startParsing value changes.
+  useEffect(() => {
+    if (startParsing) {
+      // setStatus(LinkedInActivityParsingResult.SCHEDULED);
+      // Wait for 0-3 seconds before starting so each activity starts at a different time.
+      const startDelay = Math.floor(Math.random() * 3000);
+      const intervalId = setTimeout(
+        () => setStatus(LinkedInActivityParsingResult.SCHEDULED),
+        startDelay
+      );
+      return () => clearTimeout(intervalId);
+    } else {
+      setStatus(null);
     }
-  };
-
-  if (parsedHTML) {
-    console.log("parsed HTML: ", parsedHTML);
-  }
+  }, [startParsing]);
 
   useEffect(() => {
     switch (status) {
       case LinkedInActivityParsingResult.SCHEDULED:
+        console.log("Starting Parsing for URL: ", linkedInUrl);
         startLinkedInActivityParsing(linkedInUrl)
           .then((response) => {
             setStatus(response.status);
             setTabId(response.tab_id);
           })
           .catch((error) => {
-            setErrorMessage((error as Error).message);
             setStatus(null);
+
+            // Call parent with error.
+            onError(leadId, String(error));
           });
         break;
       case LinkedInActivityParsingResult.IN_PROGRESS:
         if (!tabId) {
-          setErrorMessage(
+          // Call parent with error.
+          onError(
+            leadId,
             `Tab Id missing for URL: ${linkedInUrl}, cannot check parsing status`
           );
           return;
         }
-        const intervalId = setTimeout(async () => {
+        const intervalId = setInterval(async () => {
           getLinkedInActivityParsingResult(tabId, linkedInUrl)
             .then((response) => {
               if (response.status === LinkedInActivityParsingResult.COMPLETE) {
                 // Parsing is complete.
-                setParsedHTML(response.parsed_data);
-                setStatus(null);
                 setTabId(null);
-                setErrorMessage(null);
+
+                // Call parent with success.
+                onComplete(leadId, response.parsed_data);
               }
+              setStatus(response.status);
             })
             .catch((error) => {
-              setErrorMessage((error as Error).message);
               setStatus(null);
+
+              // Call parent withe error.
+              onError(leadId, String(error));
             });
         }, POLLING_INTERVAL);
-        return () => clearTimeout(intervalId);
+        return () => clearInterval(intervalId);
       default:
       // Do nothing.
     }
   }, [status]);
 
-  return (
-    <div>
-      {errorMessage && <p className="text-destructive">{errorMessage}</p>}
-      <Button className="w-fit" onClick={handleClick}>
-        Click me
-      </Button>
-    </div>
-  );
+  return null;
 };
 
 export default LeadActivityParser;

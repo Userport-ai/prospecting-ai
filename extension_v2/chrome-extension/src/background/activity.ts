@@ -34,7 +34,6 @@ interface FetchActivityResponse extends BaseActivityRequest {
 
 // Manages activity parsing communication with content Script.
 export const startActivityParsing = async (tabId: number, tabUrl: string) => {
-  // TODO: Store activity state for given Tab Id.
   await setActivityData(tabId, {
     status: ActivityParsingStatus.IN_PROGRESS,
     last_status: null,
