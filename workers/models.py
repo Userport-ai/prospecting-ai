@@ -3,7 +3,14 @@ from typing import List, Optional, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field
 
-class OpenAITokenUsage(BaseModel):
+class UserportPydanticBaseModel(BaseModel):
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat(),
+        }
+    
+
+class OpenAITokenUsage(UserportPydanticBaseModel):
     """Token usage when calling OpenAI models."""
     operation_tag: str = Field(..., description="Tag describing operation")
     prompt_tokens: int = Field(..., description="Prompt tokens used")
@@ -20,7 +27,7 @@ class OpenAITokenUsage(BaseModel):
         self.total_tokens += another.total_tokens
         self.total_cost_in_usd += another.total_cost_in_usd
 
-class LinkedInActivity(BaseModel):
+class LinkedInActivity(UserportPydanticBaseModel):
     """LinkedIn activity (post, comment, reaction)."""
 
     class Type(str, Enum):
@@ -35,10 +42,11 @@ class LinkedInActivity(BaseModel):
     type: "LinkedInActivity.Type" = Field(..., description="Activity type")
     content_md: str = Field(..., description="Content in markdown format")
 
-class ContentDetails(BaseModel):
+class ContentDetails(UserportPydanticBaseModel):
     """Processed activity content."""
 
     class ProcessingStatus(str, Enum):
+        NEW = "started"
         FAILED_MISSING_PUBLISH_DATE = "failed_missing_publish_date"
         FAILED_STALE_PUBLISH_DATE = "failed_stale_publish_date"
         FAILED_UNRELATED_TO_COMPANY = "failed_unrelated_to_company"
@@ -94,7 +102,7 @@ class ContentDetails(BaseModel):
 
     openai_tokens_used: Optional[OpenAITokenUsage] = Field(default=None)
 
-class LeadResearchReport(BaseModel):
+class LeadResearchReport(UserportPydanticBaseModel):
     """Lead research report model."""
 
     class Status(str, Enum):
@@ -106,14 +114,14 @@ class LeadResearchReport(BaseModel):
         COMPLETE = "complete"
         FAILED = "failed"
 
-    class Insights(BaseModel):
+    class Insights(UserportPydanticBaseModel):
         """Lead insights from activity analysis."""
 
-        class PersonalityTraits(BaseModel):
+        class PersonalityTraits(UserportPydanticBaseModel):
             description: str
             evidence: List[str]
 
-        class AreasOfInterest(BaseModel):
+        class AreasOfInterest(UserportPydanticBaseModel):
             description: str
             supporting_activities: List[str]
 
@@ -125,7 +133,7 @@ class LeadResearchReport(BaseModel):
         num_company_related_activities: Optional[int] = Field(default=None)
         total_tokens_used: Optional[OpenAITokenUsage] = Field(default=None)
 
-    class PersonalizedEmail(BaseModel):
+    class PersonalizedEmail(UserportPydanticBaseModel):
         """Personalized outreach email."""
         id: str = Field(...)
         creation_date: datetime = Field(...)

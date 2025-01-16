@@ -2,10 +2,27 @@ import os
 import logging
 from typing import List, Optional, Dict, Any
 import google.generativeai as genai
+from google.api_core.exceptions import ResourceExhausted
 
 from models import LeadResearchReport, ContentDetails, OpenAITokenUsage
+from utils.retry_utils import RetryConfig, RetryableError, with_retry
 
 logger = logging.getLogger(__name__)
+
+
+GEMINI_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    base_delay=2.0,
+    max_delay=30.0,
+    retryable_exceptions=[
+        RetryableError,
+        ResourceExhausted,
+        ValueError,
+        RuntimeError,
+        TimeoutError,
+        ConnectionError
+    ]
+)
 
 class LeadInsights:
     """Generate insights about a lead from their LinkedIn activities."""
@@ -107,6 +124,7 @@ class LeadInsights:
             logger.error(f"Error generating insights: {str(e)}", exc_info=True)
             return insights
 
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_analyze_personality")
     async def _analyze_personality(self, content_details: List[ContentDetails]) -> Dict[str, Any]:
         """Analyze personality traits from activities."""
         try:
@@ -140,6 +158,7 @@ Return as JSON:
             logger.error(f"Error analyzing personality: {str(e)}", exc_info=True)
             return {}
 
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_analyze_interests")
     async def _analyze_interests(self, content_details: List[ContentDetails]) -> Dict[str, Any]:
         """Analyze areas of interest from activities."""
         try:
@@ -177,6 +196,7 @@ Return as JSON:
             logger.error(f"Error analyzing interests: {str(e)}", exc_info=True)
             return {}
 
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_analyze_engaged_colleagues")
     async def _analyze_engaged_colleagues(self, content_details: List[ContentDetails]) -> Dict[str, Any]:
         """Analyze colleague engagement patterns."""
         try:
@@ -210,6 +230,7 @@ Return as JSON:
             logger.error(f"Error analyzing colleague engagement: {str(e)}", exc_info=True)
             return {}
 
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_analyze_product_engagement")
     async def _analyze_product_engagement(self, content_details: List[ContentDetails]) -> Dict[str, Any]:
         """Analyze product engagement patterns."""
         try:

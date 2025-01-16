@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import logging
 import os
@@ -204,9 +205,9 @@ class CallbackService:
                 account_id=account_id,
                 status=status,
                 enrichment_type=enrichment_type,
-                raw_data=raw_data,
-                processed_data=processed_data,
-                error_details=error_details,
+                raw_data = self._serialize(raw_data),
+                processed_data = self._serialize(processed_data),
+                error_details = self._serialize(error_details),
                 source=source,
                 is_partial=is_partial,
                 completion_percentage=completion_percentage,
@@ -219,3 +220,19 @@ class CallbackService:
                 exc_info=True
             )
             return False
+
+    def _serialize(self, data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Helper to serialize datetime fields in dictionaries."""
+        if data is None:
+            return None
+
+        def serialize_value(value):
+            if isinstance(value, datetime):
+                return value.isoformat()
+            elif isinstance(value, dict):
+                return self._serialize(value)  # Recursively serialize nested dicts
+            elif isinstance(value, list):
+                return [serialize_value(v) for v in value]  # Serialize list elements
+            return value
+
+        return {k: serialize_value(v) for k, v in data.items()}

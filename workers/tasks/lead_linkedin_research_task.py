@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
+from google.api_core.exceptions import ResourceExhausted
 
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
@@ -10,6 +11,7 @@ from tasks.base import BaseTask
 from models import LeadResearchReport, LinkedInActivity, ContentDetails
 from utils.activity_parser import LinkedInActivityParser
 from utils.lead_insights_gen import LeadInsights
+from utils.retry_utils import RetryConfig, RetryableError
 
 logger = logging.getLogger(__name__)
 
