@@ -13,38 +13,9 @@ import LeadActivityParser from "./LeadActivityParser";
 import { ParsedHTML } from "@/services/Extension";
 import { cn } from "@/lib/utils";
 import ScreenLoader from "@/common/ScreenLoader";
-
-// TODO: Move this to services/ once available via API.
-interface SuggestedLead {
-  id: string;
-  full_name: string;
-  first_name: string;
-  last_name: string;
-  title: string;
-  linkedin_url: string;
-  email: string | null;
-  about_description: string | null;
-  current_role: {
-    title: string;
-    department: string;
-    seniority: string;
-    years_in_role: number | null;
-    description: string | null;
-  };
-  location: string | null;
-  skills: string[];
-  education: {
-    degree: string;
-    institution: string;
-    year: number | null;
-  }[];
-  // AI populated fields.
-  fit_score: number;
-  rationale: string;
-  matching_criteria: string[];
-  persona_match: string | null;
-  recommended_approach: string;
-}
+import { Lead, listSuggestedLeads } from "@/services/Leads";
+import { useAuthContext } from "@/auth/AuthProvider";
+import { useParams } from "react-router";
 
 interface ParsedLead {
   id: string;
@@ -53,7 +24,7 @@ interface ParsedLead {
 }
 
 interface RecommendationsViewProps {
-  suggestedLeads: SuggestedLead[];
+  suggestedLeads: Lead[];
   selectedLeads: Set<string>;
   handleSelectLead: (lead: string) => void;
   handleAddLeads: () => void;
@@ -120,12 +91,20 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                       onCheckedChange={() => handleSelectLead(lead.id)}
                     />
                   </TableCell>
-                  <TableCell>{lead.fit_score}</TableCell>
+                  <TableCell>
+                    {lead.custom_fields
+                      ? lead.custom_fields.evaluation.fit_score
+                      : null}
+                  </TableCell>
                   <TableCell>
                     {lead.first_name} {lead.last_name}
                   </TableCell>
-                  <TableCell>{lead.title}</TableCell>
-                  <TableCell>{lead.persona_match}</TableCell>
+                  <TableCell>{lead.role_title}</TableCell>
+                  <TableCell>
+                    {lead.custom_fields
+                      ? lead.custom_fields.evaluation.persona_match
+                      : null}
+                  </TableCell>
                   <TableCell>
                     <a
                       href={lead.linkedin_url}
@@ -136,11 +115,24 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                       View Profile
                     </a>
                   </TableCell>
-                  <TableCell>{lead.about_description}</TableCell>
-                  <TableCell>{lead.current_role.years_in_role}</TableCell>
-                  <TableCell>{lead.rationale}</TableCell>
-                  <TableCell>{lead.matching_criteria}</TableCell>
-                  <TableCell>{lead.recommended_approach}</TableCell>
+                  <TableCell>Summary</TableCell>
+                  <TableCell>Years in Role</TableCell>
+                  <TableCell>
+                    {lead.custom_fields
+                      ? lead.custom_fields.evaluation.rationale
+                      : null}
+                    Rationale
+                  </TableCell>
+                  <TableCell>
+                    {lead.custom_fields
+                      ? lead.custom_fields.evaluation.matching_criteria
+                      : null}
+                  </TableCell>
+                  <TableCell>
+                    {lead.custom_fields
+                      ? lead.custom_fields.evaluation.recommended_approach
+                      : null}
+                  </TableCell>
                   {selectedLeads.has(lead.id) && (
                     <LeadActivityParser
                       leadId={lead.id}
@@ -216,17 +208,31 @@ const DisplayParsingErrors: React.FC<{ parsedLeads: ParsedLead[] }> = ({
 };
 
 interface SuggestedLeadsProps {
-  suggestedLeads: SuggestedLead[];
   onAddLeads: () => void;
 }
 
-const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
-  suggestedLeads,
-  onAddLeads,
-}) => {
+const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({ onAddLeads }) => {
+  const authContext = useAuthContext();
+  const [suggestedLeads, setSuggestedLeads] = useState<Lead[]>([]);
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [startParsing, setStartParsing] = useState<boolean>(false);
   const [parsedLeads, setParsedLeads] = useState<ParsedLead[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Account ID must exist in this route.
+  const { id } = useParams<{ id?: string }>();
+  const accountId: string = id!;
+
+  useEffect(() => {
+    setLoading(true);
+    listSuggestedLeads(authContext, accountId)
+      .then((leads) => setSuggestedLeads(leads))
+      .catch((error) =>
+        setErrorMessage(`Failed to fetch Suggested leads: ${String(error)}`)
+      )
+      .finally(() => setLoading(false));
+  }, []);
 
   // Handle if lead is selected or unselected and updated selected leads list.
   const handleSelectLead = (leadId: string) => {
@@ -279,15 +285,20 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
     setStartParsing(false);
 
     // TODO: call backend.
-    // Remove selected leads from the local list after successful call to the backend.
+    // Remove selected leads from the local suggested leads list after successful call to the backend.
 
     setSelectedLeads(new Set());
     // Call parent compoennt.
     // onAddLeads();
   }, [parsedLeads]);
 
+  if (loading) {
+    return <ScreenLoader />;
+  }
+
   return (
     <div className="flex flex-col gap-2">
+      {errorMessage && <p className="text-destructive">{errorMessage}</p>}
       <DisplayParsingErrors parsedLeads={parsedLeads} />
       {startParsing && <ActivityParsingInProgress />}
       <RecommendationsTableView

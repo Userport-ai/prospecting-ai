@@ -36,8 +36,8 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   const totalColumnsWidth = table.getCenterTotalSize();
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-md border w-fit border-gray-300 bg-white shadow-sm">
+    <div className="flex flex-col gap-4 mb-10">
+      <div className="rounded-md border w-full border-gray-300 bg-white shadow-sm">
         <div
           className="max-w-[80rem] min-w-full overflow-x-auto" // Ensures content width adapts dynamically
         >
@@ -139,37 +139,39 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
         </div>
       </div>
 
-      {/* Selected Rows Information */}
-      <div className="flex p-1 text-sm text-muted-foreground">
-        {table.getFilteredSelectedRowModel().rows.length} of{" "}
-        {table.getFilteredRowModel().rows.length} row(s) selected.
-      </div>
-
-      {/* Pagination Controls */}
-      <div className="flex items-center justify-start gap-4">
-        <div>
-          <p className=" text-sm text-gray-600">
-            Page {pagination.pageIndex + 1} of {table.getPageCount()}
-          </p>
+      <div className="w-full flex flex-col items-end">
+        {/* Selected Rows Information */}
+        <div className="flex p-1 text-sm text-muted-foreground">
+          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredRowModel().rows.length} row(s) selected.
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-          className="shadow-sm border-gray-300"
-        >
-          <ChevronLeft />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-          className="shadow-sm border-gray-300"
-        >
-          <ChevronRight />
-        </Button>
+
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-start gap-4">
+          <div>
+            <p className=" text-sm text-gray-600">
+              Page {pagination.pageIndex + 1} of {table.getPageCount()}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+            className="shadow-sm border-gray-300"
+          >
+            <ChevronLeft />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+            className="shadow-sm border-gray-300"
+          >
+            <ChevronRight />
+          </Button>
+        </div>
       </div>
     </div>
   );

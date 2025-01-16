@@ -21,7 +21,6 @@ import { Account as AccountRow, listAccounts } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import { listProducts, Product } from "@/services/Products";
-import { EnrichmentStatus } from "@/services/Common";
 
 const ZeroStateDisplay = () => {
   return (

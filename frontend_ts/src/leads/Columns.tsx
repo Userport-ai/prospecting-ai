@@ -117,7 +117,7 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   {
     id: "role_title",
     minSize: 200,
-    accessorFn: (row) => row.role_tile,
+    accessorFn: (row) => row.role_title,
     header: "Role Title",
     meta: {
       displayName: "Role Title",
@@ -174,7 +174,7 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
 // by adding Custom Columns to base static column definition using
 // information from the given Lead Rows.
 export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
-  // Get custom columns.
+  // Get custom columns from all the rows in table.
   var customColumnKeys = new Set<string>();
   for (const row of rows) {
     if (!row.custom_fields) {
@@ -185,15 +185,94 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
   }
 
   var finalColumns: ColumnDef<LeadRow>[] = [...baseLeadColumns];
+  // Custom columns also has AI created fields like "evaluation" which are
+  // populated whenever the lead is approved by the user.
+  // Since we know the structure of this object, we will derive columns
+  // from its keys separately.
+  const evaluationKey = "evaluation";
+  if (customColumnKeys.has(evaluationKey)) {
+    const evaluationColumns: ColumnDef<LeadRow>[] = [
+      {
+        id: "fit_score",
+        header: "Fit Score",
+        accessorFn: (row) =>
+          row.custom_fields ? row.custom_fields.evaluation.fit_score : null,
+        meta: {
+          displayName: "Fit Score",
+          visibleInitially: true,
+        } as CustomColumnMeta,
+      },
+      {
+        id: "persona_match",
+        header: "Persona Match",
+        accessorFn: (row) =>
+          row.custom_fields ? row.custom_fields.evaluation.persona_match : null,
+        meta: {
+          displayName: "Persona Match",
+          visibleInitially: true,
+        } as CustomColumnMeta,
+      },
+      {
+        id: "matchin_criteria",
+        header: "Matching Criteria",
+        accessorFn: (row) =>
+          row.custom_fields
+            ? row.custom_fields.evaluation.matching_criteria
+            : null,
+        meta: {
+          displayName: "Matching Criteria",
+          visibleInitially: true,
+        } as CustomColumnMeta,
+      },
+      {
+        id: "recommended_approach",
+        header: "Recommended Approach",
+        accessorFn: (row) =>
+          row.custom_fields
+            ? row.custom_fields.evaluation.recommended_approach
+            : null,
+        meta: {
+          displayName: "Recommended Approach",
+          visibleInitially: true,
+        } as CustomColumnMeta,
+      },
+      {
+        id: "rationale",
+        header: "Rationale",
+        accessorFn: (row) =>
+          row.custom_fields ? row.custom_fields.evaluation.rationale : null,
+        meta: {
+          displayName: "Rationale",
+          visibleInitially: true,
+        } as CustomColumnMeta,
+      },
+      {
+        id: "analysis",
+        header: "Analysis",
+        accessorFn: (row) =>
+          row.custom_fields ? row.custom_fields.evaluation.analysis : null,
+        meta: {
+          displayName: "Analysis",
+          visibleInitially: true,
+        } as CustomColumnMeta,
+      },
+    ];
+    finalColumns.push(...evaluationColumns);
+
+    // Delete the key so we don't create it again when creating the remaining
+    // custom column keys.
+    customColumnKeys.delete(evaluationKey);
+  }
+
   customColumnKeys.forEach((columnKey) => {
     finalColumns.push({
       id: columnKey,
       accessorFn: (row) => row.custom_fields,
       header: getCustomColumnDisplayName(columnKey),
       cell: (info) => {
+        // Render values in each cell for the given Custom Column.
         const customFields = info.getValue() as Record<string, any> | null;
         if (customFields && columnKey in customFields) {
-          // Return value of the custom fiel.
           return customFields[columnKey];
         }
         return null;
