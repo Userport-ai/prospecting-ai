@@ -10,6 +10,7 @@ from services.task_manager import TaskManager
 from services.task_registry import TaskRegistry
 from tasks.account_enhancement import AccountEnhancementTask
 from tasks.generate_leads_task import GenerateLeadsTask
+from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
 
 router = APIRouter()
 
@@ -17,6 +18,7 @@ router = APIRouter()
 task_registry = TaskRegistry()
 task_registry.register(AccountEnhancementTask)
 task_registry.register(GenerateLeadsTask)
+task_registry.register(LeadLinkedInResearchTask)
 
 def get_task_manager() -> TaskManager:
     """Dependency injection for task manager."""
