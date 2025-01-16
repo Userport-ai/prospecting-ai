@@ -213,7 +213,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         } as CustomColumnMeta,
       },
       {
-        id: "matchin_criteria",
+        id: "matching_criteria",
         header: "Matching Criteria",
         accessorFn: (row) =>
           row.custom_fields

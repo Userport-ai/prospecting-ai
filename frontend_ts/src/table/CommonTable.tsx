@@ -35,6 +35,8 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   // Instead we set the table width as an inline style per https://stackoverflow.com/questions/76855056/unable-to-set-arbitrary-value-for-a-background-in-tailwindcss.
   const totalColumnsWidth = table.getCenterTotalSize();
 
+  // const maxCellHeightClassName =
+
   return (
     <div className="flex flex-col gap-4 mb-10">
       <div className="rounded-md border w-full border-gray-300 bg-white shadow-sm">
@@ -116,10 +118,13 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                         style={{ width: cell.column.getSize() }}
                         className="text-gray-700 px-2 py-2"
                       >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
+                        {/* Clamping Cell content height */}
+                        <div className="overflow-hidden text-ellipsis line-clamp-5">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </div>
                       </TableCell>
                     ))}
                   </TableRow>
