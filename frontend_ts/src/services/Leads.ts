@@ -116,7 +116,7 @@ type ListLeadsResponse = ListObjectsResponse<Lead>;
 // Fetch all Leads. If Account Id is given, it fetches only leads in the given Account Id.
 export const listLeads = async (
   authContext: AuthContext,
-  accountId: string | null
+  accountId?: string
 ): Promise<Lead[]> => {
   return listLeadsHelper(authContext, accountId);
 };
@@ -124,7 +124,7 @@ export const listLeads = async (
 // Fetch suggested leads for the given account.
 export const listSuggestedLeads = async (
   authContext: AuthContext,
-  accountId: string | null
+  accountId: string
 ): Promise<Lead[]> => {
   return listLeadsHelper(authContext, accountId, SuggestionStatus.SUGGESTED);
 };
@@ -132,7 +132,7 @@ export const listSuggestedLeads = async (
 // Helper to list leads.
 const listLeadsHelper = async (
   authContext: AuthContext,
-  accountId: string | null,
+  accountId?: string,
   suggestionStatus?: SuggestionStatus
 ): Promise<Lead[]> => {
   var params: Record<string, any> = {};

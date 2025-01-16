@@ -21,6 +21,7 @@ import { Account as AccountRow, listAccounts } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import { listProducts, Product } from "@/services/Products";
+import { Separator } from "@/components/ui/separator";
 
 const ZeroStateDisplay = () => {
   return (
@@ -241,16 +242,18 @@ export default function AccountsTable() {
   };
 
   return (
-    <div>
+    <div className="px-4 mt-2">
       <PollPendingAccounts
         accounts={accounts}
         onPollingComplete={onPollingComplete}
       />
-      <div className="flex items-center gap-4 mb-3">
+      <div className="flex items-center gap-4">
         <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
         {/* Add Accounts to the table. */}
         <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
       </div>
+
+      <Separator className="my-4 bg-gray-300" />
 
       <Table
         columns={columns}

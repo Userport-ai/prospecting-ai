@@ -19,7 +19,6 @@ import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Lead as LeadRow, listLeads } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
-import { useParams } from "react-router";
 
 const ZeroStateDisplay = () => {
   return (
@@ -144,15 +143,19 @@ export const Table: React.FC<TableProps> = ({
   );
 };
 
+interface LeadsTableProps {
+  // Account ID not present when we want to
+  // list across all accounts.
+  accountId?: string;
+}
+
 // Displays table with list of leads.
-export default function LeadsTable() {
+const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const authContext = useAuthContext();
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [columns, setColumns] = useState<ColumnDef<LeadRow>[]>([]);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const { id } = useParams<{ id?: string }>();
-  const accountId: string | null = id ? id : null;
 
   useEffect(() => {
     listLeads(authContext, accountId)
@@ -187,4 +190,6 @@ export default function LeadsTable() {
       onCustomColumnAdded={onCustomColumnAdded}
     />
   );
-}
+};
+
+export default LeadsTable;

@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 import ScreenLoader from "@/common/ScreenLoader";
 import { Lead, listSuggestedLeads } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
-import { useParams } from "react-router";
 
 interface ParsedLead {
   id: string;
@@ -208,10 +207,14 @@ const DisplayParsingErrors: React.FC<{ parsedLeads: ParsedLead[] }> = ({
 };
 
 interface SuggestedLeadsProps {
+  accountId: string;
   onAddLeads: () => void;
 }
 
-const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({ onAddLeads }) => {
+const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
+  accountId,
+  onAddLeads,
+}) => {
   const authContext = useAuthContext();
   const [suggestedLeads, setSuggestedLeads] = useState<Lead[]>([]);
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
@@ -219,10 +222,6 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({ onAddLeads }) => {
   const [parsedLeads, setParsedLeads] = useState<ParsedLead[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Account ID must exist in this route.
-  const { id } = useParams<{ id?: string }>();
-  const accountId: string = id!;
 
   useEffect(() => {
     setLoading(true);

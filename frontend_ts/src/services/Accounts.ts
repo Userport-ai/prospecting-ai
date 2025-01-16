@@ -53,6 +53,31 @@ export const listAccounts = async (
   });
 };
 
+// Fetch a single Account with given ID.
+export const getAccount = async (
+  authContext: AuthContext,
+  id: string
+): Promise<Account> => {
+  const { userContext } = authContext;
+  var params: Record<string, any> = {
+    created_by: userContext!.user.id,
+    id: id,
+  };
+
+  return await apiCall<Account>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListAccountsResponse>(
+      ACCOUNTS_ENDPOINT,
+      { params }
+    );
+    if (response.data.count != 1) {
+      throw new Error(
+        `Expected 1 Account, got ${response.data.count} Accounts in results.`
+      );
+    }
+    return response.data.results[0];
+  });
+};
+
 export interface CreateAccountRequest {
   name: string;
   website: string;
