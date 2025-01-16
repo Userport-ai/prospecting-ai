@@ -5,8 +5,40 @@ import { useEffect, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { Account, getAccount } from "@/services/Accounts";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import ScreenLoader from "@/common/ScreenLoader";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+
+// Display path to current view.
+const PathToView: React.FC<{ account: Account }> = ({ account }) => {
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link to="/accounts" className="text-gray-500">
+              {" "}
+              Accounts
+            </Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbPage className="font-medium">
+            {account.name}
+          </BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+};
 
 enum LeadViewTab {
   LEADS = "leads",
@@ -56,10 +88,9 @@ const LeadsInAccount = () => {
     "w-full text-gray-500 text-sm hover:text-gray-700 py-2 rounded-lg data-[state=active]:bg-gray-200  data-[state=active]:text-gray-700";
 
   return (
-    <div className="px-4 mt-2">
-      <h1 className="font-bold text-gray-700 text-3xl mb-4 w-fit">
-        {account.name}
-      </h1>
+    <div className="px-4 mt-2 flex flex-col gap-6">
+      <PathToView account={account} />
+      <h1 className="font-bold text-gray-700 text-3xl w-fit">{account.name}</h1>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-[30rem] h-fit bg-transparent">
           <TabsTrigger value={LeadViewTab.LEADS} className={tabTriggerClass}>
