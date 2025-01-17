@@ -1,4 +1,4 @@
-import { ChevronsUpDown, ExternalLink } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
@@ -69,7 +69,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "linkedin_url",
-    minSize: 200,
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
     cell: (info) => {
@@ -84,7 +83,7 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
           rel="noopener noreferrer"
           className="flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline"
         >
-          {url} <ExternalLink size={18} />
+          {url}
         </a>
       );
     },
@@ -106,7 +105,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "company_name",
-    minSize: 200,
     accessorFn: (row) => row.account_details.name,
     header: "Company Name",
     meta: {
@@ -121,14 +119,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
     header: "Role Title",
     meta: {
       displayName: "Role Title",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
-    id: "duration_at_company",
-    header: "Duration at Company",
-    meta: {
-      displayName: "Duration at Company",
       visibleInitially: true,
     } as CustomColumnMeta,
   },
@@ -157,14 +147,6 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
     header: "Created On",
     meta: {
       displayName: "Created On",
-      visibleInitially: false,
-    } as CustomColumnMeta,
-  },
-  {
-    id: "linkedin_activity_status",
-    header: "LinkedIn Activity Enrichment Status",
-    meta: {
-      displayName: "LinkedIn Activity Enrichment Status",
       visibleInitially: false,
     } as CustomColumnMeta,
   },
@@ -206,21 +188,13 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         id: "persona_match",
         header: "Persona Match",
         accessorFn: (row) =>
-          row.custom_fields ? row.custom_fields.evaluation.persona_match : null,
-        meta: {
-          displayName: "Persona Match",
-          visibleInitially: true,
-        } as CustomColumnMeta,
-      },
-      {
-        id: "matching_criteria",
-        header: "Matching Criteria",
-        accessorFn: (row) =>
           row.custom_fields
-            ? row.custom_fields.evaluation.matching_criteria
+            ? getCustomColumnDisplayName(
+                row.custom_fields.evaluation.persona_match
+              )
             : null,
         meta: {
-          displayName: "Matching Criteria",
+          displayName: "Persona Match",
           visibleInitially: true,
         } as CustomColumnMeta,
       },

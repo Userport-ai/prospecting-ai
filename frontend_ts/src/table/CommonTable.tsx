@@ -6,14 +6,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ColumnDef, flexRender } from "@tanstack/react-table";
+import { CellContext, ColumnDef, flexRender } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { ArrowRightFromLine, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { Table as TanstackTable } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 import { CustomColumnMeta } from "./CustomColumnMeta";
 import CellExpansionSidebar from "./CellExpansionSidebar";
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 
 interface CommonTableProps<T> {
   table: TanstackTable<T>;
@@ -32,18 +32,19 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   pagination,
   headerClassName,
 }) => {
-  const [expandedCellNode, setExpandedCellNode] = useState<ReactNode | null>(
-    null
-  );
+  const [expandedCellContext, setExpandedCellContext] = useState<CellContext<
+    any,
+    unknown
+  > | null>(null);
 
   // Handler for when cell expansion Icon is clicked by the user.
-  const onExpandCell = (node: ReactNode) => {
-    setExpandedCellNode(node);
+  const onExpandCell = (cellContext: CellContext<any, unknown>) => {
+    setExpandedCellContext(cellContext);
   };
 
   // Handler for when cell expansion panel's open state changes
   const onCellExpansionPanelOpenChange = (open: boolean) => {
-    if (!open) setExpandedCellNode(null);
+    if (!open) setExpandedCellContext(null);
   };
 
   // We use total column width (in pixel values) to set the Table Width in CSS.
@@ -139,9 +140,9 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                           style={{ width: cell.column.getSize() }}
                           className="text-gray-700 px-2 py-2"
                         >
-                          <div className="flex flex-col gap-2">
+                          <div className="flex justify-between gap-2">
                             {/* Clamping Cell content height */}
-                            <div className="overflow-hidden text-ellipsis line-clamp-5">
+                            <div className="max-h-[5rem] overflow-hidden text-ellipsis line-clamp-3">
                               {flexRender(
                                 cell.column.columnDef.cell,
                                 cell.getContext()
@@ -152,13 +153,11 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                             {(cell.column.columnDef.meta as CustomColumnMeta)
                               .cellExpandable === true && (
                               <div className="flex justify-end">
-                                <ArrowRightFromLine
-                                  className="hover:cursor-pointer"
+                                <Maximize2
+                                  className="hover:cursor-pointer border border-gray-600  text-gray-600 hover:text-purple-400 hover:border-purple-400"
                                   size={16}
                                   onClick={() =>
-                                    onExpandCell(
-                                      cell.getContext().getValue() as ReactNode
-                                    )
+                                    onExpandCell(cell.getContext())
                                   }
                                 />
                               </div>
@@ -221,7 +220,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
 
       {/* Side Panel showing details of expandable cell. */}
       <CellExpansionSidebar
-        contentNode={expandedCellNode}
+        cellContext={expandedCellContext}
         onOpenChange={onCellExpansionPanelOpenChange}
       />
     </div>

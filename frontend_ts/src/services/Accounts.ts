@@ -20,13 +20,36 @@ export interface Account {
   customers: string[] | null;
   competitors: string[] | null;
   technologies: Record<string, any> | null;
-  funding_details: Record<string, any> | null;
+  funding_details: FundingDetails | null;
   enrichment_status: EnrichmentStatus;
   enrichment_sources: Record<string, any> | null;
   last_enriched_at: string | null;
   custom_fields: Record<string, any> | null;
   settings: Record<string, any> | null;
   created_at: string;
+}
+
+export interface FundingDetails {
+  total_funding: {
+    amount: number | null;
+    currency: string | null;
+    as_of_date: string | null;
+  };
+  funding_rounds: FundingRound[];
+}
+
+interface FundingRound {
+  series: string | null;
+  amount: number | null;
+  currency: string | null;
+  date: string | null;
+  lead_investors: string[];
+  other_investors: string[];
+  valuation: {
+    amount: number | null;
+    currency: string | null;
+    type: string | null;
+  };
 }
 
 type ListAccountsResponse = ListObjectsResponse<Account>;

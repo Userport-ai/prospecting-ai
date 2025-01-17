@@ -4,6 +4,30 @@ import { EnrichmentStatus } from "./Common";
 
 const LEADS_ENDPOINT = "/leads/";
 
+// Lead as returned by the backend API.
+export interface Lead {
+  id: string;
+  account_details: {
+    id: string;
+    name: string;
+    industry: string | null;
+  };
+  first_name: string | null;
+  last_name: string | null;
+  enrichment_status: EnrichmentStatus;
+  role_title: string | null;
+  linkedin_url: string;
+  email: string | null;
+  phone: string | null;
+  custom_fields: CustomFields | null;
+  enrichment_data: EnrichmentData;
+  source: Source;
+  suggestion_status: SuggestionStatus;
+  score: number | null;
+  last_enriched_at: string | null;
+  created_at: string;
+}
+
 // Lead Enrichment data as defined in
 // https://github.com/Userport-ai/prospecting-ai/blob/sowrabh/v2/api/django_app/app/apis/accounts/enrichment_callback.py.
 interface EnrichmentData {
@@ -85,30 +109,6 @@ enum SuggestionStatus {
   APPROVED = "approved",
   REJECTED = "rejected",
   MANUAL = "manual",
-}
-
-// Lead as returned by the backend API.
-export interface Lead {
-  id: string;
-  account_details: {
-    id: string;
-    name: string;
-    industry: string | null;
-  };
-  first_name: string | null;
-  last_name: string | null;
-  enrichment_status: EnrichmentStatus;
-  role_title: string | null;
-  linkedin_url: string;
-  email: string | null;
-  phone: string | null;
-  custom_fields: CustomFields | null;
-  enrichment_data: EnrichmentData;
-  source: Source;
-  suggestion_status: SuggestionStatus;
-  score: number | null;
-  last_enriched_at: string | null;
-  created_at: string;
 }
 
 type ListLeadsResponse = ListObjectsResponse<Lead>;

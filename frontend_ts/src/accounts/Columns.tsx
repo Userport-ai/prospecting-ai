@@ -1,20 +1,22 @@
-import { ChevronsUpDown, ExternalLink } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { ColumnDef, Table } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Account as AccountRow } from "@/services/Accounts";
+import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 import { Link } from "react-router";
 import { EnrichmentStatus } from "@/services/Common";
 import { Progress } from "@/components/ui/progress";
+import FundingDetailsView from "./FundingDetailsView";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
   {
     // Allows user to select rows from the table.
     id: "select",
+    maxSize: 50,
     header: ({ table }: { table: Table<AccountRow> }) => (
       <Checkbox
         className="bg-white data-[state=checked]:bg-purple-400"
@@ -46,6 +48,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "name",
     accessorFn: (row) => row.name,
     accessorKey: "name",
+    minSize: 200,
     header: ({ column }) => {
       return (
         <div className="flex justify-between items-center gap-2 mr-2">
@@ -107,7 +110,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
       }
       return null;
     },
-    size: 100,
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
     filterFn: "arrIncludesSome",
     meta: {
@@ -119,7 +121,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "location",
     accessorFn: (row) => row.location,
     header: "HQ",
-    size: 100,
     meta: {
       displayName: "HQ",
       visibleInitially: true,
@@ -129,7 +130,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "employee_count",
     accessorFn: (row) => row.employee_count,
     header: "Employee Count",
-    size: 100,
     meta: {
       displayName: "Employee Count",
       visibleInitially: true,
@@ -139,7 +139,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "customers",
     accessorFn: (row) => row.customers,
     header: "Customers",
-    size: 200,
+    minSize: 200,
     meta: {
       displayName: "Customers",
       visibleInitially: true,
@@ -149,13 +149,13 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "technologies",
     accessorFn: (row) => row.technologies,
     header: "Technologies",
+    minSize: 200,
     cell: (info) => {
       if (info.getValue()) {
         return JSON.stringify(info.getValue());
       }
       return null;
     },
-    size: 300,
     meta: {
       displayName: "Technologies",
       visibleInitially: true,
@@ -165,7 +165,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "competitors",
     accessorFn: (row) => row.competitors,
     header: "Competitors",
-    size: 200,
     meta: {
       displayName: "Competitors",
       visibleInitially: true,
@@ -175,7 +174,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "industry",
     accessorFn: (row) => row.industry,
     header: "Industry",
-    size: 200,
     meta: {
       displayName: "Industry",
       visibleInitially: true,
@@ -197,11 +195,10 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
           rel="noopener noreferrer"
           className="flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline"
         >
-          {url} <ExternalLink size={18} />
+          {url}
         </a>
       );
     },
-    size: 100,
     meta: {
       displayName: "Website",
       visibleInitially: true,
@@ -211,7 +208,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "linkedin_url",
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
-    size: 100,
+    minSize: 200,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -224,7 +221,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
           rel="noopener noreferrer"
           className="flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline"
         >
-          {url} <ExternalLink size={18} />
+          {url}
         </a>
       );
     },
@@ -237,7 +234,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "company_type",
     accessorFn: (row) => row.company_type,
     header: "Company Type",
-    size: 100,
     meta: {
       displayName: "Company Type",
       visibleInitially: true,
@@ -247,7 +243,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "created_at",
     accessorFn: (row) => formatDate(row.created_at),
     header: "Created On",
-    size: 200,
     meta: {
       displayName: "Created On",
       visibleInitially: true,
@@ -257,23 +252,25 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "funding_details",
     accessorFn: (row) => row.funding_details,
     header: "Funding Details",
+    minSize: 300,
     cell: (info) => {
-      if (info.getValue()) {
-        return JSON.stringify(info.getValue());
+      const fundingDetails = info.getValue() as FundingDetails | null;
+      if (!fundingDetails) {
+        return null;
       }
-      return null;
+      return <FundingDetailsView fundingDetails={fundingDetails} />;
     },
     size: 100,
     meta: {
       displayName: "Funding Details",
       visibleInitially: true,
+      cellExpandable: true,
     } as CustomColumnMeta,
   },
   {
     id: "founded_year",
     accessorFn: (row) => row.founded_year,
     header: "Founded Year",
-    size: 100,
     meta: {
       displayName: "Founded Year",
       visibleInitially: true,
@@ -289,7 +286,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
       }
       return null;
     },
-    size: 100,
     meta: {
       displayName: "Enrichment Sources",
       visibleInitially: true,
@@ -300,10 +296,9 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     accessorFn: (row) =>
       row.last_enriched_at ? formatDate(row.last_enriched_at) : "Unknown",
     header: "Last Enriched At",
-    size: 100,
     meta: {
       displayName: "Last Enriched At",
-      visibleInitially: true,
+      visibleInitially: false,
     } as CustomColumnMeta,
   },
 ];
