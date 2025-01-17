@@ -64,7 +64,7 @@ interface Evaluation {
   fit_score: number;
   persona_match: string;
   matching_criteria: string[];
-  recommended_approach: string[];
+  recommended_approach: string;
   analysis: string[];
   rationale: string[];
 }

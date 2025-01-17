@@ -227,6 +227,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
       {
         id: "recommended_approach",
         header: "Recommended Approach",
+        minSize: 200,
         accessorFn: (row) =>
           row.custom_fields
             ? row.custom_fields.evaluation.recommended_approach
@@ -234,26 +235,31 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         meta: {
           displayName: "Recommended Approach",
           visibleInitially: true,
+          cellExpandable: true,
         } as CustomColumnMeta,
       },
       {
         id: "rationale",
         header: "Rationale",
+        minSize: 200,
         accessorFn: (row) =>
           row.custom_fields ? row.custom_fields.evaluation.rationale : null,
         meta: {
           displayName: "Rationale",
           visibleInitially: true,
+          cellExpandable: true,
         } as CustomColumnMeta,
       },
       {
         id: "analysis",
         header: "Analysis",
+        minSize: 200,
         accessorFn: (row) =>
           row.custom_fields ? row.custom_fields.evaluation.analysis : null,
         meta: {
           displayName: "Analysis",
           visibleInitially: true,
+          cellExpandable: true,
         } as CustomColumnMeta,
       },
     ];

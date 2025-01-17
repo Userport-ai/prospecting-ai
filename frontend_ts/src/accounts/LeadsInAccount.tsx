@@ -85,7 +85,7 @@ const LeadsInAccount = () => {
   }
 
   const tabTriggerClass =
-    "w-full text-gray-500 text-sm hover:text-gray-700 py-2 rounded-lg data-[state=active]:bg-gray-200  data-[state=active]:text-gray-700";
+    "w-full text-gray-500 text-sm hover:text-gray-700 py-2 rounded-lg data-[state=active]:bg-purple-100  data-[state=active]:text-gray-700";
 
   return (
     <div className="px-4 mt-2 flex flex-col gap-6">
