@@ -365,7 +365,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
         # Extract role titles excluding end_user
         all_roles = []
         for persona_type, titles in persona_roles.items():
-            if persona_type != 'end_user':  # Skip end_user profiles
+            if persona_type not in ['end_user', 'end_users']:  # Skip end_user profiles
                 if isinstance(titles, list):
                     all_roles.extend(titles)
                 elif isinstance(titles, str):
