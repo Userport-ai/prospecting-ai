@@ -15,6 +15,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { listLeads } from "@/services/Leads";
 
 // Display path to current view.
 const PathToView: React.FC<{ account: Account }> = ({ account }) => {
@@ -59,7 +60,18 @@ const LeadsInAccount = () => {
 
   useEffect(() => {
     getAccount(authContext, accountId)
-      .then((account) => setAccount(account))
+      .then((account) => {
+        listLeads(authContext, accountId)
+          .then((leads) => {
+            setActiveTab(
+              leads.length > 0 ? LeadViewTab.LEADS : LeadViewTab.SUGGESTED_LEADS
+            );
+            setAccount(account);
+          })
+          .catch((error) =>
+            setErrorMessage(`Failed to list Leads: ${String(error)}`)
+          );
+      })
       .catch((error) =>
         setErrorMessage(`Failed to Get Account Details: ${String(error)}`)
       );
@@ -107,7 +119,7 @@ const LeadsInAccount = () => {
         <Separator className="mb-6 bg-gray-300" />
 
         <TabsContent value={LeadViewTab.LEADS}>
-          <LeadsTable />
+          <LeadsTable accountId={accountId} />
         </TabsContent>
         <TabsContent value={LeadViewTab.SUGGESTED_LEADS}>
           <SuggestedLeads accountId={account.id} onAddLeads={onAddLeads} />

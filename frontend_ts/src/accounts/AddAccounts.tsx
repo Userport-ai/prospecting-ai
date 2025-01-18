@@ -208,6 +208,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const AccountNameColumnHeader = "Name";
   const AccountWebsiteColumnHeader = "Website";
+  const AccountLinkedInURLColumnHeader = "LinkedIn URL";
 
   // CSV File is uploaded. Will validate contents during submit.
   const handleFileUpload = (file: File | null) => {
@@ -233,6 +234,12 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
       );
       return;
     }
+    if (!(AccountLinkedInURLColumnHeader in data[0])) {
+      setErrorMessage(
+        `"${AccountLinkedInURLColumnHeader}" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
+      );
+      return;
+    }
     // Validate that website rows all start with https://
     for (const row of data) {
       const websiteVal = row[AccountWebsiteColumnHeader] as string;
@@ -254,6 +261,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
       return {
         name: row[AccountNameColumnHeader] as string,
         website: row[AccountWebsiteColumnHeader] as string,
+        linkedin_url: row[AccountLinkedInURLColumnHeader] as string,
       };
     });
 
@@ -402,6 +410,10 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
     accountName: z.string().min(1, "Account Name is required"),
     productId: z.string().min(1, "Product is required"),
     website: z.string().min(1).startsWith("https://", "Website is required"),
+    linkedInUrl: z
+      .string()
+      .min(1)
+      .startsWith("https://", "Company LinkedIn URL is required"),
   });
 
   const form = useForm({
@@ -410,6 +422,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
       accountName: "",
       productId: "",
       website: "",
+      linkedInUrl: "",
     },
   });
 
@@ -419,6 +432,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
       name: updatedForm.accountName,
       website: updatedForm.website,
       product: updatedForm.productId,
+      linkedin_url: updatedForm.linkedInUrl,
     };
     setLoading(true);
     createAccount(authContext, createAccountRequest)
@@ -478,6 +492,27 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
                     <FormControl>
                       <Input
                         placeholder="e.g., https://www.stripe.com"
+                        className="border-gray-300 rounded-md"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="linkedInUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-800">
+                      LinkedIn URL
+                    </FormLabel>
+                    <FormDescription></FormDescription>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., https://www.linkedin.com/company/gleanwork/"
                         className="border-gray-300 rounded-md"
                         {...field}
                       />

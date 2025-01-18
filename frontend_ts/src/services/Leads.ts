@@ -137,7 +137,7 @@ const listLeadsHelper = async (
 ): Promise<Lead[]> => {
   var params: Record<string, any> = {};
   if (accountId) {
-    params["account__id"] = accountId;
+    params["account"] = accountId;
   }
   if (suggestionStatus) {
     params["suggestion_status"] = SuggestionStatus.SUGGESTED;
@@ -145,6 +145,7 @@ const listLeadsHelper = async (
     // Only list approved leads by default.
     params["suggestion_status"] = SuggestionStatus.APPROVED;
   }
+  console.log("ID bro: ", accountId);
   return await apiCall<Lead[]>(authContext, async (apiClient) => {
     const response = await apiClient.get<ListLeadsResponse>(LEADS_ENDPOINT, {
       params,

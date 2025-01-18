@@ -146,7 +146,7 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={14}
                   className="text-center text-gray-500 rounded-b-lg"
                 >
                   No suggested leads available.
