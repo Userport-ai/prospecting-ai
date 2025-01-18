@@ -7,6 +7,7 @@ google-cloud-bigquery==3.27.0
 google-generativeai==0.3.2  # For Gemini AI
 urllib3==2.2.1
 requests==2.31.0
+openai~=1.41.1
 python-json-logger==2.0.7  # For better JSON logging
 pydantic==2.7.3
 markdownify==0.14.1

@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from google.oauth2 import service_account
 from google.cloud import bigquery
 import logging
+from utils.bigquery_json_encoder import safe_json_dumps, BigQueryJSONEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,6 @@ class BigQueryService:
 
     def __init__(self):
         """Initialize BigQuery client and configuration."""
-
         service_account_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
         self.project = os.getenv('GOOGLE_CLOUD_PROJECT')
 
@@ -60,10 +60,10 @@ class BigQueryService:
 
             # Add additional fields with proper error handling for JSON
             try:
-                error_json = json.dumps(error_info) if error_info else None
+                error_json = safe_json_dumps(error_info) if error_info else None
             except (TypeError, ValueError):
                 logger.warning(f"Could not serialize error_info to JSON: {error_info}")
-                error_json = json.dumps({"error": "Error info serialization failed"})
+                error_json = safe_json_dumps({"error": "Error info serialization failed"})
 
             new_row.update({
                 'is_partial_data': bool(is_partial),
@@ -139,13 +139,11 @@ class BigQueryService:
 
         except Exception as e:
             logger.error(f"Error retrieving account data from BigQuery: {str(e)}")
-            # Return empty dict instead of raising to maintain backward compatibility
             return {}
 
     async def _update_account_data(self, account_id: str, row_data: Dict[str, Any]) -> None:
         """Update existing account data in BigQuery."""
         try:
-            # Modified query to use JSON functions for JSON fields
             update_query = """
             UPDATE `{}.{}.account_data`
             SET 
@@ -193,30 +191,16 @@ class BigQueryService:
             for field in json_fields:
                 value = row_data.get(field)
                 if value is not None:
-                    if isinstance(value, str):
-                        try:
-                            # Validate it's proper JSON by parsing and re-stringifying
-                            json.loads(value)
-                            row_data[field] = value
-                        except json.JSONDecodeError:
-                            # If it's not valid JSON, make it a JSON string
-                            row_data[field] = json.dumps({"value": value})
-                    else:
-                        # Convert non-string values to JSON
-                        row_data[field] = json.dumps(value)
+                    row_data[field] = safe_json_dumps(value)
                 else:
-                    # Use null JSON object for None values
                     row_data[field] = 'null'
 
             # Create query parameters
-            query_parameters = []
-
-            # Required parameters
-            query_parameters.extend([
+            query_parameters = [
                 bigquery.ScalarQueryParameter("account_id", "STRING", row_data['account_id']),
                 bigquery.ArrayQueryParameter("industry", "STRING", industries),
                 bigquery.ArrayQueryParameter("technologies", "STRING", technologies)
-            ])
+            ]
 
             # Optional scalar parameters
             optional_params = [
@@ -299,23 +283,12 @@ class BigQueryService:
             # Prepare funding details as valid JSON
             funding_details = financial_data.get('private_data', {})
             if funding_details:
-                try:
-                    if isinstance(funding_details, str):
-                        # Validate it's proper JSON
-                        json.loads(funding_details)
-                    else:
-                        # Convert to JSON string
-                        funding_details = json.dumps(funding_details)
-                except json.JSONDecodeError:
-                    funding_details = 'null'
+                funding_details = safe_json_dumps(funding_details)
             else:
                 funding_details = 'null'
 
             # Prepare raw data as valid JSON
-            if structured_data:
-                raw_data = json.dumps(structured_data)
-            else:
-                raw_data = 'null'
+            raw_data = safe_json_dumps(structured_data) if structured_data else 'null'
 
             return {
                 'record_id': record_id,
@@ -335,7 +308,6 @@ class BigQueryService:
             logger.error(f"Error preparing account row: {str(e)}")
             raise
 
-    # Data Merging Operations
     def _merge_account_data(self, existing: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
         """Merge existing and new account data, preferring newer non-null values."""
         merged = existing.copy()
@@ -394,21 +366,11 @@ class BigQueryService:
                         merged_data = new_data
 
                     # Convert back to JSON string
-                    if merged_data is not None:
-                        merged[field] = json.dumps(merged_data)
-                    else:
-                        merged[field] = 'null'
+                    merged[field] = safe_json_dumps(merged_data) if merged_data is not None else 'null'
+
                 except Exception as e:
                     logger.error(f"Error merging {field}: {str(e)}")
-                    # In case of error, use new value but ensure it's valid JSON
-                    try:
-                        if isinstance(new[field], str):
-                            json.loads(new[field])  # validate JSON
-                            merged[field] = new[field]
-                        else:
-                            merged[field] = json.dumps(new[field])
-                    except (TypeError, json.JSONDecodeError):
-                        merged[field] = 'null'
+                    merged[field] = safe_json_dumps(new[field])
 
         # Handle timestamp fields
         timestamp_fields = ['fetched_at', 'last_successful_update', 'last_attempt']
@@ -436,7 +398,6 @@ class BigQueryService:
 
         return False
 
-    # Enrichment Raw Data Operations
     async def insert_enrichment_raw_data(
             self,
             job_id: str,
@@ -489,27 +450,15 @@ class BigQueryService:
 
             # Handle raw_data JSON
             if raw_data is not None:
-                try:
-                    row['raw_data'] = json.dumps(raw_data)
-                except (TypeError, ValueError) as e:
-                    logger.warning(f"Error serializing raw_data: {str(e)}")
-                    row['raw_data'] = json.dumps({'error': 'Data serialization failed'})
+                row['raw_data'] = safe_json_dumps(raw_data)
 
             # Handle processed_data JSON
             if processed_data is not None:
-                try:
-                    row['processed_data'] = json.dumps(processed_data)
-                except (TypeError, ValueError) as e:
-                    logger.warning(f"Error serializing processed_data: {str(e)}")
-                    row['processed_data'] = json.dumps({'error': 'Data serialization failed'})
+                row['processed_data'] = safe_json_dumps(processed_data)
 
             # Handle error_details JSON
             if error_info is not None:
-                try:
-                    row['error_details'] = json.dumps(error_info)
-                except (TypeError, ValueError) as e:
-                    logger.warning(f"Error serializing error_details: {str(e)}")
-                    row['error_details'] = json.dumps({'error': 'Error info serialization failed'})
+                row['error_details'] = safe_json_dumps(error_info)
 
             # Insert data with proper error handling
             table = self.client.get_table(self._get_table_ref('enrichment_raw_data'))

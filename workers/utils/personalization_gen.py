@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import List, Optional, Dict, Any
-import google.generativeai as genai
+from services.ai_service import AIServiceFactory
 
 from models import LeadResearchReport, ContentDetails, OpenAITokenUsage
 
@@ -27,12 +27,7 @@ class LeadInsights:
         self.person_role_title = person_role_title
         self.person_about_me = person_about_me or "Not available"
 
-        self.GEMINI_API_TOKEN = os.getenv("GEMINI_API_TOKEN")
-        if not self.GEMINI_API_TOKEN:
-            raise ValueError("GEMINI_API_TOKEN environment variable required")
-
-        genai.configure(api_key=self.GEMINI_API_TOKEN)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.model = AIServiceFactory.create_service("openai")
 
         self.operation_tag = "insights_generation"
 
@@ -130,11 +125,8 @@ Return as JSON:
     "cost": number
 }}"""
 
-            response = self.model.generate_content(prompt)
-            if not response or not response.parts:
-                return {}
-
-            return self._parse_json_response(response.parts[0].text)
+            response = await self.model.generate_content(prompt)
+            return response
 
         except Exception as e:
             logger.error(f"Error analyzing personality: {str(e)}", exc_info=True)
@@ -167,11 +159,8 @@ Return as JSON:
     "cost": number
 }}"""
 
-            response = self.model.generate_content(prompt)
-            if not response or not response.parts:
-                return {}
-
-            return self._parse_json_response(response.parts[0].text)
+            response = await self.model.generate_content(prompt)
+            return response
 
         except Exception as e:
             logger.error(f"Error analyzing interests: {str(e)}", exc_info=True)
@@ -200,11 +189,8 @@ Return as JSON:
     "cost": number
 }}"""
 
-            response = self.model.generate_content(prompt)
-            if not response or not response.parts:
-                return {}
-
-            return self._parse_json_response(response.parts[0].text)
+            response = await self.model.generate_content(prompt)
+            return response
 
         except Exception as e:
             logger.error(f"Error analyzing colleague engagement: {str(e)}", exc_info=True)
@@ -233,11 +219,9 @@ Return as JSON:
     "cost": number
 }}"""
 
-            response = self.model.generate_content(prompt)
-            if not response or not response.parts:
-                return {}
+            response = await self.model.generate_content(prompt)
 
-            return self._parse_json_response(response.parts[0].text)
+            return response
 
         except Exception as e:
             logger.error(f"Error analyzing product engagement: {str(e)}", exc_info=True)

@@ -1,16 +1,53 @@
-from typing import Optional, Annotated, List, Tuple, Dict
-from deprecated import deprecated
-from pydantic.functional_validators import BeforeValidator
-from pydantic import BaseModel, Field, field_validator
-from datetime import datetime
-from app.utils import Utils
-from enum import Enum
+import json
 import re
+from datetime import datetime
+from enum import Enum
+from typing import Annotated, List, Tuple
+from typing import Optional, Any, Dict
 
-# Represents an ObjectId field in the database.
-# It will be represented as a `str` on the model so that it can be serialized to JSON.
-# The Before validator will convert ObjectId from DB into string so model validation does not
-# throw an error.
+from deprecated import deprecated
+from pydantic import BaseModel, ConfigDict
+from pydantic import Field, field_validator
+from pydantic.functional_validators import BeforeValidator
+
+from .utils import Utils
+
+
+class SerializableBaseModel(BaseModel):
+    """Base model that handles datetime and enum serialization"""
+    model_config = ConfigDict(
+        json_encoders={
+            datetime: lambda dt: dt.isoformat() if dt else None,
+            Enum: lambda e: e.value if e else None
+        },
+        use_enum_values=True
+    )
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        """Override model_dump to handle enum serialization"""
+        exclude_none = kwargs.pop('exclude_none', False)
+        result = super().model_dump(**kwargs)
+
+        def process_value(v: Any) -> Any:
+            if isinstance(v, Enum):
+                return v.value
+            if isinstance(v, datetime):
+                return v.isoformat() if v else None
+            if isinstance(v, dict):
+                return {k: process_value(v) for k, v in v.items()}
+            if isinstance(v, list):
+                return [process_value(i) for i in v]
+            return v
+
+        result = {k: process_value(v) for k, v in result.items()}
+        if exclude_none:
+            result = {k: v for k, v in result.items() if v is not None}
+        return result
+
+    def json(self, **kwargs):
+        """Custom JSON serialization"""
+        return json.dumps(self.model_dump(**kwargs))
+
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 

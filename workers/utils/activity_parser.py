@@ -12,6 +12,7 @@ from google.api_core.exceptions import ResourceExhausted
 
 import google.generativeai as genai
 from models import LinkedInActivity, ContentDetails, OpenAITokenUsage
+from services.ai_service import AIServiceFactory
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 
 # Configure logging
@@ -42,14 +43,8 @@ class LinkedInActivityParser:
         self.company_description = company_description
         self.person_role_title = person_role_title
 
-        self.GEMINI_API_TOKEN = os.getenv("GEMINI_API_TOKEN")
-        if not self.GEMINI_API_TOKEN:
-            logger.error("GEMINI_API_TOKEN environment variable not found")
-            raise ValueError("GEMINI_API_TOKEN environment variable required")
-
         try:
-            genai.configure(api_key=self.GEMINI_API_TOKEN)
-            self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            self.model = AIServiceFactory.create_service("openai")
             logger.info("Successfully configured Gemini API")
         except Exception as e:
             logger.error(f"Failed to configure Gemini API: {str(e)}")
@@ -264,19 +259,7 @@ Return as JSON with these fields:
 }}"""
 
             logger.debug(f"Sending prompt to Gemini (length: {len(prompt)})")
-            response = self.model.generate_content(prompt)
-
-            if not response or not response.parts:
-                logger.warning("Empty response from Gemini")
-                return {}
-
-            try:
-                result = self._parse_json_response(response.parts[0].text)
-                logger.debug(f"Successfully parsed JSON response: {len(str(result))} chars")
-                return result
-            except Exception as e:
-                logger.error(f"Error parsing JSON response: {str(e)}")
-                return {}
+            return await self.model.generate_content(prompt)
 
         except Exception as e:
             logger.error(f"Error in _analyze_content: {str(e)}", exc_info=True)
@@ -293,11 +276,9 @@ Return as JSON with these fields:
 Find date format like: 4h, 5d, 1mo, 2yr, 3w
 Return just the date string, nothing else."""
 
-            response = self.model.generate_content(prompt)
-            if not response or not response.parts:
-                return None
+            response = await self.model.generate_content(prompt, is_json=False)
 
-            date_str = response.parts[0].text.strip()
+            date_str = response.strip()
             return self._parse_relative_date(date_str)
 
         except Exception as e:
@@ -322,11 +303,8 @@ Return just the date string, nothing else."""
         "products": [string]
     }}"""
 
-            response = self.model.generate_content(prompt)
-            if not response or not response.parts:
-                return {}
-
-            return self._parse_json_response(response.parts[0].text)
+            response = await self.model.generate_content(prompt)
+            return response
 
         except Exception as e:
             logger.error(f"Error extracting people and products: {str(e)}", exc_info=True)
@@ -351,11 +329,8 @@ Return just the date string, nothing else."""
         "reposts": number or null
     }}"""
 
-            response = self.model.generate_content(prompt)
-            if not response or not response.parts:
-                return {}
-
-            return self._parse_json_response(response.parts[0].text)
+            response = await self.model.generate_content(prompt)
+            return response
 
         except Exception as e:
             logger.error(f"Error extracting metadata: {str(e)}", exc_info=True)
