@@ -20,7 +20,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = LeadDetailsSerializer
     queryset = Lead.objects.all()
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields =['id', 'account', 'email', 'phone', 'created_by']
+    filterset_fields =['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status']
     ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at']
     ordering = ['-created_at']  # Default sorting
 
