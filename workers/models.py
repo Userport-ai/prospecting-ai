@@ -1,7 +1,9 @@
 from datetime import datetime
-from typing import List, Optional, Dict, Any
 from enum import Enum
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
+
 
 class UserportPydanticBaseModel(BaseModel):
     class Config:

@@ -1,18 +1,18 @@
 import asyncio
-import os
-import uuid
+import datetime
 import json
 import logging
-import datetime
-from typing import Dict, Any, List
+import os
+import uuid
 from dataclasses import dataclass
-import requests
-import google.generativeai as genai
+from typing import Dict, Any, List
 
+import google.generativeai as genai
+import requests
+
+from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
-from .base import BaseTask
-from services.bigquery_service import BigQueryService
 from .enrichment_task import AccountEnrichmentTask
 
 logger = logging.getLogger(__name__)

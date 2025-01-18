@@ -1,13 +1,15 @@
+import logging
 import os
 import sys
 import time
 import traceback
+from typing import Any
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from api.routes import router
-import logging
 from pythonjsonlogger import jsonlogger
-from typing import Any
+
+from api.routes import router
 
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):

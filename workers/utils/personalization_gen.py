@@ -1,9 +1,8 @@
-import os
 import logging
 from typing import List, Optional, Dict, Any
-from services.ai_service import AIServiceFactory
 
 from models import LeadResearchReport, ContentDetails, OpenAITokenUsage
+from services.ai_service import AIServiceFactory
 
 logger = logging.getLogger(__name__)
 

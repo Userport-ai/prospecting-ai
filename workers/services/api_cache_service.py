@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple
+
 from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)

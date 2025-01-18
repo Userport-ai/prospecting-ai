@@ -1,16 +1,14 @@
-import os
-import re
-import logging
 import json
-from typing import List, Optional, Dict, Any
-from bs4 import BeautifulSoup
-from markdownify import markdownify
+import logging
+import re
 from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Any
+
+from bs4 import BeautifulSoup
 from dateutil.relativedelta import relativedelta
-
 from google.api_core.exceptions import ResourceExhausted
+from markdownify import markdownify
 
-import google.generativeai as genai
 from models import LinkedInActivity, ContentDetails, OpenAITokenUsage
 from services.ai_service import AIServiceFactory
 from utils.retry_utils import RetryableError, RetryConfig, with_retry

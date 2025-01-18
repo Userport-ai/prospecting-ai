@@ -1,5 +1,6 @@
-from typing import Dict, Any
 from abc import ABC, abstractmethod
+from typing import Dict, Any
+
 
 class BaseTask(ABC):
     """Base class for all tasks"""

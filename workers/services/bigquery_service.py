@@ -1,12 +1,14 @@
+import json
+import logging
 import os
 import uuid
-import json
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from google.oauth2 import service_account
+
 from google.cloud import bigquery
-import logging
-from utils.bigquery_json_encoder import safe_json_dumps, BigQueryJSONEncoder
+from google.oauth2 import service_account
+
+from utils.bigquery_json_encoder import safe_json_dumps
 
 logger = logging.getLogger(__name__)
 
