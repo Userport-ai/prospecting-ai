@@ -91,7 +91,7 @@ const CellExpansionSidebar: React.FC<CellExpansionSidebarProps> = ({
     <SidebarProvider
       open={cellContext !== null}
       onOpenChange={onOpenChange}
-      style={{ "--sidebar-width": "30rem" }}
+      // style={{ "--sidebar-width": "30rem" }}
     >
       {cellContext && <CellSidebar cellContext={cellContext} />}
     </SidebarProvider>

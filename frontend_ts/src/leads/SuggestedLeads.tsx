@@ -120,7 +120,6 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                     {lead.custom_fields
                       ? lead.custom_fields.evaluation.rationale
                       : null}
-                    Rationale
                   </TableCell>
                   <TableCell>
                     {lead.custom_fields
@@ -288,7 +287,7 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
 
     setSelectedLeads(new Set());
     // Call parent compoennt.
-    // onAddLeads();
+    onAddLeads();
   }, [parsedLeads]);
 
   if (loading) {
