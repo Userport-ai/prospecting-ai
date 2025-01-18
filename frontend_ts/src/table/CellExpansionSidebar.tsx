@@ -11,6 +11,12 @@ import { CellContext, flexRender } from "@tanstack/react-table";
 import { X } from "lucide-react";
 import { getCustomColumnDisplayName } from "./AddCustomColumn";
 
+// Need this interface to fix compilation error.
+// Solution found here: https://github.com/shadcn-ui/ui/issues/5509
+interface CustomCSSProperties extends React.CSSProperties {
+  "--sidebar-width"?: string;
+}
+
 export type AccountOrLeadRow = AccountRow | LeadRow;
 
 const CellSidebar: React.FC<{
@@ -91,7 +97,7 @@ const CellExpansionSidebar: React.FC<CellExpansionSidebarProps> = ({
     <SidebarProvider
       open={cellContext !== null}
       onOpenChange={onOpenChange}
-      // style={{ "--sidebar-width": "30rem" }}
+      style={{ "--sidebar-width": "30rem" } as CustomCSSProperties}
     >
       {cellContext && <CellSidebar cellContext={cellContext} />}
     </SidebarProvider>
