@@ -50,11 +50,12 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
   const pollAccountIds: string[] = accounts
     .filter(
       (account) =>
+        account.enrichment_status.total_enrichments === 0 ||
         account.enrichment_status.in_progress > 0 ||
         account.enrichment_status.pending > 0
     )
     .map((account) => account.id);
-  const POLLING_INTERVAL = 60 * 1000; // Poll every 1 min.
+  const POLLING_INTERVAL = 30 * 1000; // Poll every 30s.
 
   useEffect(() => {
     if (pollAccountIds.length === 0) {
@@ -66,7 +67,7 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
       onPollingComplete(newPolledAccounts);
     }, POLLING_INTERVAL);
     return () => clearInterval(intervalId);
-  }, [authContext, pollAccountIds]);
+  }, [pollAccountIds]);
   return null;
 };
 

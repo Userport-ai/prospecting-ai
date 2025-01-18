@@ -16,7 +16,6 @@ const LabelValuePair: React.FC<{ label: string; value: any }> = ({
 const FundingDetailsView: React.FC<{ fundingDetails: FundingDetails }> = ({
   fundingDetails,
 }) => {
-  console.log("details: ", fundingDetails);
   return (
     <div className="flex flex-col">
       {/* Total Funding Details */}

@@ -82,7 +82,12 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     cell: (info) => {
       const enrichmentStatus = info.getValue() as EnrichmentStatus | null;
       if (enrichmentStatus) {
-        if (enrichmentStatus.total_enrichments === enrichmentStatus.completed) {
+        if (enrichmentStatus.total_enrichments === 0) {
+          // Enrichment scheduled.
+          return <p className="text-red-950 font-medium">Scheduled</p>;
+        } else if (
+          enrichmentStatus.total_enrichments === enrichmentStatus.completed
+        ) {
           // Enrichment complete, link to Leads table on click.
           const accountId = info.row.original.id;
           const url = `/accounts/${accountId}/leads`;
@@ -121,6 +126,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "location",
     accessorFn: (row) => row.location,
     header: "HQ",
+    minSize: 500,
     meta: {
       displayName: "HQ",
       visibleInitially: true,
