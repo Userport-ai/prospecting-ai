@@ -11,6 +11,7 @@ from utils.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
 
+
 class AIService(ABC):
     """Abstract base class for AI service providers."""
 
@@ -53,6 +54,7 @@ class AIService(ABC):
             self._token_usage[usage.operation_tag].add_tokens(usage)
         else:
             self._token_usage[usage.operation_tag] = usage
+
 
 class OpenAIService(AIService):
     """OpenAI implementation of AI service."""
@@ -133,8 +135,8 @@ class OpenAIService(AIService):
         """Create token usage object."""
         total_tokens = prompt_tokens + completion_tokens
         total_cost = (
-                (prompt_tokens / 1000) * self.price_per_1k_tokens[self.model]["input"] +
-                (completion_tokens / 1000) * self.price_per_1k_tokens[self.model]["output"]
+            (prompt_tokens / 1000) * self.price_per_1k_tokens[self.model]["input"] +
+            (completion_tokens / 1000) * self.price_per_1k_tokens[self.model]["output"]
         )
 
         return TokenUsage(
@@ -145,6 +147,7 @@ class OpenAIService(AIService):
             total_cost_in_usd=total_cost,
             provider=self.provider_name
         )
+
 
 class GeminiService(AIService):
     """Gemini implementation of AI service."""
@@ -226,6 +229,7 @@ class GeminiService(AIService):
             total_cost_in_usd=total_cost,
             provider=self.provider_name
         )
+
 
 class AIServiceFactory:
     """Factory for creating AI service instances."""

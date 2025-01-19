@@ -34,11 +34,23 @@ workers/
    uvicorn main:app --reload
    ```
 
+4. Build using Docker
+   ```bash
+   docker build -t userport-workers-dev .
+   ```
+
+5. Run built Docker container
+   ```bash
+   docker run -p 8080:8080 --env-file .env \
+   -v $(pwd):/app \
+   userport-workers-dev
+  ```
+
 ## Usage
 
 1. Create a task:
    ```bash
-   curl -X POST http://localhost:8000/api/v1/tasks/create/hello_world \
+   curl -X POST http://localhost:8080/api/v1/tasks/create/hello_world \
         -H "Content-Type: application/json" \
         -d '{"message": "Hello from task!"}'
    ```

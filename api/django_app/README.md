@@ -12,6 +12,7 @@ sowrabh@Sowrabhs-MacBook-Pro django_app % docker build -t userport-app:dev .
    4. Make it executable: `chmod +x cloud-sql-proxy`
    5. Run `./cloud-sql-proxy --gcloud-auth omega-winter-431704-u5:us-central1:userport-pg --port 5433`
   `
+3. Build Docker: `docker build -t userport-app:dev .`
 4. Run the docker container using
 ```
 sowrabh@Sowrabhs-MacBook-Pro django_app % docker run -it --rm \
@@ -20,3 +21,7 @@ sowrabh@Sowrabhs-MacBook-Pro django_app % docker run -it --rm \
     --env-file .dev.env \
     userport-app:dev
 ```
+
+### Installation notes
+
+For Mac OS using Python 3.13, we need to use: [1] uwsgi==2.0.27 and [2] psycopg2-binary==2.9.10 instead.
