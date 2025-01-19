@@ -9,9 +9,11 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 
 import google.generativeai as genai
 
+from services.ai_service import AIServiceFactory
 from services.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
+from utils.role_pattern_generator import RolePatternGenerator
 from .enrichment_task import AccountEnrichmentTask
 
 FIT_SCORE_THRESHOLD = 0.0
@@ -350,6 +352,11 @@ class GenerateLeadsTask(AccountEnrichmentTask):
                 "stage": current_stage
             }
 
+    async def generate_role_search_pattern_ai(self, persona_roles: Dict[str, Union[List[str], str]]) -> str:
+        ai_service = AIServiceFactory.create_service("gemini")
+        generator = RolePatternGenerator(ai_service)
+        return await generator.generate_pattern(persona_roles)
+
 
     def generate_role_search_pattern(self, persona_roles: Dict[str, Union[List[str], str]]) -> str:
         """
@@ -431,12 +438,11 @@ class GenerateLeadsTask(AccountEnrichmentTask):
             raise ValueError("LinkedIn URL is required")
 
         # Set up search parameters
+        titles_ = await self.generate_role_search_pattern_ai(product_data.get('persona_role_titles', {}))
         search_params = {
             'url': linkedin_url,
             'page_size': self.PAGE_SIZE,
-            'role_search': self.generate_role_search_pattern(
-                product_data.get('persona_role_titles', {})
-            ),
+            'role_search': titles_,
             'enrich_profiles': 'enrich'
         }
 
