@@ -1,4 +1,5 @@
 import os
+import asyncio
 import logging
 import aiohttp
 from typing import List
@@ -23,6 +24,17 @@ GEMINI_RETRY_CONFIG = RetryConfig(
     ]
 )
 
+JINA_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    base_delay=1.0,
+    max_delay=5.0,
+    retryable_exceptions=[
+        RetryableError,
+        asyncio.TimeoutError,
+        ConnectionError
+    ]
+)
+
 
 class WebsiteParser:
     """Parser for a Company website."""
@@ -41,6 +53,7 @@ class WebsiteParser:
             logger.error(f"Failed to configure Gemini API: {str(e)}")
             raise
 
+    @with_retry(retry_config=JINA_RETRY_CONFIG, operation_name="_fetch_customers_from_website")
     async def fetch_company_customers(self) -> List[str]:
         """
         Fetches list of customers names listed on given Company Website.
@@ -51,9 +64,6 @@ class WebsiteParser:
         """
         try:
             website = self.website
-            if not website.startswith("https://"):
-                raise ValueError(f"Invalid website format: {website}")
-
             jina_endpoint = f"{self.BASE_URL}{website}"
             headers = {"Authorization": f"Bearer {self.jina_api_token}", "X-With-Images-Summary": "True"}
             timeout = aiohttp.ClientTimeout(total=20)  # Add timeout to prevent hanging
@@ -65,7 +75,7 @@ class WebsiteParser:
 
                     parsed_customers = await self._parse_customers(page_markdown=page_markdown)
 
-                    logger.info(f"Successfully fetched company customers for website: {self.website}")
+                    logger.debug(f"Successfully fetched company customers for website: {self.website}")
                     return parsed_customers
 
         except aiohttp.ClientError as e:
@@ -89,6 +99,7 @@ class WebsiteParser:
     Sometimes Customer names are found within case study and logo links on the page.
     Intelligently convert the links to company names using real world knowledge.
     Do not add Company names that are setting cookies on the web page as Customers.
+    Do not add Social media pages of the Company like LinkedIn, Facebook, Instagram or Twitter as Customers.
 
     Here are some examples:
     1. https://cdn.prod.website-files.com/601fab1cb6249b3cc9f592f0/66e0114153eb21ba3e5872d1_Transperfect.svg is Transperfect.
