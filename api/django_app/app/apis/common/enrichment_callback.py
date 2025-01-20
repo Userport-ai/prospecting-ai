@@ -92,7 +92,7 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
      Args:
          account: Account instance to update
          enrichment_type: Type of enrichment
-         processed_data: Dictionary containing processed enrichment data and raw_data
+         processed_data: Dictionary containing processed enrichment data
      """
     if enrichment_type == EnrichmentType.COMPANY_INFO:
         if not processed_data:
@@ -110,14 +110,10 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
             account.technologies = processed_data['technologies']
         if 'funding_details' in processed_data:
             account.funding_details = processed_data['funding_details']
-        # Handle company info from raw_data
-        raw_data = processed_data.get('raw_data', {})
-        if isinstance(raw_data, dict):
-            company_info = raw_data.get('company_info', {})
-            account.company_type = company_info.get('company_type')
-            account.founded_year = company_info.get('founded_year')
-            account.customers = company_info.get('customers', [])
-            account.competitors = company_info.get('competitors', [])
+        account.company_type = processed_data.get('company_type')
+        account.founded_year = processed_data.get('founded_year')
+        account.customers = processed_data.get('customers', [])
+        account.competitors = processed_data.get('competitors', [])
         account.save()
         return
     elif enrichment_type == EnrichmentType.GENERATE_LEADS:
@@ -241,9 +237,9 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
 
                 # Get role title from various sources
                 role_title = (
-                        current_role.get('title') or
-                        lead_data.get('occupation') or
-                        lead_data.get('headline')
+                    current_role.get('title') or
+                    lead_data.get('occupation') or
+                    lead_data.get('headline')
                 )
 
                 custom_fields = {

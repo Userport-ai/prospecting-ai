@@ -20,16 +20,20 @@ task_registry.register(AccountEnhancementTask)
 task_registry.register(GenerateLeadsTask)
 task_registry.register(LeadLinkedInResearchTask)
 
+
 def get_task_manager() -> TaskManager:
     """Dependency injection for task manager."""
     if os.getenv('ENVIRONMENT') == 'local':
         return MockTaskManager()
     return TaskManager()
 
+
 class TaskError(HTTPException):
     """Custom exception for task-related errors."""
+
     def __init__(self, status_code: int, detail: str):
         super().__init__(status_code=status_code, detail=detail)
+
 
 @router.post("/tasks/create/{task_name}")
 async def create_task(
@@ -53,6 +57,7 @@ async def create_task(
     except KeyError:
         raise TaskError(status_code=404, detail="Task not found")
 
+
 @router.post("/tasks/{task_name}")
 async def execute_task(
         task_name: str,
@@ -74,6 +79,7 @@ async def execute_task(
     except KeyError:
         raise TaskError(status_code=404, detail="Task not found")
 
+
 @router.get("/tasks/{job_id}/status")
 async def get_task_status(
         job_id: str,
@@ -92,6 +98,7 @@ async def get_task_status(
         raise TaskError(status_code=404, detail="Job not found")
     except Exception as e:
         raise TaskError(status_code=500, detail=str(e))
+
 
 @router.get("/tasks/failed")
 async def list_failed_tasks(
@@ -120,6 +127,7 @@ async def list_failed_tasks(
         )
     except Exception as e:
         raise TaskError(status_code=500, detail=str(e))
+
 
 @router.post("/tasks/{job_id}/retry")
 async def retry_task(

@@ -12,10 +12,12 @@ import requests
 
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
+from utils.website_parser import WebsiteParser
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from .enrichment_task import AccountEnrichmentTask
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class PromptTemplates:
@@ -229,6 +231,7 @@ Company Profile for analysis:
 Important: Start directly with the company name header. Do not include any introductory phrases like "Here's a summary" or "Let me provide".
 """
 
+
 class AccountEnhancementTask(AccountEnrichmentTask):
     """Task for enhancing account data with AI-powered company information."""
     ENRICHMENT_TYPE = 'company_info'
@@ -434,6 +437,15 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 logger.debug(f"Job {job_id}, Account {account_id}: Generating analysis")
                 analysis_text = await self._generate_analysis(company_profile)
 
+                # Fetch customers.
+                customers: List[str] = structured_data.get('market_position', {}).get('customers', [])
+                website: str = structured_data.get('digital_presence', {}).get('website', '')
+                if len(website) > 0:
+                    wb_parser = WebsiteParser(website=website)
+                    wb_customers: List[str] = await wb_parser.fetch_company_customers()
+                    # Merge customers from website parser.
+                    customers = list(set(customers) | set(wb_customers))
+
                 # Store data in BigQuery
                 logger.debug(f"Job {job_id}, Account {account_id}: Storing processed data in BigQuery")
                 await self.bq_service.insert_account_data(
@@ -448,16 +460,14 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     'employee_count': structured_data.get('business_metrics', {}).get('employee_count', {}).get('total'),
                     'industry': structured_data.get('industry', {}).get('sectors', []),
                     'location': self._format_location(structured_data.get('location', {})),
-                    'website': structured_data.get('digital_presence', {}).get('website'),
+                    'website': website,
                     'linkedin_url': structured_data.get('digital_presence', {}).get('social_media', {}).get('linkedin'),
                     'technologies': self._extract_technologies(structured_data.get('technology_stack', {})),
                     'funding_details': structured_data.get('financials', {}).get('private_data', {}),
-                    'company_info': {
-                        'company_type': structured_data.get('business_metrics', {}).get('company_type'),
-                        'founded_year': structured_data.get('business_metrics', {}).get('year_founded'),
-                        'customers': structured_data.get('business_details', {}).get('customers', []),
-                        'competitors': structured_data.get('market_position', {}).get('competitors', [])
-                    }
+                    'company_type': structured_data.get('business_metrics', {}).get('company_type'),
+                    'founded_year': structured_data.get('business_metrics', {}).get('year_founded'),
+                    'customers': customers,
+                    'competitors': structured_data.get('market_position', {}).get('competitors', [])
                 }
 
                 # Store enrichment raw data
@@ -607,10 +617,10 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         try:
             # Basic validation of LinkedIn company URL format
             return (
-                    url.startswith('https://www.linkedin.com/company/') and
-                    len(url) > len('https://www.linkedin.com/company/') and
-                    ' ' not in url and
-                    '\n' not in url
+                url.startswith('https://www.linkedin.com/company/') and
+                len(url) > len('https://www.linkedin.com/company/') and
+                ' ' not in url and
+                '\n' not in url
             )
         except Exception as e:
             logger.error(f"Error validating LinkedIn URL: {str(e)}")

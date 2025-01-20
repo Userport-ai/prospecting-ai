@@ -136,6 +136,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Binary
+cloud-sql-proxy
+
 # Spyder project settings
 .spyderproject
 .spyproject

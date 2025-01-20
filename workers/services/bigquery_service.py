@@ -12,6 +12,7 @@ from utils.bigquery_json_encoder import safe_json_dumps
 
 logger = logging.getLogger(__name__)
 
+
 class BigQueryService:
     """Service class for handling BigQuery operations for account enrichment data."""
 
