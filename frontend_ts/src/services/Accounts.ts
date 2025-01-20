@@ -19,7 +19,7 @@ export interface Account {
   founded_year: number | null;
   customers: string[] | null;
   competitors: string[] | null;
-  technologies: Record<string, any> | null;
+  technologies: string[] | null;
   funding_details: FundingDetails | null;
   enrichment_status: EnrichmentStatus;
   enrichment_sources: Record<string, any> | null;

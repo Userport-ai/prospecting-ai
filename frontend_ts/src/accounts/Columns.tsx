@@ -10,6 +10,7 @@ import { Link } from "react-router";
 import { EnrichmentStatus } from "@/services/Common";
 import { Progress } from "@/components/ui/progress";
 import FundingDetailsView from "./FundingDetailsView";
+import CellListView from "./CellListView";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -146,9 +147,17 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     accessorFn: (row) => row.customers,
     header: "Customers",
     minSize: 200,
+    cell: (info) => {
+      const customers = info.getValue() as string[] | null;
+      if (!customers || customers.length === 0) {
+        return null;
+      }
+      return <CellListView values={customers} />;
+    },
     meta: {
       displayName: "Customers",
       visibleInitially: true,
+      cellExpandable: true,
     } as CustomColumnMeta,
   },
   {
@@ -157,23 +166,34 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     header: "Technologies",
     minSize: 200,
     cell: (info) => {
-      if (info.getValue()) {
-        return JSON.stringify(info.getValue());
+      const technologies = info.getValue() as string[] | null;
+      if (!technologies || technologies.length === 0) {
+        return null;
       }
-      return null;
+      return <CellListView values={technologies} />;
     },
     meta: {
       displayName: "Technologies",
       visibleInitially: true,
+      cellExpandable: true,
     } as CustomColumnMeta,
   },
   {
     id: "competitors",
     accessorFn: (row) => row.competitors,
     header: "Competitors",
+    minSize: 200,
+    cell: (info) => {
+      const competitors = info.getValue() as string[] | null;
+      if (!competitors || competitors.length === 0) {
+        return null;
+      }
+      return <CellListView values={competitors} />;
+    },
     meta: {
       displayName: "Competitors",
       visibleInitially: true,
+      cellExpandable: true,
     } as CustomColumnMeta,
   },
   {
