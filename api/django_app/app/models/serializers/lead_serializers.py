@@ -54,11 +54,16 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
     def validate(self, data):
         """
         Ensure at least one identifier (linkedin_url or email) is provided
+        Only validate for POST/PUT requests, skip for PATCH/DELETE
         """
-        if not data.get('linkedin_url') and not data.get('email'):
-            raise serializers.ValidationError(
-                "Either linkedin_url or email must be provided"
-            )
+        # Get the request method from the context
+        request = self.context.get('request')
+        if request and request.method in ['POST', 'PUT']:
+            # Only validate for POST/PUT requests
+            if not data.get('linkedin_url') and not data.get('email'):
+                raise serializers.ValidationError(
+                    "Either linkedin_url or email must be provided"
+                )
         return data
 
 
