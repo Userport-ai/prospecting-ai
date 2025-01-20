@@ -353,9 +353,17 @@ class GenerateLeadsTask(AccountEnrichmentTask):
             }
 
     async def generate_role_search_pattern_ai(self, persona_roles: Dict[str, Union[List[str], str]]) -> str:
+        # Create a copy to avoid modifying the original dict
+        filtered_roles = persona_roles.copy()
+
+        # Remove end_user and end_users keys if they exist
+        filtered_roles.pop('end_user', None)
+        filtered_roles.pop('end_users', None)
+
         ai_service = AIServiceFactory.create_service("gemini")
         generator = RolePatternGenerator(ai_service)
-        return await generator.generate_pattern(persona_roles)
+        return await generator.generate_pattern(filtered_roles)
+
 
 
     def generate_role_search_pattern(self, persona_roles: Dict[str, Union[List[str], str]]) -> str:

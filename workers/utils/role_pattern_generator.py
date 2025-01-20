@@ -10,7 +10,7 @@ class RolePatternGenerator:
         """Initialize with AI service."""
         self.ai_service = ai_service
         self.prompt_template = """
-Generate a standard regex pattern that matches variations of these job titles, excluding the end_user roles.
+Generate a standard regex pattern that matches variations of these job titles, excluding the end_user, influencer roles.
 
 Role Titles:
 {titles}
@@ -25,6 +25,7 @@ Requirements:
 - Match when multiple departments are joined by "and" or "&"
 - Handle existing abbreviations in input (e.g., "VP" or "Ops")
 - Use non-capturing groups (?:) instead of capturing groups
+- Also feel free to add some additional related buyer like roles
 
 Return only the regex pattern as a JSON object with a single "pattern" field. No explanation or additional text.
 Example: {{"pattern": "your-standard-regex-pattern-here"}}
@@ -36,7 +37,7 @@ Example: {{"pattern": "your-standard-regex-pattern-here"}}
         formatted_roles = {
             role_type: titles
             for role_type, titles in persona_roles.items()
-            if role_type not in ['end_user', 'end_users']
+            if role_type not in ['end_user', 'end_users', 'influencer', 'influencers']
         }
 
         # Format prompt
