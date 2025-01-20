@@ -225,7 +225,11 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
   useEffect(() => {
     setLoading(true);
     listSuggestedLeads(authContext, accountId)
-      .then((leads) => setSuggestedLeads(leads))
+      .then((leads) =>
+        setSuggestedLeads(
+          leads.sort((l1, l2) => (l2.score ?? 0) - (l1.score ?? 0))
+        )
+      )
       .catch((error) =>
         setErrorMessage(`Failed to fetch Suggested leads: ${String(error)}`)
       )
