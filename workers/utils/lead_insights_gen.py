@@ -108,6 +108,22 @@ class LeadInsights:
                 cd for cd in all_content_details if cd.focus_on_company
             ])
 
+            # Generate outreach recommendations
+            outreach = await self._analyze_outreach_approach(all_content_details)
+            logger.debug(f"Outreach analysis for {self.person_name}: {outreach}")
+            if outreach:
+                insights.recommended_approach = LeadResearchReport.Insights.OutreachRecommendation(
+                    approach=outreach.get("approach", ""),
+                    key_topics=outreach.get("key_topics", []),
+                    conversation_starters=outreach.get("conversation_starters", []),
+                    best_channels=outreach.get("best_channels", []),
+                    timing_preferences=outreach.get("timing_preferences", ""),
+                    cautions=outreach.get("cautions", [])
+                )
+                prompt_tokens += outreach.get("prompt_tokens", 0)
+                completion_tokens += outreach.get("completion_tokens", 0)
+                total_cost += outreach.get("cost", 0.0)
+
             # Store token usage
             total_tokens = prompt_tokens + completion_tokens
             insights.total_tokens_used = OpenAITokenUsage(
@@ -123,6 +139,59 @@ class LeadInsights:
         except Exception as e:
             logger.error(f"Error generating insights: {str(e)}", exc_info=True)
             return insights
+
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_analyze_outreach_approach")
+    async def _analyze_outreach_approach(self, content_details: List[ContentDetails]) -> Dict[str, Any]:
+        """Analyze and recommend personalized outreach approach."""
+        logger.debug(f"Analyzing outreach approach for {self.person_name} at {self.company_name}")
+        try:
+            # Combine relevant activity details
+            activity_summaries = "\n\n".join([
+                cd.detailed_summary for cd in content_details
+                if cd.detailed_summary
+            ])
+
+            # Construct comprehensive context
+            context = f"""
+Person: {self.person_name}
+Role: {self.person_role_title}
+Company: {self.company_name}
+Company Description: {self.company_description}
+About: {self.person_about_me}
+
+Recent Activities:
+{activity_summaries}
+"""
+
+            prompt = f"""Analyze the following information and recommend a personalized outreach approach:
+
+{context}
+
+Consider:
+1. Their communication style and preferences based on activity patterns
+2. Topics they engage with most frequently
+3. Best conversation starters based on recent activities
+4. Optimal channels and timing based on their engagement patterns
+5. Any potential sensitivities or topics to avoid
+
+Return as JSON:
+{{
+    "approach": string (2-3 sentences describing recommended approach),
+    "key_topics": [string] (3-5 topics they care most about),
+    "conversation_starters": [string] (3 specific talking points based on their activities),
+    "best_channels": [string] (recommended outreach channels in order of preference),
+    "timing_preferences": string (when they seem most active/responsive),
+    "cautions": [string] (list of topics or approaches to avoid),
+    "prompt_tokens": number,
+    "completion_tokens": number,
+    "cost": number
+}}"""
+
+            return await self.model.generate_content(prompt)
+
+        except Exception as e:
+            logger.error(f"Error analyzing outreach approach: {str(e)}", exc_info=True)
+            return {}
 
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_analyze_personality")
     async def _analyze_personality(self, content_details: List[ContentDetails]) -> Dict[str, Any]:

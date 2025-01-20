@@ -19,6 +19,10 @@ class LeadLinkedInResearchTask(BaseTask):
         """Initialize task with required services."""
         self.bq_service = BigQueryService()
         self._initialize_credentials()
+        self.posts_html = None
+        self.comments_html = None
+        self.reactions_html = None
+
 
     def _initialize_credentials(self) -> None:
         """Initialize and validate required API credentials."""
@@ -60,6 +64,9 @@ class LeadLinkedInResearchTask(BaseTask):
         company_name = payload.get('company_name')
         person_linkedin_url = payload.get('person_linkedin_url')
         user_id = payload.get('user_id')
+        self.posts_html = payload.get('posts_html')
+        self.comments_html = payload.get('comments_html')
+        self.reactions_html = payload.get('reactions_html')
         current_stage = 'initialization'
         callback_service = CallbackService()
 
@@ -299,12 +306,13 @@ class LeadLinkedInResearchTask(BaseTask):
                 entity_id=account_id,
                 source='linkedin',
                 raw_data={
-                    'content_details': [cd.model_dump() for cd in content_details],
-                    'insights': insights.model_dump() if insights else None
+                    'posts_html':     self.posts_html if self.posts_html else None,
+                    'comments_html':  self.comments_html if self.comments_html else None,
+                    'reactions_html': self.reactions_html if self.reactions_html else None,
                 },
                 processed_data={
-                    'num_activities': len(content_details),
-                    'has_insights': insights is not None
+                    'content_details': [cd.model_dump() for cd in content_details],
+                    'insights': insights.model_dump() if insights else None,
                 },
                 status='completed'
             )

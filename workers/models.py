@@ -127,6 +127,16 @@ class LeadResearchReport(UserportPydanticBaseModel):
             description: str
             supporting_activities: List[str]
 
+        class OutreachRecommendation(BaseModel):
+            approach: str = Field(description="2-3 sentences describing recommended approach")
+            key_topics: List[str] = Field(description="3-5 topics they care most about")
+            conversation_starters: List[str] = Field(description="Specific talking points based on activities")
+            best_channels: List[str] = Field(description="Recommended outreach channels in order of preference")
+            timing_preferences: str = Field(description="When they seem most active/responsive")
+            cautions: List[str] = Field(description="Topics or approaches to avoid if any")
+
+        recommended_approach: Optional["LeadResearchReport.Insights.OutreachRecommendation"] = Field(default=None)
+
         personality_traits: Optional[PersonalityTraits] = Field(default=None)
         areas_of_interest: Optional[List[AreasOfInterest]] = Field(default=None)
         engaged_colleagues: Optional[List[str]] = Field(default=None)
@@ -134,6 +144,7 @@ class LeadResearchReport(UserportPydanticBaseModel):
         total_engaged_activities: Optional[int] = Field(default=None)
         num_company_related_activities: Optional[int] = Field(default=None)
         total_tokens_used: Optional[OpenAITokenUsage] = Field(default=None)
+
 
     class PersonalizedEmail(UserportPydanticBaseModel):
         """Personalized outreach email."""
