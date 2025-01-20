@@ -151,17 +151,18 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
 
                             {/* Expansion Icon for displaying detailed value of cell.*/}
                             {(cell.column.columnDef.meta as CustomColumnMeta)
-                              .cellExpandable === true && (
-                              <div className="flex justify-end">
-                                <Maximize2
-                                  className="hover:cursor-pointer border border-gray-600  text-gray-600 hover:text-purple-400 hover:border-purple-400"
-                                  size={16}
-                                  onClick={() =>
-                                    onExpandCell(cell.getContext())
-                                  }
-                                />
-                              </div>
-                            )}
+                              .cellExpandable === true &&
+                              cell.getValue() != null && (
+                                <div className="flex justify-end">
+                                  <Maximize2
+                                    className="hover:cursor-pointer border border-gray-600  text-gray-600 hover:text-purple-400 hover:border-purple-400"
+                                    size={16}
+                                    onClick={() =>
+                                      onExpandCell(cell.getContext())
+                                    }
+                                  />
+                                </div>
+                              )}
                           </div>
                         </TableCell>
                       ))}

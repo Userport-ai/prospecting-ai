@@ -144,7 +144,12 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   },
   {
     id: "customers",
-    accessorFn: (row) => row.customers,
+    accessorFn: (row) => {
+      if (!row.customers || row.customers.length == 0) {
+        return null;
+      }
+      return row.customers;
+    },
     header: "Customers",
     minSize: 200,
     cell: (info) => {
@@ -162,7 +167,12 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   },
   {
     id: "technologies",
-    accessorFn: (row) => row.technologies,
+    accessorFn: (row) => {
+      if (!row.technologies || row.technologies.length == 0) {
+        return null;
+      }
+      return row.technologies;
+    },
     header: "Technologies",
     minSize: 200,
     cell: (info) => {
@@ -180,7 +190,12 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   },
   {
     id: "competitors",
-    accessorFn: (row) => row.competitors,
+    accessorFn: (row) => {
+      if (!row.competitors || row.competitors.length == 0) {
+        return null;
+      }
+      return row.competitors;
+    },
     header: "Competitors",
     minSize: 200,
     cell: (info) => {
@@ -276,7 +291,15 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   },
   {
     id: "funding_details",
-    accessorFn: (row) => row.funding_details,
+    accessorFn: (row) => {
+      if (
+        !row.funding_details ||
+        Object.keys(row.funding_details).length === 0
+      ) {
+        return null;
+      }
+      return row.funding_details;
+    },
     header: "Funding Details",
     minSize: 300,
     cell: (info) => {
