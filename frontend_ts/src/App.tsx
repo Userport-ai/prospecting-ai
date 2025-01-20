@@ -10,7 +10,7 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen font-inter">
+    <div className="flex flex-col font-inter">
       <AppLayout />
     </div>
   );

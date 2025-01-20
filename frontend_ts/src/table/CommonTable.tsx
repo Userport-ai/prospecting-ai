@@ -55,7 +55,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
 
   return (
     <div>
-      <div className="flex flex-col gap-4 mb-10">
+      <div className="flex flex-col gap-4 mb-4">
         <div className="rounded-md border w-full border-gray-300 bg-white shadow-sm">
           <div
             className="max-w-[80rem] min-w-full overflow-x-auto" // Ensures content width adapts dynamically
