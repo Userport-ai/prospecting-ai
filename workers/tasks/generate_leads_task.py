@@ -455,6 +455,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
                     f"for company: {linkedin_url}"
                 )
 
+                logger.info(f"Searching Proxycurl for role patterns: {titles_}")
                 # Make API request
                 response, status_code = await cached_request(
                     cache_service=self.cache_service,
