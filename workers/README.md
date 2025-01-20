@@ -43,6 +43,7 @@ workers/
    ```bash
    docker run -p 8080:8080 --env-file .env \
    -v $(pwd):/app \
+   -v $(pwd)/<local path>/service-account.json:/secrets/service-account.json \
    userport-workers-dev
   ```
 

@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import uuid
-import aiohttp
 from dataclasses import dataclass
 from typing import Dict, Any, List
 

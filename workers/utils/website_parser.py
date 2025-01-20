@@ -1,7 +1,7 @@
 import os
 import asyncio
 import logging
-import aiohttp
+import httpx
 from typing import List
 from services.ai_service import AIServiceFactory
 from google.api_core.exceptions import ResourceExhausted
@@ -66,19 +66,16 @@ class WebsiteParser:
             website = self.website
             jina_endpoint = f"{self.BASE_URL}{website}"
             headers = {"Authorization": f"Bearer {self.jina_api_token}", "X-With-Images-Summary": "True"}
-            timeout = aiohttp.ClientTimeout(total=20)  # Add timeout to prevent hanging
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url=jina_endpoint, headers=headers, timeout=timeout) as response:
-                    response.raise_for_status()
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url=jina_endpoint, headers=headers, timeout=20.0)
+                response.raise_for_status()
 
-                    page_markdown: str = await response.text()
+                parsed_customers = await self._parse_customers(page_markdown=response.text)
 
-                    parsed_customers = await self._parse_customers(page_markdown=page_markdown)
+                logger.debug(f"Successfully fetched company customers for website: {self.website}")
+                return parsed_customers
 
-                    logger.debug(f"Successfully fetched company customers for website: {self.website}")
-                    return parsed_customers
-
-        except aiohttp.ClientError as e:
+        except httpx.HTTPStatusError as e:
             logger.error(f"Unexpected error in making call to Jina Reader while fetching Company customers in website: {website}: {str(e)}", exc_info=True)
             return []
         except Exception as e:
