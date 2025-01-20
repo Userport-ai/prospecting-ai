@@ -68,7 +68,7 @@ class ContentDetails(UserportPydanticBaseModel):
 
     id: Optional[str] = Field(default=None, description="Content ID")
     url: str = Field(..., description="Content URL")
-    person_name: str = Field(..., description="Person name")
+    person_name: Optional[str] = Field(..., description="Person name")
     company_name: str = Field(..., description="Company name")
     person_role_title: str = Field(..., description="Person's role")
     linkedin_activity_ref_id: Optional[str] = Field(default=None)
