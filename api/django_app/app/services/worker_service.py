@@ -144,3 +144,38 @@ class WorkerService:
         except Exception as e:
             logger.error(f"Failed to trigger account enrichment: {str(e)}")
             raise Exception(f"Failed to trigger account enrichment: {str(e)}")
+
+    def trigger_lead_enrichment(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Triggers lead LinkedIn research enrichment with OIDC token authentication
+        """
+        try:
+            if os.getenv('ENVIRONMENT') == 'local' and settings.DEBUG:
+                headers = {
+                    "Content-Type": "application/json"
+                }
+            else:
+                token = self._get_id_token()
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+
+            logger.debug(f"Making request to: {self.base_url}/api/v1/tasks/create/lead_linkedin_research")
+
+            response = requests.post(
+                f"{self.base_url}/api/v1/tasks/create/lead_linkedin_research",
+                json=payload,
+                headers=headers,
+                timeout=self.timeout
+            )
+
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.headers)}")
+
+            response.raise_for_status()
+            return response.json()
+
+        except Exception as e:
+            logger.error(f"Failed to trigger lead enrichment: {str(e)}")
+            raise Exception(f"Failed to trigger lead enrichment: {str(e)}")

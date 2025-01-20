@@ -1,3 +1,6 @@
+import logging
+from pickle import FALSE
+
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -7,7 +10,7 @@ from rest_framework.response import Response
 
 from app.apis.common.base import TenantScopedViewSet
 from app.apis.common.lead_generation_mixin import LeadGenerationMixin
-from app.models import UserRole, Lead, Account
+from app.models import UserRole, Lead, Account, EnrichmentStatus
 from app.models.serializers.lead_serializers import (
     LeadDetailsSerializer,
     LeadBulkCreateSerializer
@@ -15,6 +18,7 @@ from app.models.serializers.lead_serializers import (
 from app.permissions import HasRole
 from app.services.worker_service import WorkerService
 
+logger = logging.getLogger(__name__)
 
 class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = LeadDetailsSerializer
@@ -130,6 +134,80 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'])
+    def enrich_linkedin_activity(self, request, pk=None):
+        """
+        Trigger LinkedIn research enrichment for a specific lead
+        """
+        try:
+            # Get the lead with related account
+            lead = Lead.objects.select_related('account').get(
+                id=pk,
+                tenant=request.tenant
+            )
+
+            if not lead.linkedin_url:
+                return Response(
+                    {"error": "Lead must have a LinkedIn URL for enrichment"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get HTML content from request payload
+            posts_html = request.data.get('posts_html', '')
+            comments_html = request.data.get('comments_html', '')
+            reactions_html = request.data.get('reactions_html', '')
+
+            # Prepare payload for worker service
+            payload = {
+                "account_id": str(lead.account.id),
+                "lead_id": str(lead.id),
+                "person_name": f"{lead.first_name or ''} {lead.last_name or ''}".strip(),
+                "company_name": lead.account.name,
+                "person_linkedin_url": lead.linkedin_url,
+                "posts_html": posts_html,
+                "comments_html": comments_html,
+                "reactions_html": reactions_html,
+                "research_request_type": "linkedin_only",
+                "job_id": f"linkedin_research_{str(lead.id)}",
+                "origin": "api",
+                "user_id": str(request.user.id),
+                "attempt_number": 1,
+                "max_retries": 3
+            }
+
+            # Update lead status to indicate enrichment in progress
+            lead.enrichment_status = EnrichmentStatus.IN_PROGRESS
+            lead.save(update_fields=['enrichment_status'])
+
+            # Trigger worker job
+            worker_service = WorkerService()
+            response = worker_service.trigger_lead_enrichment(payload)
+
+            return Response({
+                "message": "Lead LinkedIn research started",
+                "job_id": response.get('job_id'),
+                "lead_id": str(lead.id)
+            })
+
+        except Lead.DoesNotExist:
+            return Response(
+                {"error": "Lead not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            # Log the error for debugging
+            logger.error(f"Failed to trigger lead LinkedIn research: {str(e)}")
+
+            # Update lead status to failed if there's an error
+            if 'lead' in locals():
+                lead.enrichment_status = EnrichmentStatus.FAILED
+                lead.save(update_fields=['enrichment_status'])
+
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
