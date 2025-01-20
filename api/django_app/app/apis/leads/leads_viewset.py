@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = LeadDetailsSerializer
     queryset = Lead.objects.all()
+    http_method_names = ['get', 'post', 'patch', 'delete']
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields =['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status']
     ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at']

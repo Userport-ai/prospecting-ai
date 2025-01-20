@@ -16,7 +16,11 @@ def log_permission_check(func: Callable) -> Callable:
     """
 
     @functools.wraps(func)
-    def wrapper(permission_class: Any, request: Request, view: APIView) -> bool:
+    def wrapper(*args, **kwargs) -> bool:
+        # The first arg will be the permission class instance
+        permission_class = args[0]
+        # The second arg will be the request
+        request = args[1]
         class_name = permission_class.__class__.__name__
 
         # Get endpoint information
@@ -36,7 +40,7 @@ def log_permission_check(func: Callable) -> Callable:
         )
 
         try:
-            result = func(permission_class, request, view)
+            result = func(*args, **kwargs)
 
             # Log the result
             log_level = logging.INFO if result else logging.WARNING
