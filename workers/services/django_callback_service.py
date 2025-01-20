@@ -96,6 +96,7 @@ class CallbackService:
             account_id: str,
             status: str,
             enrichment_type: str = 'company_info',
+            lead_id: str = None,
             raw_data: Optional[Dict[str, Any]] = None,
             processed_data: Optional[Dict[str, Any]] = None,
             error_details: Optional[Dict[str, Any]] = None,
@@ -118,6 +119,7 @@ class CallbackService:
             callback_data = {
                 "job_id": job_id,
                 "account_id": account_id,
+                "lead_id": lead_id,
                 "status": status,
                 "enrichment_type": enrichment_type,
                 "source": source,
@@ -189,6 +191,7 @@ class CallbackService:
             account_id: str,
             status: str,
             enrichment_type: str = 'company_info',
+            lead_id: str = None,
             raw_data: Optional[Dict[str, Any]] = None,
             processed_data: Optional[Dict[str, Any]] = None,
             error_details: Optional[Dict[str, Any]] = None,
@@ -203,6 +206,7 @@ class CallbackService:
             return await self._send_callback_internal(
                 job_id=job_id,
                 account_id=account_id,
+                lead_id = lead_id,
                 status=status,
                 enrichment_type=enrichment_type,
                 raw_data = self._serialize(raw_data),

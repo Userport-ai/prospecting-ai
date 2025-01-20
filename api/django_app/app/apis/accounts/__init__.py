@@ -1,8 +1,8 @@
-from rest_framework.routers import DefaultRouter
 from django.urls import path
-from .accounts_viewset import AccountsViewSet
-from .enrichment_callback import enrichment_callback
+from rest_framework.routers import DefaultRouter
 
+from app.apis.common.enrichment_callback import enrichment_callback
+from .accounts_viewset import AccountsViewSet
 from .accounts_viewset import AccountsViewSet
 
 router = DefaultRouter()

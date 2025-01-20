@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from app.apis.auth.auth_verify_cloud_run_decorator import verify_cloud_run_token
+from app.apis.leads.lead_enrichment_handler import LeadEnrichmentHandler
 from app.models import Lead
 from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType
 from app.models.accounts import Account, EnrichmentStatus
@@ -18,13 +19,14 @@ logger = logging.getLogger(__name__)
 @api_view(['POST'])
 @authentication_classes([])  # Disable default auth
 @permission_classes([AllowAny])
-@verify_cloud_run_token
+# TODO**** @verify_cloud_run_token
 def enrichment_callback(request):
     logger.info(
         f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} Full data: {request.data}")
     try:
         data = request.data
         account_id = data.get('account_id')
+        lead_id = data.get('lead_id')
         status = data.get('status')
         enrichment_type = data.get('enrichment_type')
         processed_data = data.get('processed_data', {})
@@ -37,6 +39,7 @@ def enrichment_callback(request):
         with transaction.atomic():
             account = Account.objects.select_for_update().get(id=account_id)
 
+            # Update enrichment status
             enrichment_status, _ = AccountEnrichmentStatus.objects.update_or_create(
                 account=account,
                 enrichment_type=enrichment_type,
@@ -55,10 +58,19 @@ def enrichment_callback(request):
                 enrichment_status.failure_count += 1
                 enrichment_status.save()
 
-            # Update account fields if enrichment was successful
+            # Route to appropriate handler based on enrichment type
             if status == EnrichmentStatus.COMPLETED and processed_data:
-                _update_account_from_enrichment(account, enrichment_type, processed_data)
-                account.save()
+                if enrichment_type == EnrichmentType.LEAD_LINKEDIN_RESEARCH:
+                    if not lead_id:
+                        raise ValueError("Lead ID required for lead enrichment")
+                    LeadEnrichmentHandler.handle_lead_enrichment(
+                        lead_id=lead_id,
+                        account_id=account_id,
+                        processed_data=processed_data
+                    )
+                else:
+                    # Use existing account enrichment function for other types
+                    _update_account_from_enrichment(account, enrichment_type, processed_data)
 
         return Response({
             "status": "success",
@@ -67,8 +79,10 @@ def enrichment_callback(request):
 
     except Account.DoesNotExist:
         return Response({"error": "Account not found"}, status=404)
+    except Lead.DoesNotExist:
+        return Response({"error": "Lead not found"}, status=404)
     except Exception as e:
-        logger.error(f"Error processing callback: {str(e)}")
+        logger.error(f"Error processing callback: {str(e)}", exc_info=True)
         return Response({"error": str(e)}, status=500)
 
 

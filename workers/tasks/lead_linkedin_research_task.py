@@ -61,6 +61,7 @@ class LeadLinkedInResearchTask(BaseTask):
         """Execute the lead research task."""
         job_id = payload.get('job_id')
         account_id = payload.get('account_id')
+        lead_id = payload.get('lead_id')
         company_name = payload.get('company_name')
         person_linkedin_url = payload.get('person_linkedin_url')
         user_id = payload.get('user_id')
@@ -77,8 +78,9 @@ class LeadLinkedInResearchTask(BaseTask):
             await callback_service.send_callback(
                 job_id=job_id,
                 account_id=account_id,
+                lead_id=lead_id,
                 status='processing',
-                enrichment_type='lead_research',
+                enrichment_type='lead_linkedin_research',
                 source="linkedin",
                 completion_percentage=10,
                 processed_data={'stage': current_stage}
@@ -96,8 +98,9 @@ class LeadLinkedInResearchTask(BaseTask):
             await callback_service.send_callback(
                 job_id=job_id,
                 account_id=account_id,
+                lead_id=lead_id,
                 status='processing',
-                enrichment_type='lead_research',
+                enrichment_type='lead_linkedin_research',
                 source="linkedin",
                 completion_percentage=30,
                 processed_data={
@@ -119,8 +122,9 @@ class LeadLinkedInResearchTask(BaseTask):
             await callback_service.send_callback(
                 job_id=job_id,
                 account_id=account_id,
+                lead_id=lead_id,
                 status='processing',
-                enrichment_type='lead_research',
+                enrichment_type='lead_linkedin_research',
                 source="linkedin",
                 completion_percentage=60,
                 processed_data={
@@ -145,7 +149,7 @@ class LeadLinkedInResearchTask(BaseTask):
             current_stage = 'storing_results'
             await self._store_results(
                 job_id=job_id,
-                account_id=account_id,
+                lead_id=lead_id,
                 user_id=user_id,
                 content_details=content_details,
                 insights=insights
@@ -155,8 +159,9 @@ class LeadLinkedInResearchTask(BaseTask):
             await callback_service.send_callback(
                 job_id=job_id,
                 account_id=account_id,
+                lead_id=lead_id,
                 status='completed',
-                enrichment_type='lead_research',
+                enrichment_type='lead_linkedin_research',
                 source="linkedin",
                 completion_percentage=100,
                 processed_data={
@@ -183,14 +188,15 @@ class LeadLinkedInResearchTask(BaseTask):
             }
 
             # Store error state
-            await self._store_error_state(job_id, account_id, error_details)
+            await self._store_error_state(job_id, lead_id, error_details)
 
             # Send failure callback
             await callback_service.send_callback(
                 job_id=job_id,
                 account_id=account_id,
+                lead_id=lead_id,
                 status='failed',
-                enrichment_type='lead_research',
+                enrichment_type='lead_linkedin_research',
                 source="linkedin",
                 error_details=error_details,
                 processed_data={'stage': current_stage}
@@ -294,7 +300,7 @@ class LeadLinkedInResearchTask(BaseTask):
     async def _store_results(
             self,
             job_id: str,
-            account_id: str,
+            lead_id: str,
             user_id: str,
             content_details: List[ContentDetails],
             insights: Optional[LeadResearchReport.Insights]
@@ -303,7 +309,8 @@ class LeadLinkedInResearchTask(BaseTask):
         try:
             await self.bq_service.insert_enrichment_raw_data(
                 job_id=job_id,
-                entity_id=account_id,
+                entity_id=lead_id,
+                entity_type='lead',
                 source='linkedin',
                 raw_data={
                     'posts_html':     self.posts_html if self.posts_html else None,
@@ -339,6 +346,7 @@ class LeadLinkedInResearchTask(BaseTask):
             await self.bq_service.insert_enrichment_raw_data(
                 job_id=job_id,
                 entity_id=entity_id,
+                entity_type='lead',
                 source='linkedin',
                 raw_data={},
                 processed_data={},

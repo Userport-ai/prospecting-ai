@@ -8,6 +8,7 @@ firebase-admin~=6.6.0
 psutil~=5.9.8
 pyjwt==2.8.0
 psycopg2-binary==2.9.9
+pydantic==2.7.3
 python-dotenv==1.0.1
 requests==2.31.0
 six==1.16.0

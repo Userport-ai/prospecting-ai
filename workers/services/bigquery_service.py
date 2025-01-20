@@ -403,8 +403,9 @@ class BigQueryService:
     async def insert_enrichment_raw_data(
             self,
             job_id: str,
-            entity_id: str,
             source: str,
+            entity_id: str,
+            entity_type: str = 'account',
             raw_data: Optional[Dict[str, Any]] = None,
             processed_data: Optional[Dict[str, Any]] = None,
             status: str = 'completed',

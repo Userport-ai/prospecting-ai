@@ -446,6 +446,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
             'enrich_profiles': 'enrich'
         }
 
+
         # Attempt to fetch with retries
         for attempt in range(max_retries):
             try:
