@@ -22,7 +22,7 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'custom_fields',
             'score',
             'last_enriched_at',
-            'created_at',
+            'suggestion_status',
             'updated_at'
         ]
         read_only_fields = [
