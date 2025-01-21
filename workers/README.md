@@ -1,4 +1,4 @@
-# Workers
+# Workers.
 
 Background job workers using Cloud Tasks and Cloud Run
 
