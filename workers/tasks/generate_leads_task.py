@@ -356,10 +356,6 @@ class GenerateLeadsTask(AccountEnrichmentTask):
         # Create a copy to avoid modifying the original dict
         filtered_roles = persona_roles.copy()
 
-        # Remove end_user and end_users keys if they exist
-        filtered_roles.pop('end_user', None)
-        filtered_roles.pop('end_users', None)
-
         ai_service = AIServiceFactory.create_service("gemini")
         generator = RolePatternGenerator(ai_service)
         return await generator.generate_pattern(filtered_roles)

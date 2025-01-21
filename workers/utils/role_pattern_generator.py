@@ -13,7 +13,7 @@ class RolePatternGenerator:
 You are a super intelligent B2B Sales person who is tasked with figuring out the leads that will fall under the Buyer persona in a company.
 You are given an initial list of Role titles that fall under the Buyer persona of the product you are trying to sell.
 
-Initial Role titles list: {titles}
+Buyer Role titles list: {titles}
 
 These Role titles are not exhaustive by any means and each prospective company has their own list of Role titles that may not match this initial list.
 Using your intelligence and real world knowledge, suggest other Role titles using regular expressions, that fall under the same buyer persona but are also variants of the role titles in the initial list.
@@ -26,7 +26,10 @@ Variants can include:
 6."Area Vice President, APAC Marketing" instead of "AVP Marketing" and vice versa
 7."International Sales Head" instead of "CRO" and vice versa
 8. Use regular expressions to do wider match, make stop words optional, etc.
-9. Be exhaustive but total number of characters used across the array should not exceed 3000 characters. 
+9. Be exhaustive but total number of characters used across the array should not exceed 3000 characters.
+10. Exclude the end_user personas in the list
+
+End user personas to be excluded: {end_users}
 
 Here are 2 examples:
 1.Initial Role titles list: [VP of Marketing, CMO] => [".*Vice President of Marketing, Senior VP (?:of)? Marketing.*", "Chief Marketing Officer", "Head of Marketing", "Director of Marketing", "VP Brand Partnerships", "North America VP of Marketing", "AVP Marketing - Central"]
@@ -56,9 +59,12 @@ Return as JSON:
             if role_type not in ['end_user', 'end_users', 'influencer', 'influencers']
         }
 
+        end_users = persona_roles.get('end_users', []) + persona_roles.get('end_user', [])
+
         # Format prompt with the actual roles
         prompt = self.prompt_template.format(
-            titles=formatted_roles
+            titles=formatted_roles,
+            end_users=end_users
         )
 
         try:
