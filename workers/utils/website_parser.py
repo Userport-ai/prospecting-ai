@@ -27,11 +27,13 @@ GEMINI_RETRY_CONFIG = RetryConfig(
 JINA_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
     base_delay=1.0,
-    max_delay=5.0,
+    max_delay=20.0,
     retryable_exceptions=[
         RetryableError,
         asyncio.TimeoutError,
-        ConnectionError
+        ConnectionError,
+        httpx.ConnectTimeout,
+        httpx.ConnectError,
     ]
 )
 
