@@ -36,7 +36,7 @@ class LeadLinkedInResearchTask(BaseTask):
 
     async def create_task_payload(self, **kwargs) -> Dict[str, Any]:
         """Create a standardized task payload."""
-        required_fields = ['account_id', 'company_name', 'person_linkedin_url', 'posts_html', 'comments_html', 'reactions_html']
+        required_fields = ['lead_id', 'account_id', 'company_name', 'person_linkedin_url', 'posts_html', 'comments_html', 'reactions_html']
         missing_fields = [field for field in required_fields if field not in kwargs]
 
         if missing_fields:
@@ -45,6 +45,7 @@ class LeadLinkedInResearchTask(BaseTask):
         return {
             "account_id": kwargs["account_id"],
             "company_name": kwargs["company_name"],
+            'lead_id': kwargs["lead_id"],
             "person_linkedin_url": kwargs["person_linkedin_url"],
             "posts_html": kwargs.get("posts_html"),
             "comments_html": kwargs.get("comments_html"),
