@@ -1,6 +1,7 @@
 import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall, ListObjectsResponse } from "./Api";
 import { EnrichmentStatus } from "./Common";
+import { ParsedHTML } from "./Extension";
 
 const LEADS_ENDPOINT = "/leads/";
 
@@ -129,6 +130,30 @@ export const listSuggestedLeads = async (
   return listLeadsHelper(authContext, accountId, SuggestionStatus.SUGGESTED);
 };
 
+// Approve given Lead.
+export const approveLead = async (
+  authContext: AuthContext,
+  id: string
+): Promise<Lead> => {
+  const request = { suggestion_status: SuggestionStatus.APPROVED };
+  const endpoint = `${LEADS_ENDPOINT}${id}/`;
+  return await apiCall<Lead>(authContext, async (apiClient) => {
+    const response = await apiClient.patch<Lead>(endpoint, request);
+    return response.data;
+  });
+};
+
+export const enrichLinkedInActivity = async (
+  authContext: AuthContext,
+  id: string,
+  parsedHTML: ParsedHTML
+): Promise<void> => {
+  const endpoint = `${LEADS_ENDPOINT}${id}/enrich_linkedin_activity/`;
+  return await apiCall<void>(authContext, async (apiClient) => {
+    await apiClient.post(endpoint, parsedHTML);
+  });
+};
+
 // Helper to list leads.
 const listLeadsHelper = async (
   authContext: AuthContext,
@@ -145,7 +170,6 @@ const listLeadsHelper = async (
     // Only list approved leads by default.
     params["suggestion_status"] = SuggestionStatus.APPROVED;
   }
-  console.log("ID bro: ", accountId);
   return await apiCall<Lead[]>(authContext, async (apiClient) => {
     const response = await apiClient.get<ListLeadsResponse>(LEADS_ENDPOINT, {
       params,

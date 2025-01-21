@@ -80,7 +80,8 @@ const LeadsInAccount = () => {
   // Handler once suggested leads are added by User.
   const onAddLeads = () => {
     // Switch tabs.
-    // setActiveTab(LeadViewTab.LEADS);
+    console.log("got called");
+    setActiveTab(LeadViewTab.LEADS);
   };
 
   if (errorMessage) {

@@ -13,7 +13,12 @@ import LeadActivityParser from "./LeadActivityParser";
 import { ParsedHTML } from "@/services/Extension";
 import { cn } from "@/lib/utils";
 import ScreenLoader from "@/common/ScreenLoader";
-import { Lead, listSuggestedLeads } from "@/services/Leads";
+import {
+  approveLead,
+  enrichLinkedInActivity,
+  Lead,
+  listSuggestedLeads,
+} from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 
 interface ParsedLead {
@@ -275,6 +280,9 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
   };
 
   useEffect(() => {
+    if (!startParsing) {
+      return;
+    }
     const allLeadsParsed =
       selectedLeads.size === parsedLeads.length &&
       parsedLeads.every((lead) => selectedLeads.has(lead.id));
@@ -286,13 +294,35 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
     // Parsing complete.
     setStartParsing(false);
 
-    // TODO: call backend.
-    // Remove selected leads from the local suggested leads list after successful call to the backend.
+    setLoading(true);
+    const promises = parsedLeads
+      .filter((lead) => lead.parsedHTML !== undefined)
+      .map((parsedLead) => {
+        approveLead(authContext, parsedLead.id)
+          .then((_) =>
+            enrichLinkedInActivity(
+              authContext,
+              parsedLead.id,
+              parsedLead.parsedHTML!
+            )
+          )
+          .catch((error) => Promise.reject(error));
+      });
 
-    setSelectedLeads(new Set());
-    // Call parent compoennt.
-    onAddLeads();
-  }, [parsedLeads]);
+    Promise.all(promises)
+      .then(() => {
+        // All leads processed
+        setLoading(false);
+        onAddLeads();
+      })
+      .catch((error) => {
+        // Handle the overall error (e.g., if any of the promises rejected)
+        setErrorMessage(
+          `Failed to Approve some or all the leads: ${String(error)}`
+        );
+        setLoading(false);
+      });
+  }, [startParsing, parsedLeads]);
 
   if (loading) {
     return <ScreenLoader />;
