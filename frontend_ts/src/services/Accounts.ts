@@ -54,13 +54,45 @@ interface FundingRound {
 
 type ListAccountsResponse = ListObjectsResponse<Account>;
 
+const USERPORT_TENANT_ID = "34410fcc-83bf-4006-b7d3-fedfe0472afb";
+
 // Fetch all accounts for given tenant.
 export const listAccounts = async (
   authContext: AuthContext,
   ids?: string[] // Optional parameter for list of IDs
 ): Promise<Account[]> => {
   const { userContext } = authContext;
+  if (userContext!.tenant.id === USERPORT_TENANT_ID) {
+    // Reroute to internal method.
+    return listAccountsWithinTenant(authContext, ids);
+  }
+
   var params: Record<string, any> = { created_by: userContext!.user.id };
+
+  if (ids && ids.length > 0) {
+    // Create a comma-separated string for 'id__in' param
+    params["id__in"] = ids.join(",");
+  }
+
+  return await apiCall<Account[]>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListAccountsResponse>(
+      ACCOUNTS_ENDPOINT,
+      { params }
+    );
+    return response.data.results;
+  });
+};
+
+// Internal method that should only be used for Userport tenant for dev purposes.
+const listAccountsWithinTenant = async (
+  authContext: AuthContext,
+  ids?: string[] // Optional parameter for list of IDs
+): Promise<Account[]> => {
+  const { userContext } = authContext;
+  if (userContext!.tenant.id !== USERPORT_TENANT_ID) {
+    throw new Error(`Cannot call internal method to List accounts!`);
+  }
+  var params: Record<string, any> = {};
 
   if (ids && ids.length > 0) {
     // Create a comma-separated string for 'id__in' param
