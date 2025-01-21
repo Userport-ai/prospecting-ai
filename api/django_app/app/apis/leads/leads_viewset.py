@@ -152,9 +152,9 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 tenant=request.tenant
             )
 
-            if not lead.linkedin_url:
+            if (not pk) or (not lead.linkedin_url):
                 return Response(
-                    {"error": "Lead must have a LinkedIn URL for enrichment"},
+                    {"error": "Lead must have both ID and LinkedIn URL for enrichment"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
