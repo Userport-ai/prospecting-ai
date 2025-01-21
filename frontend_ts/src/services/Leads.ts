@@ -85,6 +85,12 @@ interface EnrichmentData {
   enriched_at: string;
 }
 
+interface CustomFields {
+  evaluation: Evaluation;
+  personality_insights: PersonalityInsights;
+  [key: string]: any;
+}
+
 interface Evaluation {
   fit_score: number;
   persona_match: string;
@@ -94,9 +100,31 @@ interface Evaluation {
   rationale: string[];
 }
 
-interface CustomFields {
-  evaluation: Evaluation;
-  [key: string]: any;
+interface PersonalityInsights {
+  traits: PersonalityTrait;
+  engaged_products: string[];
+  areas_of_interest: AreaOfInterest[];
+  engaged_colleagues: string[];
+  recommended_approach: RecommendedApproach;
+}
+
+export interface PersonalityTrait {
+  evidence: string[];
+  description: string;
+}
+
+export interface AreaOfInterest {
+  description: string;
+  supporting_activities: string[];
+}
+
+export interface RecommendedApproach {
+  approach: string;
+  cautions: string[];
+  key_topics: string[];
+  best_channels: string[];
+  timing_preferences: string;
+  conversation_starters: string[];
 }
 
 enum Source {

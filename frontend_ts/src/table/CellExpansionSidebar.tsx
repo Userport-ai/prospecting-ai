@@ -58,7 +58,7 @@ const CellSidebar: React.FC<{
             </h1>
             <a
               href={getLinkedInURL(row)}
-              className="text-blue-500"
+              className="text-blue-500 text-sm"
               target="_blank"
             >
               {getLinkedInURL(row)}

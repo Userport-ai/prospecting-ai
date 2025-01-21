@@ -10,7 +10,7 @@ import { Link } from "react-router";
 import { EnrichmentStatus } from "@/services/Common";
 import { Progress } from "@/components/ui/progress";
 import FundingDetailsView from "./FundingDetailsView";
-import CellListView from "./CellListView";
+import CellListView from "../table/CellListView";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -154,7 +154,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     minSize: 200,
     cell: (info) => {
       const customers = info.getValue() as string[] | null;
-      if (!customers || customers.length === 0) {
+      if (!customers) {
         return null;
       }
       return <CellListView values={customers} />;
@@ -177,7 +177,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     minSize: 200,
     cell: (info) => {
       const technologies = info.getValue() as string[] | null;
-      if (!technologies || technologies.length === 0) {
+      if (!technologies) {
         return null;
       }
       return <CellListView values={technologies} />;
@@ -200,7 +200,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     minSize: 200,
     cell: (info) => {
       const competitors = info.getValue() as string[] | null;
-      if (!competitors || competitors.length === 0) {
+      if (!competitors) {
         return null;
       }
       return <CellListView values={competitors} />;
@@ -322,21 +322,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     header: "Founded Year",
     meta: {
       displayName: "Founded Year",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
-    id: "enrichment_sources",
-    accessorFn: (row) => row.enrichment_sources,
-    header: "Enrichment Sources",
-    cell: (info) => {
-      if (info.getValue()) {
-        return JSON.stringify(info.getValue());
-      }
-      return null;
-    },
-    meta: {
-      displayName: "Enrichment Sources",
       visibleInitially: true,
     } as CustomColumnMeta,
   },

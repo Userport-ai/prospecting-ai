@@ -76,9 +76,6 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
               <TableHead className="text-purple-800">
                 Matching Criteria
               </TableHead>
-              <TableHead className="text-purple-800">
-                Recommended Approach
-              </TableHead>
             </TableRow>
           </TableHeader>
           {/* Table Body */}
@@ -119,8 +116,10 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                       View Profile
                     </a>
                   </TableCell>
-                  <TableCell>Summary</TableCell>
-                  <TableCell>Years in Role</TableCell>
+                  <TableCell>{lead.enrichment_data?.summary ?? ""}</TableCell>
+                  <TableCell>
+                    {lead.enrichment_data?.total_years_experience ?? "Unknown"}
+                  </TableCell>
                   <TableCell>
                     {lead.custom_fields
                       ? lead.custom_fields.evaluation.rationale
@@ -128,12 +127,9 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                   </TableCell>
                   <TableCell>
                     {lead.custom_fields
-                      ? lead.custom_fields.evaluation.matching_criteria
-                      : null}
-                  </TableCell>
-                  <TableCell>
-                    {lead.custom_fields
-                      ? lead.custom_fields.evaluation.recommended_approach
+                      ? lead.custom_fields.evaluation.matching_criteria.join(
+                          ", "
+                        )
                       : null}
                   </TableCell>
                   {selectedLeads.has(lead.id) && (
