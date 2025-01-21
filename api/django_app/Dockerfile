@@ -11,19 +11,23 @@ ENV PYTHONUNBUFFERED=1 \
 # ---- Dependencies ----
 FROM python-base as builder
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
+# Keep the same directory structure as original
 WORKDIR /wheels
 
 # Copy requirements files
 COPY requirements.txt .
 
-# Build wheels for ALL dependencies (including sub-dependencies)
-RUN pip wheel --wheel-dir=/wheels \
+# Install build dependencies with mount cache, maintaining cleanup
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build wheels with pip cache
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip wheel --wheel-dir=/wheels \
     --requirement requirements.txt \
     --wheel-dir=/wheels \
     gunicorn \
@@ -51,8 +55,10 @@ ENV USERPORT_DEBUG=$USERPORT_DEBUG \
     GUNICORN_TIMEOUT=$GUNICORN_TIMEOUT \
     PORT=$PORT
 
-# Install runtime dependencies only
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install runtime dependencies with mount cache, maintaining cleanup
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
     wget \
     netcat-traditional \
     && rm -rf /var/lib/apt/lists/* \
@@ -72,8 +78,8 @@ RUN ARCH=$(uname -m); \
 COPY --from=builder /wheels /wheels
 COPY requirements.txt .
 
-# Install Python packages from wheels
-RUN pip install --no-index --find-links=/wheels -r requirements.txt \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-index --find-links=/wheels -r requirements.txt \
     && pip install --no-index --find-links=/wheels gunicorn \
     && rm -rf /wheels
 

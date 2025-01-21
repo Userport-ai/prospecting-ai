@@ -9,6 +9,8 @@ steps:
       'build',
       '--build-arg', 'BUILDKIT_INLINE_CACHE=1',
       '--cache-from', 'gcr.io/$PROJECT_ID/userport-django-app:latest',
+      '--cache-to', 'type=inline',
+      '--build-arg', 'BUILDKIT_PROGRESS=plain',
       '-f', './api/django_app/Dockerfile',
       '--build-arg', 'USERPORT_DEBUG=${_USERPORT_DEBUG}',
       '--build-arg', 'USERPORT_DEV_DB_USERNAME=${_USERPORT_DEV_DB_USERNAME}',
@@ -24,17 +26,17 @@ steps:
       './api/django_app'
     ]
 
-  # Push images in parallel
+  # Run these steps in parallel after build
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-latest'
     args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:latest']
     waitFor: ['build']
+
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-sha'
     args: ['push', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA']
     waitFor: ['build']
 
-  # Get GKE credentials (with proper cluster config)
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'get-credentials'
     args:
@@ -49,7 +51,7 @@ steps:
       - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
     waitFor: ['build']
 
-  # Set up KSA with proper cluster config
+  # These can run in parallel after get-credentials
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'setup-ksa'
     args:
@@ -63,7 +65,6 @@ steps:
       - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
     waitFor: ['get-credentials']
 
-  # Create DB credentials (with proper cluster config)
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'create-secrets'
     entrypoint: 'bash'
@@ -83,7 +84,7 @@ steps:
       - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
     waitFor: ['get-credentials']
 
-  # Deploy to GKE (with proper cluster config)
+  # Deploy after all prerequisites are done
   - name: 'gcr.io/cloud-builders/gke-deploy'
     args:
       - run
@@ -96,10 +97,8 @@ steps:
       - 'CLOUDSDK_CONTAINER_CLUSTER=userport-service-prod'
     waitFor: ['push-sha', 'push-latest', 'setup-ksa', 'create-secrets']
 
-# Set a higher timeout for the build
 timeout: 1800s
 
-# Enable faster builds with more CPU/memory
 options:
   machineType: 'N1_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
