@@ -443,8 +443,18 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 if len(website) > 0:
                     wb_parser = WebsiteParser(website=website)
                     wb_customers: List[str] = await wb_parser.fetch_company_customers()
+                    logger.debug(f"Customers from Website for account ID {account_id} are {wb_customers}")
                     # Merge customers from website parser.
                     customers = list(set(customers) | set(wb_customers))
+
+                # Fetch technologies.
+                technologies: List[str] = self._extract_technologies(structured_data.get('technology_stack', {}))
+                if len(website) > 0:
+                    wb_parser = WebsiteParser(website=website)
+                    wb_technologies: List[str] = await wb_parser.fetch_technologies()
+                    logger.debug(f"Technologies from Website for account ID {account_id} are {wb_technologies}")
+                    # Merge technologies from website parser.
+                    technologies = list(set(technologies) | set(wb_technologies))
 
                 # Store data in BigQuery
                 logger.debug(f"Job {job_id}, Account {account_id}: Storing processed data in BigQuery")
@@ -462,7 +472,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     'location': self._format_location(structured_data.get('location', {})),
                     'website': website,
                     'linkedin_url': structured_data.get('digital_presence', {}).get('social_media', {}).get('linkedin'),
-                    'technologies': self._extract_technologies(structured_data.get('technology_stack', {})),
+                    'technologies': technologies,
                     'funding_details': structured_data.get('financials', {}).get('private_data', {}),
                     'company_type': structured_data.get('business_metrics', {}).get('company_type'),
                     'founded_year': structured_data.get('business_metrics', {}).get('year_founded'),
