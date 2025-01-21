@@ -49,7 +49,7 @@ const RecommendedApproachView: React.FC<{
       ></LabelValuePair>
       <LabelValuePair
         label="Conversation Starters"
-        value={recommendedApproach.timing_preferences}
+        value={recommendedApproach.conversation_starters}
       ></LabelValuePair>
     </div>
   );
