@@ -46,6 +46,7 @@ class LeadLinkedInResearchTask(BaseTask):
             "account_id": kwargs["account_id"],
             "company_name": kwargs["company_name"],
             'lead_id': kwargs["lead_id"],
+            'person_name': kwargs["person_name"],
             "person_linkedin_url": kwargs["person_linkedin_url"],
             "posts_html": kwargs.get("posts_html"),
             "comments_html": kwargs.get("comments_html"),
