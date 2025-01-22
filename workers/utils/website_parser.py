@@ -127,8 +127,8 @@ class WebsiteParser:
         Fetches list of technologies found on given Company Website.
 
         Note:
-            This function does not return an exhaustive list of all customers.
-            It provides a starting point for identifying potential customers.
+            This function does not return an exhaustive list of all technologies.
+            It provides a starting point for identifying potential technologies.
         """
         try:
             website = self.website
