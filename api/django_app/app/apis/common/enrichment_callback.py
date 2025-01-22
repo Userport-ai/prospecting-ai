@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from app.apis.auth.auth_verify_cloud_run_decorator import verify_cloud_run_token
 from app.apis.leads.lead_enrichment_handler import LeadEnrichmentHandler
+from app.apis.leads.streaming_leads_callback_handler import StreamingCallbackHandler
 from app.models import Lead
 from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType
 from app.models.accounts import Account, EnrichmentStatus
@@ -21,8 +22,8 @@ logger = logging.getLogger(__name__)
 @permission_classes([AllowAny])
 # TODO**** @verify_cloud_run_token
 def enrichment_callback(request):
-    logger.info(
-        f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} Full data: {request.data}")
+    logger.info(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')}")
+
     try:
         data = request.data
         account_id = data.get('account_id')
@@ -58,7 +59,7 @@ def enrichment_callback(request):
                 enrichment_status.failure_count += 1
                 enrichment_status.save()
 
-            # Route to appropriate handler based on enrichment type
+            # Process based on enrichment type
             if status == EnrichmentStatus.COMPLETED and processed_data:
                 if enrichment_type == EnrichmentType.LEAD_LINKEDIN_RESEARCH:
                     if not lead_id:
@@ -68,6 +69,12 @@ def enrichment_callback(request):
                         account_id=account_id,
                         processed_data=processed_data
                     )
+                elif enrichment_type == EnrichmentType.GENERATE_LEADS and data.get('pagination'):
+                    # Process through streaming handler
+                    result = StreamingCallbackHandler.handle_callback(data)
+                    if result is None:
+                        # Intermediate page - acknowledge receipt
+                        return Response({"status": "processing"})
                 else:
                     # Use existing account enrichment function for other types
                     _update_account_from_enrichment(account, enrichment_type, processed_data)

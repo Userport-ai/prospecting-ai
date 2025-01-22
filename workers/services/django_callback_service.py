@@ -1,8 +1,9 @@
 import json
 import logging
+import math
 import os
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import httpx
 from google.auth import default
@@ -10,6 +11,7 @@ from google.auth.transport.requests import Request
 from google.oauth2 import id_token
 from google.oauth2 import service_account
 
+from services.django_callback_service_paginated import PaginatedCallbackService
 from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE_STATUS_CODES
 
 logger = logging.getLogger(__name__)
@@ -61,12 +63,13 @@ class CallbackService:
                 logger.info(f"Successfully initialized workload identity credentials for project: {self.project}")
 
             logger.debug(f"Credentials initialized. Type: {type(self.credentials)}, Workload Identity: {self._use_workload_identity}")
+            self.paginated_service = PaginatedCallbackService(self)
 
         except Exception as e:
             logger.error(f"Failed to initialize credentials: {str(e)}", exc_info=True)
             raise
 
-    async def _get_id_token(self) -> str:
+    async def get_id_token(self) -> str:
         """Get fresh ID token for Django callback authentication"""
         logger.debug("Attempting to get fresh ID token")
         try:
@@ -112,7 +115,7 @@ class CallbackService:
         try:
             # Get fresh OIDC token
             logger.debug(f"Requesting fresh ID token for job {job_id}")
-            id_token = await self._get_id_token()
+            id_token = await self.get_id_token()
             logger.debug(f"Successfully obtained ID token for job {job_id}. Got token: {id_token[:10]}...")
 
             # Prepare callback payload

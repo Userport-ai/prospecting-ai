@@ -192,7 +192,7 @@ LOGGING = {
         },
         'django.db.models': {
             'handlers': ['console'],
-            'level': 'WARNING',
+            'level': 'INFO',
             'propagate': False,
         },
         'django.urls': {
@@ -208,7 +208,7 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'INFO',
+        'level': 'DEBUG',
     },
 }
 

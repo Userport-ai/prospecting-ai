@@ -256,6 +256,8 @@ async def cached_request(
         extra={
             "url": url,
             "method": method,
+            "params": params,
+            "headers": headers,
             "tenant_id": tenant_id,
             "force_refresh": force_refresh
         }

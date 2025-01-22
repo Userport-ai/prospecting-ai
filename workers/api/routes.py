@@ -9,6 +9,7 @@ from services.mocks.mock_task_manager import MockTaskManager
 from services.task_manager import TaskManager
 from services.task_registry import TaskRegistry
 from tasks.account_enhancement import AccountEnhancementTask
+from tasks.generate_leads_apollo import ApolloLeadsTask
 from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
 
@@ -19,6 +20,7 @@ task_registry = TaskRegistry()
 task_registry.register(AccountEnhancementTask)
 task_registry.register(GenerateLeadsTask)
 task_registry.register(LeadLinkedInResearchTask)
+task_registry.register(ApolloLeadsTask)
 
 
 def get_task_manager() -> TaskManager:
