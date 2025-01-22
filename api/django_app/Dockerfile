@@ -11,16 +11,13 @@ ENV PYTHONUNBUFFERED=1 \
 # ---- Dependencies ----
 FROM python-base as builder
 
-# Keep the same directory structure as original
 WORKDIR /wheels
 
 # Copy requirements files
 COPY requirements.txt .
 
-# Install build dependencies with mount cache, maintaining cleanup
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt \
-    apt-get update && apt-get install -y --no-install-recommends \
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
     && rm -rf /var/lib/apt/lists/*
@@ -55,17 +52,14 @@ ENV USERPORT_DEBUG=$USERPORT_DEBUG \
     GUNICORN_TIMEOUT=$GUNICORN_TIMEOUT \
     PORT=$PORT
 
-# Install runtime dependencies with mount cache, maintaining cleanup
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt \
+# Create directories and install ALL runtime dependencies in one layer
+RUN mkdir -p /app/staticfiles && \
     apt-get update && apt-get install -y --no-install-recommends \
     wget \
     netcat-traditional \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /app/staticfiles
-
-# Install cloud-sql-proxy with architecture detection
-RUN ARCH=$(uname -m); \
+    && rm -rf /var/lib/apt/lists/* && \
+    # Install cloud-sql-proxy based on the architecture
+    ARCH=$(uname -m) && \
     if [ "$ARCH" = "aarch64" ]; then \
         CLOUD_SQL_PROXY_ARCH="arm64"; \
     else \
@@ -86,7 +80,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Copy application code
 COPY . .
 
-# Collect static files and prepare for production
+# Collect static files
 RUN chmod +x start.sh && \
     python manage.py collectstatic --noinput
 
