@@ -50,9 +50,15 @@ class PromptTemplates:
     You're an experienced SDR tasked with evaluating leads. 
     Evaluate potential leads based on the given product and persona criteria. Rate each lead's fit.
     1. Evaluate each lead independently, without referring to the other leads.
-    2. Use the given product and persona information to evaluate each lead.
+    2. Use the given product and persona information to evaluate each lead. Consider how likely the lead is to have the pain point the product is solving.
     3. You can assume that the account is already qualified and have a good potential fit, you're only evaluating leads.
     4. Rationale and analysis should highlight and quote specific instances from the data that supports the score.
+    5. Analyze the lead's information, focusing on how their background, role, or responsibilities relate to the product.
+    6. Assign a Fit Score from 0 to 1, where 1 indicates a perfect fit and 0 indicates no alignment.
+    7. Identify the best matching persona type (e.g., end_user, buyer, influencer) or use null if none apply.
+    8. Recommend an engagement approach tailored to this lead.
+    9. Provide an overall analysis summarizing the lead's potential.
+
     
     Product Information:
     {product_info}
@@ -80,6 +86,27 @@ class PromptTemplates:
     1. Return ONLY valid JSON
     2. If a field is not available, use null
     3. Do not include any other information or pleasantries or anything else outside the JSON
+    
+    Example:
+{{
+  "evaluated_leads": [
+    {{
+      "lead_id": "6784a8440ec1a623615b2053",
+      "fit_score": 0.85,
+      "rationale": "Lead demonstrates strong alignment with product features and decision-making authority",
+      "matching_criteria": [
+        "Role matches target persona",
+        "Expressed interest in similar solutions"
+      ],
+      "persona_match": "buyer",
+      "recommended_approach": "Highlight ROI and integration capabilities in initial outreach",
+      "overall_analysis": [
+        "High potential for conversion",
+        "Likely to influence purchase decision"
+      ]
+    }}
+  ]
+}}
     """
 
 class ApolloLeadsTask(AccountEnrichmentTask):
