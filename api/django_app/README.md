@@ -17,7 +17,7 @@ sowrabh@Sowrabhs-MacBook-Pro django_app % docker build -t userport-app:dev .
 ```
 sowrabh@Sowrabhs-MacBook-Pro django_app % docker run -it --rm \
     -p 8000:8000 \
-    -v $(pwd)/<your local path>/service-account.json:/secrets/service-account.json \
+    -v $(pwd)/secrets/service-account.json:/secrets/service-account.json \
     -v $(pwd):/app \
     --env-file .dev.env \
     userport-app:dev
