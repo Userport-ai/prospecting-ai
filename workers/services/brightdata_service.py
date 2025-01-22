@@ -62,7 +62,7 @@ class BrightDataService:
             with httpx.Client() as client:
                 headers = {"Authorization": f"Bearer {self.brightdata_api_key}"}
                 endpoint = f"{self.BRIGHTDATA_URL}snapshot/{snapshot_id}?format=json"
-                for _ in range(5):  # Loop for a maximum of 5 attempts.
+                for _ in range(30):  # Loop for a maximum of 30 attempts or 300 seconds in total/
                     response = client.get(url=endpoint, headers=headers, timeout=self.API_TIMEOUT)
                     response.raise_for_status()
                     if response.status_code == 202:
