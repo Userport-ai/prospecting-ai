@@ -55,7 +55,6 @@ class WebsiteParser:
             logger.error(f"Failed to configure Gemini API: {str(e)}")
             raise
 
-    @with_retry(retry_config=JINA_RETRY_CONFIG, operation_name="_fetch_customers_from_website")
     async def fetch_company_customers(self) -> List[str]:
         """
         Fetches list of customers names listed on given Company Website.
@@ -82,7 +81,6 @@ class WebsiteParser:
             logger.error(f"Unexpected error while fetching Company customers: {str(e)}", exc_info=True)
             return []
 
-    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_extract_customers")
     async def _parse_customers(self, page_markdown: str) -> List[str]:
         """Extract customers from given Page markdown."""
         logger.info(f"Start parsing customers from Page Markdown for website: {self.website}")
@@ -124,7 +122,6 @@ class WebsiteParser:
             logger.error(f"Error parsing customers: {str(e)}", exc_info=True)
             return []
 
-    @with_retry(retry_config=JINA_RETRY_CONFIG, operation_name="_fetch_technologies_from_website")
     async def fetch_technologies(self) -> List[str]:
         """
         Fetches list of technologies found on given Company Website.
