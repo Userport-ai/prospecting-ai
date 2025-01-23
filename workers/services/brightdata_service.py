@@ -6,7 +6,7 @@ import httpx
 import json
 from typing import List
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
-from models import BrightDataAccount
+from models.accounts import BrightDataAccount
 from pydantic import BaseModel, Field
 
 # Configure logging

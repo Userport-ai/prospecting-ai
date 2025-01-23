@@ -5,7 +5,7 @@ import asyncio
 import httpx
 from typing import List, Optional, Dict, Any
 
-from models import ProxyCurlEmployeeProfile, ProxyCurlSearchResponse
+from models.leads import ProxyCurlEmployeeProfile, ProxyCurlSearchResponse
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from services.api_cache_service import APICacheService, cached_request
 
@@ -24,6 +24,7 @@ PROXYCURL_RETRY_CONFIG = RetryConfig(
         httpx.ConnectError,
     ]
 )
+
 
 class ProxyCurlService:
     """Service for interacting with ProxyCurl APIs."""

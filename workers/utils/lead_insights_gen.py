@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 
 from google.api_core.exceptions import ResourceExhausted
 
-from models import LeadResearchReport, ContentDetails, OpenAITokenUsage
+from models.lead_activities import LeadResearchReport, ContentDetails, OpenAITokenUsage
 from services.ai_service import AIServiceFactory
 from utils.retry_utils import RetryConfig, RetryableError, with_retry
 
@@ -24,6 +24,7 @@ GEMINI_RETRY_CONFIG = RetryConfig(
         ConnectionError
     ]
 )
+
 
 class LeadInsights:
     """Generate insights about a lead from their LinkedIn activities."""

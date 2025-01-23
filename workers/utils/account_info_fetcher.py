@@ -4,7 +4,7 @@ from typing import List, Optional
 from services.ai_service import AIServiceFactory
 from services.jina_service import JinaService
 from services.brightdata_service import BrightDataService
-from models import BrightDataAccount, AccountInfo
+from models.accounts import BrightDataAccount, AccountInfo, RecentDevelopments
 from pydantic import BaseModel, Field
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 
@@ -90,14 +90,15 @@ class AccountInfoFetcher:
                 description=bd_account.description,
                 slogan=bd_account.slogan,
                 industries=bd_account.industries,
-                specialities=bd_account.specialties,
+                categories=bd_account.specialties,
                 headquarters=bd_account.headquarters,
                 organization_type=bd_account.organization_type,
                 founded_year=bd_account.founded,
                 logo=bd_account.logo,
                 crunchbase_url=bd_account.crunchbase_url,
                 locations=bd_account.formatted_locations,
-                location_country_codes=bd_account.country_codes_array
+                location_country_codes=bd_account.country_codes_array,
+                recent_developments=RecentDevelopments(linkedin_posts=bd_account.updates)
             )
 
         except Exception as e:

@@ -15,6 +15,8 @@ from services.django_callback_service import CallbackService
 from utils.website_parser import WebsiteParser
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from .enrichment_task import AccountEnrichmentTask
+from utils.account_info_fetcher import AccountInfoFetcher
+from models.accounts import AccountInfo, Financials
 
 logger = logging.getLogger(__name__)
 
@@ -299,8 +301,8 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 raise ValueError("'accounts' must be a non-empty list")
 
             for account in accounts:
-                if not all(k in account for k in ['account_id', 'company_name']):
-                    raise ValueError("Each account must have 'account_id' and 'company_name'")
+                if not all(k in account for k in ['account_id', 'website']):
+                    raise ValueError("Each account must have 'account_id' and and 'website'")
 
             return {
                 "accounts": accounts,
@@ -309,7 +311,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             }
 
         # Single account case
-        required_fields = ['account_id', 'company_name']
+        required_fields = ['account_id', 'website']
         missing_fields = [field for field in required_fields if field not in kwargs]
 
         if missing_fields:
@@ -318,7 +320,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         return {
             "accounts": [{
                 "account_id": kwargs["account_id"],
-                "company_name": kwargs["company_name"]
+                "website": kwargs["website"],
             }],
             "job_id": str(uuid.uuid4()),
             "is_bulk": False
@@ -349,12 +351,12 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         for account in accounts:
             processed_count += 1
             account_id = account.get('account_id')
-            company_name = account.get('company_name')
+            website = account.get('website')
 
-            logger.info(f"Processing account {processed_count}/{total_accounts}: ID {account_id}, Company: {company_name}")
+            logger.info(f"Processing account {processed_count}/{total_accounts}: ID {account_id}, website: {website}")
 
             try:
-                if not all([company_name, account_id]):
+                if not all([account_id, website]):
                     logger.error(f"Job {job_id}, Account {account_id}: Missing required fields")
                     error_details = {'error_type': 'validation_error', 'message': "Missing required fields"}
 
@@ -389,11 +391,12 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     completion_percentage=int((processed_count - 0.5) / total_accounts * 100)
                 )
 
-                # Fetch LinkedIn URL first
-                logger.debug(f"Job {job_id}, Account {account_id}: Fetching LinkedIn URL from Jina AI")
-                linkedin_url = await self._fetch_linkedin_url(company_name)
+                # Fetch Basic Account information first.
+                logger.debug(f"Job {job_id}, Account {account_id}: Fetching Basic Account information")
+                account_info_fetcher = AccountInfoFetcher(website=website)
+                account_info: AccountInfo = await account_info_fetcher.get()
 
-                # Send intermediate callback after LinkedIn URL fetch
+                # Send intermediate callback after Basic Account information has been fetched.
                 await callback_service.send_callback(
                     job_id=job_id,
                     account_id=account_id,
@@ -401,12 +404,19 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     enrichment_type='company_info',
                     is_partial=True,
                     completion_percentage=int((processed_count - 0.75) / total_accounts * 100),
-                    processed_data={'linkedin_url': linkedin_url} if linkedin_url else {}
+                    processed_data={'linkedin_url': account_info.linkedin_url} if account_info.linkedin_url else {}
                 )
 
                 # Fetch company profile
                 logger.debug(f"Job {job_id}, Account {account_id}: Fetching company profile from Jina AI")
-                company_profile = await self._fetch_company_profile(company_name)
+                try:
+                    company_profile = await self._fetch_company_profile(account_info.name)
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Jina API error for company profile: {str(e)}", exc_info=True)
+                    raise
+                except Exception as e:
+                    logger.error(f"Unexpected error fetching company profile: {str(e)}", exc_info=True)
+                    raise
 
                 # Send intermediate callback after profile fetch
                 await callback_service.send_callback(
@@ -421,40 +431,40 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 logger.debug(f"Job {job_id}, Account {account_id}: Extracting structured data using Gemini")
                 structured_data = await self._extract_structured_data(company_profile)
 
+                # Populate some fields from structured data to account info.
+                account_info.financials = Financials(**structured_data.get('financials'))
+                account_info.technologies = self._extract_technologies(structured_data.get('technology_stack', {}))
+                account_info.customers = structured_data.get('market_position', {}).get('customers', [])
+                account_info.competitors = structured_data.get('market_position', {}).get('competitors', [])
+
                 # Ensure LinkedIn URL is properly set in structured data
-                if linkedin_url:
+                if account_info.linkedin_url:
                     if 'digital_presence' not in structured_data:
                         structured_data['digital_presence'] = {}
                     if 'social_media' not in structured_data['digital_presence']:
                         structured_data['digital_presence']['social_media'] = {}
 
                     # Only update if not already present or if existing URL is invalid
-                    structured_data['digital_presence']['social_media']['linkedin'] = linkedin_url
-                    if not self._is_valid_linkedin_url(linkedin_url):
-                        logger.warning(f"LinkedIn URL - {linkedin_url} is invalid!")
+                    structured_data['digital_presence']['social_media']['linkedin'] = account_info.linkedin_url
+                    if not self._is_valid_linkedin_url(account_info.linkedin_url):
+                        logger.warning(f"LinkedIn URL - {account_info.linkedin_url} is invalid!")
 
                 # Generate analysis
                 logger.debug(f"Job {job_id}, Account {account_id}: Generating analysis")
                 analysis_text = await self._generate_analysis(company_profile)
 
                 # Fetch customers.
-                customers: List[str] = structured_data.get('market_position', {}).get('customers', [])
-                website: str = structured_data.get('digital_presence', {}).get('website', '')
-                if len(website) > 0:
-                    wb_parser = WebsiteParser(website=website)
-                    wb_customers: List[str] = await wb_parser.fetch_company_customers()
-                    logger.debug(f"Customers from Website for account ID {account_id} are {wb_customers}")
-                    # Merge customers from website parser.
-                    customers = list(set(customers) | set(wb_customers))
+                wb_parser = WebsiteParser(website=website)
+                wb_customers: List[str] = await wb_parser.fetch_company_customers()
+                logger.debug(f"Customers from Website for account ID {account_id} are {wb_customers}")
+                # Merge customers from website parser.
+                account_info.customers = list(set(account_info.customers) | set(wb_customers))
 
                 # Fetch technologies.
-                technologies: List[str] = self._extract_technologies(structured_data.get('technology_stack', {}))
-                if len(website) > 0:
-                    wb_parser = WebsiteParser(website=website)
-                    wb_technologies: List[str] = await wb_parser.fetch_technologies()
-                    logger.debug(f"Technologies from Website for account ID {account_id} are {wb_technologies}")
-                    # Merge technologies from website parser.
-                    technologies = list(set(technologies) | set(wb_technologies))
+                wb_technologies: List[str] = await wb_parser.fetch_technologies()
+                logger.debug(f"Technologies from Website for account ID {account_id} are {wb_technologies}")
+                # Merge technologies from website parser.
+                account_info.technologies = list(set(account_info.technologies) | set(wb_technologies))
 
                 # Store data in BigQuery
                 logger.debug(f"Job {job_id}, Account {account_id}: Storing processed data in BigQuery")
@@ -466,18 +476,18 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
                 # Process and format enrichment data
                 processed_data = {
-                    'company_name': structured_data.get('company_name', {}).get('legal_name'),
-                    'employee_count': structured_data.get('business_metrics', {}).get('employee_count', {}).get('total'),
-                    'industry': structured_data.get('industry', {}).get('sectors', []),
-                    'location': self._format_location(structured_data.get('location', {})),
+                    'company_name': account_info.name,
+                    'employee_count': account_info.employee_count,
+                    'industry': account_info.industries,
+                    'location': account_info.formatted_hq(),
                     'website': website,
-                    'linkedin_url': structured_data.get('digital_presence', {}).get('social_media', {}).get('linkedin'),
-                    'technologies': technologies,
-                    'funding_details': structured_data.get('financials', {}).get('private_data', {}),
-                    'company_type': structured_data.get('business_metrics', {}).get('company_type'),
-                    'founded_year': structured_data.get('business_metrics', {}).get('year_founded'),
-                    'customers': customers,
-                    'competitors': structured_data.get('market_position', {}).get('competitors', [])
+                    'linkedin_url': account_info.linkedin_url,
+                    'technologies': account_info.technologies,
+                    'funding_details': account_info.financials.private_data.model_dump(),
+                    'company_type': account_info.organization_type,
+                    'founded_year': account_info.founded_year,
+                    'customers': account_info.customers,
+                    'competitors': account_info.competitors
                 }
 
                 # Store enrichment raw data
@@ -509,7 +519,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 results.append({
                     "status": "completed",
                     "account_id": account_id,
-                    "company_name": company_name
+                    "company_name": account_info.name
                 })
 
             except Exception as e:
@@ -639,29 +649,21 @@ class AccountEnhancementTask(AccountEnrichmentTask):
     @with_retry(retry_config=API_RETRY_CONFIG, operation_name="fetch_company_profile")
     async def _fetch_company_profile(self, company_name: str) -> str:
         """Fetch company profile from Jina AI."""
-        try:
-            search_query = f"{company_name}+company+profile"
-            logger.debug(f"Searching Jina AI for company profile with query: {search_query}")
+        search_query = f"{company_name}+company+profile"
+        logger.debug(f"Searching Jina AI for company profile with query: {search_query}")
 
-            jina_url = f"https://s.jina.ai/{search_query}"
-            response = requests.get(
-                jina_url,
-                headers={"Authorization": f"Bearer {self.jina_api_token}"},
-                timeout=30
-            )
-            response.raise_for_status()
+        jina_url = f"https://s.jina.ai/{search_query}"
+        response = requests.get(
+            jina_url,
+            headers={"Authorization": f"Bearer {self.jina_api_token}"},
+            timeout=30
+        )
+        response.raise_for_status()
 
-            if not response.text.strip():
-                raise ValueError(f"Empty response from Jina AI for company: {company_name}")
+        if not response.text.strip():
+            raise ValueError(f"Empty response from Jina AI for company: {company_name}")
 
-            return response.text
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Jina API error for company profile: {str(e)}", exc_info=True)
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error fetching company profile: {str(e)}", exc_info=True)
-            raise
+        return response.text
 
     @with_retry(retry_config=AI_RETRY_CONFIG, operation_name="extract_structured_data")
     async def _extract_structured_data(self, company_profile: str) -> Dict[str, Any]:

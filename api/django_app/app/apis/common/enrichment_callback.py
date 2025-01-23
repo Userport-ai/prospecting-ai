@@ -106,12 +106,12 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
             return
         logger.info(f"Updating account {account.id} with company info")
         # Update fields from processed_data
-        account.name = account.name or processed_data.get('company_name')
+        account.name = processed_data.get('company_name')
         account.employee_count = processed_data.get('employee_count')
-        account.industry = processed_data.get('industry', [None])[0]  # Take first industry if list
+        account.industry = processed_data.get('industry')
         account.location = processed_data.get('location')
-        account.website = account.website or processed_data.get('website')
-        account.linkedin_url = account.linkedin_url or processed_data.get('linkedin_url')
+        account.website = processed_data.get('website')
+        account.linkedin_url = processed_data.get('linkedin_url')
         # Handle array/JSON fields
         if 'technologies' in processed_data:
             account.technologies = processed_data['technologies']
