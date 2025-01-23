@@ -10,7 +10,7 @@ class UserportPydanticBaseModel(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat(),
         }
-    
+
 
 class OpenAITokenUsage(UserportPydanticBaseModel):
     """Token usage when calling OpenAI models."""
@@ -29,6 +29,7 @@ class OpenAITokenUsage(UserportPydanticBaseModel):
         self.total_tokens += another.total_tokens
         self.total_cost_in_usd += another.total_cost_in_usd
 
+
 class LinkedInActivity(UserportPydanticBaseModel):
     """LinkedIn activity (post, comment, reaction)."""
 
@@ -43,6 +44,7 @@ class LinkedInActivity(UserportPydanticBaseModel):
     activity_url: Optional[str] = Field(default=None, description="Activity URL")
     type: "LinkedInActivity.Type" = Field(..., description="Activity type")
     content_md: str = Field(..., description="Content in markdown format")
+
 
 class ContentDetails(UserportPydanticBaseModel):
     """Processed activity content."""
@@ -104,6 +106,7 @@ class ContentDetails(UserportPydanticBaseModel):
 
     openai_tokens_used: Optional[OpenAITokenUsage] = Field(default=None)
 
+
 class LeadResearchReport(UserportPydanticBaseModel):
     """Lead research report model."""
 
@@ -145,7 +148,6 @@ class LeadResearchReport(UserportPydanticBaseModel):
         num_company_related_activities: Optional[int] = Field(default=None)
         total_tokens_used: Optional[OpenAITokenUsage] = Field(default=None)
 
-
     class PersonalizedEmail(UserportPydanticBaseModel):
         """Personalized outreach email."""
         id: str = Field(...)
@@ -173,3 +175,84 @@ class LeadResearchReport(UserportPydanticBaseModel):
     creation_date: Optional[datetime] = Field(default=None)
     completion_date: Optional[datetime] = Field(default=None)
     error_message: Optional[str] = Field(default=None)
+
+
+class BrightDataAccount(UserportPydanticBaseModel):
+    """Bright Data account returned as part of data collection process."""
+    class Input(UserportPydanticBaseModel):
+        url: str = Field(...)
+
+    class Funding(UserportPydanticBaseModel):
+        last_round_date: Optional[datetime] = Field(default=None)
+        last_round_type: Optional[str] = Field(default=None)
+        rounds: Optional[int] = Field(default=None)
+        last_round_raised: Optional[str] = Field(default=None)
+
+    class LinkedInPost(UserportPydanticBaseModel):
+        class TaggedEntity(UserportPydanticBaseModel):
+            name: Optional[str] = Field(default=None)
+            link: Optional[str] = Field(default=None, description="LinkedIn profile of person or company.")
+
+        title: Optional[str] = Field(default=None, description="Likely name of account e.g. Lunos, Zoom etc.")
+        text: Optional[str] = Field(default=None)
+        time: Optional[str] = Field(default=None, description="Examples: 6d Edited, 1w etc.")
+        date: Optional[datetime] = Field(default=None, description="Same as 'time' field but displayed in ISO format, Example:  2024-12-25T10:06:52.933Z")
+        post_url: Optional[str] = Field(default=None)
+        post_id: Optional[str] = Field(default=None)
+        images: Optional[List[str]] = Field(default=None, description="URLs of images in Post.")
+        videos: Optional[List[str]] = Field(default=None, description="URLs of videos in Post.")
+        tagged_companies: Optional[List[TaggedEntity]] = Field(default=None)
+        tagged_people: Optional[List[TaggedEntity]] = Field(default=None)
+        likes_count: Optional[int] = Field(default=None)
+        comments_count: Optional[int] = Field(default=None)
+
+    input: Input = Field(...)
+    id: Optional[str] = Field(default=None)
+    name: Optional[str] = Field(default=None)
+    employees_in_linkedin: Optional[int] = Field(default=None)
+    about: Optional[str] = Field(default=None)
+    description: Optional[str] = Field(default=None)
+    specialties: Optional[str] = Field(default=None)
+    company_size: Optional[str] = Field(default=None)
+    organization_type: Optional[str] = Field(default=None)
+    industries: Optional[str] = Field(default=None)
+    website: Optional[str] = Field(default=None)
+    crunchbase_url: Optional[str] = Field(default=None)
+    founded: Optional[int] = Field(default=None)
+    headquarters: Optional[str] = Field(default=None)
+    logo: Optional[str] = Field(default=None)
+    url: Optional[str] = Field(default=None)  # LinkedIn URL of the Account.
+    slogan: Optional[str] = Field(default=None)
+    funding: Optional[Funding] = Field(default=None)
+    investors: Optional[List[str]] = Field(default=None)
+    formatted_locations: Optional[List[str]] = Field(default=None)
+    country_codes_array: Optional[List[str]] = Field(default=None)
+    timestamp: Optional[datetime] = Field(default=None)
+
+    # LinkedIn Posts from the Account.
+    updates: Optional[List[LinkedInPost]] = Field(default=None)
+
+    # In case the page is invalid, these fields are populated.
+    warning: Optional[str] = Field(default=None, description="Example warning text: 4XX page - dead page")
+    warning_code: Optional[str] = Field(default=None, description="Example code: dead_page")
+
+
+class AccountInfo(UserportPydanticBaseModel):
+    """Account information that are relevant for Userport."""
+    name: Optional[str] = Field(default=None)
+    website: Optional[str] = Field(default=None)
+    linkedin_url: Optional[str] = Field(default=None)
+    employee_count: Optional[int] = Field(default=None)
+    about: Optional[str] = Field(default=None)
+    description: Optional[str] = Field(default=None)
+    slogan: Optional[str] = Field(default=None)
+    industries: Optional[str] = Field(default=None)
+    specialities: Optional[str] = Field(default=None)
+    headquarters: Optional[str] = Field(default=None)
+    company_size: Optional[str] = Field(default=None)
+    organization_type: Optional[str] = Field(default=None)
+    founded_year: Optional[int] = Field(default=None)
+    logo: Optional[str] = Field(default=None)
+    crunchbase_url: Optional[str] = Field(default=None)
+    locations: Optional[List[str]] = Field(default=None)
+    location_country_codes: Optional[List[str]] = Field(default=None)
