@@ -6,7 +6,7 @@ import {
 import { CirclePlus } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { ColumnFilter, Table} from "@tanstack/react-table";
+import { ColumnFilter, Table } from "@tanstack/react-table";
 import { CheckedState } from "@radix-ui/react-checkbox";
 import { CustomColumnMeta } from "./CustomColumnMeta";
 
@@ -23,11 +23,15 @@ interface EnumFilterProps {
 
 // Common Filter component for columns that have finite set of values (Enums)
 // like Status, Type of Company etc.
-const EnumFilter: React.FC<EnumFilterProps> = ({ table, columnId, columnFilters }) => {
+const EnumFilter: React.FC<EnumFilterProps> = ({
+  table,
+  columnId,
+  columnFilters,
+}) => {
   const column = table.getColumn(columnId);
-  if(!column) {
+  if (!column) {
     // Column does not exist for given columnId.
-    console.error(`Column does not exist for given key: ${columnId}`)
+    console.error(`Column does not exist for given key: ${columnId}`);
     return null;
   }
 
@@ -46,7 +50,8 @@ const EnumFilter: React.FC<EnumFilterProps> = ({ table, columnId, columnFilters 
   const isColumnValChecked = (columnVal: string) =>
     columnFilters.some(
       (curFilter) =>
-        curFilter.id === columnId && (curFilter.value as string[]).includes(columnVal)
+        curFilter.id === columnId &&
+        (curFilter.value as string[]).includes(columnVal)
     );
 
   // Handle Checked Value change for a given column. We need to update
@@ -79,11 +84,13 @@ const EnumFilter: React.FC<EnumFilterProps> = ({ table, columnId, columnFilters 
   );
   const curSelectedFilter = gotFilterArr.length > 0 ? gotFilterArr[0] : null;
 
-  const colDisplayName = (column.columnDef.meta as CustomColumnMeta).displayName || column.columnDef.id;
+  const colDisplayName =
+    (column.columnDef.meta as CustomColumnMeta).displayName ||
+    column.columnDef.id;
   return (
     <div>
       <Popover>
-        <PopoverTrigger className="flex gap-4 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300">
+        <PopoverTrigger className="flex gap-4 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300 border border-gray-200">
           {/* Trigger Button */}
           <div className="flex gap-2">
             <CirclePlus size={18} />
@@ -129,6 +136,6 @@ const EnumFilter: React.FC<EnumFilterProps> = ({ table, columnId, columnFilters 
       </Popover>
     </div>
   );
-}
+};
 
 export default EnumFilter;

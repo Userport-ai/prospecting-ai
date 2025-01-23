@@ -43,6 +43,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Fetch user context.
+      setLoading(true);
       fetchUserContext(user!)
         .then((userContext) => setUserContext(userContext))
         .catch((error) =>

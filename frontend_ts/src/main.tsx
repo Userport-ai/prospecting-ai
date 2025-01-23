@@ -6,13 +6,15 @@ import App from "./App.jsx";
 import Playbook from "./playbook/Playbook";
 import AddProduct from "./playbook/AddProduct";
 import ProductsPage from "./playbook/ProductsPage";
-import Accounts from "./accounts/Table.js";
+import AccountsTable from "./accounts/AccountsTable.js";
 import { Login } from "./auth/Login";
 import { SignUp } from "./auth/SignUp";
 import AuthProvider from "./auth/AuthProvider";
-import Leads from "./leads/Table.js";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorFallback } from "./ErrorFallback.js";
+import LeadsInAccount from "./accounts/LeadsInAccount.js";
+import AccountsView from "./accounts/AccountsView.js";
+import LeadsView from "./leads/LeadsView.js";
 
 // Error Logging Function
 function logErrorToService(error: Error, info: ErrorInfo) {
@@ -36,8 +38,11 @@ createRoot(document.getElementById("root") as HTMLElement).render(
                 <Route index element={<ProductsPage />} />
                 <Route path="add-product" element={<AddProduct />} />
               </Route>
-              <Route path="accounts" element={<Accounts />}></Route>
-              <Route path="leads" element={<Leads />}></Route>
+              <Route path="accounts" element={<AccountsView />}>
+                <Route index element={<AccountsTable />} />
+                <Route path=":id/leads" element={<LeadsInAccount />} />
+              </Route>
+              <Route path="leads" element={<LeadsView />} />
             </Route>
           </Routes>
         </BrowserRouter>

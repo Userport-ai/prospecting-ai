@@ -4,7 +4,7 @@ import { Outlet } from "react-router";
 
 export default function AppLayout() {
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <AppSidebar />
       <main className="w-full">
         <SidebarTrigger />

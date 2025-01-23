@@ -3,6 +3,7 @@ import { apiCall, ListObjectsResponse } from "./Api";
 import { EnrichmentStatus } from "./Common";
 
 const ACCOUNTS_ENDPOINT = "/accounts/";
+const BULK_CREATE_ACCOUNTS_ENDPOINT = "/accounts/bulk_create/";
 
 // Account as returned by the backend API.
 export interface Account {
@@ -18,8 +19,8 @@ export interface Account {
   founded_year: number | null;
   customers: string[] | null;
   competitors: string[] | null;
-  technologies: Record<string, any> | null;
-  funding_details: Record<string, any> | null;
+  technologies: string[] | null;
+  funding_details: FundingDetails | null;
   enrichment_status: EnrichmentStatus;
   enrichment_sources: Record<string, any> | null;
   last_enriched_at: string | null;
@@ -28,41 +29,155 @@ export interface Account {
   created_at: string;
 }
 
+export interface FundingDetails {
+  total_funding: {
+    amount: number | null;
+    currency: string | null;
+    as_of_date: string | null;
+  };
+  funding_rounds: FundingRound[];
+}
+
+interface FundingRound {
+  series: string | null;
+  amount: number | null;
+  currency: string | null;
+  date: string | null;
+  lead_investors: string[];
+  other_investors: string[];
+  valuation: {
+    amount: number | null;
+    currency: string | null;
+    type: string | null;
+  };
+}
+
 type ListAccountsResponse = ListObjectsResponse<Account>;
 
+const USERPORT_TENANT_ID = "34410fcc-83bf-4006-b7d3-fedfe0472afb";
+
 // Fetch all accounts for given tenant.
-// TODO: Update this to only fetch accounts created by given user.
 export const listAccounts = async (
-  authContext: AuthContext
+  authContext: AuthContext,
+  ids?: string[] // Optional parameter for list of IDs
 ): Promise<Account[]> => {
+  const { userContext } = authContext;
+  if (userContext!.tenant.id === USERPORT_TENANT_ID) {
+    // Reroute to internal method.
+    return listAccountsWithinTenant(authContext, ids);
+  }
+
+  var params: Record<string, any> = { created_by: userContext!.user.id };
+
+  if (ids && ids.length > 0) {
+    // Create a comma-separated string for 'id__in' param
+    params["id__in"] = ids.join(",");
+  }
+
   return await apiCall<Account[]>(authContext, async (apiClient) => {
     const response = await apiClient.get<ListAccountsResponse>(
-      ACCOUNTS_ENDPOINT
+      ACCOUNTS_ENDPOINT,
+      { params }
     );
     return response.data.results;
   });
 };
 
-export interface CreateAccountsRequest {
+// Internal method that should only be used for Userport tenant for dev purposes.
+const listAccountsWithinTenant = async (
+  authContext: AuthContext,
+  ids?: string[] // Optional parameter for list of IDs
+): Promise<Account[]> => {
+  const { userContext } = authContext;
+  if (userContext!.tenant.id !== USERPORT_TENANT_ID) {
+    throw new Error(`Cannot call internal method to List accounts!`);
+  }
+  var params: Record<string, any> = {};
+
+  if (ids && ids.length > 0) {
+    // Create a comma-separated string for 'id__in' param
+    params["id__in"] = ids.join(",");
+  }
+
+  return await apiCall<Account[]>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListAccountsResponse>(
+      ACCOUNTS_ENDPOINT,
+      { params }
+    );
+    return response.data.results;
+  });
+};
+
+// Fetch a single Account with given ID.
+export const getAccount = async (
+  authContext: AuthContext,
+  id: string
+): Promise<Account> => {
+  const { userContext } = authContext;
+  var params: Record<string, any> = {
+    created_by: userContext!.user.id,
+    id: id,
+  };
+
+  return await apiCall<Account>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListAccountsResponse>(
+      ACCOUNTS_ENDPOINT,
+      { params }
+    );
+    if (response.data.count != 1) {
+      throw new Error(
+        `Expected 1 Account, got ${response.data.count} Accounts in results.`
+      );
+    }
+    return response.data.results[0];
+  });
+};
+
+export interface CreateAccountRequest {
+  name: string;
+  website: string;
   product: string; // ID of the product accounts are enriched for.
-  accounts: { name: string }[];
+  linkedin_url: string;
 }
 
-interface CreateAccountsResponse {
+// Create Single Account for enrichment.
+export const createAccount = async (
+  authContext: AuthContext,
+  request: CreateAccountRequest
+): Promise<Account> => {
+  return await apiCall<Account>(authContext, async (apiClient) => {
+    const response = await apiClient.post<Account>(ACCOUNTS_ENDPOINT, request);
+    return response.data;
+  });
+};
+
+// Account information request in creation request.
+export interface AccountInfo {
+  name: string;
+  website: string;
+  linkedin_url: string;
+}
+
+export interface CreateBulkAccountsRequest {
+  product: string; // ID of the product accounts are enriched for.
+  accounts: AccountInfo[];
+}
+
+interface CreateBulkAccountsResponse {
   message: string;
   account_count: number;
   accounts: Account[];
   enrichment_status: Record<string, any>;
 }
 
-// Create Accounts for enrichment.
-export const createAccounts = async (
+// Create Accounts in Bulk for enrichment.
+export const createBulkAccounts = async (
   authContext: AuthContext,
-  request: CreateAccountsRequest
+  request: CreateBulkAccountsRequest
 ): Promise<Account[]> => {
   return await apiCall<Account[]>(authContext, async (apiClient) => {
-    const response = await apiClient.post<CreateAccountsResponse>(
-      ACCOUNTS_ENDPOINT,
+    const response = await apiClient.post<CreateBulkAccountsResponse>(
+      BULK_CREATE_ACCOUNTS_ENDPOINT,
       request
     );
     return response.data.accounts;
