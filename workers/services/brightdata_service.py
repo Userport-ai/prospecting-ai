@@ -72,7 +72,7 @@ class BrightDataService:
                         # Successful response.
                         results: List = response.json()
                         if not isinstance(results, list):
-                            raise ValueError(f"Expected List response, got: {result}")
+                            raise ValueError(f"Expected List response, got: {results}")
                         return [BrightDataAccount(**res) for res in results]
 
             raise ValueError(f"Failed to collect Account data for Snapshot ID: {snapshot_id}")

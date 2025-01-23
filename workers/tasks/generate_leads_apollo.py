@@ -8,12 +8,11 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Union
 
-import google.generativeai as genai
-
 from services.ai_service import AIServiceFactory
 from services.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
+from services.proxycurl_service import ProxyCurlService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
 from .enrichment_task import AccountEnrichmentTask
@@ -32,6 +31,7 @@ class ApolloConfig:
     max_retries: int = 3
     retry_delay: float = 1.0
     max_retry_delay: float = 5.0
+    enrich_leads: bool = True  # New: Flag to control lead enrichment
 
 @dataclass
 class ProcessingMetrics:
@@ -42,6 +42,8 @@ class ProcessingMetrics:
     processing_time: float = 0.0
     api_errors: int = 0
     ai_errors: int = 0
+    enriched_leads: int = 0  # New: Track enriched leads
+    enrichment_errors: int = 0  # New: Track enrichment errors
 
 @dataclass
 class PromptTemplates:
@@ -87,7 +89,7 @@ class PromptTemplates:
     2. If a field is not available, use null
     3. Do not include any other information or pleasantries or anything else outside the JSON
     
-    Example:
+    Example (Structure only):
 {{
   "evaluated_leads": [
     {{
@@ -110,7 +112,7 @@ class PromptTemplates:
     """
 
 class ApolloLeadsTask(AccountEnrichmentTask):
-    """Task for identifying potential leads using Apollo API and AI analysis."""
+    """Task for identifying potential leads using Apollo API, ProxyCurl enrichment and AI analysis."""
 
     ENRICHMENT_TYPE = 'generate_leads'
 
@@ -133,6 +135,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         self.bq_service = BigQueryService()
         self._initialize_credentials()
         self._configure_ai_service()
+        self._initialize_services()
         self.prompts = PromptTemplates()
 
     def _initialize_credentials(self) -> None:
@@ -156,8 +159,11 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the Gemini AI service."""
-        genai.configure(api_key=self.google_api_key)
         self.model = AIServiceFactory.create_service("openai")
+
+    def _initialize_services(self) -> None:
+        """Initialize required services."""
+        self.proxycurl_service = ProxyCurlService(self.cache_service)
 
     @property
     def enrichment_type(self) -> str:
@@ -224,11 +230,10 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 enrichment_type=self.ENRICHMENT_TYPE,
                 source="apollo",
                 status='processing',
-                completion_percentage=40,
+                completion_percentage=30,
                 processed_data={
                     'stage': current_stage,
-                    'employees_found': len(raw_employee_data),
-                    'metrics': asdict(self.metrics)
+                    'employees_found': len(raw_employee_data)
                 }
             )
 
@@ -247,17 +252,42 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 enrichment_type=self.ENRICHMENT_TYPE,
                 source="apollo",
                 status='processing',
+                completion_percentage=50,
+                processed_data={
+                    'stage': current_stage,
+                    'structured_leads': len(structured_leads)
+                }
+            )
+
+            # Enrich leads with ProxyCurl if enabled
+            if self.config.enrich_leads and structured_leads:
+                current_stage = 'enriching_leads'
+                try:
+                    enriched_leads = await self.proxycurl_service.enrich_leads(structured_leads)
+                    self.metrics.enriched_leads = len(enriched_leads)
+                except Exception as e:
+                    logger.error(f"Lead enrichment failed: {str(e)}", exc_info=True)
+                    self.metrics.enrichment_errors += 1
+                    enriched_leads = structured_leads  # Fallback to non-enriched leads
+            else:
+                enriched_leads = structured_leads
+
+            await callback_service.send_callback(
+                job_id=job_id,
+                account_id=account_id,
+                enrichment_type=self.ENRICHMENT_TYPE,
+                source="apollo",
+                status='processing',
                 completion_percentage=70,
                 processed_data={
                     'stage': current_stage,
-                    'structured_leads': len(structured_leads),
-                    'metrics': asdict(self.metrics)
+                    'enriched_leads': len(enriched_leads)
                 }
             )
 
             # Evaluate leads
             current_stage = 'evaluating_leads'
-            evaluated_leads = await self._evaluate_leads(structured_leads, product_data)
+            evaluated_leads = await self._evaluate_leads(enriched_leads, product_data)
 
             # Store results with enhanced metadata
             current_stage = 'storing_results'
@@ -266,7 +296,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             await self._store_results(
                 job_id=job_id,
                 account_id=account_id,
-                structured_leads=structured_leads,
+                structured_leads=enriched_leads,  # Store enriched leads
                 evaluated_leads=evaluated_leads
             )
 
@@ -283,7 +313,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 completion_percentage=100,
                 processed_data={
                     'score_distribution': score_distribution,
-                    'structured_leads': structured_leads,
+                    'structured_leads': enriched_leads,
                     'all_leads': evaluated_leads,
                     'qualified_leads': qualified_leads,
                     'metrics': asdict(self.metrics)
@@ -328,7 +358,6 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 "stage": current_stage,
                 "metrics": asdict(self.metrics)
             }
-
 
     @with_retry(retry_config=APOLLO_RETRY_CONFIG, operation_name="fetch_employees_concurrent")
     async def _fetch_employees_concurrent(self, domain: str) -> List[Dict[str, Any]]:
