@@ -868,29 +868,3 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             return "right_skewed"  # More high scores
         else:
             return "left_skewed"  # More low scores
-
-    def _attempt_json_fix(self, text: str) -> str:
-        """Attempt to fix common JSON formatting issues."""
-        # Fix 1: Replace single quotes with double quotes
-        # Before: {'name': 'John'}
-        # After:  {"name": "John"}
-        text = text.replace("'", '"')
-
-        # Fix 2: Handle missing commas between objects and fix missing quotes around keys
-        # Before: { title: "Manager" } { role: "lead" }
-        # After:  { "title": "Manager" }, { "role": "lead" }
-        import re
-        text = re.sub(r'(\s*})(\s*,?\s*{?\s*[\w_]+\s*:)', r'\1,\2', text)
-        text = re.sub(r'([\w_]+)(:)', r'"\1"\2', text)
-
-        # Fix 3: Remove trailing commas in objects/arrays
-        # Before: {"items": ["a", "b",]}
-        # After:  {"items": ["a", "b"]}
-        text = re.sub(r',(\s*[}\]])', r'\1', text)
-
-        # Fix 4: Add quotes around unquoted string values
-        # Before: {"status": pending, "id": 123}
-        # After:  {"status": "pending", "id": 123}
-        text = re.sub(r':\s*([\w_-]+)([,}])', r': "\1"\2', text)
-
-        return text
