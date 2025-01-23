@@ -88,10 +88,10 @@ class WorkerService:
                     "Content-Type": "application/json"
                 }
 
-            logger.debug(f"Making request to: {self.base_url}/api/v1/tasks/create/lead_identification")
+            logger.debug(f"Making request to: {self.base_url}/api/v1/tasks/create/lead_identification_apollo")
 
             response = requests.post(
-                f"{self.base_url}/api/v1/tasks/create/lead_identification",
+                f"{self.base_url}/api/v1/tasks/create/lead_identification_apollo",
                 json=payload,
                 headers=headers,
                 timeout=self.timeout
