@@ -3,6 +3,8 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Union
+from google.api_core.exceptions import ResourceExhausted as GoogleAPIResourceExhausted
+from utils.retry_utils import RetryableError, RetryConfig, with_retry
 
 import google.generativeai as genai
 from openai import AsyncOpenAI
@@ -10,6 +12,33 @@ from openai import AsyncOpenAI
 from utils.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
+
+GEMINI_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    base_delay=2.0,
+    max_delay=30.0,
+    retryable_exceptions=[
+        RetryableError,
+        GoogleAPIResourceExhausted,
+        ValueError,
+        RuntimeError,
+        TimeoutError,
+        ConnectionError
+    ]
+)
+
+OPENAI_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    base_delay=2.0,
+    max_delay=30.0,
+    retryable_exceptions=[
+        RetryableError,
+        ValueError,
+        RuntimeError,
+        TimeoutError,
+        ConnectionError
+    ]
+)
 
 
 class AIService(ABC):
@@ -79,6 +108,7 @@ class OpenAIService(AIService):
             }
         }
 
+    @with_retry(retry_config=OPENAI_RETRY_CONFIG, operation_name="_openai_generate_content")
     async def generate_content(self, prompt: str, is_json: bool = True, operation_tag: str = "default") -> Union[Dict[str, Any], str]:
         """Generate content using OpenAI."""
         try:
@@ -168,6 +198,7 @@ class GeminiService(AIService):
         self.avg_chars_per_token = 4
         self.cost_per_1k_tokens = 0.00015  # Example rate
 
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_content")
     async def generate_content(self, prompt: str, is_json: bool = True, operation_tag: str = "default") -> Union[Dict[str, Any], str]:
         """Generate content using Gemini."""
         try:
