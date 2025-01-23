@@ -64,7 +64,7 @@ class AccountInfoFetcher:
             logger.debug(f"Starting fetch of Account information for website: {self.website}")
             domain = self._get_domain(self.website)
             query = f"{domain} LinkedIn Page"
-            web_search_results_md: str = await self.jina_service.search_query(query=query, headers={"X-Retain-Images": "none"})
+            web_search_results_md: str = await self.jina_service.search_query(query=query, headers={"X-Retain-Images": "none", "X-No-Cache": "true"})
             logger.debug(f"Fetched Jina Web search results for query {query} for website: {self.website}")
 
             account_linkedin_urls: List[str] = await self._parse_account_linkedin_urls(web_search_results_md=web_search_results_md)
