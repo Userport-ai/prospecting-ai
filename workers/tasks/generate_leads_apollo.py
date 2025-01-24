@@ -56,11 +56,13 @@ class PromptTemplates:
     2. Use the given product and persona information to evaluate each lead. Consider how likely the lead is to have the pain point the product is solving.
     3. You can assume that the account is already qualified and have a good potential fit, you're only evaluating leads.
     4. Rationale and analysis should highlight and quote specific instances from the data that supports the score.
-    5. Analyze the lead's information, focusing on how their background, role, or responsibilities relate to the product.
-    6. Assign a Fit Score from 0 to 1, where 1 indicates a perfect fit and 0 indicates no alignment.
-    7. Identify the best matching persona type (e.g., end_user, buyer, influencer) or use null if none apply.
-    8. Recommend an engagement approach tailored to this lead.
-    9. Provide an overall analysis summarizing the lead's potential.
+    5. Consider their role titles in conjunction with the content including their background, about them, descriptions provided before deciding on persona fit. Often titles are abstract and may not describe their role comprehensively.
+    6. The role and responsibility of a certain role title also depends on the size of the company. So consider that before concluding anything.
+    7. Analyze the lead's information, focusing on how their background, role, or responsibilities relate to the product.
+    8. Assign a Fit Score from 0 to 1, where 1 indicates a perfect fit and 0 indicates no alignment.
+    9. Identify the best matching persona type (e.g., end_user, buyer, influencer) or use null if none apply.
+    10. Recommend an engagement approach tailored to this lead.
+    11. Provide an overall analysis summarizing the lead's potential.
 
     Website Context:
     {website_context}
@@ -88,7 +90,7 @@ class PromptTemplates:
             }}
         ]
     }}
-    1. Return ONLY valid JSON
+    1. Return ONLY valid JSON without codeblocks, additional comments or anything else. 
     2. If a field is not available, use null
     3. Do not include any other information or pleasantries or anything else outside the JSON
     
@@ -145,14 +147,11 @@ class ApolloLeadsTask(AccountEnrichmentTask):
     def _initialize_credentials(self) -> None:
         """Initialize and validate required API credentials."""
         self.apollo_api_key = os.getenv('APOLLO_API_KEY')
-        self.google_api_key = os.getenv('GEMINI_API_TOKEN')
         self.project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
         self.dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
 
         if not self.apollo_api_key:
             raise ValueError("APOLLO_API_KEY environment variable is required")
-        if not self.google_api_key:
-            raise ValueError("GEMINI_API_TOKEN environment variable is required")
 
         # Initialize cache service
         self.cache_service = APICacheService(
@@ -163,7 +162,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the Gemini AI service."""
-        self.model = AIServiceFactory.create_service("openai", "gpt-4o")
+        self.model = AIServiceFactory.create_service("gemini")
 
     def _initialize_services(self) -> None:
         """Initialize required services."""
@@ -291,7 +290,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
             # Evaluate leads
             current_stage = 'evaluating_leads'
-            evaluated_leads = await self._evaluate_leads(enriched_leads, product_data)
+            evaluated_leads = await self._evaluate_leads(enriched_leads, product_data, account_data)
 
             # Store results with enhanced metadata
             current_stage = 'storing_results'
@@ -676,8 +675,8 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             self.metrics.failed_leads += 1
             return None
 
-    async def _evaluate_leads(self, structured_leads: List[Dict[str, Any]],
-                              product_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _evaluate_leads(self, structured_leads: List[Dict[str, Any]], product_data: Dict[str, Any],
+                              account_data) -> List[Dict[str, Any]]:
         """Evaluate leads in batches with enhanced error handling."""
         website_context_prompt = None
         if not structured_leads:
@@ -686,7 +685,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
         # Get website context first
         try:
-            website = product_data.get('account_data', {}).get('website',)
+            website = account_data.get('website',)
             if not website:
                 logger.warning("Website URL not provided for context extraction")
                 website_context_prompt = "<Website context unavailable>"
