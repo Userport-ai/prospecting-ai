@@ -88,7 +88,7 @@ class AIService(ABC):
 class OpenAIService(AIService):
     """OpenAI implementation of AI service."""
 
-    def __init__(self):
+    def __init__(self, model_name):
         """Initialize OpenAI client."""
         super().__init__()
         self.provider_name = "openai"
@@ -98,13 +98,17 @@ class OpenAIService(AIService):
             raise ValueError("OPENAI_API_KEY environment variable required")
 
         self.client = AsyncOpenAI(api_key=api_key)
-        self.model = "gpt-4o-mini"  # Can be configured as needed
+        self.model = model_name or "gpt-4o-mini"  # Can be configured as needed
 
         # OpenAI pricing per 1K tokens (can be configured)
         self.price_per_1k_tokens = {
             "gpt-4o-mini": {
                 "input": 0.01,
                 "output": 0.03
+            },
+            "gpt-4o": {
+                "input": 0.1,
+                "output": 0.3
             }
         }
 
@@ -131,6 +135,7 @@ class OpenAIService(AIService):
                 messages=messages,
                 response_format=response_format
             )
+            logger.debug(f"OpenAI response: {response}")
 
             if not response.choices:
                 logger.warning("Empty response from OpenAI")
@@ -182,7 +187,7 @@ class OpenAIService(AIService):
 class GeminiService(AIService):
     """Gemini implementation of AI service."""
 
-    def __init__(self):
+    def __init__(self, model_name):
         """Initialize Gemini client."""
         super().__init__()
         self.provider_name = "gemini"
@@ -192,7 +197,8 @@ class GeminiService(AIService):
             raise ValueError("GEMINI_API_TOKEN environment variable required")
 
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        name = model_name or 'gemini-2.0-flash-exp'
+        self.model = genai.GenerativeModel(name)
 
         # Approximate token count for cost estimation
         self.avg_chars_per_token = 4
@@ -213,6 +219,7 @@ class GeminiService(AIService):
 
             # Track token usage
             response_text = response.parts[0].text
+            logger.debug(f"Gemini response: {response_text}")
             token_usage = self._create_token_usage(prompt, response_text, operation_tag)
             self._track_usage(token_usage)
 
@@ -266,11 +273,11 @@ class AIServiceFactory:
     """Factory for creating AI service instances."""
 
     @staticmethod
-    def create_service(provider: str = "openai") -> AIService:
+    def create_service(provider: str = "openai", model_name=None) -> AIService:
         """Create an AI service instance."""
         if provider.lower() == "openai":
-            return OpenAIService()
+            return OpenAIService(model_name)
         elif provider.lower() == "gemini":
-            return GeminiService()
+            return GeminiService(model_name)
         else:
             raise ValueError(f"Unsupported AI provider: {provider}")

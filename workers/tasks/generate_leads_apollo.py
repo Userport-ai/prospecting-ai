@@ -12,6 +12,7 @@ from services.ai_service import AIServiceFactory
 from services.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
+from services.jina_service import JinaService
 from services.proxycurl_service import ProxyCurlService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
@@ -61,6 +62,8 @@ class PromptTemplates:
     8. Recommend an engagement approach tailored to this lead.
     9. Provide an overall analysis summarizing the lead's potential.
 
+    Website Context:
+    {website_context}
     
     Product Information:
     {product_info}
@@ -137,6 +140,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         self._configure_ai_service()
         self._initialize_services()
         self.prompts = PromptTemplates()
+        self.jina_service = JinaService()
 
     def _initialize_credentials(self) -> None:
         """Initialize and validate required API credentials."""
@@ -159,7 +163,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the Gemini AI service."""
-        self.model = AIServiceFactory.create_service("openai")
+        self.model = AIServiceFactory.create_service("openai", "gpt-4o")
 
     def _initialize_services(self) -> None:
         """Initialize required services."""
@@ -675,9 +679,26 @@ class ApolloLeadsTask(AccountEnrichmentTask):
     async def _evaluate_leads(self, structured_leads: List[Dict[str, Any]],
                               product_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Evaluate leads in batches with enhanced error handling."""
+        website_context_prompt = None
         if not structured_leads:
             logger.warning("No structured leads provided for evaluation")
             return []
+
+        # Get website context first
+        try:
+            website = product_data.get('account_data', {}).get('website',)
+            if not website:
+                logger.warning("Website URL not provided for context extraction")
+                website_context_prompt = "<Website context unavailable>"
+            else:
+                website_context = await self.jina_service.read_url(url=website, headers={})
+                website_context_prompt = await self.model.generate_content(
+                    f"Summarize the website in 5-10 sentences:\n{website_context}",
+                    is_json=False
+                )
+        except Exception as e:
+            logger.error(f"Error getting website context: {str(e)}")
+            website_context_prompt = "<Website context unavailable>"
 
         evaluated_leads = []
         start_time = time.time()
@@ -687,6 +708,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 batch = structured_leads[i:i + self.config.ai_batch_size]
 
                 evaluation_prompt = self.prompts.LEAD_EVALUATION_PROMPT.format(
+                    website_context=website_context_prompt,
                     product_info=json.dumps(product_data, indent=2),
                     persona_info=json.dumps(product_data.get('persona_role_titles', {}), indent=2),
                     lead_data=json.dumps(batch, indent=2)
