@@ -5,14 +5,15 @@ from app.services import FirebaseAuthService
 import logging
 
 logger = logging.getLogger(__name__)
+
+
 class FirebaseAuthMiddleware(authentication.BaseAuthentication):
     """
     Middleware to authenticate requests using Firebase tokens and match with Django users
     """
 
     def authenticate(self, request):
-        logger.info(f"FirebaseAuthMiddleware: Processing request for path {request.path}")
-        logger.info(f"Exempt paths: {getattr(settings, 'FIREBASE_AUTH_EXEMPT_PATHS', [])}")
+        logger.info(f"FirebaseAuthMiddleware: Processing request method: {request.method} for path {request.path}")
 
         # Skip authentication for paths that don't need it
         if getattr(request, '_skip_firebase_auth', False):

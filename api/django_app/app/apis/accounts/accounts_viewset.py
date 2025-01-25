@@ -18,6 +18,8 @@ from app.services.worker_service import WorkerService
 
 logger = logging.getLogger(__name__)
 
+MAX_ACCOUNTS_PER_REQUEST = 2
+
 
 class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = AccountDetailsSerializer
@@ -84,6 +86,8 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             enrichment_responses = self._trigger_enrichments(account)
             response.data['enrichment_responses'] = enrichment_responses
 
+            logger.info(f"Triggerd Account Enrichment successfully for Account: {account}.")
+
         return response
 
     @action(detail=False, methods=['post'])
@@ -107,9 +111,9 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if len(accounts_data) > 1000:
+        if len(accounts_data) > MAX_ACCOUNTS_PER_REQUEST:
             return Response(
-                {"error": "Maximum 1000 accounts allowed per request"},
+                {"error": f"Maximum {MAX_ACCOUNTS_PER_REQUEST} accounts allowed per request"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -138,6 +142,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
                 enrichment_responses = self._trigger_enrichments(created_accounts)
 
+                logger.info(f"Triggerd Bulk Account Enrichments successfully for Accounts: {accounts_data}.")
                 response_data = {
                     "message": "Accounts created successfully",
                     "account_count": len(created_accounts),
