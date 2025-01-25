@@ -81,8 +81,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY . .
 
 # Collect static files
-RUN chmod +x start.sh && \
-    python manage.py collectstatic --noinput
+# RUN chmod +x start.sh && \
+#     python manage.py collectstatic --noinput
+RUN chmod +x start.sh
 
 ENV USERPORT_DEBUG=0
 
