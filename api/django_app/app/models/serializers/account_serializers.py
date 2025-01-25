@@ -11,6 +11,7 @@ class EnrichmentStatusSerializer(serializers.Serializer):
     last_update = serializers.DateTimeField(allow_null=True)
     quality_score = serializers.FloatField(allow_null=True)
 
+
 class AccountDetailsSerializer(serializers.ModelSerializer):
     enrichment_status = EnrichmentStatusSerializer(source='get_enrichment_summary', read_only=True)
 
@@ -81,8 +82,8 @@ class AccountBulkCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        if not data.get('website') and not data.get('linkedin_url'):
+        if not data.get('website'):
             raise serializers.ValidationError(
-                "Either website or linkedin_url must be provided"
+                "Website must be provided"
             )
         return data

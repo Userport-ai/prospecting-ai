@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-from models import LeadResearchReport, LinkedInActivity, ContentDetails
+from models.lead_activities import LeadResearchReport, LinkedInActivity, ContentDetails
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from tasks.base import BaseTask
@@ -11,6 +11,7 @@ from utils.activity_parser import LinkedInActivityParser
 from utils.lead_insights_gen import LeadInsights
 
 logger = logging.getLogger(__name__)
+
 
 class LeadLinkedInResearchTask(BaseTask):
     """Task for generating lead research report from LinkedIn activities."""
@@ -22,7 +23,6 @@ class LeadLinkedInResearchTask(BaseTask):
         self.posts_html = None
         self.comments_html = None
         self.reactions_html = None
-
 
     def _initialize_credentials(self) -> None:
         """Initialize and validate required API credentials."""

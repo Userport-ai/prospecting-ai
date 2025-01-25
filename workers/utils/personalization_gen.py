@@ -1,10 +1,11 @@
 import logging
 from typing import List, Optional, Dict, Any
 
-from models import LeadResearchReport, ContentDetails, OpenAITokenUsage
+from models.lead_activities import LeadResearchReport, ContentDetails, OpenAITokenUsage
 from services.ai_service import AIServiceFactory
 
 logger = logging.getLogger(__name__)
+
 
 class LeadInsights:
     """Generate insights about a lead from their LinkedIn activities."""

@@ -2,6 +2,7 @@
 from typing import Dict, Any
 from app.services.worker_service import WorkerService
 
+
 class LeadGenerationMixin:
     def _create_lead_generation_payload(self, account) -> Dict[str, Any]:
         """
@@ -10,8 +11,6 @@ class LeadGenerationMixin:
         return {
             "account_id": str(account.id),
             "account_data": {
-                "linkedin_url": account.linkedin_url,
-                "name": account.name,
                 "website": account.website
             },
             "product_data": {
@@ -27,12 +26,6 @@ class LeadGenerationMixin:
         """
         Triggers lead generation for a single account
         """
-        if not account.linkedin_url:
-            return {
-                "status": "skipped",
-                "message": "No LinkedIn URL provided"
-            }
-
         worker_service = WorkerService()
         payload = self._create_lead_generation_payload(account)
         return worker_service.trigger_lead_generation(payload)

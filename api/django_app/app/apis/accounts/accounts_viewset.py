@@ -18,6 +18,7 @@ from app.services.worker_service import WorkerService
 
 logger = logging.getLogger(__name__)
 
+
 class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = AccountDetailsSerializer
     queryset = Account.objects.all()
@@ -47,7 +48,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             try:
                 if enrichment_type == EnrichmentType.COMPANY_INFO:
                     enrichment_data = [
-                        {"account_id": str(account.id), "company_name": account.name}
+                        {"account_id": str(account.id), "website": account.website}
                         for account in accounts_list
                     ]
                     response = worker_service.trigger_account_enrichment(enrichment_data)
