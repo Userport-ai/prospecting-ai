@@ -26,12 +26,6 @@ class LeadGenerationMixin:
         """
         Triggers lead generation for a single account
         """
-        if not account.linkedin_url:
-            return {
-                "status": "skipped",
-                "message": "No LinkedIn URL provided"
-            }
-
         worker_service = WorkerService()
         payload = self._create_lead_generation_payload(account)
         return worker_service.trigger_lead_generation(payload)
