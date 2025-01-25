@@ -8,8 +8,8 @@ if [ -f "/secrets/service-account.json" ]; then
         --credentials-file=/secrets/service-account.json &
 else
     # Production with Workload Identity
-    cloud-sql-proxy --port=5432 \
-        "omega-winter-431704-u5:us-central1:userport-pg --quiet" &
+    cloud-sql-proxy --port=5432 --quiet \
+        "omega-winter-431704-u5:us-central1:userport-pg" &
 fi
 
 # Wait for the proxy to be ready
