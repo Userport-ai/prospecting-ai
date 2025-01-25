@@ -53,15 +53,19 @@ class BigQueryService:
             is_partial: bool = False,
             error_info: Optional[Dict[str, Any]] = None
     ) -> str:
-        """Store enriched account data with defaults for new columns."""
+        """Store enriched account data using insert-only approach."""
         try:
+            # Get existing data first
+            existing_data = await self._get_existing_account_data(account_id)
+
+            # Generate new record
             record_id = str(uuid.uuid4())
             current_time = datetime.utcnow()
 
             # Prepare the base row
             new_row = self._prepare_account_row(record_id, account_id, structured_data, raw_profile)
 
-            # Add additional fields with proper error handling for JSON
+            # Add additional fields
             try:
                 error_json = safe_json_dumps(error_info) if error_info else None
             except (TypeError, ValueError):
@@ -76,17 +80,18 @@ class BigQueryService:
                 'last_attempt': current_time.isoformat()
             })
 
-            # Handle existing data
-            existing_data = await self._get_existing_account_data(account_id)
+            # Merge with existing data if available
             if existing_data:
                 final_row = self._merge_account_data(existing_data, new_row)
-                await self._update_account_data(account_id, final_row)
             else:
-                table = self.client.get_table(self._get_table_ref('account_data'))
-                errors = self.client.insert_rows_json(table, [new_row])
-                if errors:
-                    error_messages = '; '.join(str(error) for error in errors)
-                    raise Exception(f"BigQuery insert errors: {error_messages}")
+                final_row = new_row
+
+            # Always insert as new row
+            table = self.client.get_table(self._get_table_ref('account_data'))
+            errors = self.client.insert_rows_json(table, [final_row])
+            if errors:
+                error_messages = '; '.join(str(error) for error in errors)
+                raise Exception(f"BigQuery insert errors: {error_messages}")
 
             return record_id
 
@@ -98,11 +103,18 @@ class BigQueryService:
         """Retrieve existing account data if it exists."""
         try:
             query = """
-            SELECT *
-            FROM `{}.{}.account_data`
-            WHERE account_id = @account_id
-            ORDER BY fetched_at DESC
-            LIMIT 1
+            WITH RankedData AS (
+                SELECT *,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY account_id 
+                        ORDER BY fetched_at DESC, record_id DESC
+                    ) as rn
+                FROM `{}.{}.account_data`
+                WHERE account_id = @account_id
+            )
+            SELECT * EXCEPT (rn)
+            FROM RankedData
+            WHERE rn = 1
             """.format(self.project, self.dataset)
 
             job_config = bigquery.QueryJobConfig(
@@ -143,97 +155,6 @@ class BigQueryService:
         except Exception as e:
             logger.error(f"Error retrieving account data from BigQuery: {str(e)}")
             return {}
-
-    async def _update_account_data(self, account_id: str, row_data: Dict[str, Any]) -> None:
-        """Update existing account data in BigQuery."""
-        try:
-            update_query = """
-            UPDATE `{}.{}.account_data`
-            SET 
-                company_name = @company_name,
-                employee_count = @employee_count,
-                industry = @industry,
-                location = @location,
-                website = @website,
-                linkedin_url = @linkedin_url,
-                technologies = @technologies,
-                funding_details = PARSE_JSON(@funding_details),
-                raw_data = PARSE_JSON(@raw_data),
-                fetched_at = @fetched_at,
-                is_partial_data = @is_partial_data,
-                last_error = PARSE_JSON(@last_error),
-                data_quality_score = @data_quality_score,
-                last_successful_update = @last_successful_update,
-                last_attempt = @last_attempt
-            WHERE account_id = @account_id
-            """.format(self.project, self.dataset)
-
-            # Handle repeated string fields (arrays)
-            industries = row_data.get('industry', [])
-            if isinstance(industries, str):
-                try:
-                    industries = json.loads(industries)
-                except json.JSONDecodeError:
-                    industries = [industries]
-            elif not isinstance(industries, list):
-                industries = [str(industries)] if industries else []
-            industries = [str(i) for i in industries if i is not None]
-
-            technologies = row_data.get('technologies', [])
-            if isinstance(technologies, str):
-                try:
-                    technologies = json.loads(technologies)
-                except json.JSONDecodeError:
-                    technologies = [technologies]
-            elif not isinstance(technologies, list):
-                technologies = [str(technologies)] if technologies else []
-            technologies = [str(t) for t in technologies if t is not None]
-
-            # Handle JSON fields - ensure they're valid JSON strings
-            json_fields = ['funding_details', 'raw_data', 'last_error']
-            for field in json_fields:
-                value = row_data.get(field)
-                if value is not None:
-                    row_data[field] = safe_json_dumps(value)
-                else:
-                    row_data[field] = 'null'
-
-            # Create query parameters
-            query_parameters = [
-                bigquery.ScalarQueryParameter("account_id", "STRING", row_data['account_id']),
-                bigquery.ArrayQueryParameter("industry", "STRING", industries),
-                bigquery.ArrayQueryParameter("technologies", "STRING", technologies)
-            ]
-
-            # Optional scalar parameters
-            optional_params = [
-                ("company_name", "STRING", row_data.get('company_name')),
-                ("employee_count", "INTEGER", row_data.get('employee_count')),
-                ("location", "STRING", row_data.get('location')),
-                ("website", "STRING", row_data.get('website')),
-                ("linkedin_url", "STRING", row_data.get('linkedin_url')),
-                ("funding_details", "STRING", row_data.get('funding_details')),
-                ("raw_data", "STRING", row_data.get('raw_data')),
-                ("fetched_at", "TIMESTAMP", row_data.get('fetched_at')),
-                ("is_partial_data", "BOOL", row_data.get('is_partial_data')),
-                ("last_error", "STRING", row_data.get('last_error')),
-                ("data_quality_score", "FLOAT64", row_data.get('data_quality_score')),
-                ("last_successful_update", "TIMESTAMP", row_data.get('last_successful_update')),
-                ("last_attempt", "TIMESTAMP", row_data.get('last_attempt'))
-            ]
-
-            # Add optional parameters only if they have a value
-            for name, type_, value in optional_params:
-                if value is not None:
-                    query_parameters.append(bigquery.ScalarQueryParameter(name, type_, value))
-
-            job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
-            query_job = self.client.query(update_query, job_config=job_config)
-            query_job.result()
-
-        except Exception as e:
-            logger.error(f"Error updating account data in BigQuery: {str(e)}")
-            raise
 
     def _prepare_account_row(self, record_id: str, account_id: str,
                              structured_data: Dict[str, Any], raw_profile: str) -> Dict[str, Any]:
