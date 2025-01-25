@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 from google.api_core.exceptions import ResourceExhausted
 from markdownify import markdownify
 
-from models import LinkedInActivity, ContentDetails, OpenAITokenUsage
+from models.lead_activities import LinkedInActivity, ContentDetails, OpenAITokenUsage
 from services.ai_service import AIServiceFactory
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 
@@ -29,6 +29,7 @@ GEMINI_RETRY_CONFIG = RetryConfig(
         ConnectionError
     ]
 )
+
 
 class LinkedInActivityParser:
     """Parser for LinkedIn activities."""
@@ -55,7 +56,7 @@ class LinkedInActivityParser:
         """Create system prompt for AI analysis."""
         return f"""You are analyzing LinkedIn activity for:
 Person: {self.person_name}
-Company: {self.company_name} 
+Company: {self.company_name}
 Role: {self.person_role_title}
 
 Company Description: {self.company_description}
@@ -131,7 +132,6 @@ Analyze the content to extract:
             return f"{base}/reactions"
         else:
             raise ValueError(f"Invalid activity type: {activity_type}")
-
 
     async def parse_v2(self, activity: LinkedInActivity) -> Optional[ContentDetails]:
         """Parse LinkedIn activity into structured content."""
@@ -238,7 +238,7 @@ Analyze the content to extract:
 
 Provide a structured analysis with:
 1. Detailed summary of the content (2-3 paragraphs)
-2. Concise one-paragraph summary 
+2. Concise one-paragraph summary
 3. One line summary
 4. Content category and reason for categorization
 5. Whether this is related to {self.company_name} and why
@@ -288,12 +288,12 @@ Return just the date string, nothing else."""
         """Extract mentioned people and products."""
         try:
             prompt = f"""Analyze the following LinkedIn activity for people and products:
-    
+
     {content_md}
-    
+
     1. Identify the main colleague from {self.company_name} mentioned or discussed
     2. List any products from {self.company_name} mentioned
-    
+
     Return as JSON:
     {{
             "main_colleague": string or null,
@@ -313,9 +313,9 @@ Return just the date string, nothing else."""
         """Extract post metadata like author, hashtags, metrics."""
         try:
             prompt = f"""Extract metadata from this LinkedIn activity:
-    
+
     {content_md}
-    
+
     Return as JSON:
     {{
             "author": string,

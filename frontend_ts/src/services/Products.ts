@@ -21,7 +21,7 @@ export interface Product {
 
 type ListProductsResponse = ListObjectsResponse<Product>;
 
-// Fetch all products.
+// Fetch all products within a tenant.
 export const listProducts = async (
   authContext: AuthContext
 ): Promise<Product[]> => {
@@ -53,7 +53,7 @@ export const deleteProduct = async (
   id: string
 ): Promise<void> => {
   return await apiCall<void>(authContext, async (apiClient) => {
-    const response = await apiClient.delete(`${PRODUCTS_ENDPOINT}${id}`);
+    const response = await apiClient.delete(`${PRODUCTS_ENDPOINT}${id}/`);
     checkDeletionSuccessful(response);
   });
 };

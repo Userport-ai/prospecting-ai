@@ -8,7 +8,7 @@ if [ -f "/secrets/service-account.json" ]; then
         --credentials-file=/secrets/service-account.json &
 else
     # Production with Workload Identity
-    cloud-sql-proxy --port=5432 \
+    cloud-sql-proxy --port=5432 --quiet \
         "omega-winter-431704-u5:us-central1:userport-pg" &
 fi
 
@@ -41,5 +41,5 @@ exec gunicorn \
     --bind "0.0.0.0:${GUNICORN_PORT}" \
     --timeout "${GUNICORN_TIMEOUT}" \
     --workers "${GUNICORN_WORKERS}" \
-    --log-level debug \
+    --log-level info \
     userport.wsgi:application
