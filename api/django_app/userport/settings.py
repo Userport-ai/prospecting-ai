@@ -59,7 +59,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'app.middleware.TenantMiddleware'
+    'app.middleware.TenantMiddleware',
+    'google.cloud.logging_v2.handlers.middleware.RequestMiddleware',  # Reference: https://cloud.google.com/python/docs/reference/logging/latest/web-framework-integration.
 ]
 
 # CORS Settings
@@ -111,7 +112,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_EXEMPT_PATHS': [
         '/api/v2/internal/enrichment-callback/'
     ]
-    #TODO(Sowrabh) 'EXCEPTION_HANDLER': ''
+    # TODO(Sowrabh) 'EXCEPTION_HANDLER': ''
 }
 
 ROOT_URLCONF = 'userport.urls'
@@ -159,58 +160,75 @@ DATABASES = {
     }
 }
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+if os.path.exists('.dev.env'):
+    # Local env.
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+                'style': '{',
+            },
         },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose'
+            },
         },
-    },
-    'loggers': {
-        'permissions': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
+        'loggers': {
+            'permissions': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'django.db.backends': {
+                'handlers': ['console'],
+                'level': 'WARNING',
+                'propagate': False,
+            },
+            'django.db.backends.schema': {
+                'handlers': ['console'],
+                'level': 'WARNING',
+                'propagate': False,
+            },
+            'django.db.models': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'django.urls': {
+                'handlers': ['console'],
+                'level': 'DEBUG',
+                'propagate': True,
+            },
+            'health': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': True,
+            }
         },
-        'django.db.backends': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'django.db.backends.schema': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'django.db.models': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'django.urls': {
+        'root': {
             'handlers': ['console'],
             'level': 'DEBUG',
-            'propagate': True,
         },
-        'health': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': True,
-        }
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'DEBUG',
-    },
-}
+    }
+else:
+    # prod env, use Google Cloud Logging.
+    # reference: https://cloud.google.com/python/docs/reference/logging/latest/std-lib-integration.
+
+    # Imports the Cloud Logging client library
+    import google.cloud.logging
+
+    # Instantiates a client
+    client = google.cloud.logging.Client()
+
+    # Retrieves a Cloud Logging handler based on the environment
+    # you're running in and integrates the handler with the
+    # Python logging module. By default this captures all logs
+    # at INFO level and higher
+    client.setup_logging()
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
