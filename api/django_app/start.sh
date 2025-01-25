@@ -9,7 +9,7 @@ if [ -f "/secrets/service-account.json" ]; then
 else
     # Production with Workload Identity
     cloud-sql-proxy --port=5432 \
-        "omega-winter-431704-u5:us-central1:userport-pg" &
+        "omega-winter-431704-u5:us-central1:userport-pg --quiet" &
 fi
 
 # Wait for the proxy to be ready
