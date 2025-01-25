@@ -11,8 +11,8 @@ class ProductViewSet(TenantScopedViewSet):
     serializer_class = ProductDetailsSerializer
     queryset = Product.objects.all()
     filter_backends = [DjangoFilterBackend]
-    filterset_fields =['id', 'website', 'created_by']
+    filterset_fields = ['id', 'website', 'created_by']
+    ordering = ['-created_at']  # Default sorting
 
     def get_permissions(self):
-            return [HasRole(allowed_roles=[UserRole.TENANT_ADMIN.value, UserRole.INTERNAL_ADMIN.value])]
-
+        return [HasRole(allowed_roles=[UserRole.TENANT_ADMIN.value, UserRole.INTERNAL_ADMIN.value])]
