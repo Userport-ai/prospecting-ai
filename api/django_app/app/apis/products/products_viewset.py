@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 
 class ProductViewSet(TenantScopedViewSet):
     serializer_class = ProductDetailsSerializer
-    queryset = Product.objects.all()
+    queryset = Product.objects.all().order_by('-created_at')  # Apply ordering to the queryset directly
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id', 'website', 'created_by']
     ordering = ['-created_at']  # Default sorting
