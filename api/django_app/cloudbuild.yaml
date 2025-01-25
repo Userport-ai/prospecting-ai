@@ -19,7 +19,6 @@ steps:
       '--build-arg', 'CORS_ALLOWED_ORIGINS=${_CORS_ALLOWED_ORIGINS}',
       '--build-arg', 'PORT=${_PORT}',
       '--build-arg', 'WORKER_API_BASE_URL=${_WORKER_API_BASE_URL}',
-      '--build-arg', 'GOOGLE_CLOUD_PROJECT=${_GOOGLE_CLOUD_PROJECT}',
       '-t', 'gcr.io/$PROJECT_ID/userport-django-app:$COMMIT_SHA',
       '-t', 'gcr.io/$PROJECT_ID/userport-django-app:latest',
       './api/django_app'
