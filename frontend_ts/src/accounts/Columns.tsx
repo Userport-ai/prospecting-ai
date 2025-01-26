@@ -6,13 +6,12 @@ import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
-import { Link } from "react-router";
 import { EnrichmentStatus } from "@/services/Common";
-import { Progress } from "@/components/ui/progress";
 import FundingDetailsView from "./FundingDetailsView";
 import CellListView from "../table/CellListView";
 import { cn } from "@/lib/utils";
 import { wrapColumnContentClass } from "@/common/utils";
+import EnrichmentStatusView from "./EnrichmentStatusView";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -90,39 +89,16 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     header: "Enrichment Status",
     cell: (info) => {
       const enrichmentStatus = info.getValue() as EnrichmentStatus | null;
-      if (enrichmentStatus) {
-        if (enrichmentStatus.total_enrichments === 0) {
-          // Enrichment scheduled.
-          return <p className="text-red-950 font-medium">Scheduled</p>;
-        } else if (
-          enrichmentStatus.total_enrichments === enrichmentStatus.completed
-        ) {
-          // Enrichment complete, link to Leads table on click.
-          const accountId = info.row.original.id;
-          const url = `/accounts/${accountId}/leads`;
-          return (
-            <Link to={url} className="text-blue-500 underline font-medium">
-              Complete
-            </Link>
-          );
-        } else if (enrichmentStatus.failed > 0) {
-          return <p className="text-red-700 font-medium">Failed</p>;
-        } else {
-          return (
-            <div>
-              <p className="text-yellow-600 font-medium">In Progress</p>
-              <Progress
-                value={
-                  (enrichmentStatus.completed /
-                    enrichmentStatus.total_enrichments) *
-                  100
-                }
-              />
-            </div>
-          );
-        }
+      if (!enrichmentStatus) {
+        return null;
       }
-      return null;
+
+      return (
+        <EnrichmentStatusView
+          accountId={info.row.original.id}
+          enrichmentStatus={enrichmentStatus}
+        />
+      );
     },
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
     filterFn: "arrIncludesSome",
