@@ -418,9 +418,10 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex flex-col gap-6">
-        <DialogTitle>Enter Account Name</DialogTitle>
+        <DialogTitle>Enter Account Website</DialogTitle>
         <DialogDescription className="text-sm text-gray-500">
-          Enter the Account name and select the product to use for prospecting.
+          Enter the Account website and select the product to use for
+          prospecting.
         </DialogDescription>
 
         {errorMessage && (

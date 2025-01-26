@@ -114,8 +114,40 @@ export const getAccount = async (
   id: string
 ): Promise<Account> => {
   const { userContext } = authContext;
+  if (userContext!.tenant.id === USERPORT_TENANT_ID) {
+    // Reroute to internal method.
+    return getAccountWithinTenant(authContext, id);
+  }
   var params: Record<string, any> = {
     created_by: userContext!.user.id,
+    id: id,
+  };
+
+  return await apiCall<Account>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListAccountsResponse>(
+      ACCOUNTS_ENDPOINT,
+      { params }
+    );
+    if (response.data.count != 1) {
+      throw new Error(
+        `Expected 1 Account, got ${response.data.count} Accounts in results.`
+      );
+    }
+    return response.data.results[0];
+  });
+};
+
+// Fetch a single Account within tentant.
+// We don't enforce that account has to be created by the user.
+export const getAccountWithinTenant = async (
+  authContext: AuthContext,
+  id: string
+): Promise<Account> => {
+  const { userContext } = authContext;
+  if (userContext!.tenant.id !== USERPORT_TENANT_ID) {
+    throw new Error(`Cannot call internal method to Fetch account!`);
+  }
+  var params: Record<string, any> = {
     id: id,
   };
 
