@@ -40,9 +40,9 @@ import { parse, ParseResult } from "papaparse";
 import { Product } from "@/services/Products";
 import {
   Account,
-  AccountInfo,
   createAccount,
   createBulkAccounts,
+  CreateBulkAccountsRequest,
 } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
@@ -206,9 +206,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const AccountNameColumnHeader = "Name";
   const AccountWebsiteColumnHeader = "Website";
-  const AccountLinkedInURLColumnHeader = "LinkedIn URL";
 
   // CSV File is uploaded. Will validate contents during submit.
   const handleFileUpload = (file: File | null) => {
@@ -222,21 +220,9 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
       setErrorMessage(`Error! File is empty with no data!`);
       return;
     }
-    if (!(AccountNameColumnHeader in data[0])) {
-      setErrorMessage(
-        `"${AccountNameColumnHeader}" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
-      );
-      return;
-    }
     if (!(AccountWebsiteColumnHeader in data[0])) {
       setErrorMessage(
         `"${AccountWebsiteColumnHeader}" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
-      );
-      return;
-    }
-    if (!(AccountLinkedInURLColumnHeader in data[0])) {
-      setErrorMessage(
-        `"${AccountLinkedInURLColumnHeader}" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
       );
       return;
     }
@@ -256,25 +242,21 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
       );
       return;
     }
-    // Gather all Account names and websites.
+    // Gather all the websites.
     const accountsInfo = data.map((row) => {
       return {
-        name: row[AccountNameColumnHeader] as string,
         website: row[AccountWebsiteColumnHeader] as string,
-        linkedin_url: row[AccountLinkedInURLColumnHeader] as string,
       };
     });
 
     // Call backend to enrich these accounts.
-    enrichAccounts(accountsInfo, selectedProduct!);
+    enrichAccounts({ accounts: accountsInfo, product: selectedProduct! });
   };
 
   // Calls backend API to enrich the given accounts.
-  const enrichAccounts = (accountsInfo: AccountInfo[], productId: string) => {
-    const createBulkAccountsRequest = {
-      accounts: accountsInfo,
-      product: productId,
-    };
+  const enrichAccounts = (
+    createBulkAccountsRequest: CreateBulkAccountsRequest
+  ) => {
     setLoading(true);
     createBulkAccounts(authContext, createBulkAccountsRequest)
       .then((createdAccounts) => onImported(createdAccounts))
@@ -336,14 +318,10 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
         <DialogTitle>Upload a CSV</DialogTitle>
         <DialogDescription />
         <div className="flex flex-col gap-2 text-sm text-gray-500">
-          <p>Ensure the uploaded CSV file has columns named:</p>
+          <p>Ensure the uploaded CSV file has one column named:</p>
           <p className="ml-4">
-            1. <span className="font-bold">{AccountNameColumnHeader}</span>{" "}
-            which contains the names of the Accounts
-          </p>
-          <p className="ml-4">
-            2. <span className="font-bold">{AccountWebsiteColumnHeader}</span>{" "}
-            which contains the names of the Accounts
+            1. <span className="font-bold">{AccountWebsiteColumnHeader}</span>{" "}
+            which contains the Website of the Accounts
           </p>
           <p>
             You can upload a maximum of{" "}
@@ -407,32 +385,23 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const formSchema = z.object({
-    accountName: z.string().min(1, "Account Name is required"),
     productId: z.string().min(1, "Product is required"),
     website: z.string().min(1).startsWith("https://", "Website is required"),
-    linkedInUrl: z
-      .string()
-      .min(1)
-      .startsWith("https://", "Company LinkedIn URL is required"),
   });
 
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      accountName: "",
       productId: "",
       website: "",
-      linkedInUrl: "",
     },
   });
 
   // Handle form submission.
   const onSubmit = (updatedForm: z.infer<typeof formSchema>) => {
     const createAccountRequest = {
-      name: updatedForm.accountName,
       website: updatedForm.website,
       product: updatedForm.productId,
-      linkedin_url: updatedForm.linkedInUrl,
     };
     setLoading(true);
     createAccount(authContext, createAccountRequest)
@@ -463,27 +432,6 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
             <div className="flex flex-col gap-6">
               <FormField
                 control={form.control}
-                name="accountName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-gray-800">
-                      Account Name
-                    </FormLabel>
-                    <FormDescription></FormDescription>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., Stripe, Rippling"
-                        className="border-gray-300 rounded-md"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="website"
                 render={({ field }) => (
                   <FormItem>
@@ -492,27 +440,6 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
                     <FormControl>
                       <Input
                         placeholder="e.g., https://www.stripe.com"
-                        className="border-gray-300 rounded-md"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="linkedInUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-gray-800">
-                      LinkedIn URL
-                    </FormLabel>
-                    <FormDescription></FormDescription>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., https://www.linkedin.com/company/gleanwork/"
                         className="border-gray-300 rounded-md"
                         {...field}
                       />
