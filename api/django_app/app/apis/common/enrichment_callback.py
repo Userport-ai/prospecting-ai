@@ -49,6 +49,7 @@ def enrichment_callback(request):
                     'last_attempted_run': timezone.now(),
                     'last_successful_run': timezone.now() if status == EnrichmentStatus.COMPLETED else None,
                     'source': data.get('source', 'unknown'),
+                    'completion_percent': data.get('completion_percentage', 0),
                     'error_details': data.get('error_details'),
                     'metadata': data.get('metadata', {}),
                     'data_quality_score': data.get('quality_score')

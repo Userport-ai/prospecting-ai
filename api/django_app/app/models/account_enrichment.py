@@ -22,6 +22,7 @@ class AccountEnrichmentStatus(BaseMixin):
         choices=EnrichmentStatus.choices,
         default=EnrichmentStatus.PENDING
     )
+    completion_percent = models.IntegerField(default=0)
     last_successful_run = models.DateTimeField(null=True)
     last_attempted_run = models.DateTimeField(null=True)
     next_scheduled_run = models.DateTimeField(null=True)
