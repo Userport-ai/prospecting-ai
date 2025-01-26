@@ -26,7 +26,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields =['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status']
     ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at']
-    ordering = ['-created_at']  # Default sorting
+    ordering = ['-score']  # Default sorting
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
