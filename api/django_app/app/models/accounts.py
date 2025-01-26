@@ -58,10 +58,12 @@ class Account(BaseMixin):
                 'in_progress': 0,
                 'pending': 0,
                 'last_update': None,
-                'quality_score': None
+                'quality_score': None,
+                'avg_completion_percent': 0,
             }
 
         completed = sum(1 for s in statuses if s.status == EnrichmentStatus.COMPLETED)
+        percent = sum([s.completion_percent for s in statuses if s.completion_percent is not None]) / len(statuses) if statuses else 0
         failed = sum(1 for s in statuses if s.status == EnrichmentStatus.FAILED)
         in_progress = sum(1 for s in statuses if s.status == EnrichmentStatus.IN_PROGRESS)
         pending = sum(1 for s in statuses if s.status == EnrichmentStatus.PENDING)
@@ -78,7 +80,8 @@ class Account(BaseMixin):
             'in_progress': in_progress,
             'pending': pending,
             'last_update': last_update,
-            'quality_score': avg_score
+            'quality_score': avg_score,
+            'avg_completion_percent': percent,
         }
 
     class Meta:
