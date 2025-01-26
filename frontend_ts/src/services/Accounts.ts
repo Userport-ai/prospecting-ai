@@ -134,10 +134,8 @@ export const getAccount = async (
 };
 
 export interface CreateAccountRequest {
-  name: string;
   website: string;
   product: string; // ID of the product accounts are enriched for.
-  linkedin_url: string;
 }
 
 // Create Single Account for enrichment.
@@ -152,10 +150,8 @@ export const createAccount = async (
 };
 
 // Account information request in creation request.
-export interface AccountInfo {
-  name: string;
+interface AccountInfo {
   website: string;
-  linkedin_url: string;
 }
 
 export interface CreateBulkAccountsRequest {

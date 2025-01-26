@@ -11,6 +11,8 @@ import { EnrichmentStatus } from "@/services/Common";
 import { Progress } from "@/components/ui/progress";
 import FundingDetailsView from "./FundingDetailsView";
 import CellListView from "../table/CellListView";
+import { cn } from "@/lib/utils";
+import { wrapColumnContentClass } from "@/common/utils";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -49,7 +51,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "name",
     accessorFn: (row) => row.name,
     accessorKey: "name",
-    minSize: 200,
+    minSize: 100,
     header: ({ column }) => {
       return (
         <div className="flex justify-between items-center gap-2 mr-2">
@@ -70,7 +72,13 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
         </div>
       );
     },
-    size: 100,
+    cell: (info) => {
+      const name = info.getValue() as string | null;
+      if (!name) {
+        return null;
+      }
+      return <p className={wrapColumnContentClass}>{name}</p>;
+    },
     meta: {
       displayName: "Name",
       visibleInitially: true,
@@ -127,7 +135,14 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "location",
     accessorFn: (row) => row.location,
     header: "HQ",
-    minSize: 500,
+    minSize: 200,
+    cell: (info) => {
+      const hq = info.getValue() as string | null;
+      if (!hq) {
+        return null;
+      }
+      return <p className="whitespace-normal break-words">{hq}</p>;
+    },
     meta: {
       displayName: "HQ",
       visibleInitially: true,
@@ -137,6 +152,14 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "employee_count",
     accessorFn: (row) => row.employee_count,
     header: "Employee Count",
+    size: 20,
+    cell: (info) => {
+      const count = info.getValue() as number | null;
+      if (!count) {
+        return null;
+      }
+      return <p className={wrapColumnContentClass}>{count}</p>;
+    },
     meta: {
       displayName: "Employee Count",
       visibleInitially: true,
@@ -215,6 +238,14 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "industry",
     accessorFn: (row) => row.industry,
     header: "Industry",
+    minSize: 100,
+    cell: (info) => {
+      const industry = info.getValue() as string | null;
+      if (!industry) {
+        return null;
+      }
+      return <p className={wrapColumnContentClass}>{industry}</p>;
+    },
     meta: {
       displayName: "Industry",
       visibleInitially: true,
@@ -224,6 +255,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "website",
     accessorFn: (row) => row.website,
     header: "Website",
+    minSize: 200,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -234,7 +266,10 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline"
+          className={cn(
+            "flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline",
+            wrapColumnContentClass
+          )}
         >
           {url}
         </a>
@@ -249,18 +284,21 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "linkedin_url",
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
-    minSize: 200,
+    minSize: 300,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
-        return <div></div>;
+        return null;
       }
       return (
         <a
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline"
+          className={cn(
+            "flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline",
+            wrapColumnContentClass
+          )}
         >
           {url}
         </a>
@@ -275,6 +313,14 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "company_type",
     accessorFn: (row) => row.company_type,
     header: "Company Type",
+    size: 20,
+    cell: (info) => {
+      const type = info.getValue() as string | null;
+      if (!type) {
+        return null;
+      }
+      return <p className={wrapColumnContentClass}>{type}</p>;
+    },
     meta: {
       displayName: "Company Type",
       visibleInitially: true,
@@ -301,7 +347,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
       return row.funding_details;
     },
     header: "Funding Details",
-    minSize: 300,
+    minSize: 250,
     cell: (info) => {
       const fundingDetails = info.getValue() as FundingDetails | null;
       if (!fundingDetails) {
@@ -320,6 +366,14 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "founded_year",
     accessorFn: (row) => row.founded_year,
     header: "Founded Year",
+    size: 20,
+    cell: (info) => {
+      const founded_year = info.getValue() as string | null;
+      if (!founded_year) {
+        return null;
+      }
+      return <p className={wrapColumnContentClass}>{founded_year}</p>;
+    },
     meta: {
       displayName: "Founded Year",
       visibleInitially: true,

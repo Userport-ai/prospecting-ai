@@ -1,4 +1,6 @@
+import { wrapColumnContentClass } from "@/common/utils";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import { FundingDetails } from "@/services/Accounts";
 
 const LabelValuePair: React.FC<{ label: string; value: any }> = ({
@@ -17,7 +19,12 @@ const FundingDetailsView: React.FC<{ fundingDetails: FundingDetails }> = ({
   fundingDetails,
 }) => {
   return (
-    <div className="flex flex-col">
+    <div
+      className={cn(
+        "flex flex-col whitespace-normal break-all",
+        wrapColumnContentClass
+      )}
+    >
       {/* Total Funding Details */}
       <div className="flex flex-col gap-2 p-2 mb-4">
         <h2 className="text-md font-medium">Total Funding</h2>
