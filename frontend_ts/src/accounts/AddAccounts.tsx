@@ -206,6 +206,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const AccountNameColumnHeader = "Name";
   const AccountWebsiteColumnHeader = "Website";
 
   // CSV File is uploaded. Will validate contents during submit.
@@ -218,6 +219,12 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
   const validateCSVFile = (data: Record<string, any>[]) => {
     if (data.length === 0) {
       setErrorMessage(`Error! File is empty with no data!`);
+      return;
+    }
+    if (!(AccountNameColumnHeader in data[0])) {
+      setErrorMessage(
+        `"${AccountNameColumnHeader}" column does not exist or it's not in the first Row of the CSV. Please reupload the file with the right Column Name!`
+      );
       return;
     }
     if (!(AccountWebsiteColumnHeader in data[0])) {
@@ -245,6 +252,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
     // Gather all the websites.
     const accountsInfo = data.map((row) => {
       return {
+        name: row[AccountNameColumnHeader] as string,
         website: row[AccountWebsiteColumnHeader] as string,
       };
     });
@@ -386,6 +394,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
 
   const formSchema = z.object({
     productId: z.string().min(1, "Product is required"),
+    name: z.string().min(1, "Name is required"),
     website: z.string().min(1).startsWith("https://", "Website is required"),
   });
 
@@ -393,6 +402,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       productId: "",
+      name: "",
       website: "",
     },
   });
@@ -400,6 +410,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   // Handle form submission.
   const onSubmit = (updatedForm: z.infer<typeof formSchema>) => {
     const createAccountRequest = {
+      name: updatedForm.name,
       website: updatedForm.website,
       product: updatedForm.productId,
     };
@@ -418,9 +429,9 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex flex-col gap-6">
-        <DialogTitle>Enter Account Website</DialogTitle>
+        <DialogTitle>Enter Account Details</DialogTitle>
         <DialogDescription className="text-sm text-gray-500">
-          Enter the Account website and select the product to use for
+          Enter the Account name and website and select the product to use for
           prospecting.
         </DialogDescription>
 
@@ -431,6 +442,27 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="flex flex-col gap-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-800">
+                      Account Name
+                    </FormLabel>
+                    <FormDescription></FormDescription>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Stripe, Rippling"
+                        className="border-gray-300 rounded-md"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="website"

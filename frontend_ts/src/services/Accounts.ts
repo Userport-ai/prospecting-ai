@@ -166,6 +166,7 @@ export const getAccountWithinTenant = async (
 };
 
 export interface CreateAccountRequest {
+  name: string;
   website: string;
   product: string; // ID of the product accounts are enriched for.
 }
@@ -183,6 +184,7 @@ export const createAccount = async (
 
 // Account information request in creation request.
 interface AccountInfo {
+  name: string;
   website: string;
 }
 
