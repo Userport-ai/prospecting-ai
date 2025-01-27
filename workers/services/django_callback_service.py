@@ -157,7 +157,7 @@ class CallbackService:
                         "Authorization": f"Bearer {id_token}",
                         "Content-Type": "application/json"
                     },
-                    timeout=30.0
+                    timeout=300.0
                 )
 
                 logger.debug(f"Received response for job {job_id}: Status {response.status_code}")

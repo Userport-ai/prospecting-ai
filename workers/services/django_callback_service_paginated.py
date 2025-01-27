@@ -20,9 +20,9 @@ class PaginatedCallbackService:
     LEADS_PER_PAGE = 20
 
     CALLBACK_RETRY_CONFIG = RetryConfig(
-        max_attempts=3,
+        max_attempts=5,
         base_delay=1.0,
-        max_delay=5.0,
+        max_delay=30.0,
         retryable_exceptions=[
             RetryableError,
             httpx.TimeoutException,
@@ -151,7 +151,7 @@ class PaginatedCallbackService:
                         "Authorization": f"Bearer {id_token}",
                         "Content-Type": "application/json"
                     },
-                    timeout=120.0
+                    timeout=300.0
                 )
 
                 if response.status_code in RETRYABLE_STATUS_CODES:
