@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from google.cloud import tasks_v2
 
@@ -34,7 +34,9 @@ class TaskManager:
         """Get the fully qualified queue path."""
         return self.client.queue_path(self.project, self.location, self.queue)
 
-    async def create_task(self, task_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_task(self, task_name: str, payload: Dict[str, Any],
+                          timeout_seconds: Optional[int] = 1800
+                          ) -> Dict[str, Any]:
         """
         Create a new task or retry an existing one.
 
@@ -54,6 +56,11 @@ class TaskManager:
         if 'max_retries' not in payload:
             payload['max_retries'] = 3
 
+        dispatch_timeout = timeout_seconds or self.default_task_timeout
+
+        # Validate timeout (max 30 minutes)
+        dispatch_timeout = min(dispatch_timeout, 1800)
+
         # Configure task with OIDC authentication
         task = {
             'http_request': {
@@ -65,6 +72,7 @@ class TaskManager:
                     service_account_email=self.service_account_email,
                     audience=self.base_url
                 ),
+                'dispatch_deadline': {'seconds': dispatch_timeout}
             }
         }
 

@@ -1,8 +1,9 @@
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, Header, Request
 from fastapi.responses import JSONResponse
 
 from services.mocks.mock_task_manager import MockTaskManager
@@ -13,6 +14,8 @@ from tasks.generate_leads_apollo import ApolloLeadsTask
 from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
 
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Initialize task registry and register tasks
@@ -55,16 +58,23 @@ async def create_task(
         task = task_registry.get_task(task_name)
         task_payload = await task.create_task_payload(**payload)
         result = await task_manager.create_task(task_name, task_payload)
+        logger.info(f"Task created", extra={
+            'result': result,
+            'task_name': task_name,
+            'job_id': payload.get('job_id'),
+            'account_id': payload.get('account_id', '<account id not found>'),
+            'attempt_number': payload.get('attempt_number', 1)
+        })
         return JSONResponse(content=result)
     except KeyError:
         raise TaskError(status_code=404, detail="Task not found")
-
 
 @router.post("/tasks/{task_name}")
 async def execute_task(
         task_name: str,
         payload: Dict[str, Any],
-        task_manager: TaskManager = Depends(get_task_manager, use_cache=True)
+        request: Request,
+        x_cloudtasks_queuename: Optional[str] = Header(None, alias="X-CloudTasks-QueueName")
 ) -> JSONResponse:
     """
     Execute a task with the given name and payload.
@@ -72,12 +82,37 @@ async def execute_task(
     Args:
         task_name: Name of the task to execute
         payload: Task execution parameters
-        task_manager: Injected task manager instance
+        request: Request object
+        x_cloudtasks_queuename: Queuename by Google Cloud tasks
     """
     try:
+        # Check if this is a Cloud Tasks execution or direct API call
+        is_cloud_task = x_cloudtasks_queuename is not None
+
+        # Get all Cloud Tasks related headers
+        cloudtasks_headers = {
+            'queue_name': x_cloudtasks_queuename,
+            'task_retry_count': request.headers.get('X-CloudTasks-TaskRetryCount'),
+            'task_execution_count': request.headers.get('X-CloudTasks-TaskExecutionCount'),
+            'task_eta': request.headers.get('X-CloudTasks-TaskETA'),
+            'task_previous_response': request.headers.get('X-CloudTasks-TaskPreviousResponse'),
+            'task_retry_reason': request.headers.get('X-CloudTasks-TaskRetryReason'),
+            'deadline': request.headers.get('X-CloudTasks-TaskDeadline')
+        }
+
+        logger.info(f"Task execution request received", extra={
+            'task_name': task_name,
+            'job_id': payload.get('job_id'),
+            'account_id': payload.get('account_id', '<account id not found>'),
+            'is_cloud_task': is_cloud_task,
+            'cloud_tasks_headers': cloudtasks_headers,
+            'attempt_number': payload.get('attempt_number', 1)
+        })
+
         task = task_registry.get_task(task_name)
-        result = await task.execute(payload)
+        result = await task.run_task(payload)
         return JSONResponse(content=result)
+
     except KeyError:
         raise TaskError(status_code=404, detail="Task not found")
 
