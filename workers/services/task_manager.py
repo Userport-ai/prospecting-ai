@@ -72,8 +72,8 @@ class TaskManager:
                     service_account_email=self.service_account_email,
                     audience=self.base_url
                 ),
-                'dispatch_deadline': {'seconds': dispatch_timeout}
-            }
+            },
+            'dispatch_deadline': {'seconds': dispatch_timeout}
         }
 
         # Create task and get response
