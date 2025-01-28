@@ -160,6 +160,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
 
     def __init__(self):
         """Initialize the task with required services and configurations."""
+        super().__init__()
         self.bq_service = BigQueryService()
         self._initialize_credentials()
         self._configure_ai_service()
@@ -214,7 +215,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
             "job_id": str(uuid.uuid4())
         }
 
-    async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any], Dict[str, Any]):
         """Execute the lead identification task."""
         job_id = payload.get('job_id')
         account_id = payload.get('account_id')
@@ -296,23 +297,22 @@ class GenerateLeadsTask(AccountEnrichmentTask):
             score_distribution = self._calculate_score_distribution(evaluated_leads)
             qualified_leads = [l for l in evaluated_leads if l['fit_score'] >= FIT_SCORE_THRESHOLD]
 
-            # Send success callback
-            await callback_service.send_callback(
-                job_id=job_id,
-                account_id=account_id,
-                enrichment_type=self.ENRICHMENT_TYPE,
-                source="proxycurl",
-                status='completed',
-                completion_percentage=100,
-                processed_data={
+            result = {
+                'job_id': job_id,
+                'account_id': account_id,
+                'enrichment_type': self.ENRICHMENT_TYPE,
+                'source': "proxycurl",
+                'status': 'completed',
+                'completion_percentage': 100,
+                'processed_data': {
                     'score_distribution': score_distribution,
                     'structured_leads': structured_leads,
                     'all_leads': evaluated_leads,
                     'qualified_leads': qualified_leads,
                 }
-            )
+            }
 
-            return {
+            summary = {
                 "status": "completed",
                 "job_id": job_id,
                 "account_id": account_id,
@@ -320,6 +320,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
                 "qualified_leads": len(qualified_leads),
                 "score_distribution": score_distribution
             }
+            return result, summary
 
         except Exception as e:
             logger.error(f"Lead identification failed for job {job_id}: {str(e)}", exc_info=True)
@@ -344,7 +345,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
                 processed_data={'stage': current_stage}
             )
 
-            return {
+            return None, {
                 "status": "failed",
                 "job_id": job_id,
                 "account_id": account_id,

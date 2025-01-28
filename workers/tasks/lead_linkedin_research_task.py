@@ -18,6 +18,7 @@ class LeadLinkedInResearchTask(BaseTask):
 
     def __init__(self):
         """Initialize task with required services."""
+        super().__init__()
         self.bq_service = BigQueryService()
         self._initialize_credentials()
         self.posts_html = None
@@ -59,7 +60,7 @@ class LeadLinkedInResearchTask(BaseTask):
             "max_retries": kwargs.get("max_retries", 3)
         }
 
-    async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any],Dict[str, Any]):
         """Execute the lead research task."""
         job_id = payload.get('job_id')
         account_id = payload.get('account_id')
@@ -158,27 +159,28 @@ class LeadLinkedInResearchTask(BaseTask):
             )
 
             # Send success callback
-            await callback_service.send_callback(
-                job_id=job_id,
-                account_id=account_id,
-                lead_id=lead_id,
-                status='completed',
-                enrichment_type='lead_linkedin_research',
-                source="linkedin",
-                completion_percentage=100,
-                processed_data={
+            result = {
+                'job_id': job_id,
+                'account_id': account_id,
+                'lead_id': lead_id,
+                'status': 'completed',
+                'enrichment_type': 'lead_linkedin_research',
+                'source': "linkedin",
+                'completion_percentage': 100,
+                'processed_data': {
                     'content_details': [cd.model_dump() for cd in content_details],
                     'insights': insights.model_dump() if insights else None
                 }
-            )
+            }
 
-            return {
+            summary = {
                 "status": "completed",
                 "job_id": job_id,
                 "account_id": account_id,
                 "activities_processed": len(activities),
                 "content_generated": len(content_details)
             }
+            return result, summary
 
         except Exception as e:
             logger.error(f"Lead research failed for job {job_id}: {str(e)}", exc_info=True)
@@ -204,7 +206,7 @@ class LeadLinkedInResearchTask(BaseTask):
                 processed_data={'stage': current_stage}
             )
 
-            return {
+            return None, {
                 "status": "failed",
                 "job_id": job_id,
                 "account_id": account_id,

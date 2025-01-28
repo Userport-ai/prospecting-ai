@@ -263,6 +263,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
     def __init__(self):
         """Initialize the task with required services and configurations."""
+        super().__init__()
         self._initialize_credentials()
         self.bq_service = BigQueryService()
         self._configure_ai_service()
@@ -326,7 +327,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             "is_bulk": False
         }
 
-    async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any], Dict[str, Any]):
         """Execute the account enhancement task."""
         job_id = payload.get('job_id')
         accounts = payload.get('accounts', [])
@@ -348,6 +349,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         processed_count = 0
         total_accounts = len(accounts)
 
+        callback_payload = None # result payload to be sent back to django
         for account in accounts:
             processed_count += 1
             account_id = account.get('account_id')
@@ -506,15 +508,15 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
                 # Send success callback
                 logger.info(f"Job {job_id}, Account {account_id}: Processing completed successfully")
-                await callback_service.send_callback(
-                    job_id=job_id,
-                    account_id=account_id,
-                    status='completed',
-                    enrichment_type='company_info',
-                    raw_data=structured_data,
-                    processed_data=processed_data,
-                    completion_percentage=int((processed_count / total_accounts) * 100)
-                )
+                callback_payload = {
+                    'job_id': job_id,
+                    'account_id': account_id,
+                    'status': 'completed',
+                    'enrichment_type': 'company_info',
+                    'raw_data': structured_data,
+                    'processed_data': processed_data,
+                    'completion_percentage': int((processed_count / total_accounts) * 100)
+                }
 
                 results.append({
                     "status": "completed",
@@ -563,7 +565,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         logger.info(f"Job {job_id} finished. Status: {final_status}, "
                     f"Success: {successful_accounts}, Failed: {failed_accounts}")
 
-        return {
+        return callback_payload, {
             "status": final_status,
             "job_id": job_id,
             "is_bulk": is_bulk,
