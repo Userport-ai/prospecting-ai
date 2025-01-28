@@ -177,6 +177,7 @@ class LeadLinkedInResearchTask(BaseTask):
                 "status": "completed",
                 "job_id": job_id,
                 "account_id": account_id,
+                "lead_id": lead_id,
                 "activities_processed": len(activities),
                 "content_generated": len(content_details)
             }

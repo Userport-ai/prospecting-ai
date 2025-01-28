@@ -46,6 +46,7 @@ class BaseTask(ABC):
         lead_id = payload.get("lead_id")
         account_id = payload.get("account_id")
         attempt_number = payload.get("attempt_number")
+        job_id = payload.get("job_id")
         start_time = datetime.now(UTC)
 
         # Log task start
@@ -68,7 +69,8 @@ class BaseTask(ABC):
             logger.info(f"Searched for {account_id} and {lead_id} in the table and found : {existing}")
             if existing and existing.get("status") == "completed":
                 logger.info(f"Found existing completed result for account_id={account_id}, lead_id={lead_id}, resending callback.")
-                await self.result_manager.resend_callback(callback_service=self.callback_service, account_id=account_id, lead_id=lead_id)
+                callback_params = {k: v for k, v in existing.items() if k != 'job_id'}
+                self.callback_service.paginated_service.send_callback(job_id = job_id, **callback_params)
                 return existing
 
             # 2. If no existing result, we do the normal flow
