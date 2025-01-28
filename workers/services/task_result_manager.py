@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -118,23 +119,34 @@ class TaskResultManager:
 
             # If no rows are returned, return None
             if not rows:
+                logger.info(f"No rows found for account_id: {account_id}, lead_id: {lead_id}")
                 return None
 
             row = rows[0]
+            logger.debug(f"Retrieved row: {row}")
 
             # If callback_payload is empty or None, return None
             if not row.callback_payload:
+                logger.info(f"No callback_payload found for account_id: {account_id}, lead_id: {lead_id}")
                 return None
 
-            # Attempt to parse the JSON payload
-            try:
-                return json.loads(row.callback_payload)
-            except json.JSONDecodeError:
-                logger.warning("Failed to parse callback_payload JSON.")
+            # Determine the type of callback_payload and handle accordingly
+            if isinstance(row.callback_payload, dict):
+                return row.callback_payload
+            elif isinstance(row.callback_payload, str):
+                try:
+                    payload = json.loads(row.callback_payload)
+                    return payload
+                except json.JSONDecodeError as jde:
+                    logger.warning(f"Failed to parse callback_payload JSON: {jde}. callback_payload: {row.callback_payload}")
+                    return None
+            else:
+                logger.warning(f"Unexpected type for callback_payload: {type(row.callback_payload)}. Value: {row.callback_payload}")
                 return None
 
         except Exception as e:
             logger.error(f"Error querying BigQuery: {e}")
+            logger.debug("Stack trace:", exc_info=True)
             return None
 
     async def resend_callback(self, callback_service,  account_id: str, lead_id: str) -> None:

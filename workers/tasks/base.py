@@ -65,9 +65,10 @@ class BaseTask(ABC):
         try:
             # 1. Check existing stored result
             existing = await self.result_manager.get_result(account_id, lead_id)
+            logger.info(f"Searched for {account_id} and {lead_id} in the table and found : {existing}")
             if existing and existing.get("status") == "completed":
                 logger.info(f"Found existing completed result for account_id={account_id}, lead_id={lead_id}, resending callback.")
-                await self.result_manager.resend_callback(self, account_id, lead_id)
+                await self.result_manager.resend_callback(callback_service=self.callback_service, account_id=account_id, lead_id=lead_id)
                 return existing
 
             # 2. If no existing result, we do the normal flow
