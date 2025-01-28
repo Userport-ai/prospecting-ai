@@ -70,7 +70,7 @@ class BaseTask(ABC):
             if existing and existing.get("status") == "completed":
                 logger.info(f"Found existing completed result for account_id={account_id}, lead_id={lead_id}, resending callback.")
                 callback_params = {k: v for k, v in existing.items() if k != 'job_id'}
-                self.callback_service.paginated_service.send_callback(job_id = job_id, **callback_params)
+                await self.callback_service.paginated_service.send_callback(job_id = job_id, **callback_params)
                 return existing
 
             # 2. If no existing result, we do the normal flow
