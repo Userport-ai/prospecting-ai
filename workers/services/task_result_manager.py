@@ -44,17 +44,16 @@ class TaskResultManager:
     async def store_result(self, callback_payload: Dict[str, Any]) -> None:
         """
         Inserts a new row into the enrichment_callbacks table with the entire
-        callback payload (job_id, account_id, status, processed_data, etc.).
+        callback payload (account_id, status, processed_data, etc.).
         """
         if (not callback_payload) or callback_payload.get("status", "unknown") != "completed":
             logger.info(f"Not storing the callback payload to bigquery, since the job didn't complete")
             return
 
-        job_id = callback_payload.get("job_id")
         account_id = callback_payload.get("account_id")
         lead_id = callback_payload.get("lead_id")
-        if not job_id or not account_id:
-            raise ValueError("callback_payload must contain both 'job_id' and 'account_id'")
+        if not account_id:
+            raise ValueError("callback_payload must contain 'account_id'")
 
         # Convert entire payload to JSON
         payload_json = json.dumps(callback_payload)
@@ -63,7 +62,6 @@ class TaskResultManager:
         now_ts = datetime.now(timezone.utc).isoformat()
 
         row_to_insert = {
-            "job_id": job_id,
             "account_id": account_id,
             "lead_id": lead_id,
             "status": status,
@@ -78,7 +76,7 @@ class TaskResultManager:
         if errors:
             logger.error(f"BigQuery insert errors: {errors}")
 
-    async def get_result(self, job_id: str, account_id: str, lead_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def get_result(self, account_id: str, lead_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Retrieve the most recent callback payload for the given job/entity from
         the enrichment_callbacks table, returning it as a Python dict.
@@ -89,13 +87,11 @@ class TaskResultManager:
         query = f"""
             SELECT callback_payload
             FROM `{self.table_id}`
-            WHERE job_id = @job_id
-              AND account_id = @account_id
+            WHERE account_id = @account_id
         """
 
         # Initialize query parameters with mandatory parameters
         query_parameters = [
-            bigquery.ScalarQueryParameter("job_id", "STRING", job_id),
             bigquery.ScalarQueryParameter("account_id", "STRING", account_id),
         ]
 
@@ -141,13 +137,13 @@ class TaskResultManager:
             logger.error(f"Error querying BigQuery: {e}")
             return None
 
-    async def resend_callback(self, callback_service, job_id: str, account_id: str, lead_id: str) -> None:
+    async def resend_callback(self, callback_service,  account_id: str, lead_id: str) -> None:
         """
         Convenience method: fetch stored callback payload and re-send it
         through the callback service.
         """
-        stored = await self.get_result(job_id, account_id, lead_id)
+        stored = await self.get_result(account_id, lead_id)
         if not stored:
-            raise ValueError(f"No stored callback payload for job {job_id}, account_id {account_id}, lead_id {lead_id}")
+            raise ValueError(f"No stored callback payload for account_id {account_id}, lead_id {lead_id}")
 
         await callback_service.paginated_service.send_callback(**stored)

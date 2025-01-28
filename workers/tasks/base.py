@@ -43,7 +43,6 @@ class BaseTask(ABC):
           2. If yes, re-send callback and return
           3. Otherwise, call `execute()`, store, and callback
         """
-        job_id = payload.get("job_id")
         lead_id = payload.get("lead_id")
         account_id = payload.get("account_id")
         attempt_number = payload.get("attempt_number")
@@ -54,7 +53,6 @@ class BaseTask(ABC):
             f"Starting task execution: {self.task_name}",
             extra={
                 'event': 'task_start',
-                'job_id': job_id,
                 'account_id': account_id,
                 'lead_id': lead_id,
                 'task_name': self.task_name,
@@ -66,10 +64,10 @@ class BaseTask(ABC):
 
         try:
             # 1. Check existing stored result
-            existing = await self.result_manager.get_result(job_id, account_id, lead_id)
+            existing = await self.result_manager.get_result(account_id, lead_id)
             if existing and existing.get("status") == "completed":
-                logger.info(f"Found existing completed result for job={job_id}, account_id={account_id}, lead_id={lead_id}, resending callback.")
-                await self.result_manager.resend_callback(self, job_id, account_id, lead_id)
+                logger.info(f"Found existing completed result for account_id={account_id}, lead_id={lead_id}, resending callback.")
+                await self.result_manager.resend_callback(self, account_id, lead_id)
                 return existing
 
             # 2. If no existing result, we do the normal flow
@@ -91,7 +89,6 @@ class BaseTask(ABC):
             logger.error(
                 f"Task {self.task_name} failed: {str(e)}",
                 extra={
-                    "job_id": job_id,
                     "account_id": account_id,
                     "lead_id": lead_id
                 },
