@@ -135,6 +135,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
     def __init__(self, config: Optional[ApolloConfig] = None):
         """Initialize the task with required services and configurations."""
+        super().__init__()
         self.config = config or ApolloConfig()
         self.metrics = ProcessingMetrics()
         self.bq_service = BigQueryService()
@@ -193,7 +194,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             "job_id": str(uuid.uuid4())
         }
 
-    async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any],Dict[str, Any]):
         """Execute the lead identification task."""
         start_time = time.time()
         job_id = payload.get('job_id')
@@ -306,24 +307,23 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             score_distribution = self._calculate_score_distribution(evaluated_leads)
             qualified_leads = [l for l in evaluated_leads if l['fit_score'] >= self.config.fit_score_threshold]
 
-            # Send final callback with complete metrics
-            await callback_service.paginated_service.send_callback(
-                job_id=job_id,
-                account_id=account_id,
-                enrichment_type=self.ENRICHMENT_TYPE,
-                source="apollo",
-                status='completed',
-                completion_percentage=100,
-                processed_data={
+            result = {
+                'job_id': job_id,
+                'account_id': account_id,
+                'enrichment_type': self.ENRICHMENT_TYPE,
+                'source': "apollo",
+                'status': 'completed',
+                'completion_percentage': 100,
+                'processed_data': {
                     'score_distribution': score_distribution,
                     'structured_leads': enriched_leads,
                     'all_leads': evaluated_leads,
                     'qualified_leads': qualified_leads,
                     'metrics': asdict(self.metrics)
                 }
-            )
+            }
 
-            return {
+            summary = {
                 "status": "completed",
                 "job_id": job_id,
                 "account_id": account_id,
@@ -332,6 +332,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 "score_distribution": score_distribution,
                 "metrics": asdict(self.metrics)
             }
+            return result, summary
 
         except Exception as e:
             logger.error(f"Lead identification failed for job {job_id}: {str(e)}", exc_info=True)
@@ -353,7 +354,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 processed_data={'stage': current_stage}
             )
 
-            return {
+            return None, {
                 "status": "failed",
                 "job_id": job_id,
                 "account_id": account_id,
