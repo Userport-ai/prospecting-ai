@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any
 from django.db import transaction
 from django.utils import timezone
 
-from app.models import Lead, Account
+from app.models import Lead, Account, AccountEnrichmentStatus, EnrichmentType
 from app.models.accounts import EnrichmentStatus
 
 logger = logging.getLogger(__name__)
@@ -323,11 +323,20 @@ class StreamingCallbackHandler:
                 'score_distribution': processed_data.get('score_distribution', {})
             }
 
+            # Update enrichment status to completed
+            AccountEnrichmentStatus.objects.filter(
+                account=account,
+                enrichment_type=EnrichmentType.GENERATE_LEADS
+            ).update(
+                status=EnrichmentStatus.COMPLETED,
+                last_successful_run=timezone.now()
+            )
+
             account.save()
             logger.info(
                 f"[_update_account_final_status] Updated account {account.id} "
                 f"enrichment status: {all_leads_count} total leads, "
-                f"{qualified_leads_count} qualified leads"
+                f"{qualified_leads_count} qualified leads. Status set to COMPLETED."
             )
 
         except Exception as e:
