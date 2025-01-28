@@ -170,12 +170,13 @@ def enrichment_callback(request):
                     "enrichment_summary": account.get_enrichment_summary()
                 })
 
-            current_page = pagination_data.get('page', 1)
-            total_pages = pagination_data.get('total_pages', 1)
 
             # For paginated requests, status should be in_progress until final page
-            if pagination_data and current_page < total_pages:
-                status = EnrichmentStatus.IN_PROGRESS
+            if pagination_data:
+                current_page = pagination_data.get('page', 1)
+                total_pages = pagination_data.get('total_pages', 1)
+                if current_page < total_pages:
+                    status = EnrichmentStatus.IN_PROGRESS
 
             # Update enrichment status atomically
             enrichment_status = update_enrichment_status(
@@ -199,13 +200,16 @@ def enrichment_callback(request):
                 elif enrichment_type == EnrichmentType.GENERATE_LEADS:
                     # Process through streaming handler
                     result = StreamingCallbackHandler.handle_callback(data)
-                    if result is None and pagination_data and current_page < total_pages:
-                        # Intermediate page - acknowledge receipt
-                        return Response({
-                            "status": "processing",
-                            "page": pagination_data.get('page'),
-                            "total_pages": pagination_data.get('total_pages')
-                        })
+                    if result is None and pagination_data:
+                        current_page = pagination_data.get('page', 1)
+                        total_pages = pagination_data.get('total_pages', 1)
+                        if current_page < total_pages:
+                            # Intermediate page - acknowledge receipt
+                            return Response({
+                                "status": "processing",
+                                "page": pagination_data.get('page'),
+                                "total_pages": pagination_data.get('total_pages')
+                            })
                 else:
                     # Use existing account enrichment function for other types
                     _update_account_from_enrichment(account, enrichment_type, processed_data)
