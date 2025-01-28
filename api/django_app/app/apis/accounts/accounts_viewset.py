@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from app.apis.common.base import TenantScopedViewSet
-from app.apis.common.lead_generation_mixin import LeadGenerationMixin
+from app.apis.leads.lead_generation_mixin import LeadGenerationMixin
 from app.models import UserRole, Account, EnrichmentType
 from app.models.serializers.account_serializers import (
     AccountDetailsSerializer,

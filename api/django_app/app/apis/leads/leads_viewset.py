@@ -8,7 +8,7 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from app.apis.common.base import TenantScopedViewSet
-from app.apis.common.lead_generation_mixin import LeadGenerationMixin
+from app.apis.leads.lead_generation_mixin import LeadGenerationMixin
 from app.models import UserRole, Lead, Account, EnrichmentStatus
 from app.models.serializers.lead_serializers import (
     LeadDetailsSerializer,
