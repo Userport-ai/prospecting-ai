@@ -13,7 +13,7 @@ class FirebaseAuthMiddleware(authentication.BaseAuthentication):
     """
 
     def authenticate(self, request):
-        logger.info(f"FirebaseAuthMiddleware: Processing request method: {request.method} for path {request.path}")
+        # logger.debug(f"FirebaseAuthMiddleware: Processing request method: {request.method} for path {request.path}")
 
         # Skip authentication for paths that don't need it
         if getattr(request, '_skip_firebase_auth', False):

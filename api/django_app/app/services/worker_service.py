@@ -10,12 +10,14 @@ import google.auth.transport.requests
 import urllib.parse
 import logging
 
+from app.utils.retry_utils import with_retry
+
 logger = logging.getLogger(__name__)
 
 class WorkerService:
     def __init__(self):
         self.base_url = settings.WORKER_API_BASE_URL
-        self.timeout = 30.0
+        self.timeout = 120.0
 
         # Format the audience URL correctly for Cloud Run
         base_url = self.base_url.rstrip('/')

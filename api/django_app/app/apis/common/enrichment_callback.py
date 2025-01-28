@@ -135,7 +135,7 @@ def update_enrichment_status(
 @permission_classes([AllowAny])
 # @verify_cloud_run_token
 def enrichment_callback(request):
-    logger.info(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')}")
+    logger.info(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} account_id: {request.data.get('account_id')}")
 
     try:
         data = request.data
@@ -220,11 +220,13 @@ def enrichment_callback(request):
         })
 
     except Account.DoesNotExist:
+        logger.error(f"Account.DoesNotExist: {account_id}", exc_info=True)
         return Response({"error": "Account not found"}, status=404)
     except Lead.DoesNotExist:
+        logger.error(f"Lead.DoesNotExist:{lead_id}. Account ID: {account_id}", exc_info=True)
         return Response({"error": "Lead not found"}, status=404)
     except Exception as e:
-        logger.error(f"Error processing callback: {str(e)}", exc_info=True)
+        logger.error(f"Error processing callback: Account ID: {account_id}. Error: {str(e)}", exc_info=True)
         return Response({"error": str(e)}, status=500)
 
 def _update_account_from_enrichment(account: Account, enrichment_type: str, processed_data: Dict[str, Any]) -> None:
