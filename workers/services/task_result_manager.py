@@ -76,8 +76,11 @@ class TaskResultManager:
             "updated_at": now_ts
         }
 
+        logger.debug(f"Row to insert: {row_to_insert}")
+
         # Insert the row
         table_ref = self.client.get_table(self.table_id)
+        logger.debug(f"Table ref: {table_ref}")
         errors = self.client.insert_rows_json(table_ref, [row_to_insert])
         if errors:
             logger.error(f"BigQuery insert errors: {errors}")
