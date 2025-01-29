@@ -246,6 +246,15 @@ else:
                     "application": "userport-django-app"
                 }
             },
+            "structured_log_handler": {
+                "class": "google.cloud.logging.handlers.StructuredLogHandler",
+                "client": client,
+                "name": "userport-django-app",
+                "labels": {
+                    "environment": "production",
+                    "application": "userport-django-app"
+                }
+            },
             "console": {
                 "class": "logging.StreamHandler",
                 "formatter": "verbose"
@@ -253,53 +262,53 @@ else:
         },
         'loggers': {
             'permissions': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.db.backends': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.backends.schema': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.models': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.urls': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': True,
             },
             'health': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'INFO',
                 'propagate': True,
             },
             'django.security': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'app': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'gunicorn': {
-                'handlers': ['cloud_logging_handler', 'console'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
                 'level': 'INFO',
                 'propagate': False,
             }
         },
         "root": {
-            "handlers": ['cloud_logging_handler', 'console'],
+            "handlers": ['cloud_logging_handler', 'structured_log_handler', 'console'],
             "level": "INFO",
         },
     }
