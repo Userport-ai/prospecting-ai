@@ -163,7 +163,7 @@ DATABASES = {
 }
 
 if os.path.exists('.dev.env'):
-    # Local env.
+    # Local environment logging config (same as you had before)
     LOGGING = {
         'version': 1,
         'disable_existing_loggers': False,
@@ -209,111 +209,79 @@ if os.path.exists('.dev.env'):
                 'handlers': ['console'],
                 'level': 'INFO',
                 'propagate': True,
-            }
+            },
         },
         'root': {
             'handlers': ['console'],
             'level': 'DEBUG',
         },
     }
-else:
-    # Production configuration
-    import google.cloud.logging
 
-    # Instantiate the client and set up logging
+else:
+    import google.cloud.logging
+    from google.cloud.logging.handlers import CloudLoggingHandler
+
+    # Production logging using GCP
     client = google.cloud.logging.Client()
 
     LOGGING = {
         'version': 1,
         'disable_existing_loggers': False,
         'formatters': {
-            'json': {
-                'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-                'format': '%(levelname)s %(asctime)s %(name)s %(process)d %(thread)d %(message)s'
-            },
             'verbose': {
                 'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
                 'style': '{',
             },
         },
         'handlers': {
-            "cloud_logging_handler": {
-                "class": "google.cloud.logging.handlers.CloudLoggingHandler",
-                "client": client,
-                "name": "userport-django-app",
-                "labels": {
-                    "environment": "production",
-                    "application": "userport-django-app"
-                }
+            'gcp': {
+                'class': 'google.cloud.logging.handlers.CloudLoggingHandler',
+                'client': client,
+                'formatter': 'verbose',
             },
-            "structured_log_handler": {
-                "class": "google.cloud.logging.handlers.StructuredLogHandler",
-                "client": client,
-                "name": "userport-django-app",
-                "labels": {
-                    "environment": "production",
-                    "application": "userport-django-app"
-                }
-            },
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "verbose"
-            }
         },
         'loggers': {
             'permissions': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
+                'handlers': ['gcp'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.db.backends': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
+                'handlers': ['gcp'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.backends.schema': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
+                'handlers': ['gcp'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.models': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
+                'handlers': ['gcp'],
                 'level': 'INFO',
-                'propagate': False,
-            },
-            'django.urls': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
-                'level': 'WARNING',
-                'propagate': True,
-            },
-            'health': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
-                'level': 'INFO',
-                'propagate': True,
-            },
-            'django.security': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
-                'level': 'WARNING',
                 'propagate': False,
             },
             'app': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
-                'level': 'INFO',
+                'handlers': ['gcp'],
+                'level': 'DEBUG',
                 'propagate': False,
             },
-            'gunicorn': {
-                'handlers': ['cloud_logging_handler', 'structured_log_handler', 'console'],
+            'django.urls': {
+                'handlers': ['gcp'],
+                'level': 'DEBUG',
+                'propagate': True,
+            },
+            'health': {
+                'handlers': ['gcp'],
                 'level': 'INFO',
-                'propagate': False,
-            }
+                'propagate': True,
+            },
         },
-        "root": {
-            "handlers": ['cloud_logging_handler', 'structured_log_handler', 'console'],
-            "level": "INFO",
+        'root': {
+            'handlers': ['gcp'],
+            'level': 'DEBUG',
         },
     }
-
-# Apply the configuration
 logging.config.dictConfig(LOGGING)
 
 
