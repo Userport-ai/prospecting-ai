@@ -215,6 +215,8 @@ if os.path.exists('.dev.env'):
         },
     }
 else:
+    import logging
+    import logging.config
     import google.cloud.logging
     from google.cloud.logging.handlers import CloudLoggingHandler
     from google.cloud.logging_v2.handlers.transports.sync import SyncTransport
@@ -296,8 +298,8 @@ else:
         },
     }
 
-    # Apply the configuration
-    logging.config.dictConfig(LOGGING)
+# Apply the configuration
+logging.config.dictConfig(LOGGING)
 
 
 # Password validation
