@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import os
 from pathlib import Path
+import logging
+import logging.config
 
 from dotenv import load_dotenv
 
@@ -215,31 +217,11 @@ if os.path.exists('.dev.env'):
         },
     }
 else:
-    import logging
-    import logging.config
+    # Production configuration
     import google.cloud.logging
-    from google.cloud.logging.handlers import CloudLoggingHandler
-    from google.cloud.logging_v2.handlers.transports.sync import SyncTransport
 
-    # Production logging configuration for GCP
+    # Instantiate the client and set up logging
     client = google.cloud.logging.Client()
-    env = "production"
-
-    class CustomJsonFormatter(logging.Formatter):
-        """Custom formatter to ensure correct severity mapping in GCP"""
-        def format(self, record):
-            if record.levelno == logging.INFO:
-                record.severity = 'INFO'
-            elif record.levelno == logging.WARNING:
-                record.severity = 'WARNING'
-            elif record.levelno == logging.ERROR:
-                record.severity = 'ERROR'
-            elif record.levelno == logging.DEBUG:
-                record.severity = 'DEBUG'
-            elif record.levelno == logging.CRITICAL:
-                record.severity = 'CRITICAL'
-
-            return super().format(record)
 
     LOGGING = {
         'version': 1,
@@ -247,75 +229,78 @@ else:
         'formatters': {
             'json': {
                 'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-                'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+                'format': '%(levelname)s %(asctime)s %(name)s %(process)d %(thread)d %(message)s'
+            },
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+                'style': '{',
             },
         },
         'handlers': {
-            'cloudlogging': {
-                'class': 'google.cloud.logging.handlers.CloudLoggingHandler',
-                'client': client,
-                'formatter': 'json',
-                'labels': {
-                    'environment': env,
-                    'application': 'userport-django-app'
-                },
-                'name': 'django_app'
+            "structured_log_handler": {
+                "class": "google.cloud.logging.handlers.StructuredLogHandler",
+                "client": client,
+                "name": "userport-django-app",
+                "labels": {
+                    "environment": "production",
+                    "application": "userport-django-app"
+                }
             },
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'json'
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "verbose"
             }
         },
         'loggers': {
             'permissions': {
-                'handlers': ['cloudlogging', 'console'],
+                'handlers': ['structured_log_handler', 'console'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.db.backends': {
-                'handlers': ['cloudlogging', 'console'],
+                'handlers': ['structured_log_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.backends.schema': {
-                'handlers': ['cloudlogging', 'console'],
+                'handlers': ['structured_log_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.models': {
-                'handlers': ['cloudlogging', 'console'],
+                'handlers': ['structured_log_handler', 'console'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.urls': {
-                'handlers': ['cloudlogging', 'console'],
-                'level': 'DEBUG',
-                'propagate': True,
-            },
-            'health': {
-                'handlers': ['cloudlogging', 'console'],
+                'handlers': ['structured_log_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': True,
             },
-            'gunicorn': {
-                'handlers': ['cloudlogging', 'console'],
+            'health': {
+                'handlers': ['structured_log_handler', 'console'],
                 'level': 'INFO',
                 'propagate': True,
             },
             'django.security': {
-                'handlers': ['cloudlogging', 'console'],
+                'handlers': ['structured_log_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': False,
             },
-            'app': {  # Main app logger
-                'handlers': ['cloudlogging', 'console'],
-                'level': 'DEBUG',
-                'propagate': True,
+            'app': {
+                'handlers': ['structured_log_handler', 'console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'gunicorn': {
+                'handlers': ['structured_log_handler', 'console'],
+                'level': 'INFO',
+                'propagate': False,
             }
         },
-        'root': {
-            'handlers': ['cloudlogging', 'console'],
-            'level': 'INFO',
+        "root": {
+            "handlers": ['structured_log_handler', 'console'],
+            "level": "INFO",
         },
     }
 
