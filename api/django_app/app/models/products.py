@@ -23,6 +23,7 @@ class Product(BaseMixin):
         null=True,
         related_name='created_products'
     )
+    playbook_description = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = 'products'
