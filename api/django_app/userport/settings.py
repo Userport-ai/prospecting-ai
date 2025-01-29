@@ -262,53 +262,53 @@ else:
         },
         'loggers': {
             'permissions': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.db.backends': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.backends.schema': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.models': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.urls': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'WARNING',
                 'propagate': True,
             },
             'health': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'INFO',
                 'propagate': True,
             },
             'django.security': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'app': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'gunicorn': {
-                'handlers': ['cloud_logging_handler'],
+                'handlers': ['cloud_logging_handler', 'structured_log_handler'],
                 'level': 'INFO',
                 'propagate': False,
             }
         },
         "root": {
-            "handlers": ['cloud_logging_handler'],
+            "handlers": ['cloud_logging_handler', 'structured_log_handler'],
             "level": "INFO",
         },
     }
