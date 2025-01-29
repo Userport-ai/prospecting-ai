@@ -62,7 +62,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'app.middleware.TenantMiddleware',
-#    'google.cloud.logging_v2.handlers.middleware.RequestMiddleware',  # Reference: https://cloud.google.com/python/docs/reference/logging/latest/web-framework-integration.
+    'google.cloud.logging_v2.handlers.middleware.RequestMiddleware',  # Reference: https://cloud.google.com/python/docs/reference/logging/latest/web-framework-integration.
 ]
 
 # CORS Settings
@@ -282,7 +282,6 @@ else:
             'level': 'DEBUG',
         },
     }
-logging.config.dictConfig(LOGGING)
 
 
 # Password validation
