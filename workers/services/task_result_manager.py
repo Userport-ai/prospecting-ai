@@ -44,7 +44,7 @@ class TaskResultManager:
         # Prebuild the fully-qualified table ID for callbacks
         self.table_id = f"{self.project}.{self.dataset}.enrichment_callbacks"
 
-    async def store_result(self, callback_payload: Dict[str, Any]) -> None:
+    async def store_result(self, enrichment_type, callback_payload: Dict[str, Any]) -> None:
         """
         Inserts a new row into the enrichment_callbacks table with the entire
         callback payload (account_id, status, processed_data, etc.).
@@ -67,6 +67,7 @@ class TaskResultManager:
         row_to_insert = {
             "account_id": account_id,
             "lead_id": lead_id,
+            "enrichment_type": enrichment_type,
             "status": status,
             "callback_payload": payload_json,
             "created_at": now_ts,
@@ -79,7 +80,7 @@ class TaskResultManager:
         if errors:
             logger.error(f"BigQuery insert errors: {errors}")
 
-    async def get_result(self, account_id: str, lead_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def get_result(self, enrichment_type: str, account_id: str, lead_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Retrieve the most recent callback payload for the given job/entity from
         the enrichment_callbacks table, returning it as a Python dict.
@@ -90,12 +91,14 @@ class TaskResultManager:
         query = f"""
             SELECT callback_payload
             FROM `{self.table_id}`
-            WHERE account_id = @account_id
+            WHERE account_id = @account_id and
+            enrichment_type = @enrichment_type
         """
 
         # Initialize query parameters with mandatory parameters
         query_parameters = [
             bigquery.ScalarQueryParameter("account_id", "STRING", account_id),
+            bigquery.ScalarQueryParameter("enrichment_type", "STRING", enrichment_type),
         ]
 
         # Conditionally add lead_id filter
@@ -121,7 +124,7 @@ class TaskResultManager:
 
             # If no rows are returned, return None
             if not rows:
-                logger.info(f"No rows found for account_id: {account_id}, lead_id: {lead_id}")
+                logger.info(f"No rows found for account_id: {account_id}, lead_id: {lead_id} in enrichment_callbacks cache")
                 return None
 
             row = rows[0]

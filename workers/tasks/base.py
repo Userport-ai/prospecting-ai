@@ -20,6 +20,16 @@ class BaseTask(ABC):
         self.result_manager = TaskResultManager()
         self.callback_service = callback_service
 
+    @property
+    @abstractmethod
+    def enrichment_type(self) -> str:
+        """
+           Enrichment Type identifier
+           Note: Make sure to keep it in sync with the @EnrichmentType enum in the AccountEnrichment model
+           in Django
+        """
+        pass
+
     @classmethod
     async def create(cls):
         try:
@@ -74,8 +84,9 @@ class BaseTask(ABC):
 
         try:
             # 1. Check existing stored result
-            existing = await self.result_manager.get_result(account_id, lead_id)
-            logger.info(f"Searched for {account_id} and {lead_id} in the table and found : {existing}")
+            existing = await self.result_manager.get_result(enrichment_type=self.enrichment_type, account_id=account_id,
+                                                            lead_id=lead_id)
+            logger.info(f"Searched for {self.enrichment_type}, {account_id} and {lead_id} in the table and found: {existing}")
             if existing and existing.get("status") == "completed":
                 logger.info(f"Found existing completed result for account_id={account_id}, lead_id={lead_id}, resending callback.")
                 callback_params = {k: v for k, v in existing.items() if k != 'job_id'}
@@ -86,7 +97,7 @@ class BaseTask(ABC):
             result, summary = await self.execute(payload)
 
             # Store final result if successful
-            await self.result_manager.store_result(result)
+            await self.result_manager.store_result(enrichment_type=self.enrichment_type, callback_payload=result)
 
             # Send callback if successful
             if result and (result.get("status", "unknown") == "completed"):

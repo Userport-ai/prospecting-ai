@@ -7,14 +7,17 @@ from models.lead_activities import LeadResearchReport, LinkedInActivity, Content
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from tasks.base import BaseTask
+from tasks.enrichment_task import AccountEnrichmentTask
 from utils.activity_parser import LinkedInActivityParser
 from utils.lead_insights_gen import LeadInsights
 
 logger = logging.getLogger(__name__)
 
 
-class LeadLinkedInResearchTask(BaseTask):
+class LeadLinkedInResearchTask(AccountEnrichmentTask):
     """Task for generating lead research report from LinkedIn activities."""
+
+    ENRICHMENT_TYPE = "lead_linkedin_research"
 
     def __init__(self, callback_service):
         """Initialize task with required services."""
@@ -59,6 +62,10 @@ class LeadLinkedInResearchTask(BaseTask):
             "attempt_number": kwargs.get("attempt_number", 1),
             "max_retries": kwargs.get("max_retries", 3)
         }
+
+    def enrichment_type(self) -> str:
+        return self.ENRICHMENT_TYPE
+
 
     async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any],Dict[str, Any]):
         """Execute the lead research task."""
