@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 from google.cloud import tasks_v2
+from google.protobuf import duration_pb2
 
 from .bigquery_service import BigQueryService  # Import BigQueryService for reuse
 
@@ -61,9 +62,9 @@ class TaskManager:
         # Validate timeout (max 30 minutes)
         dispatch_timeout_seconds = min(dispatch_timeout_seconds, 1800)
 
-        # Convert to Duration format as expected by
-        # https://cloud.google.com/tasks/docs/reference/rpc/google.cloud.tasks.v2#google.cloud.tasks.v2.Task.
-        dispatch_timeout_duration: str = f"{dispatch_timeout_seconds}s"
+        # Convert to Duration instance.
+        dispatch_deadline_duration = duration_pb2.Duration()
+        dispatch_deadline_duration.FromSeconds(dispatch_timeout_seconds)
 
         # Configure task with OIDC authentication
         task = {
@@ -77,7 +78,7 @@ class TaskManager:
                     audience=self.base_url
                 ),
             },
-            'dispatch_deadline': dispatch_timeout_duration
+            'dispatch_deadline': dispatch_deadline_duration
         }
 
         # Create task and get response

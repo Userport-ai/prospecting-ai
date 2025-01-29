@@ -10,6 +10,7 @@ from google.oauth2 import service_account
 
 logger = logging.getLogger(__name__)
 
+
 class TaskResultManager:
     """
     Manages storing and retrieving final callback payloads for idempotent tasks
