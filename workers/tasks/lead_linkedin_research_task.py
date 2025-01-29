@@ -63,11 +63,11 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
             "max_retries": kwargs.get("max_retries", 3)
         }
 
+    @property
     def enrichment_type(self) -> str:
         return self.ENRICHMENT_TYPE
 
-
-    async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any],Dict[str, Any]):
+    async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any], Dict[str, Any]):
         """Execute the lead research task."""
         job_id = payload.get('job_id')
         account_id = payload.get('account_id')
