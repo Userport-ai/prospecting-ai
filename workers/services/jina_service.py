@@ -14,6 +14,7 @@ JINA_RETRY_CONFIG = RetryConfig(
         ConnectionError,
         httpx.ConnectTimeout,
         httpx.ConnectError,
+        httpx.ReadError,
     ]
 )
 
