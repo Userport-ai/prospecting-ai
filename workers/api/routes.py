@@ -58,7 +58,7 @@ async def create_task(
         task = task_registry.get_task(task_name)
         task_payload = await task.create_task_payload(**payload)
         result = await task_manager.create_task(task_name, task_payload)
-        logger.info(f"Task created", extra={
+        logger.info(f"Task created: name: {task_name}, account ID: {payload.get('account_id', '<account id not found>')}", extra={
             'result': result,
             'task_name': task_name,
             'job_id': payload.get('job_id'),
@@ -66,8 +66,10 @@ async def create_task(
             'attempt_number': payload.get('attempt_number', 1)
         })
         return JSONResponse(content=result)
-    except KeyError:
+    except KeyError as e:
+        logger.error(f"Failed to find task: {task_name} and payload: {payload} with error: {e}")
         raise TaskError(status_code=404, detail="Task not found")
+
 
 @router.post("/tasks/{task_name}")
 async def execute_task(
