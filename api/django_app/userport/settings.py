@@ -282,6 +282,7 @@ else:
             'level': 'DEBUG',
         },
     }
+logging.config.dictConfig(LOGGING)
 
 
 # Password validation
