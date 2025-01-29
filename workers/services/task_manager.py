@@ -56,10 +56,14 @@ class TaskManager:
         if 'max_retries' not in payload:
             payload['max_retries'] = 3
 
-        dispatch_timeout = timeout_seconds or self.default_task_timeout
+        dispatch_timeout_seconds = timeout_seconds or self.default_task_timeout
 
         # Validate timeout (max 30 minutes)
-        dispatch_timeout = min(dispatch_timeout, 1800)
+        dispatch_timeout_seconds = min(dispatch_timeout_seconds, 1800)
+
+        # Convert to Duration format as expected by
+        # https://cloud.google.com/tasks/docs/reference/rpc/google.cloud.tasks.v2#google.cloud.tasks.v2.Task.
+        dispatch_timeout_duration: str = f"{dispatch_timeout_seconds}s"
 
         # Configure task with OIDC authentication
         task = {
@@ -73,7 +77,7 @@ class TaskManager:
                     audience=self.base_url
                 ),
             },
-            'dispatch_deadline': {'seconds': dispatch_timeout}
+            'dispatch_deadline': {'seconds': dispatch_timeout_duration}
         }
 
         # Create task and get response
