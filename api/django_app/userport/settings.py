@@ -225,6 +225,22 @@ else:
     client = google.cloud.logging.Client()
     env = "production"
 
+    class CustomJsonFormatter(logging.Formatter):
+        """Custom formatter to ensure correct severity mapping in GCP"""
+        def format(self, record):
+            if record.levelno == logging.INFO:
+                record.severity = 'INFO'
+            elif record.levelno == logging.WARNING:
+                record.severity = 'WARNING'
+            elif record.levelno == logging.ERROR:
+                record.severity = 'ERROR'
+            elif record.levelno == logging.DEBUG:
+                record.severity = 'DEBUG'
+            elif record.levelno == logging.CRITICAL:
+                record.severity = 'CRITICAL'
+
+            return super().format(record)
+
     LOGGING = {
         'version': 1,
         'disable_existing_loggers': False,
@@ -279,6 +295,11 @@ else:
             'health': {
                 'handlers': ['cloudlogging', 'console'],
                 'level': 'WARNING',
+                'propagate': True,
+            },
+            'gunicorn': {
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'INFO',
                 'propagate': True,
             },
             'django.security': {
