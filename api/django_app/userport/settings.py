@@ -215,20 +215,90 @@ if os.path.exists('.dev.env'):
         },
     }
 else:
-    # prod env, use Google Cloud Logging.
-    # reference: https://cloud.google.com/python/docs/reference/logging/latest/std-lib-integration.
-
-    # Imports the Cloud Logging client library
     import google.cloud.logging
+    from google.cloud.logging.handlers import CloudLoggingHandler
+    from google.cloud.logging_v2.handlers.transports.sync import SyncTransport
 
-    # Instantiates a client
+    # Production logging configuration for GCP
     client = google.cloud.logging.Client()
+    env = "production"
 
-    # Retrieves a Cloud Logging handler based on the environment
-    # you're running in and integrates the handler with the
-    # Python logging module. By default this captures all logs
-    # at INFO level and higher
-    client.setup_logging()
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'json': {
+                'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+                'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+            },
+        },
+        'handlers': {
+            'cloudlogging': {
+                'class': 'google.cloud.logging.handlers.CloudLoggingHandler',
+                'client': client,
+                'formatter': 'json',
+                'labels': {
+                    'environment': env,
+                    'application': 'userport-django-app'
+                },
+                'name': 'django_app'
+            },
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'json'
+            }
+        },
+        'loggers': {
+            'permissions': {
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'django.db.backends': {
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'WARNING',
+                'propagate': False,
+            },
+            'django.db.backends.schema': {
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'WARNING',
+                'propagate': False,
+            },
+            'django.db.models': {
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'django.urls': {
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'DEBUG',
+                'propagate': True,
+            },
+            'health': {
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'WARNING',
+                'propagate': True,
+            },
+            'django.security': {
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'WARNING',
+                'propagate': False,
+            },
+            'app': {  # Main app logger
+                'handlers': ['cloudlogging', 'console'],
+                'level': 'DEBUG',
+                'propagate': True,
+            }
+        },
+        'root': {
+            'handlers': ['cloudlogging', 'console'],
+            'level': 'INFO',
+        },
+    }
+
+    # Apply the configuration
+    logging.config.dictConfig(LOGGING)
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
