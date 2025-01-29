@@ -67,22 +67,22 @@ class TaskManager:
         dispatch_deadline_duration.FromSeconds(dispatch_timeout_seconds)
 
         # Configure task with OIDC authentication
-        task = {
-            'http_request': {
-                'http_method': tasks_v2.HttpMethod.POST,
-                'url': f"{self.base_url}/api/v1/tasks/{task_name}",
-                'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps(payload).encode(),
-                'oidc_token': tasks_v2.OidcToken(
+        task = tasks_v2.Task(
+            http_request=tasks_v2.HttpRequest(
+                http_method=tasks_v2.HttpMethod.POST,
+                url=f"{self.base_url}/api/v1/tasks/{task_name}",
+                headers={'Content-Type': 'application/json'},
+                body=json.dumps(payload).encode(),
+                oidc_token=tasks_v2.OidcToken(
                     service_account_email=self.service_account_email,
-                    audience=self.base_url
+                    audience=self.base_url,
                 ),
-            },
-            'dispatch_deadline': dispatch_deadline_duration
-        }
+            ),
+            dispatch_deadline=dispatch_deadline_duration
+        )
 
         # Create task and get response
-        response = self.client.create_task(request={"parent": parent, "task": task})
+        response = self.client.create_task(tasks_v2.CreateTaskRequest(parent=parent, task=task))
 
         return {
             "status": "scheduled",
