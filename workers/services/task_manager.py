@@ -77,7 +77,7 @@ class TaskManager:
                     audience=self.base_url
                 ),
             },
-            'dispatch_deadline': {'seconds': dispatch_timeout_duration}
+            'dispatch_deadline': dispatch_timeout_duration
         }
 
         # Create task and get response
