@@ -11,8 +11,6 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import os
 from pathlib import Path
-import logging
-import logging.config
 
 from dotenv import load_dotenv
 
@@ -54,7 +52,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'google.cloud.logging_v2.handlers.middleware.RequestMiddleware',  # Reference: https://cloud.google.com/python/docs/reference/logging/latest/web-framework-integration.
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -63,6 +60,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'app.middleware.TenantMiddleware',
+    'google.cloud.logging_v2.handlers.middleware.RequestMiddleware',  # Reference: https://cloud.google.com/python/docs/reference/logging/latest/web-framework-integration.
 ]
 
 # CORS Settings
@@ -163,7 +161,7 @@ DATABASES = {
 }
 
 if os.path.exists('.dev.env'):
-    # Local environment logging config (same as you had before)
+    # Local env.
     LOGGING = {
         'version': 1,
         'disable_existing_loggers': False,
@@ -209,74 +207,28 @@ if os.path.exists('.dev.env'):
                 'handlers': ['console'],
                 'level': 'INFO',
                 'propagate': True,
-            },
+            }
         },
         'root': {
             'handlers': ['console'],
             'level': 'DEBUG',
         },
     }
-
 else:
+    # prod env, use Google Cloud Logging.
+    # reference: https://cloud.google.com/python/docs/reference/logging/latest/std-lib-integration.
+
+    # Imports the Cloud Logging client library
     import google.cloud.logging
-    from google.cloud.logging.handlers import CloudLoggingHandler
 
-    # Production logging using GCP
-    client = google.cloud.logging.Client(project='omega-winter-431704-u5')
+    # Instantiates a client
+    client = google.cloud.logging.Client()
 
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'handlers': {
-            'gcp': {
-                'class': 'google.cloud.logging.handlers.CloudLoggingHandler',
-                'client': client,
-            },
-        },
-        'loggers': {
-            'permissions': {
-                'handlers': ['gcp'],
-                'level': 'INFO',
-                'propagate': False,
-            },
-            'django.db.backends': {
-                'handlers': ['gcp'],
-                'level': 'WARNING',
-                'propagate': False,
-            },
-            'django.db.backends.schema': {
-                'handlers': ['gcp'],
-                'level': 'WARNING',
-                'propagate': False,
-            },
-            'django.db.models': {
-                'handlers': ['gcp'],
-                'level': 'INFO',
-                'propagate': False,
-            },
-            'app': {
-                'handlers': ['gcp'],
-                'level': 'DEBUG',
-                'propagate': False,
-            },
-            'django.urls': {
-                'handlers': ['gcp'],
-                'level': 'DEBUG',
-                'propagate': True,
-            },
-            'health': {
-                'handlers': ['gcp'],
-                'level': 'INFO',
-                'propagate': True,
-            },
-        },
-        'root': {
-            'handlers': ['gcp'],
-            'level': 'DEBUG',
-        },
-    }
-logging.config.dictConfig(LOGGING)
-
+    # Retrieves a Cloud Logging handler based on the environment
+    # you're running in and integrates the handler with the
+    # Python logging module. By default this captures all logs
+    # at INFO level and higher
+    client.setup_logging()
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
