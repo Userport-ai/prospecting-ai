@@ -54,6 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'google.cloud.logging_v2.handlers.middleware.RequestMiddleware',  # Reference: https://cloud.google.com/python/docs/reference/logging/latest/web-framework-integration.
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -62,7 +63,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'app.middleware.TenantMiddleware',
-    'google.cloud.logging_v2.handlers.middleware.RequestMiddleware',  # Reference: https://cloud.google.com/python/docs/reference/logging/latest/web-framework-integration.
 ]
 
 # CORS Settings
@@ -222,22 +222,15 @@ else:
     from google.cloud.logging.handlers import CloudLoggingHandler
 
     # Production logging using GCP
-    client = google.cloud.logging.Client()
+    client = google.cloud.logging.Client(project='omega-winter-431704-u5')
 
     LOGGING = {
         'version': 1,
         'disable_existing_loggers': False,
-        'formatters': {
-            'verbose': {
-                'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-                'style': '{',
-            },
-        },
         'handlers': {
             'gcp': {
                 'class': 'google.cloud.logging.handlers.CloudLoggingHandler',
                 'client': client,
-                'formatter': 'verbose',
             },
         },
         'loggers': {
