@@ -261,9 +261,9 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         ]
     )
 
-    def __init__(self):
+    def __init__(self, callback_service):
         """Initialize the task with required services and configurations."""
-        super().__init__()
+        super().__init__(callback_service)
         self._initialize_credentials()
         self.bq_service = BigQueryService()
         self._configure_ai_service()
@@ -332,7 +332,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         job_id = payload.get('job_id')
         accounts = payload.get('accounts', [])
         is_bulk = payload.get('is_bulk', False)
-        callback_service = CallbackService()
+        callback_service = await CallbackService.get_instance()
 
         logger.info(f"Starting execution for job_id: {job_id}, is_bulk: {is_bulk}, total accounts: {len(accounts)}")
 

@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 class LeadLinkedInResearchTask(BaseTask):
     """Task for generating lead research report from LinkedIn activities."""
 
-    def __init__(self):
+    def __init__(self, callback_service):
         """Initialize task with required services."""
-        super().__init__()
+        super().__init__(callback_service)
         self.bq_service = BigQueryService()
         self._initialize_credentials()
         self.posts_html = None
@@ -72,7 +72,7 @@ class LeadLinkedInResearchTask(BaseTask):
         self.comments_html = payload.get('comments_html')
         self.reactions_html = payload.get('reactions_html')
         current_stage = 'initialization'
-        callback_service = CallbackService()
+        callback_service = await CallbackService.get_instance()
 
         logger.info(f"Starting lead research for job_id: {job_id}, account_id: {account_id}")
 

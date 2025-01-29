@@ -3,13 +3,17 @@ import os
 import sys
 import time
 import traceback
+import uuid
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pythonjsonlogger import jsonlogger
 
+from api.routes import register_tasks
 from api.routes import router
+from services.django_callback_service import CallbackService
 
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
@@ -58,12 +62,36 @@ log_level = os.getenv('LOG_LEVEL', 'DEBUG').upper()
 logger.setLevel(getattr(logging, log_level))
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-app = FastAPI(title="Workers API")
+@asynccontextmanager
+async def lifespan(fastapi_app: FastAPI):
+    # Initialize on startup
+    logger.info("Application starting up", extra={
+        'environment': os.getenv('ENVIRONMENT', 'development'),
+        'log_level': log_level,
+        'version': os.getenv('VERSION', 'unknown')
+    })
+    fastapi_app.state.callback_service = await CallbackService.get_instance()
+    await register_tasks()
+
+    try:
+        yield
+    finally:
+        # Cleanup on shutdown
+        logger.info("Lifespan: Application is shutting down")
+        callback_service = getattr(fastapi_app.state, 'callback_service', None)
+        if callback_service:
+            await callback_service.cleanup()
+
+app = FastAPI(title="Workers API", lifespan=lifespan)
+
 
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
     # Generate request ID
-    request_id = request.headers.get('X-Request-ID', str(time.time()))
+    request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
+    sensitive_headers = ['authorization', 'cookie']
+    filtered_headers = {k: v for k, v in request.headers.items() if k.lower() not in sensitive_headers}
+
 
     # Add context to logging
     logger.info(
@@ -73,7 +101,7 @@ async def logging_middleware(request: Request, call_next):
             'method': request.method,
             'url': str(request.url),
             'client_host': request.client.host if request.client else None,
-            'headers': dict(request.headers)
+            'headers': dict(filtered_headers)
         }
     )
 
@@ -122,15 +150,3 @@ app.include_router(router, prefix="/api/v1")
 async def health_check():
     logger.info("Health check endpoint called")
     return {"status": "healthy"}
-
-# Log application startup
-logger.info("Application starting up", extra={
-    'environment': os.getenv('ENVIRONMENT', 'development'),
-    'log_level': log_level,
-    'version': os.getenv('VERSION', 'unknown')
-})
-
-# Add shutdown logging
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("Application shutting down")

@@ -2,6 +2,8 @@ import os
 import asyncio
 import httpx
 from typing import Dict, Optional
+
+from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 
 JINA_RETRY_CONFIG = RetryConfig(
@@ -28,7 +30,15 @@ class JinaService:
         # User Jina Search API to do web search and return results.
         self.JINA_SEARCH_API = "https://s.jina.ai/"
         self.jina_api_token = os.getenv('JINA_API_TOKEN')
-        self.API_TIMEOUT = 40.0  # timeout in seconds.
+        self.API_TIMEOUT = 60.0  # timeout in seconds.
+        self.pool = ConnectionPool(
+            limits=httpx.Limits(
+                max_keepalive_connections=10,
+                max_connections=15,            # Maximum concurrent connections
+                keepalive_expiry=150.0         # Connection TTL in seconds
+            ),
+            timeout=300.0
+        )
 
     @with_retry(retry_config=JINA_RETRY_CONFIG, operation_name="_call_jina_reader_api")
     async def read_url(self, url: str, headers: Dict[str, str]) -> str:
@@ -39,7 +49,7 @@ class JinaService:
         """
         authHeaders = {"Authorization": f"Bearer {self.jina_api_token}"}
         finalHeaders = {**headers, **authHeaders}
-        async with httpx.AsyncClient() as client:
+        async with self.pool.acquire_connection() as client:
             endpoint = f"{self.JINA_READER_API}{url}"
             response = await client.get(url=endpoint, headers=finalHeaders, timeout=self.API_TIMEOUT)
             response.raise_for_status()
@@ -54,7 +64,7 @@ class JinaService:
         """
         authHeaders = {"Authorization": f"Bearer {self.jina_api_token}"}
         finalHeaders = {**headers, **authHeaders}
-        async with httpx.AsyncClient() as client:
+        async with self.pool.acquire_connection() as client:
             endpoint = f"{self.JINA_SEARCH_API}{query}"
             response = await client.get(url=endpoint, headers=finalHeaders, timeout=self.API_TIMEOUT)
             response.raise_for_status()

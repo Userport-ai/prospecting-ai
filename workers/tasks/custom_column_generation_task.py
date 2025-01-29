@@ -47,8 +47,9 @@ class CustomColumnTask(AccountEnrichmentTask):
 
     ENRICHMENT_TYPE = 'custom_column'
 
-    def __init__(self):
+    def __init__(self, callback_service):
         """Initialize the task with required services."""
+        super(callback_service)
         self.bq_service = BigQueryService()
         self._configure_ai_service()
 
@@ -94,7 +95,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         context_data = payload.get('context_data', {})
         batch_size = payload.get('batch_size', 10)
         current_stage = 'initialization'
-        callback_service = CallbackService()
+        callback_service = await CallbackService.get_instance()
 
         logger.info(f"Starting custom column generation for job_id: {job_id}, column_id: {column_id}")
 

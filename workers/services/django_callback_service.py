@@ -1,9 +1,10 @@
+import asyncio
 import json
 import logging
 import math
 import os
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 import httpx
 from google.auth import default
@@ -12,6 +13,7 @@ from google.oauth2 import id_token
 from google.oauth2 import service_account
 
 from services.django_callback_service_paginated import PaginatedCallbackService
+from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE_STATUS_CODES
 
 logger = logging.getLogger(__name__)
@@ -31,8 +33,26 @@ class CallbackService:
             httpx.RequestError           # Base class for request-related errors
         ]
     )
+    _instance = None
+    _lock = asyncio.Lock()
+
+    @classmethod
+    async def get_instance(cls):
+        async with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+
+    def __new__(cls):
+        if cls._instance is not None:
+            raise RuntimeError("Use get_instance() instead")
+        return super().__new__(cls)
+
     def __init__(self):
         """Initialize the callback service with OIDC auth"""
+        if CallbackService._instance is not None:
+            logger.error("Error: Use get_instance() instead of initializing callback service directly")
+            raise RuntimeError("Use get_instance() instead")
         logger.info("Initializing CallbackService")
 
         self.django_base_url = os.environ.get('DJANGO_BASE_URL')
@@ -43,6 +63,14 @@ class CallbackService:
         logger.info(f"Using Django base URL: {self.django_base_url}")
         self.callback_path = '/api/v2/internal/enrichment-callback/'
         self.audience = self.django_base_url.rstrip('/')
+        self.pool = ConnectionPool(
+            limits=httpx.Limits(
+                max_keepalive_connections=15,
+                max_connections=20,            # Maximum concurrent connections
+                keepalive_expiry=150.0         # Connection TTL in seconds
+            ),
+            timeout=300.0
+        )
 
         try:
             # Check if running locally with service account file
@@ -63,7 +91,7 @@ class CallbackService:
                 logger.info(f"Successfully initialized workload identity credentials for project: {self.project}")
 
             logger.debug(f"Credentials initialized. Type: {type(self.credentials)}, Workload Identity: {self._use_workload_identity}")
-            self.paginated_service = PaginatedCallbackService(self)
+            self.paginated_service = PaginatedCallbackService(self, self.pool)
 
         except Exception as e:
             logger.error(f"Failed to initialize credentials: {str(e)}", exc_info=True)
@@ -148,7 +176,7 @@ class CallbackService:
             callback_url = f"{self.django_base_url}{self.callback_path}"
             logger.info(f"Sending callback to {callback_url} for job {job_id}")
 
-            async with httpx.AsyncClient() as client:
+            async with self.pool.acquire_connection() as client:
                 logger.debug(f"Making POST request for job {job_id}")
                 response = await client.post(
                     callback_url,
@@ -243,3 +271,7 @@ class CallbackService:
             return value
 
         return {k: serialize_value(v) for k, v in data.items()}
+
+    async def cleanup(self):
+        """Cleanup connection pool when service is shutting down"""
+        await self.pool.close()

@@ -12,13 +12,22 @@ logger = logging.getLogger(__name__)
 
 class BaseTask(ABC):
     """Base class for all tasks."""
-    def __init__(self):
+    def __init__(self, callback_service):
         """
         - result_manager: An instance of TaskResultManager
         - callback_service: An instance of CallbackService
         """
         self.result_manager = TaskResultManager()
-        self.callback_service = CallbackService()
+        self.callback_service = callback_service
+
+    @classmethod
+    async def create(cls):
+        try:
+            callback_service = await CallbackService.get_instance()
+            return cls(callback_service)
+        except Exception as e:
+            logger.error(f"Failed to initialize CallbackService: {e}")
+            raise
 
     @property
     @abstractmethod

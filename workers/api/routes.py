@@ -20,11 +20,14 @@ router = APIRouter()
 
 # Initialize task registry and register tasks
 task_registry = TaskRegistry()
-task_registry.register(AccountEnhancementTask)
-task_registry.register(GenerateLeadsTask)
-task_registry.register(LeadLinkedInResearchTask)
-task_registry.register(ApolloLeadsTask)
 
+async def register_tasks():
+    """Asynchronously registers tasks during FastAPI startup."""
+    await task_registry.register(AccountEnhancementTask)
+    await task_registry.register(GenerateLeadsTask)
+    await task_registry.register(LeadLinkedInResearchTask)
+    await task_registry.register(ApolloLeadsTask)
+    logger.info("All tasks successfully registered.")
 
 def get_task_manager() -> TaskManager:
     """Dependency injection for task manager."""

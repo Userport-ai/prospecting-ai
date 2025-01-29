@@ -158,9 +158,9 @@ class GenerateLeadsTask(AccountEnrichmentTask):
     BATCH_SIZE = 2 # Batch size for Gemini processing
     PAGE_SIZE = 5 # Number of results fetched from ProxyCurl API. Note: Increasing this will bump up our cost significantly
 
-    def __init__(self):
+    def __init__(self, callback_service):
         """Initialize the task with required services and configurations."""
-        super().__init__()
+        super().__init__(callback_service)
         self.bq_service = BigQueryService()
         self._initialize_credentials()
         self._configure_ai_service()
@@ -222,7 +222,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
         account_data = payload.get('account_data', {})
         product_data = payload.get('product_data', {})
         tenant_id = payload.get('tenant_id')
-        callback_service = CallbackService()
+        callback_service = await CallbackService.get_instance()
         current_stage = 'initialization'
 
         logger.info(f"Starting lead identification for job_id: {job_id}, account_id: {account_id}")

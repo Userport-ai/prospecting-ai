@@ -33,11 +33,12 @@ class PaginatedCallbackService:
         ]
     )
 
-    def __init__(self, callback_service):
+    def __init__(self, callback_service, connection_pool):
         """Initialize with existing callback service for auth handling."""
         self.callback_service = callback_service
         self.django_base_url = callback_service.django_base_url
         self.callback_path = callback_service.callback_path
+        self.pool = connection_pool
 
     def _should_paginate(self, data: Dict[str, Any]) -> bool:
         """Determine if payload needs pagination based on size."""
@@ -143,7 +144,7 @@ class PaginatedCallbackService:
             id_token = await self.callback_service.get_id_token()
             callback_url = f"{self.django_base_url}{self.callback_path}"
 
-            async with httpx.AsyncClient() as client:
+            async with self.pool.acquire_connection() as client:
                 response = await client.post(
                     callback_url,
                     json=callback_data,

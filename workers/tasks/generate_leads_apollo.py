@@ -11,7 +11,6 @@ from typing import Dict, Any, List, Optional, Union
 from services.ai_service import AIServiceFactory
 from services.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
-from services.django_callback_service import CallbackService
 from services.jina_service import JinaService
 from services.proxycurl_service import ProxyCurlService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
@@ -133,10 +132,11 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         ]
     )
 
-    def __init__(self, config: Optional[ApolloConfig] = None):
+    def __init__(self, callback_service):
         """Initialize the task with required services and configurations."""
-        super().__init__()
-        self.config = config or ApolloConfig()
+        super().__init__(callback_service)
+        self.callback_svc = callback_service
+        self.config = ApolloConfig()
         self.metrics = ProcessingMetrics()
         self.bq_service = BigQueryService()
         self._initialize_credentials()
@@ -201,7 +201,6 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         account_id = payload.get('account_id')
         account_data = payload.get('account_data', {})
         product_data = payload.get('product_data', {})
-        callback_service = CallbackService()
         current_stage = 'initialization'
 
         website = account_data.get('website')
@@ -213,7 +212,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
         try:
             # Send initial processing callback
-            await callback_service.send_callback(
+            await self.callback_svc.send_callback(
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
@@ -228,7 +227,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             raw_employee_data = await self._fetch_employees_concurrent(account_data['domain'])
             self.metrics.total_leads_processed = len(raw_employee_data)
 
-            await callback_service.send_callback(
+            await self.callback_svc.send_callback(
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
@@ -250,7 +249,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             )
             self.metrics.successful_leads = len(structured_leads)
 
-            await callback_service.send_callback(
+            await self.callback_svc.send_callback(
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
@@ -276,7 +275,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             else:
                 enriched_leads = structured_leads
 
-            await callback_service.send_callback(
+            await self.callback_svc.send_callback(
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,
@@ -344,7 +343,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             }
 
             await self._store_error_state(job_id, account_id, error_details)
-            await callback_service.send_callback(
+            await self.callback_svc.send_callback(
                 job_id=job_id,
                 account_id=account_id,
                 enrichment_type=self.ENRICHMENT_TYPE,

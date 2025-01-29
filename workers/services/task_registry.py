@@ -16,7 +16,7 @@ class TaskRegistry:
             cls._instance._tasks = {}
         return cls._instance
 
-    def register(self, task_class: Type[BaseTask]) -> None:
+    async def register(self, task_class: Type[BaseTask]) -> None:
         """
         Register a new task implementation
 
@@ -26,7 +26,7 @@ class TaskRegistry:
         Raises:
             ValueError: If a task with the same name is already registered
         """
-        task = task_class()
+        task = await task_class.create()
         if task.task_name in self._tasks:
             raise ValueError(f"Task {task.task_name} is already registered")
         self._tasks[task.task_name] = task
