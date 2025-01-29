@@ -59,7 +59,9 @@ class TaskResultManager:
             raise ValueError("callback_payload must contain 'account_id'")
 
         # Convert entire payload to JSON
+        logger.debug(f"Callback payload to convert to JSON: {callback_payload}")
         payload_json = json.dumps(callback_payload, default=JSONUtils.serialize_datetime)
+        logger.debug(f"Converted callback payload to JSON: {payload_json}")
 
         status = str(callback_payload.get("status", "unknown"))
         now_ts = datetime.now(timezone.utc).isoformat()

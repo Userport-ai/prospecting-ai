@@ -9,4 +9,4 @@ class JSONUtils:
         """
         if isinstance(obj, datetime):
             return obj.isoformat()
-        return obj
+        raise TypeError(f"Type {type(obj)} not serializable")
