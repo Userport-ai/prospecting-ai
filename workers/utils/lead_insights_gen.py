@@ -131,10 +131,15 @@ class LeadInsights:
 
             if self.lead and self.product:
                 # Find personalization signals.
-                signals = await self._provide_personalization_signals(content_details=all_content_details)
-                insights.personalization_signals = [LeadResearchReport.Insights.PersonalizationSignal(description=signal.get(
-                    "description"), reason=signal.get("reason"), outreach_message=signal.get("outreach_message")) for signal in signals]
-                logger.debug(f"Provided personalization signals for {self.person_name}: company name: {self.company_name}")
+                signals_response = await self._provide_personalization_signals(content_details=all_content_details)
+                if "personalization_signals" in signals_response:
+                    signals = signals_response["personalization_signals"]
+                    logger.debug(f"For person: {self.person_name}, company name: {self.company_name}, Signals found are: {signals}")
+                    insights.personalization_signals = [LeadResearchReport.Insights.PersonalizationSignal(description=signal.get(
+                        "description"), reason=signal.get("reason"), outreach_message=signal.get("outreach_message")) for signal in signals]
+                    logger.debug(f"Provided personalization signals for {self.person_name}: company name: {self.company_name}")
+                else:
+                    logger.debug(f"Personalization signals missing for {self.person_name}: comapny name: {self.company_name} in response: {signals_response}")
             else:
                 logger.debug(f"Skipping personalization signals since one of Lead or Product is None for {self.person_name}, company: {self.company_name}")
 
