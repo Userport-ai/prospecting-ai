@@ -269,6 +269,11 @@ else:
                 'level': 'INFO',
                 'propagate': False,
             },
+            'app': {
+                'handlers': ['cloud_logging_handler', 'console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
             'django.urls': {
                 'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'DEBUG',
@@ -282,7 +287,7 @@ else:
         },
         'root': {
             'handlers': ['cloud_logging_handler', 'console'],
-            'level': 'DEBUG',
+            'level': 'INFO',
         },
     }
 
