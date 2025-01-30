@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from pathlib import Path
 
+import google.cloud.logging
 from dotenv import load_dotenv
 
 if os.path.exists('.env'):
@@ -159,7 +160,9 @@ DATABASES = {
         'DEFAULT_SCHEMA': 'public'
     }
 }
-
+import google.cloud.logging
+client = google.cloud.logging.Client()
+env = "production"
 # Local env.
 LOGGING = {
     'version': 1,
@@ -171,6 +174,22 @@ LOGGING = {
         },
     },
     'handlers': {
+        'cloudlogging': {
+            'class': 'google.cloud.logging.handlers.StructuredLogHandler',
+            'client': client,
+            'name': 'userport-django-app',
+            'labels': {
+                'environment': 'production',
+                'application': 'userport-django-app'
+            },
+            'severity_map': {
+                'DEBUG': 'DEBUG',
+                'INFO': 'INFO',
+                'WARNING': 'WARNING',
+                'ERROR': 'ERROR',
+                'CRITICAL': 'CRITICAL'
+            }
+        },
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose'
@@ -178,38 +197,38 @@ LOGGING = {
     },
     'loggers': {
         'permissions': {
-            'handlers': ['console'],
+            'handlers': ['cloudlogging'],
             'level': 'INFO',
             'propagate': False,
         },
         'django.db.backends': {
-            'handlers': ['console'],
+            'handlers': ['cloudlogging'],
             'level': 'WARNING',
             'propagate': False,
         },
         'django.db.backends.schema': {
-            'handlers': ['console'],
+            'handlers': ['cloudlogging'],
             'level': 'WARNING',
             'propagate': False,
         },
         'django.db.models': {
-            'handlers': ['console'],
+            'handlers': ['cloudlogging'],
             'level': 'INFO',
             'propagate': False,
         },
         'django.urls': {
-            'handlers': ['console'],
+            'handlers': ['cloudlogging'],
             'level': 'DEBUG',
             'propagate': True,
         },
         'health': {
-            'handlers': [ 'console'],
+            'handlers': ['cloudlogging'],
             'level': 'WARNING',
             'propagate': True,
         }
     },
     'root': {
-        'handlers': ['console'],
+        'handlers': ['cloudlogging'],
         'level': 'DEBUG',
     },
 }
