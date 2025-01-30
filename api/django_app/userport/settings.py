@@ -160,136 +160,59 @@ DATABASES = {
     }
 }
 
-if os.path.exists('.dev.env'):
-    # Local env.
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'verbose': {
-                'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-                'style': '{',
-            },
+# Local env.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
         },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'verbose'
-            },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
         },
-        'loggers': {
-            'permissions': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'INFO',
-                'propagate': False,
-            },
-            'django.db.backends': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'WARNING',
-                'propagate': False,
-            },
-            'django.db.backends.schema': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'WARNING',
-                'propagate': False,
-            },
-            'django.db.models': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'INFO',
-                'propagate': False,
-            },
-            'django.urls': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'DEBUG',
-                'propagate': True,
-            },
-            'health': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'INFO',
-                'propagate': True,
-            }
-        },
-        'root': {
-            'handlers': ['cloud_logging_handler', 'console'],
-            'level': 'DEBUG',
-        },
-    }
-else:
-    # prod env, use Google Cloud Logging.
-    # reference: https://cloud.google.com/python/docs/reference/logging/latest/std-lib-integration.
-
-    # Imports the Cloud Logging client library
-    import google.cloud.logging
-
-    # Instantiates a client
-    client = google.cloud.logging.Client()
-
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'verbose': {
-                'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-                'style': '{',
-            },
-        },
-        'handlers': {
-            "cloud_logging_handler": {
-                "class": "google.cloud.logging.handlers.CloudLoggingHandler",
-                "client": client,
-                "name": "userport-django-app",
-                "labels": {
-                    "environment": "production",
-                    "application": "userport-django-app"
-                }
-            },
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'verbose'
-            },
-        },
-        'loggers': {
-            'permissions': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'INFO',
-                'propagate': False,
-            },
-            'django.db.backends': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'WARNING',
-                'propagate': False,
-            },
-            'django.db.backends.schema': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'WARNING',
-                'propagate': False,
-            },
-            'django.db.models': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'INFO',
-                'propagate': False,
-            },
-            'app': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'DEBUG',
-                'propagate': False,
-            },
-            'django.urls': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'DEBUG',
-                'propagate': False,
-            },
-            'health': {
-                'handlers': ['cloud_logging_handler', 'console'],
-                'level': 'WARNING',
-                'propagate': False,
-            }
-        },
-        'root': {
-            'handlers': ['cloud_logging_handler', 'console'],
+    },
+    'loggers': {
+        'permissions': {
+            'handlers': ['console'],
             'level': 'INFO',
+            'propagate': False,
         },
-    }
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.db.backends.schema': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.db.models': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.urls': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'health': {
+            'handlers': [ 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        }
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
