@@ -1,2 +1,3 @@
 from .tenant_middleware import TenantMiddleware
 from .firebase_auth_middleware import FirebaseAuthMiddleware
+from .request_logging import RequestLoggingMiddleware

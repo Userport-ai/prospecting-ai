@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import os
 from pathlib import Path
+from app.middleware import RequestLoggingMiddleware
 
 import google.cloud.logging
 from dotenv import load_dotenv
@@ -53,6 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'app.middleware.RequestLoggingMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -61,7 +63,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'app.middleware.TenantMiddleware',
-    'google.cloud.logging_v2.handlers.middleware.RequestMiddleware',  # Reference: https://cloud.google.com/python/docs/reference/logging/latest/web-framework-integration.
 ]
 
 # CORS Settings
@@ -216,6 +217,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'django.request': {
+            'handlers': ['cloudlogging'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'django.urls': {
             'handlers': ['cloudlogging'],
             'level': 'DEBUG',
@@ -229,7 +235,7 @@ LOGGING = {
     },
     'root': {
         'handlers': ['cloudlogging'],
-        'level': 'DEBUG',
+        'level': 'INFO',
     },
 }
 
