@@ -96,7 +96,7 @@ interface Evaluation {
   persona_match: string;
   matching_criteria: string[];
   recommended_approach: string;
-  analysis: string[];
+  overall_analysis: string[];
   rationale: string[];
 }
 
@@ -106,6 +106,7 @@ interface PersonalityInsights {
   areas_of_interest: AreaOfInterest[];
   engaged_colleagues: string[];
   recommended_approach: RecommendedApproach;
+  personalization_signals: PersonalizationSignal[];
 }
 
 export interface PersonalityTrait {
@@ -125,6 +126,12 @@ export interface RecommendedApproach {
   best_channels: string[];
   timing_preferences: string;
   conversation_starters: string[];
+}
+
+export interface PersonalizationSignal {
+  description: string;
+  reason: string;
+  outreach_message: string;
 }
 
 enum Source {

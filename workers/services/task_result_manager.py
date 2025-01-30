@@ -59,9 +59,7 @@ class TaskResultManager:
             raise ValueError("callback_payload must contain 'account_id'")
 
         # Convert entire payload to JSON
-        logger.debug(f"Callback payload to convert to JSON: {callback_payload}")
         payload_json = json.dumps(callback_payload, default=JSONUtils.serialize_datetime)
-        logger.debug(f"Converted callback payload to JSON: {payload_json}")
 
         status = str(callback_payload.get("status", "unknown"))
         now_ts = datetime.now(timezone.utc).isoformat()
@@ -76,11 +74,8 @@ class TaskResultManager:
             "updated_at": now_ts
         }
 
-        logger.debug(f"Row to insert: {row_to_insert}")
-
         # Insert the row
         table_ref = self.client.get_table(self.table_id)
-        logger.debug(f"Table ref: {table_ref}")
         errors = self.client.insert_rows_json(table_ref, [row_to_insert])
         if errors:
             logger.error(f"BigQuery insert errors: {errors}")

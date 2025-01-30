@@ -26,15 +26,18 @@ class LinkedInActivity(BaseModel):
     main_colleague_reason: Optional[str] = None
     processing_status: Optional[str] = None
 
+
 class LinkedInProfile(BaseModel):
     company_name: Optional[str] = None
     person_role_title: Optional[str] = None
     linkedin_url: Optional[str] = None
     last_activity_date: Optional[str] = None
 
+
 class PersonalityTraits(BaseModel):
     description: Optional[str] = None
     evidence: Optional[List[str]] = None
+
 
 class RecommendedApproach(BaseModel):
     approach: Optional[str] = None
@@ -44,13 +47,22 @@ class RecommendedApproach(BaseModel):
     timing_preferences: Optional[str] = None
     cautions: Optional[List[str]] = None
 
+
+class PersonalizationSignal(BaseModel):
+    description: Optional[str] = None
+    reason: Optional[str] = None
+    outreach_message: Optional[str] = None
+
+
 class AreaOfInterest(BaseModel):
     description: Optional[str] = None
     supporting_activities: Optional[List[str]] = None
 
+
 class EnrichmentMetadata(BaseModel):
     num_company_related_activities: Optional[int] = None
     last_enriched: str = Field(default_factory=lambda: datetime.now().isoformat())
+
 
 class PersonalityInsights(BaseModel):
     traits: Optional[PersonalityTraits] = None
@@ -58,6 +70,8 @@ class PersonalityInsights(BaseModel):
     areas_of_interest: Optional[List[AreaOfInterest]] = None
     engaged_colleagues: Optional[List[str]] = None
     engaged_products: Optional[List[str]] = None
+    personalization_signals: Optional[List[PersonalizationSignal]] = None
+
 
 class LinkedInEnrichmentData(BaseModel):
     metadata: Optional[EnrichmentMetadata]

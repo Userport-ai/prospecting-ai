@@ -7,6 +7,7 @@ import {
   AreaOfInterest,
   Lead as LeadRow,
   PersonalityTrait,
+  PersonalizationSignal,
   RecommendedApproach,
 } from "@/services/Leads";
 import { formatDate } from "@/common/utils";
@@ -15,6 +16,7 @@ import CellListView from "@/table/CellListView";
 import RecommendedApproachView from "./RecommendedApproachView";
 import AreasOfInterestView from "./AreasOfInterestView";
 import PersonalityTraitsView from "./PersonalityTraitsView";
+import PersonalizationSignalsView from "./PersonalizationSignalsView";
 
 // Base Lead Columns that we know will exist in the table and are statically defined.
 export const baseLeadColumns: ColumnDef<LeadRow>[] = [
@@ -224,7 +226,9 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         header: "Analysis",
         minSize: 200,
         accessorFn: (row) =>
-          row.custom_fields ? row.custom_fields.evaluation.analysis : null,
+          row.custom_fields
+            ? row.custom_fields.evaluation.overall_analysis
+            : null,
         meta: {
           displayName: "Analysis",
           visibleInitially: true,
@@ -329,6 +333,31 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
           return (
             <RecommendedApproachView
               recommendedApproach={recommendedApproach}
+            />
+          );
+        },
+        meta: {
+          displayName: "Recommended Approach",
+          visibleInitially: true,
+          cellExpandable: true,
+        } as CustomColumnMeta,
+      },
+      {
+        id: "personalization_signals",
+        header: "Personalization Signals",
+        accessorFn: (row) =>
+          row.custom_fields?.personality_insights?.personalization_signals ??
+          null,
+        cell: (info) => {
+          const personalizationSignals = info.getValue() as
+            | PersonalizationSignal[]
+            | null;
+          if (!personalizationSignals) {
+            return null;
+          }
+          return (
+            <PersonalizationSignalsView
+              personalizationSignals={personalizationSignals}
             />
           );
         },
