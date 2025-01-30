@@ -50,8 +50,8 @@ class RecommendedApproach(BaseModel):
 
 class PersonalizationSignal(BaseModel):
     description: Optional[str] = None
-    reason: Optional[List[str]] = None
-    outreach_message: Optional[List[str]] = None
+    reason: Optional[str] = None
+    outreach_message: Optional[str] = None
 
 
 class AreaOfInterest(BaseModel):
