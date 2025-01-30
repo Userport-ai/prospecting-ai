@@ -153,7 +153,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             )
 
             # Select product associated with given Account.
-            product = Product.objects.get(id=lead.account.product)
+            product = Product.objects.get(id=lead.account.product.id)
 
             if (not pk) or (not lead.linkedin_url):
                 return Response(
@@ -166,8 +166,8 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             comments_html = request.data.get('comments_html', '')
             reactions_html = request.data.get('reactions_html', '')
 
-            logger.debug(f"Lead for request ID {pk} : {lead}")
-            logger.debug(f"product for request ID: {pk} : {product}")
+            logger.debug(f"Lead for request ID {pk} : {lead.__dict__}")
+            logger.debug(f"product for request ID: {pk} : {product.__dict__}")
 
             # Prepare payload for worker service
             payload = {
