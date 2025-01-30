@@ -6,7 +6,7 @@ from django.utils.deprecation import MiddlewareMixin
 
 
 class RequestLoggingMiddleware(MiddlewareMixin):
-    def _init_(self, get_response):
+    def __init__(self, get_response):
         super().__init__(get_response)
         self.logger = logging.getLogger('django.request')
 
