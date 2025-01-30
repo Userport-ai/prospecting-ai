@@ -277,12 +277,12 @@ else:
             'django.urls': {
                 'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'DEBUG',
-                'propagate': True,
+                'propagate': False,
             },
             'health': {
                 'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'INFO',
-                'propagate': True,
+                'propagate': False,
             }
         },
         'root': {
