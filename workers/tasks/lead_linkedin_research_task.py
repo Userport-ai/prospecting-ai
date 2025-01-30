@@ -56,6 +56,8 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
             "comments_html": kwargs.get("comments_html"),
             "reactions_html": kwargs.get("reactions_html"),
             "research_request_type": kwargs.get("research_request_type", "linkedin_only"),
+            "lead": kwargs.get("lead"),
+            "product": kwargs.get("product"),
             "job_id": kwargs.get("job_id"),
             "origin": "extension",
             "user_id": kwargs.get("user_id"),
@@ -152,7 +154,9 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
                 company_description="",
                 person_role_title="",
                 person_about_me="",
-                content_details=content_details
+                content_details=content_details,
+                lead=payload.get("lead"),
+                product=payload.get("product")
             )
 
             # Store results
@@ -291,7 +295,9 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
             company_description: str,
             person_role_title: str,
             person_about_me: str,
-            content_details: List[ContentDetails]
+            content_details: List[ContentDetails],
+            lead: Optional[Dict[str, Any]] = None,
+            product: Optional[Dict[str, Any]] = None,
     ) -> Optional[LeadResearchReport.Insights]:
         """Generate insights from processed content."""
         try:
@@ -301,7 +307,9 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
                 company_name=company_name,
                 company_description=company_description,
                 person_role_title=person_role_title,
-                person_about_me=person_about_me
+                person_about_me=person_about_me,
+                lead=lead,
+                product=product
             )
 
             return await insights_generator.generate(all_content_details=content_details)

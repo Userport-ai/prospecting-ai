@@ -132,6 +132,12 @@ class LeadResearchReport(UserportPydanticBaseModel):
             timing_preferences: str = Field(description="When they seem most active/responsive")
             cautions: List[str] = Field(description="Topics or approaches to avoid if any")
 
+        class PersonalizationSignal(BaseModel):
+            description: Optional[str] = Field(default=None)
+            reason: Optional[str] = Field(default=None)
+            outreach_message: Optional[str] = Field(default=None)
+
+        personalization_signals: Optional[List[PersonalizationSignal]] = Field(default=None)
         recommended_approach: Optional["LeadResearchReport.Insights.OutreachRecommendation"] = Field(default=None)
 
         personality_traits: Optional[PersonalityTraits] = Field(default=None)

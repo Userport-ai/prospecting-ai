@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from app.apis.common.base import TenantScopedViewSet
 from app.apis.leads.lead_generation_mixin import LeadGenerationMixin
-from app.models import UserRole, Lead, Account, EnrichmentStatus
+from app.models import UserRole, Lead, Account, EnrichmentStatus, Product
 from app.models.serializers.lead_serializers import (
     LeadDetailsSerializer,
     LeadBulkCreateSerializer
@@ -19,12 +19,13 @@ from app.services.worker_service import WorkerService
 
 logger = logging.getLogger(__name__)
 
+
 class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = LeadDetailsSerializer
     queryset = Lead.objects.all()
     http_method_names = ['get', 'post', 'patch', 'delete']
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields =['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status']
+    filterset_fields = ['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status']
     ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at', 'score']
     ordering = ['-score']  # Default sorting
 
@@ -151,6 +152,9 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 tenant=request.tenant
             )
 
+            # Select product associated with given Account.
+            product = Product.objects.get(id=lead.account.id)
+
             if (not pk) or (not lead.linkedin_url):
                 return Response(
                     {"error": "Lead must have both ID and LinkedIn URL for enrichment"},
@@ -161,6 +165,9 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             posts_html = request.data.get('posts_html', '')
             comments_html = request.data.get('comments_html', '')
             reactions_html = request.data.get('reactions_html', '')
+
+            logger.debug(f"Lead for request ID {pk} : {lead}")
+            logger.debug(f"product for request ID: {pk} : {product}")
 
             # Prepare payload for worker service
             payload = {
@@ -173,6 +180,8 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 "comments_html": comments_html,
                 "reactions_html": reactions_html,
                 "research_request_type": "linkedin_only",
+                "lead": lead,
+                "product": product,
                 "job_id": f"linkedin_research_{str(lead.id)}",
                 "origin": "api",
                 "user_id": str(request.user.id),
