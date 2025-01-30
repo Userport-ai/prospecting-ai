@@ -131,7 +131,7 @@ class LeadInsights:
 
             if self.lead and self.product:
                 # Find personalization signals.
-                signals = self._provide_personalization_signals(content_details=all_content_details)
+                signals = await self._provide_personalization_signals(content_details=all_content_details)
                 insights.personalization_signals = [LeadResearchReport.Insights.PersonalizationSignal(description=signal.get(
                     "description"), reason=signal.get("reason"), outreach_message=signal.get("outreach_message")) for signal in signals]
                 logger.debug(f"Provided personalization signals for {self.person_name}: company name: {self.company_name}")
