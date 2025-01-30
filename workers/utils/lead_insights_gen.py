@@ -36,7 +36,9 @@ class LeadInsights:
             company_name: str,
             company_description: str,
             person_role_title: str,
-            person_about_me: Optional[str] = None
+            person_about_me: Optional[str] = None,
+            lead: Optional[Dict[str, Any]] = None,
+            product: Optional[Dict[str, Any]] = None
     ):
         """Initialize insights generator."""
         self.lead_research_report_id = lead_research_report_id
@@ -45,6 +47,8 @@ class LeadInsights:
         self.company_description = company_description
         self.person_role_title = person_role_title
         self.person_about_me = person_about_me or "Not available"
+        self.lead = lead
+        self.product = product
 
         self.GEMINI_API_TOKEN = os.getenv("GEMINI_API_TOKEN")
         if not self.GEMINI_API_TOKEN:
@@ -125,6 +129,15 @@ class LeadInsights:
                 completion_tokens += outreach.get("completion_tokens", 0)
                 total_cost += outreach.get("cost", 0.0)
 
+            if self.lead and self.product:
+                # Find personalization signals.
+                signals = self._provide_personalization_signals(content_details=all_content_details)
+                insights.personalization_signals = [LeadResearchReport.Insights.PersonalizationSignal(description=signal.get(
+                    "description"), reason=signal.get("reason"), outreach_message=signal.get("outreach_message")) for signal in signals]
+                logger.debug(f"Provided personalization signals for {self.person_name}: company name: {self.company_name}")
+            else:
+                logger.debug(f"Skipping personalization signals since one of Lead or Product is None for {self.person_name}, company: {self.company_name}")
+
             # Store token usage
             total_tokens = prompt_tokens + completion_tokens
             insights.total_tokens_used = OpenAITokenUsage(
@@ -140,6 +153,53 @@ class LeadInsights:
         except Exception as e:
             logger.error(f"Error generating insights: {str(e)}", exc_info=True)
             return insights
+
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_provide_personalization_signals")
+    async def _provide_personalization_signals(self, content_details: List[ContentDetails]) -> Dict[str, Any]:
+        """Provide personalization signals for outreach."""
+        logger.debug(f"Provide personalization signals for {self.person_name} at {self.company_name}")
+        try:
+            prompt = f"""
+You are a Sales person who is tasked with outbound sales to a given prospect.
+You are super intelligent and recognize that the only way to get responses to cold outreach is by personalizing your outreach message to the prospect.
+The definition of a personalization is to take all the context associated with a Prospect and their Company and finding those pieces of information (also called signals or triggers) that can tie in the product you are selling in a very relevant way for the prospect. In your outreach, you will reference these signals to appear relevant to the Prospect.
+
+The signals or triggers that matter to the product you are selling can be found in the Sales playbook. It provides different outreach approaches depending on the signals found in the context associated with the Prospect.
+
+Below we have provided all the context associated with the Prospect: their Professional profile, details about their Company, their recent Social media activities etc.
+We have also provided details about the Product you are selling and the associated Sales Playbook that encodes the personalization approach for different signals that could be found in the context.
+
+Using the Context and the Sales playbook as a guide, figure out the best signals that you can reference to make your outreach super personalized to the Prospect.
+Return as JSON:
+{{
+    "personalization_signals": [
+        {{
+            "description": string,
+            "reason": string (Feel free to cite a source as evidence),
+            "outreach_message" string (outreach message referencing the signal),
+        }}
+    ]
+}}
+
+````
+## Context
+
+### Prospect and their Company's Details
+{self.lead}
+
+### Prospect's engagement on LinkedIn
+{[cd.model_dump() for cd in content_details]}
+
+
+## Product and Sales Playbook Description
+{self.product}
+```
+            """
+            logger.info(f"Personalization Signals prompt: {prompt}")
+            return await self.model.generate_content(prompt)
+        except Exception as e:
+            logger.error(f"Error providing personalization signals for {self.person_name} at {self.company_name} with error: {str(e)}", exc_info=True)
+            return {}
 
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_analyze_outreach_approach")
     async def _analyze_outreach_approach(self, content_details: List[ContentDetails]) -> Dict[str, Any]:
