@@ -166,8 +166,36 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             comments_html = request.data.get('comments_html', '')
             reactions_html = request.data.get('reactions_html', '')
 
-            logger.debug(f"Lead for request ID {pk} : {lead.__dict__}")
-            logger.debug(f"product for request ID: {pk} : {product.__dict__}")
+            # Convert Django models to serializable dicts.
+            lead_clone = lead.__dict__.copy()
+            del lead_clone["_state"]
+            del lead_clone["created_at"]
+            del lead_clone["updated_at"]
+            del lead_clone["last_enriched_at"]
+            del lead_clone["id"]
+            del lead_clone["tenant_id"]
+            del lead_clone["account_id"]
+            del lead_clone["created_by_id"]
+
+            # add account info.
+            account_clone = lead.account.__dict__.copy()
+            del account_clone["_state"]
+            del account_clone["created_at"]
+            del account_clone["updated_at"]
+            del account_clone["last_enriched_at"]
+            del account_clone["id"]
+            del account_clone["tenant_id"]
+            del account_clone["product_id"]
+            del account_clone["created_by_id"]
+            lead_clone["account"] = account_clone
+
+            product_clone = product.__dict__.copy()
+            del product_clone["_state"]
+            del product_clone["created_at"]
+            del product_clone["updated_at"]
+            del product_clone["id"]
+            del product_clone["tenant_id"]
+            del product_clone["created_by_id"]
 
             # Prepare payload for worker service
             payload = {
@@ -180,8 +208,8 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 "comments_html": comments_html,
                 "reactions_html": reactions_html,
                 "research_request_type": "linkedin_only",
-                "lead": lead,
-                "product": product,
+                "lead": lead_clone,
+                "product": product_clone,
                 "job_id": f"linkedin_research_{str(lead.id)}",
                 "origin": "api",
                 "user_id": str(request.user.id),
