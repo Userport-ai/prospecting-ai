@@ -8,7 +8,7 @@ from django.utils.deprecation import MiddlewareMixin
 class RequestLoggingMiddleware(MiddlewareMixin):
     def __init__(self, get_response):
         super().__init__(get_response)
-        self.logger = logging.getLogger('django.request')
+        self.logger = logging.getLogger('middleware.request')
 
     def process_request(self, request):
         # Debug level for detailed request information

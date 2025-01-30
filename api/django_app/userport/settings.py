@@ -160,7 +160,7 @@ DATABASES = {
         'DEFAULT_SCHEMA': 'public'
     }
 }
-import google.cloud.logging
+
 client = google.cloud.logging.Client()
 env = "production"
 # Local env.
@@ -216,7 +216,7 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'django.request': {
+        'middleware.request': {
             'handlers': ['cloudlogging'],
             'level': 'INFO',
             'propagate': False,
