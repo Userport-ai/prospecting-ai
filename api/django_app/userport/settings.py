@@ -204,7 +204,7 @@ LOGGING = {
         },
         'health': {
             'handlers': [ 'console'],
-            'level': 'INFO',
+            'level': 'WARNING',
             'propagate': True,
         }
     },
