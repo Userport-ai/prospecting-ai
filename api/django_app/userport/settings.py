@@ -228,7 +228,7 @@ else:
     # you're running in and integrates the handler with the
     # Python logging module. By default this captures all logs
     # at INFO level and higher
-    client.setup_logging()
+    client.setup_logging(log_level=DEBUG)
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
