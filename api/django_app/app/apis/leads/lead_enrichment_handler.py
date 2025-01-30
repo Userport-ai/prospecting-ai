@@ -14,6 +14,7 @@ from app.models.enrichment.lead_linkedin_research import (
 
 logger = logging.getLogger(__name__)
 
+
 class LeadEnrichmentHandler:
     """Handler for processing individual lead enrichment data from LinkedIn"""
 
@@ -81,7 +82,8 @@ class LeadEnrichmentHandler:
                     recommended_approach=insights.get('recommended_approach'),
                     areas_of_interest=insights.get('areas_of_interest'),
                     engaged_colleagues=insights.get('engaged_colleagues'),
-                    engaged_products=insights.get('engaged_products')
+                    engaged_products=insights.get('engaged_products'),
+                    personalization_signals=insights.get('personalization_signals')
                 ).dict(exclude_none=True)
 
                 # Update or merge enrichment_data
