@@ -179,38 +179,38 @@ if os.path.exists('.dev.env'):
         },
         'loggers': {
             'permissions': {
-                'handlers': ['console'],
+                'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.db.backends': {
-                'handlers': ['console'],
+                'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.backends.schema': {
-                'handlers': ['console'],
+                'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'WARNING',
                 'propagate': False,
             },
             'django.db.models': {
-                'handlers': ['console'],
+                'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'INFO',
                 'propagate': False,
             },
             'django.urls': {
-                'handlers': ['console'],
+                'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'DEBUG',
                 'propagate': True,
             },
             'health': {
-                'handlers': ['console'],
+                'handlers': ['cloud_logging_handler', 'console'],
                 'level': 'INFO',
                 'propagate': True,
             }
         },
         'root': {
-            'handlers': ['console'],
+            'handlers': ['cloud_logging_handler', 'console'],
             'level': 'DEBUG',
         },
     }
@@ -224,11 +224,67 @@ else:
     # Instantiates a client
     client = google.cloud.logging.Client()
 
-    # Retrieves a Cloud Logging handler based on the environment
-    # you're running in and integrates the handler with the
-    # Python logging module. By default this captures all logs
-    # at INFO level and higher
-    client.setup_logging(log_level=DEBUG)
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+                'style': '{',
+            },
+        },
+        'handlers': {
+            "cloud_logging_handler": {
+                "class": "google.cloud.logging.handlers.CloudLoggingHandler",
+                "client": client,
+                "name": "userport-django-app",
+                "labels": {
+                    "environment": "production",
+                    "application": "userport-django-app"
+                }
+            },
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose'
+            },
+        },
+        'loggers': {
+            'permissions': {
+                'handlers': ['cloud_logging_handler', 'console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'django.db.backends': {
+                'handlers': ['cloud_logging_handler', 'console'],
+                'level': 'WARNING',
+                'propagate': False,
+            },
+            'django.db.backends.schema': {
+                'handlers': ['cloud_logging_handler', 'console'],
+                'level': 'WARNING',
+                'propagate': False,
+            },
+            'django.db.models': {
+                'handlers': ['cloud_logging_handler', 'console'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'django.urls': {
+                'handlers': ['cloud_logging_handler', 'console'],
+                'level': 'DEBUG',
+                'propagate': True,
+            },
+            'health': {
+                'handlers': ['cloud_logging_handler', 'console'],
+                'level': 'INFO',
+                'propagate': True,
+            }
+        },
+        'root': {
+            'handlers': ['cloud_logging_handler', 'console'],
+            'level': 'DEBUG',
+        },
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
