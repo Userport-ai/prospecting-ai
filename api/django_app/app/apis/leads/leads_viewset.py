@@ -153,7 +153,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             )
 
             # Select product associated with given Account.
-            product = Product.objects.get(id=lead.account.product)
+            product = Product.objects.get(id=lead.account.product.id)
 
             if (not pk) or (not lead.linkedin_url):
                 return Response(
