@@ -1,34 +1,20 @@
 import { PersonalizationSignal } from "@/services/Leads";
 
-const LabelValuePair: React.FC<{ label: string; value: any }> = ({
-  label,
-  value,
-}) => {
-  return (
-    <div className="flex flex-col gap-1">
-      <p className="text-md font-semibold">{label}</p>
-      {!Array.isArray(value) ? (
-        <p className="text-sm">{value}</p>
-      ) : (
-        value.map((v) => (
-          <p key={v} className="text-sm">
-            * {v}
-          </p>
-        ))
-      )}
-    </div>
-  );
-};
-
 const Signal: React.FC<{ signal: PersonalizationSignal }> = ({ signal }) => {
   return (
-    <div className="flex flex-col gap-1">
-      <LabelValuePair label="Signal" value={signal.description} />
-      <LabelValuePair label="Reason" value={signal.reason} />
-      <LabelValuePair
-        label="Outreach Message"
-        value={signal.outreach_message}
-      />
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col">
+        <p className="text-xl font-semibold">Signal</p>
+        <p className="text-md">{signal.description}</p>
+      </div>
+      <div className="flex flex-col">
+        <p className="text-md font-medium">Reason</p>
+        <p className="text-sm">{signal.reason}</p>
+      </div>
+      <div className="flex flex-col">
+        <p className="text-md font-medium">Outreach Message</p>
+        <p className="text-sm">{signal.outreach_message}</p>
+      </div>
     </div>
   );
 };
@@ -37,7 +23,7 @@ const PersonalizationSignalsView: React.FC<{
   personalizationSignals: PersonalizationSignal[];
 }> = ({ personalizationSignals }) => {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-8">
       {personalizationSignals.map((signal) => (
         <Signal key={signal.description} signal={signal} />
       ))}

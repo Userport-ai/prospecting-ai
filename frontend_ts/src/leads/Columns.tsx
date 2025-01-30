@@ -226,7 +226,9 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         header: "Analysis",
         minSize: 200,
         accessorFn: (row) =>
-          row.custom_fields ? row.custom_fields.evaluation.analysis : null,
+          row.custom_fields
+            ? row.custom_fields.evaluation.overall_analysis
+            : null,
         meta: {
           displayName: "Analysis",
           visibleInitially: true,

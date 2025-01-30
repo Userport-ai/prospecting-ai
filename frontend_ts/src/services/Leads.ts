@@ -96,7 +96,7 @@ interface Evaluation {
   persona_match: string;
   matching_criteria: string[];
   recommended_approach: string;
-  analysis: string[];
+  overall_analysis: string[];
   rationale: string[];
 }
 
