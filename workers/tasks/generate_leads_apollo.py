@@ -229,8 +229,8 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
             # Fetch employees with concurrent processing
             current_stage = 'fetching_employees'
-            raw_employee_data: List[ApolloLead] = await self._fetch_employees_concurrent(account_data['domain'])
-            self.metrics.total_leads_processed = len(raw_employee_data)
+            apollo_leads: List[ApolloLead] = await self._fetch_employees_concurrent(account_data['domain'])
+            self.metrics.total_leads_processed = len(apollo_leads)
 
             await self.callback_svc.send_callback(
                 job_id=job_id,
@@ -241,18 +241,18 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 completion_percentage=30,
                 processed_data={
                     'stage': current_stage,
-                    'employees_found': len(raw_employee_data)
+                    'employees_found': len(apollo_leads)
                 }
             )
 
             # Transform employees in batches
             current_stage = 'structuring_leads'
-            apollo_leads: List[EnrichedLead] = await self._process_leads_in_batches(
-                raw_employee_data,
+            enriched_leads: List[EnrichedLead] = await self._process_leads_in_batches(
+                apollo_leads,
                 self.config.batch_size,
                 self._transform_apollo_employee
             )
-            self.metrics.successful_leads = len(apollo_leads)
+            self.metrics.successful_leads = len(enriched_leads)
 
             await self.callback_svc.send_callback(
                 job_id=job_id,
@@ -263,23 +263,22 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 completion_percentage=50,
                 processed_data={
                     'stage': current_stage,
-                    'structured_leads': len(apollo_leads)
+                    'structured_leads': len(enriched_leads)
                 }
             )
 
             # Enrich leads further with ProxyCurl if enabled.
-            enriched_leads: List[EnrichedLead] = []
-            if self.config.enrich_leads and apollo_leads:
+            if self.config.enrich_leads and enriched_leads:
                 current_stage = 'enriching_leads'
                 try:
-                    enriched_leads = await self.proxycurl_service.enrich_leads(apollo_leads)
+                    enriched_leads = await self.proxycurl_service.enrich_leads(enriched_leads)
                     self.metrics.enriched_leads = len(enriched_leads)
                 except Exception as e:
                     logger.error(f"Lead enrichment failed: {str(e)}", exc_info=True)
                     self.metrics.enrichment_errors += 1
-                    enriched_leads = apollo_leads  # Fallback to non-enriched leads
+                    enriched_leads = enriched_leads  # Fallback to non-enriched leads
             else:
-                enriched_leads = apollo_leads
+                enriched_leads = enriched_leads
 
             await self.callback_svc.send_callback(
                 job_id=job_id,
@@ -618,7 +617,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             if apollo_employee.employment_history:
                 enriched_employee.other_employments = []
                 for apollo_employment in apollo_employee.employment_history:
-                    if apollo_employment.current:
+                    if apollo_employment.current and (apollo_employee.organization != None) and (apollo_employee.organization.name == apollo_employment.organization_name):
                         # Current Employment as marked by Apollo.
                         # Should be set to True only for one of the employments.
                         enriched_employee.current_employment = EnrichedLead.CurrentEmployment(
@@ -658,7 +657,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 last_enriched_at=datetime.now(tz=timezone.utc),
                 enrichment_sources=["apollo"],
                 data_quality=EnrichedLead.EnrichmentInfo.Quality(
-                    has_detailed_employment=enriched_employee.current_employment and enriched_employee.other_employments and len(enriched_employee.other_employments) > 0
+                    has_detailed_employment=(enriched_employee.current_employment != None and enriched_employee.other_employments != None and len(enriched_employee.other_employments) > 0)
                 )
             )
             return enriched_employee
@@ -909,3 +908,47 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             return "right_skewed"  # More high scores
         else:
             return "left_skewed"  # More low scores
+
+
+async def main():
+    leads_task = ApolloLeadsTask(None)
+
+    apollo_leads: List[ApolloLead] = await leads_task._fetch_employees_concurrent(domain="scrut.io")
+
+    logger.info(f"Got {len(apollo_leads)} apollo leads")
+
+    enriched_leads: List[EnrichedLead] = await leads_task._process_leads_in_batches(
+        apollo_leads,
+        leads_task.config.batch_size,
+        leads_task._transform_apollo_employee
+    )
+
+    # logger.info(f"Enriched Apollo leads: {[lead.model_dump() for lead in enriched_leads[:1]]}")
+    # lead = enriched_leads[1]
+    lead = list(filter(lambda l: l.linkedin_url == "http://www.linkedin.com/in/pratyushkukreja", enriched_leads))[0]
+    lead_dict = lead.model_dump()
+    # logger.info(f"Apollo lead transformed")
+
+    import pprint
+    import json
+    # print(json.dumps(lead_dict, indent=2, default=str))
+
+    logger.info(f"\n\n-----------------------\n\n")
+
+    proxycurl_enriched_leads: List[EnrichedLead] = await leads_task.proxycurl_service.enrich_leads([lead])
+    proxycurl_lead = proxycurl_enriched_leads[0]
+    proxycurl_dict = proxycurl_lead.model_dump()
+
+    print(json.dumps(proxycurl_dict, indent=2, default=str))
+
+
+if __name__ == "__main__":
+    import asyncio
+    import logging
+
+    logging.basicConfig(level=logging.DEBUG)
+
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    asyncio.run(main())

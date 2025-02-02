@@ -119,7 +119,7 @@ class ProxyCurlPersonProfile(UserportPydanticBaseModel):
 
     languages_and_proficiencies: Optional[List[Dict[str, Any]]] = None
     accomplishment_organisations: Optional[List[Dict[str, Any]]] = None
-    accomplishment_publications: Optional[Publication] = None
+    accomplishment_publications: Optional[List[Publication]] = None
     accomplishment_honors_awards: Optional[List[HonorAward]] = None
     accomplishment_patents: Optional[List[Dict[str, Any]]] = None
     accomplishment_courses: Optional[List[Dict[str, Any]]] = None
@@ -189,7 +189,7 @@ class ApolloLead(UserportPydanticBaseModel):
     twitter_url: Optional[str] = None
     github_url: Optional[str] = None
     facebook_url: Optional[str] = None
-    extrapolated_email_confidence: Optional[str] = None
+    extrapolated_email_confidence: Optional[float] = None
     headline: Optional[str] = None
     email: Optional[str] = Field(default=None, description="When not enriched, it is email_not_unlocked@domain.com otherwise email of lead.")
     organization_id: Optional[str] = None
@@ -276,7 +276,7 @@ class EnrichedLead(UserportPydanticBaseModel):
     class ContactInfo(UserportPydanticBaseModel):
         email: Optional[str] = None
         email_status: Optional[str] = Field(default=None, description="e.g. unavailable, extrapolated, verified etc.")
-        extrapolated_email_confidence: Optional[int] = Field(default=None, description="e.g. 0.54")
+        extrapolated_email_confidence: Optional[float] = Field(default=None, description="e.g. 0.54")
         phone_numbers: Optional[List[str]] = None
 
     class SocialProfiles(UserportPydanticBaseModel):
@@ -292,7 +292,6 @@ class EnrichedLead(UserportPydanticBaseModel):
     class EnrichmentInfo(UserportPydanticBaseModel):
         class Quality(UserportPydanticBaseModel):
             has_detailed_employment: Optional[bool] = None
-            proxycurl_has_fresher_data: Optional[bool] = None
 
         last_enriched_at: Optional[datetime] = None
         enrichment_sources: Optional[List[str]] = None
@@ -308,8 +307,8 @@ class EnrichedLead(UserportPydanticBaseModel):
 
     # Current role and history
     current_employment: Optional[CurrentEmployment] = Field(default=None)
-    organization: Optional[Organization] = None
     other_employments: Optional[List[Employment]] = Field(default=None)
+    organization: Optional[Organization] = None
 
     contact_info: Optional[ContactInfo] = None
     location: Optional[Location] = Field(default=None, description="Lead's location details.")
