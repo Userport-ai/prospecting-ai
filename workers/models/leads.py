@@ -63,6 +63,12 @@ class Project(BaseModel):
     ends_at: Optional[DateInfo] = None
 
 
+class LinkedInGroup(BaseModel):
+    profile_pic_url: Optional[str] = None
+    name: Optional[str] = None
+    url: Optional[str] = None
+
+
 class ProxyCurlPersonProfile(UserportPydanticBaseModel):
     class Experience(BaseModel):
         company: Optional[str] = None
@@ -130,7 +136,7 @@ class ProxyCurlPersonProfile(UserportPydanticBaseModel):
     activities: Optional[List[Activity]] = Field(default=None, description="Not guaranteed to return.")
     similarly_named_profiles: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     articles: Optional[List[Dict[str, Any]]] = Field(default=None, description="Not guaranteed to return.")
-    groups: Optional[List[Dict[str, Any]]] = Field(default=None, description="A list of LinkedIn groups that this user is a part of.")
+    groups: Optional[List[LinkedInGroup]] = Field(default=None, description="A list of LinkedIn groups that this user is a part of.")
     recommendations: Optional[List[str]] = Field(default=None, description="List of recommendations made by other users about this profile.")
 
     def get_latest_employment_start_date(self) -> Optional[datetime]:
@@ -138,6 +144,8 @@ class ProxyCurlPersonProfile(UserportPydanticBaseModel):
         if not self.experiences or len(self.experiences) == 0:
             return None
         experiences_with_start_date = list(filter(lambda exp: exp.starts_at is not None, self.experiences))
+        if len(experiences_with_start_date) == 0:
+            return None
         start_dates: List[datetime] = [datetime(exp.starts_at.year, exp.starts_at.month, exp.starts_at.day) for exp in experiences_with_start_date]
         return sorted(start_dates, reverse=True)[0]
 
@@ -318,12 +326,78 @@ class EnrichedLead(UserportPydanticBaseModel):
 
     # Education and skills
     education: Optional[List[Education]] = Field(default=None)
-    certifications: Optional[List[Certification]] = Field(default=None)
     projects: Optional[List[Project]] = Field(default=None)
     publications: Optional[List[Publication]] = Field(default=None)
+    groups: Optional[List[LinkedInGroup]] = Field(default=None)
+    certifications: Optional[List[Certification]] = Field(default=None)
     honor_awards: Optional[List[HonorAward]] = Field(default=None)
-    groups: Optional[List[Dict[str, Any]]] = Field(default=None)
     volunteer_work: Optional[List[Dict[str, Any]]] = Field(default=None)
     recommendations: Optional[List[str]] = Field(default=None)
 
     enrichment_info: Optional[EnrichmentInfo] = None
+
+    def get_lead_evaluation_serialization_fields(self) -> Dict[str, Any]:
+        """Fields that will be used to serialize lead during evaluation."""
+        return {
+            "id": True,
+            "name": True,
+            "headline": True,
+            "about": True,
+            "current_employment": {
+                "title": True,
+                "organization_name": True,
+                "description": True,
+                "start_date": True,
+                "seniority": True,
+                "departments": True,
+                "subdepartments": True,
+                "functions": True,
+                "location": True
+            },
+            "other_employments": {
+                "__all__": {
+                    "title": True,
+                    "organization_name": True,
+                    "description": True,
+                    "start_date": True,
+                    "end_date": True,
+                    "location": True
+                }
+            },
+            "location": {
+                "city": True,
+                "state": True,
+                "country": True
+            },
+            "publications": {
+                "__all__": {
+                    "name": True,
+                    "description": True,
+                    "publisher": True,
+                    "published_on": True
+                }
+            },
+            "projects": {
+                "__all__": {
+                    "title": True,
+                    "description": True,
+                    "starts_at": True,
+                    "ends_at": True
+                }
+            },
+            "groups": {
+                "__all__": {
+                    "name": True
+                }
+            },
+            "certifications": {
+                "__all__": {
+                    "name": True,
+                    "authority": True,
+                    "starts_at": True,
+                    "ends_at": True
+                }
+            },
+            "honor_awards": True,
+            "recommendations": True
+        }
