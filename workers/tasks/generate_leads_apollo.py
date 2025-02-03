@@ -119,6 +119,57 @@ class PromptTemplates:
 }}
     """
 
+    LEAD_EVALUATION_PROMPT_V2 = """
+You're a highly intelligent B2B Sales Development Representative tasked with evaluating leads that are the best fit for the Product you are selling.
+
+You will be provided the following inputs delimited by triple quotes below:
+1. Description of the Product you are selling.
+2. Role titles of the Target Personas that need your Product.
+3. Additional Signals (for example Keywords or events) that you makes a Lead more relevant to your Product.
+4. The Profiles of Leads you need to evaluate.
+
+Your goal is to look for the Signals provided in these Inputs within each Leads's profile to evaluate how good of a match they are for your product.
+Here are some more guidelines to follow:
+*. Evaluate each lead independently, without referring to the other leads.
+*. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit and 0 indicates no alignment.
+*. The more Signals you find in the Lead's profile that are relevant to your Product, the higher their score.
+*. Consider their role titles in conjunction with the content including their background, about them, role descriptions, other employments provided before deciding on persona fit. Often titles are abstract and may not describe their role comprehensively.
+*. Rationale should highlight and cit the specific Signals from the Lead's Profile that supports the score. If there are no Signals, say "No Signals found".
+*. If the Lead has a high Fit Score, assign a Persona Type (one of end_user, influencer or buyer) to them else set Persona Type to null. Use the Role Titles in the Target Personas input to figure out whether the Lead is a Buyer, Influencer or an End User Persona Type for your Product.
+*. The date today is {date_now}. Use it compute any time related Signals (e.g. Recent Lead promotion, joining company etc.) that might be relevant.
+
+Evaluate each lead and return a JSON response with this structure:
+{{
+    "evaluated_leads": [
+        {{
+            "id": string,
+            "fit_score": number (0-100),
+            "rationale": string,
+            "matching_signals": [string],
+            "persona_match": string or null,
+        }}
+    ]
+}}
+1. Return ONLY valid JSON without codeblocks, additional comments or anything else.
+2. If a field is not available, use null.
+3. Do not include any other information or pleasantries or anything else outside the JSON.
+
+\"\"\"
+Product Description:
+{product_description}
+
+Role Titles of Target Personas:
+{persona_role_titles}
+
+Additional Signals:
+{additional_signals}
+
+Lead Profiles:
+{lead_profiles}
+
+\"\"\"
+"""
+
 
 class ApolloLeadsTask(AccountEnrichmentTask):
     """Task for identifying potential leads using Apollo API, ProxyCurl enrichment and AI analysis."""
