@@ -127,6 +127,7 @@ class StreamingCallbackHandler:
                             'last_name': lead.get('last_name'),
                             'full_name': lead.get('full_name'),
                             'headline': lead.get('headline'),
+                            'about': lead.get('about'),
                             'linkedin_url': lead.get('linkedin_url'),
 
                             # Contact information
@@ -156,6 +157,13 @@ class StreamingCallbackHandler:
                                 'state': lead.get('location', {}).get('state'),
                                 'country': lead.get('location', {}).get('country'),
                             },
+
+                            'education': lead.get('education'),
+                            'projects': lead.get('projects'),
+                            'publications': lead.get('publications'),
+                            'groups': lead.get('groups'),
+                            'certifications': lead.get('certifications'),
+                            'honor_awards': lead.get('honor_awards'),
 
                             # Professional history
                             'social_profiles': lead.get('social_profiles'),
@@ -223,6 +231,7 @@ class StreamingCallbackHandler:
                 # Base profile info
                 'linkedin_url': lead_data.get('linkedin_url'),
                 'headline': lead_data.get('headline'),
+                'about': lead_data.get('about'),
                 'location': lead_data.get('location'),
                 'current_employment': lead_data.get('current_employment'),
                 'organization': lead_data.get('organization'),
@@ -230,9 +239,16 @@ class StreamingCallbackHandler:
                 # Contact info
                 'contact_info': lead_data.get('contact_info'),
 
+                'education': lead_data.get('education'),
+                'projects': lead_data.get('projects'),
+                'publications': lead_data.get('publications'),
+                'groups': lead_data.get('groups'),
+                'certifications': lead_data.get('certifications'),
+                'honor_awards': lead_data.get('honor_awards'),
+
                 # Professional details
                 'social_profiles': lead_data.get('social_profiles'),
-                'employment_history': lead_data.get('employment_history'),
+                'employment_history': lead_data.get('other_employments'),
 
                 # Data quality
                 'data_quality': lead_data.get('data_quality'),

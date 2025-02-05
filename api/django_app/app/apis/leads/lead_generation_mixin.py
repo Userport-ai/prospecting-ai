@@ -18,7 +18,8 @@ class LeadGenerationMixin:
                 "description": account.product.description,
                 "icp_description": account.product.icp_description,
                 "persona_role_titles": account.product.persona_role_titles,
-                "additional_lead_signals": account.product.playbook_description
+                # TODO: This is hack, fix by adding a new column to table.
+                "additional_lead_signals": account.product.playbook_description.split("---")[0],
             },
             "tenant_id": str(account.tenant.id)
         }

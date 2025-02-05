@@ -56,8 +56,7 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
             "comments_html": kwargs.get("comments_html"),
             "reactions_html": kwargs.get("reactions_html"),
             "research_request_type": kwargs.get("research_request_type", "linkedin_only"),
-            "lead": kwargs.get("lead"),
-            "product": kwargs.get("product"),
+            "input_data": kwargs.get("input_data"),
             "job_id": kwargs.get("job_id"),
             "origin": "extension",
             "user_id": kwargs.get("user_id"),
@@ -77,6 +76,7 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
         company_name = payload.get('company_name')
         person_linkedin_url = payload.get('person_linkedin_url')
         user_id = payload.get('user_id')
+        input_data = payload.get("input_data")
         self.posts_html = payload.get('posts_html')
         self.comments_html = payload.get('comments_html')
         self.reactions_html = payload.get('reactions_html')
@@ -155,8 +155,7 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
                 person_role_title="",
                 person_about_me="",
                 content_details=content_details,
-                lead=payload.get("lead"),
-                product=payload.get("product")
+                input_data=input_data
             )
 
             # Store results
@@ -296,8 +295,7 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
             person_role_title: str,
             person_about_me: str,
             content_details: List[ContentDetails],
-            lead: Optional[Dict[str, Any]] = None,
-            product: Optional[Dict[str, Any]] = None,
+            input_data: Optional[Dict[str, Any]] = None,
     ) -> Optional[LeadResearchReport.Insights]:
         """Generate insights from processed content."""
         try:
@@ -308,8 +306,7 @@ class LeadLinkedInResearchTask(AccountEnrichmentTask):
                 company_description=company_description,
                 person_role_title=person_role_title,
                 person_about_me=person_about_me,
-                lead=lead,
-                product=product
+                input_data=input_data
             )
 
             return await insights_generator.generate(all_content_details=content_details)

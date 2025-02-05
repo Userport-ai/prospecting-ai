@@ -4,6 +4,44 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 
+class LinkedInResearchInputData(BaseModel):
+    class LeadData(BaseModel):
+        name: Optional[str] = None
+        headline: Optional[str] = None
+        about: Optional[str] = None
+        location: Optional[Dict[str, Any]] = None
+        current_employment: Optional[Dict[str, Any]] = None
+        employment_history: Optional[List[Dict[str, Any]]] = None
+        education: Optional[List[Dict[str, Any]]] = None
+        projects: Optional[List[Dict[str, Any]]] = None
+        publications: Optional[List[Dict[str, Any]]] = None
+        groups: Optional[List[Dict[str, Any]]] = None
+        certifications: Optional[List[Dict[str, Any]]] = None
+        honor_awards: Optional[List[Dict[str, Any]]] = None
+
+    class AccountData(BaseModel):
+        name: Optional[str] = None
+        industry: Optional[str] = None
+        location: Optional[str] = None
+        employee_count: Optional[int] = None
+        company_type: Optional[str] = None
+        founded_year: Optional[int] = None
+        technologies: Optional[List[str]] = None
+        competitors: Optional[List[str]] = None
+        customers: Optional[List[str]] = None
+        funding_details: Optional[Dict[str, Any]] = None
+
+    class ProductData(BaseModel):
+        name: Optional[str] = None
+        description: Optional[str] = None
+        persona_role_titles: Optional[Dict[str, Any]] = None
+        playbook_description: Optional[str] = None
+
+    lead_data: Optional[LeadData] = None
+    account_data: Optional[AccountData] = None
+    product_data: Optional[ProductData] = None
+
+
 class LinkedInActivity(BaseModel):
     type: Optional[str] = None
     date: Optional[str] = None

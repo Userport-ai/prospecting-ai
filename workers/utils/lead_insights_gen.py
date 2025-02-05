@@ -1,6 +1,8 @@
 import logging
 import os
+import json
 from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
 
 from google.api_core.exceptions import ResourceExhausted
 
@@ -37,8 +39,7 @@ class LeadInsights:
             company_description: str,
             person_role_title: str,
             person_about_me: Optional[str] = None,
-            lead: Optional[Dict[str, Any]] = None,
-            product: Optional[Dict[str, Any]] = None
+            input_data: Optional[Dict[str, Any]] = None,
     ):
         """Initialize insights generator."""
         self.lead_research_report_id = lead_research_report_id
@@ -47,8 +48,7 @@ class LeadInsights:
         self.company_description = company_description
         self.person_role_title = person_role_title
         self.person_about_me = person_about_me or "Not available"
-        self.lead = lead
-        self.product = product
+        self.input_data = input_data
 
         self.GEMINI_API_TOKEN = os.getenv("GEMINI_API_TOKEN")
         if not self.GEMINI_API_TOKEN:
@@ -129,14 +129,14 @@ class LeadInsights:
                 completion_tokens += outreach.get("completion_tokens", 0)
                 total_cost += outreach.get("cost", 0.0)
 
-            if self.lead and self.product:
-                # Find personalization signals.
+            if self.input_data:
+                # Recommend personalization signals.
                 signals_response = await self._provide_personalization_signals(content_details=all_content_details)
-                if "personalization_signals" in signals_response:
-                    signals = signals_response["personalization_signals"]
+                if "personalizations" in signals_response:
+                    signals = signals_response["personalizations"]
                     logger.debug(f"For person: {self.person_name}, company name: {self.company_name}, Signals found are: {signals}")
                     insights.personalization_signals = [LeadResearchReport.Insights.PersonalizationSignal(description=signal.get(
-                        "description"), reason=signal.get("reason"), outreach_message=signal.get("outreach_message")) for signal in signals]
+                        "signal"), reason=signal.get("reason"), outreach_message=signal.get("personalized_outreach_message")) for signal in signals]
                     logger.debug(f"Provided personalization signals for {self.person_name}: company name: {self.company_name}")
                 else:
                     logger.debug(f"Personalization signals missing for {self.person_name}: comapny name: {self.company_name} in response: {signals_response}")
@@ -163,42 +163,55 @@ class LeadInsights:
     async def _provide_personalization_signals(self, content_details: List[ContentDetails]) -> Dict[str, Any]:
         """Provide personalization signals for outreach."""
         logger.debug(f"Provide personalization signals for {self.person_name} at {self.company_name}")
+        lead_data = json.dumps(self.input_data.get('lead_data'), indent=2)
+        account_data = json.dumps(self.input_data.get('account_data'), indent=2)
+        product_data = json.dumps(self.input_data.get('product_data'), indent=2)
+        date_now = datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
+        lead_engagements = json.dumps([cd.model_dump() for cd in content_details], indent=2)
         try:
             prompt = f"""
-You are a Sales person who is tasked with outbound sales to a given prospect.
-You are super intelligent and recognize that the only way to get responses to cold outreach is by personalizing your outreach message to the prospect.
-The definition of a personalization is to take all the context associated with a Prospect and their Company and finding those pieces of information (also called signals or triggers) that can tie in the product you are selling in a very relevant way for the prospect. In your outreach, you will reference these signals to appear relevant to the Prospect.
+You're a highly intelligent B2B Sales Development Representative tasked with performing outreach for Leads.
 
-The signals or triggers that matter to the product you are selling can be found in the Sales playbook. It provides different outreach approaches depending on the signals found in the context associated with the Prospect.
+You recognize that the only way to get responses to outreach is by personalizing your outreach message to the Lead.
+The definition of a personalization is to find the best Signals associated with a Lead or their Company that can make your product very relevant way to them.
 
-Below we have provided all the context associated with the Prospect: their Professional profile, details about their Company, their recent Social media activities etc.
-We have also provided details about the Product you are selling and the associated Sales Playbook that encodes the personalization approach for different signals that could be found in the context.
+You will be provided the following inputs delimited by triple quotes below:
+1. Details of the Product you are selling including its description, Target Personas and a Sales Playbook with guidelines for Outreach.
+2. Details of the Lead's Company including Technologies used, their Competitors, their Customers, Employee Count etc.
+3. Details of the Lead including Current employment, Description of Role, Employment history, Education, Projects etc.
+4. Details of recent LinkedIn Activities that the Lead has engaged with i.e. has posted, reposted, commented or liked.
 
-Using the Context and the Sales playbook as a guide, figure out the best signals that you can reference to make your outreach super personalized to the Prospect.
+Your goal is to use the Sales Playbook to identify the best Signals in the Lead or their Company and craft a personalized message using the specific guideline provided in the Playbook.
+The date today is {date_now}. Use it compute any time related Signals (e.g. Recent Lead promotion, Joining company, Anniversary at Company etc.) that might be relevant.
+
 Return as JSON:
 {{
-    "personalization_signals": [
+    "personalizations": [
         {{
-            "description": string,
-            "reason": string (Feel free to cite a source as evidence),
-            "outreach_message" string (outreach message referencing the signal),
+            "signal": string (Cite the Signal used),
+            "reason": string (Explain why this Signal was chosen),
+            "personalized_outreach_message" string,
         }}
     ]
 }}
+1. Return ONLY valid JSON without codeblocks, additional comments or anything else.
+2. If a field is not available, use null.
+3. Do not include any other information or pleasantries or anything else outside the JSON.
 
-````
-## Context
+\"\"\"
+Product Details:
+{product_data}
 
-### Prospect and their Company's Details
-{self.lead}
+Lead's Company Details:
+{account_data}
 
-### Prospect's engagement on LinkedIn
-{[cd.model_dump() for cd in content_details]}
+Lead Details:
+{lead_data}
 
+### Lead's engagement on LinkedIn
+{lead_engagements}
 
-## Product and Sales Playbook Description
-{self.product}
-```
+\"\"\"
             """
             logger.info(f"Personalization Signals prompt: {prompt}")
             return await self.model.generate_content(prompt)
