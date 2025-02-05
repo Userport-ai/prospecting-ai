@@ -94,7 +94,8 @@ interface CustomFields {
 interface Evaluation {
   fit_score: number;
   persona_match: string;
-  matching_criteria: string[];
+  matching_criteria?: string[];
+  matching_signals?: string[];
   recommended_approach: string;
   overall_analysis: string[];
   rationale: string[];

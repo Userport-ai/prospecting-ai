@@ -46,6 +46,19 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
   onParsingSuccess,
   onParsingError,
 }) => {
+  const getMatchingSignals = (lead: Lead): string | null => {
+    if (!lead.custom_fields || !lead.custom_fields.evaluation) {
+      return null;
+    }
+    const matchingCriteria = lead.custom_fields.evaluation.matching_criteria;
+    const matchingSignals = lead.custom_fields.evaluation.matching_signals;
+    if (matchingSignals) {
+      return matchingSignals.join(", ");
+    } else if (matchingCriteria) {
+      return matchingCriteria.join(", ");
+    }
+    return null;
+  };
   return (
     <div className={cn("flex flex-col gap-4", startParsing ? "hidden" : "")}>
       <div className="flex justify-between items-center">
@@ -125,13 +138,7 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                       ? lead.custom_fields.evaluation.rationale
                       : null}
                   </TableCell>
-                  <TableCell>
-                    {lead.custom_fields
-                      ? lead.custom_fields.evaluation.matching_criteria.join(
-                          ", "
-                        )
-                      : null}
-                  </TableCell>
+                  <TableCell>{getMatchingSignals(lead)}</TableCell>
                   {selectedLeads.has(lead.id) && (
                     <LeadActivityParser
                       leadId={lead.id}
