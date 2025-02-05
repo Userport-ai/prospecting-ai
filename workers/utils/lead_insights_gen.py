@@ -167,7 +167,7 @@ class LeadInsights:
         account_data = json.dumps(self.input_data.get('account_data'), indent=2)
         product_data = json.dumps(self.input_data.get('product_data'), indent=2)
         date_now = datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
-        lead_engagements = json.dumps([cd.model_dump() for cd in content_details], indent=2)
+        lead_engagements = json.dumps([cd.model_dump() for cd in content_details], indent=2, default=str)
         try:
             prompt = f"""
 You're a highly intelligent B2B Sales Development Representative tasked with performing outreach for Leads.
