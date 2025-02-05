@@ -15,7 +15,7 @@ from services.jina_service import JinaService
 from services.proxycurl_service import ProxyCurlService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
-from models.leads import ApolloLead, SearchApolloLeadsResponse, EnrichedLead
+from models.leads import ApolloLead, SearchApolloLeadsResponse, EnrichedLead, EvaluateLeadsResult, EvaluatedLead
 from .enrichment_task import AccountEnrichmentTask
 
 logger = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ You're a highly intelligent B2B Sales Development Representative tasked with eva
 You will be provided the following inputs delimited by triple quotes below:
 1. Description of the Product you are selling.
 2. Role titles of the Target Personas that need your Product.
-3. Additional Signals (for example Keywords or events) that you makes a Lead more relevant to your Product.
+3. Additional Signals (for example Keywords or events) that makes a Lead more relevant to your Product.
 4. The Profiles of Leads you need to evaluate.
 
 Your goal is to look for the Signals provided in these Inputs within each Leads's profile to evaluate how good of a match they are for your product.
@@ -346,22 +346,23 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
             # Evaluate leads
             current_stage = 'evaluating_leads'
-            evaluated_leads = await self._evaluate_leads(enriched_leads, product_data, account_data)
+            evaluated_leads = await self._evaluate_leads_v2(enriched_leads, product_data)
 
             # Store results with enhanced metadata
             current_stage = 'storing_results'
             self.metrics.processing_time = time.time() - start_time
 
             enriched_leads_dict_list: List[Dict[str, Any]] = [lead.model_dump() for lead in enriched_leads]
+            evaluated_leads_dict_list: List[Dict[str, Any]] = [lead.model_dump() for lead in evaluated_leads]
             await self._store_results(
                 job_id=job_id,
                 account_id=account_id,
                 structured_leads=enriched_leads_dict_list,  # Store enriched leads
-                evaluated_leads=evaluated_leads
+                evaluated_leads=evaluated_leads_dict_list
             )
 
-            score_distribution = self._calculate_score_distribution(evaluated_leads)
-            qualified_leads = [l for l in evaluated_leads if l['fit_score'] >= self.config.fit_score_threshold]
+            score_distribution = self._calculate_score_distribution(evaluated_leads_dict_list)
+            qualified_leads_dict_list = [l for l in evaluated_leads_dict_list if l['fit_score'] >= self.config.fit_score_threshold]
 
             result = {
                 'job_id': job_id,
@@ -373,8 +374,8 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 'processed_data': {
                     'score_distribution': score_distribution,
                     'structured_leads': enriched_leads_dict_list,
-                    'all_leads': evaluated_leads,
-                    'qualified_leads': qualified_leads,
+                    'all_leads': evaluated_leads_dict_list,
+                    'qualified_leads': qualified_leads_dict_list,
                     'metrics': asdict(self.metrics)
                 }
             }
@@ -383,8 +384,8 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 "status": "completed",
                 "job_id": job_id,
                 "account_id": account_id,
-                "total_leads_found": len(evaluated_leads),
-                "qualified_leads": len(qualified_leads),
+                "total_leads_found": len(evaluated_leads_dict_list),
+                "qualified_leads": len(qualified_leads_dict_list),
                 "score_distribution": score_distribution,
                 "metrics": asdict(self.metrics)
             }
@@ -705,7 +706,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             )
 
             enriched_employee.enrichment_info = EnrichedLead.EnrichmentInfo(
-                last_enriched_at=datetime.now(tz=timezone.utc),
+                last_enriched_at=datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d"),
                 enrichment_sources=["apollo"],
                 data_quality=EnrichedLead.EnrichmentInfo.Quality(
                     has_detailed_employment=(enriched_employee.current_employment != None and enriched_employee.other_employments != None and len(enriched_employee.other_employments) > 0)
@@ -790,6 +791,48 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         self.metrics.processing_time = time.time() - start_time
         return evaluated_leads
 
+    async def _evaluate_leads_v2(self, enriched_leads: List[EnrichedLead], product_data: Dict[str, Any]) -> List[EvaluatedLead]:
+        """Evaluate leads in batches with enhanced error handling."""
+        if not enriched_leads:
+            logger.warning("No enriched leads provided for evaluation")
+            return []
+
+        evaluated_leads: List[EvaluatedLead] = []
+        start_time = time.time()
+        for i in range(0, len(enriched_leads), self.config.ai_batch_size):
+            try:
+                batch_dict_list: List[Dict[str, Any]] = [lead.model_dump(include=lead.get_lead_evaluation_serialization_fields()) for lead in enriched_leads[i:i + self.config.ai_batch_size]]
+                evaluation_prompt = self.prompts.LEAD_EVALUATION_PROMPT_V2.format(
+                    product_description=product_data["description"],
+                    persona_role_titles=json.dumps(product_data.get('persona_role_titles'), indent=2),
+                    additional_signals=product_data.get('additional_lead_signals'),
+                    lead_profiles=json.dumps(batch_dict_list, indent=2),
+                    date_now=datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
+                )
+
+                response = await self.model.generate_content(
+                    prompt=evaluation_prompt,
+                    is_json=True,
+                    operation_tag="lead_evaluation"
+                )
+
+                if not response:
+                    logger.error(f"Empty response from AI for batch {i//self.config.ai_batch_size + 1}")
+                    self.metrics.ai_errors += 1
+                    continue
+
+                evaluated_leads_result = EvaluateLeadsResult(**response)
+                evaluated_leads.extend(evaluated_leads_result.evaluated_leads)
+                self.metrics.successful_leads += len(evaluated_leads_result.evaluated_leads)
+
+            except Exception as e:
+                logger.error(f"Error processing batch {i//self.config.ai_batch_size + 1}: {str(e)}")
+                self.metrics.ai_errors += 1
+                continue
+
+        self.metrics.processing_time = time.time() - start_time
+        return evaluated_leads
+
     async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
         """Store error information with enhanced metadata in BigQuery."""
         try:
@@ -865,27 +908,27 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                     'qualified_rate': 0.0
                 },
                 'score_ranges': {
-                    '0.8-1.0': 0,
-                    '0.6-0.8': 0,
-                    '0.4-0.6': 0,
-                    '0.0-0.4': 0
+                    '80-100': 0,
+                    '60-80': 0,
+                    '40-60': 0,
+                    '0-40': 0
                 }
             }
 
         # Basic distribution counting
         distribution = {
-            'excellent': 0,  # 0.8 - 1.0
-            'good': 0,      # 0.6 - 0.8
-            'moderate': 0,  # 0.4 - 0.6
-            'low': 0        # 0.0 - 0.4
+            'excellent': 0,  # 80 - 100
+            'good': 0,      # 60 - 80
+            'moderate': 0,  # 40 - 60
+            'low': 0        # 0 - 40
         }
 
         # Detailed score ranges for histogram
         score_ranges = {
-            '0.8-1.0': 0,
-            '0.6-0.8': 0,
-            '0.4-0.6': 0,
-            '0.0-0.4': 0
+            '80-100': 0,
+            '60-80': 0,
+            '40-60': 0,
+            '0-40': 0
         }
 
         # Calculate score statistics
@@ -895,18 +938,18 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             scores.append(score)
 
             # Update distribution categories
-            if score >= 0.8:
+            if score >= 80:
                 distribution['excellent'] += 1
-                score_ranges['0.8-1.0'] += 1
-            elif score >= 0.6:
+                score_ranges['80-100'] += 1
+            elif score >= 60:
                 distribution['good'] += 1
-                score_ranges['0.6-0.8'] += 1
-            elif score >= 0.4:
+                score_ranges['60-80'] += 1
+            elif score >= 40:
                 distribution['moderate'] += 1
-                score_ranges['0.4-0.6'] += 1
+                score_ranges['40-60'] += 1
             else:
                 distribution['low'] += 1
-                score_ranges['0.0-0.4'] += 1
+                score_ranges['0-40'] += 1
 
         # Calculate statistical metrics
         total_leads = len(evaluated_leads)

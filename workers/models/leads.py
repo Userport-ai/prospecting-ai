@@ -301,7 +301,7 @@ class EnrichedLead(UserportPydanticBaseModel):
         class Quality(UserportPydanticBaseModel):
             has_detailed_employment: Optional[bool] = None
 
-        last_enriched_at: Optional[datetime] = None
+        last_enriched_at: Optional[str] = Field(default=None, description="Format: YYYY-MM-DD")
         enrichment_sources: Optional[List[str]] = None
         data_quality: Optional[Quality] = None
 
@@ -401,3 +401,17 @@ class EnrichedLead(UserportPydanticBaseModel):
             "honor_awards": True,
             "recommendations": True
         }
+
+
+class EvaluatedLead(UserportPydanticBaseModel):
+    """Final evaluated Lead for fit."""
+    id: Optional[str] = Field(default=None, description="Same ID as in Enriched Lead.")
+    fit_score: Optional[float] = Field(default=None, description="Number between 0-100 (inclusive) where 0 indicates no fit and 100 indicates excellent fit")
+    rationale: Optional[str] = None,
+    matching_signals: Optional[List[str]] = None
+    persona_match: Optional[str] = None
+
+
+class EvaluateLeadsResult(UserportPydanticBaseModel):
+    """Result of Evaluating Leads for fit."""
+    evaluated_leads: Optional[List[EvaluatedLead]] = None

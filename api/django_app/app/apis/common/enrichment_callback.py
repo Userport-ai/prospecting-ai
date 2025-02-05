@@ -16,6 +16,7 @@ from app.models.accounts import Account, EnrichmentStatus
 
 logger = logging.getLogger(__name__)
 
+
 def get_current_enrichment_status(account_id: str, enrichment_type: str) -> Optional[AccountEnrichmentStatus]:
     """
     Get current enrichment status with select_for_update to handle concurrency
@@ -27,6 +28,7 @@ def get_current_enrichment_status(account_id: str, enrichment_type: str) -> Opti
         )
     except AccountEnrichmentStatus.DoesNotExist:
         return None
+
 
 def should_process_callback(current_status: Optional[AccountEnrichmentStatus], new_status: str,
                             pagination_data: Optional[Dict] = None) -> Tuple[bool, Optional[str]]:
@@ -64,6 +66,7 @@ def should_process_callback(current_status: Optional[AccountEnrichmentStatus], n
             return False, "Cannot update failed status except to completed"
 
     return True, None
+
 
 def update_enrichment_status(
         account: Account,
@@ -130,6 +133,7 @@ def update_enrichment_status(
 
         return enrichment_status
 
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -170,7 +174,6 @@ def enrichment_callback(request):
                     "enrichment_summary": account.get_enrichment_summary()
                 })
 
-
             # For paginated requests, status should be in_progress until final page
             if pagination_data:
                 current_page = pagination_data.get('page', 1)
@@ -188,31 +191,32 @@ def enrichment_callback(request):
             )
 
             # Process based on enrichment type
-            if status == EnrichmentStatus.COMPLETED and processed_data:
-                if enrichment_type == EnrichmentType.LEAD_LINKEDIN_RESEARCH:
-                    if not lead_id:
-                        raise ValueError("Lead ID required for lead enrichment")
-                    LeadEnrichmentHandler.handle_lead_enrichment(
-                        lead_id=lead_id,
-                        account_id=account_id,
-                        processed_data=processed_data
-                    )
-                elif enrichment_type == EnrichmentType.GENERATE_LEADS:
-                    # Process through streaming handler
-                    result = StreamingCallbackHandler.handle_callback(data)
-                    if result is None and pagination_data:
-                        current_page = pagination_data.get('page', 1)
-                        total_pages = pagination_data.get('total_pages', 1)
-                        if current_page < total_pages:
-                            # Intermediate page - acknowledge receipt
-                            return Response({
-                                "status": "processing",
-                                "page": pagination_data.get('page'),
-                                "total_pages": pagination_data.get('total_pages')
-                            })
-                else:
-                    # Use existing account enrichment function for other types
-                    _update_account_from_enrichment(account, enrichment_type, processed_data)
+            if enrichment_type == EnrichmentType.GENERATE_LEADS:
+                # Process through streaming handler
+                result = StreamingCallbackHandler.handle_callback(data)
+                if result is None and pagination_data:
+                    current_page = pagination_data.get('page', 1)
+                    total_pages = pagination_data.get('total_pages', 1)
+                    if current_page < total_pages:
+                        # Intermediate page - acknowledge receipt
+                        return Response({
+                            "status": "processing",
+                            "page": pagination_data.get('page'),
+                            "total_pages": pagination_data.get('total_pages')
+                        })
+            else:
+                if status == EnrichmentStatus.COMPLETED and processed_data:
+                    if enrichment_type == EnrichmentType.LEAD_LINKEDIN_RESEARCH:
+                        if not lead_id:
+                            raise ValueError("Lead ID required for lead enrichment")
+                        LeadEnrichmentHandler.handle_lead_enrichment(
+                            lead_id=lead_id,
+                            account_id=account_id,
+                            processed_data=processed_data
+                        )
+                    else:
+                        # Use existing account enrichment function for other types
+                        _update_account_from_enrichment(account, enrichment_type, processed_data)
 
         return Response({
             "status": "success",
@@ -228,6 +232,7 @@ def enrichment_callback(request):
     except Exception as e:
         logger.error(f"Error processing callback: Account ID: {account_id}. Error: {str(e)}", exc_info=True)
         return Response({"error": str(e)}, status=500)
+
 
 def _update_account_from_enrichment(account: Account, enrichment_type: str, processed_data: Dict[str, Any]) -> None:
     """
@@ -280,7 +285,7 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
             if lead_id:
                 lead_data_mapping[lead_id] = {
                     'fit_score': lead.get('fit_score'),
-                    'matching_criteria': lead.get('matching_criteria', []),
+                    'matching_signals': lead.get('matching_signals', []),
                     'overall_analysis': lead.get('overall_analysis', []),
                     'persona_match': lead.get('persona_match'),
                     'rationale': lead.get('rationale'),
@@ -392,7 +397,7 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
                     'evaluation': {
                         'fit_score': lead_data.get('fit_score', 0.0),
                         'persona_match': lead_data.get('persona_match'),
-                        'matching_criteria': lead_data.get('matching_criteria', []),
+                        'matching_signals': lead_data.get('matching_signals', []),
                         'recommended_approach': lead_data.get('recommended_approach'),
                         'analysis': lead_data.get('overall_analysis', []),
                         'rationale': lead_data.get('rationale'),

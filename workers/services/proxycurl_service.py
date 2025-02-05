@@ -270,7 +270,7 @@ class ProxyCurlService:
                 )
 
                 if lead.enrichment_info:
-                    lead.enrichment_info.last_enriched_at = datetime.now(timezone.utc)
+                    lead.enrichment_info.last_enriched_at = datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
                     if lead.enrichment_info.enrichment_sources:
                         lead.enrichment_info.enrichment_sources.append("proxycurl")
                     else:
@@ -281,7 +281,7 @@ class ProxyCurlService:
                         )
                 else:
                     lead.enrichment_info = EnrichedLead.EnrichmentInfo(
-                        last_enriched_at=datetime.now(timezone.utc),
+                        last_enriched_at=datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d"),
                         enrichment_sources=["proxycurl"],
                         data_quality=EnrichedLead.EnrichmentInfo.Quality(
                             has_detailed_employment=(lead.current_employment != None and lead.other_employments != None and len(lead.other_employments) > 0),

@@ -9,6 +9,7 @@ from app.models.accounts import EnrichmentStatus
 
 logger = logging.getLogger(__name__)
 
+
 class StreamingCallbackHandler:
     """Handler for processing paginated callbacks."""
 
@@ -96,12 +97,12 @@ class StreamingCallbackHandler:
 
             # Process all_leads section
             for lead in all_leads:
-                lead_id = lead.get('lead_id')
+                lead_id = lead.get('id')
                 if lead_id:
                     lead_data_mapping[lead_id] = {
                         'evaluation': {
                             'fit_score': lead.get('fit_score'),
-                            'matching_criteria': lead.get('matching_criteria', []),
+                            'matching_signals': lead.get('matching_signals', []),
                             'overall_analysis': lead.get('overall_analysis', []),
                             'persona_match': lead.get('persona_match'),
                             'rationale': lead.get('rationale'),
@@ -116,7 +117,7 @@ class StreamingCallbackHandler:
 
             # Process structured_leads section
             for lead in structured_leads:
-                lead_id = lead.get('lead_id')
+                lead_id = lead.get('id')
                 if lead_id:
                     if lead_id in lead_data_mapping:
                         lead_data = lead_data_mapping[lead_id]
@@ -133,30 +134,32 @@ class StreamingCallbackHandler:
                                 'email': lead.get('contact_info', {}).get('email'),
                                 'email_status': lead.get('contact_info', {}).get('email_status'),
                                 'phone_numbers': lead.get('contact_info', {}).get('phone_numbers', []),
-                                'time_zone': lead.get('contact_info', {}).get('time_zone')
                             },
 
                             # Role and company info
-                            'current_role': {
-                                'title': lead.get('current_role', {}).get('title'),
-                                'department': lead.get('current_role', {}).get('department'),
-                                'seniority': lead.get('current_role', {}).get('seniority'),
-                                'functions': lead.get('current_role', {}).get('functions', []),
-                                'subdepartments': lead.get('current_role', {}).get('subdepartments', [])
+                            'current_employment': {
+                                'title': lead.get('current_employment', {}).get('title'),
+                                'organization_name': lead.get('current_employment', {}).get('organization_name'),
+                                'description': lead.get('current_employment', {}).get('description'),
+                                'start_date': lead.get('current_employment', {}).get('start_date'),
+                                'location': lead.get('current_employment', {}).get('location'),
+                                'department': lead.get('current_employment', {}).get('department'),
+                                'seniority': lead.get('current_employment', {}).get('seniority'),
+                                'functions': lead.get('current_employment', {}).get('functions', []),
+                                'subdepartments': lead.get('current_employment', {}).get('subdepartments', [])
                             },
-                            'company': lead.get('company'),
+                            'organization': lead.get('organization'),
 
                             # Location
                             'location': {
                                 'city': lead.get('location', {}).get('city'),
                                 'state': lead.get('location', {}).get('state'),
                                 'country': lead.get('location', {}).get('country'),
-                                'raw_address': lead.get('location', {}).get('raw_address')
                             },
 
                             # Professional history
                             'social_profiles': lead.get('social_profiles'),
-                            'employment_history': lead.get('employment_history'),
+                            'other_employments': lead.get('other_employments'),
 
                             # Data quality
                             'data_quality': {
@@ -221,8 +224,8 @@ class StreamingCallbackHandler:
                 'linkedin_url': lead_data.get('linkedin_url'),
                 'headline': lead_data.get('headline'),
                 'location': lead_data.get('location'),
-                'current_role': lead_data.get('current_role'),
-                'company': lead_data.get('company'),
+                'current_employment': lead_data.get('current_employment'),
+                'organization': lead_data.get('organization'),
 
                 # Contact info
                 'contact_info': lead_data.get('contact_info'),
@@ -260,9 +263,8 @@ class StreamingCallbackHandler:
 
             # Get role title
             role_title = (
-                    lead_data.get('current_role', {}).get('title') or
-                    lead_data.get('occupation') or
-                    lead_data.get('headline')
+                lead_data.get('current_employment', {}).get('title') or
+                lead_data.get('headline')
             )
 
             # Build defaults for create or update

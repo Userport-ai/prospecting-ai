@@ -15,6 +15,7 @@ from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE
 
 logger = logging.getLogger(__name__)
 
+
 class PaginatedCallbackService:
     """Service for handling paginated callbacks with backward compatibility."""
     LEADS_PER_PAGE = 20
@@ -56,7 +57,6 @@ class PaginatedCallbackService:
             logger.warning(f"Error checking payload size: {e}")
             return False
 
-
     def _paginate_data(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Split data into ID-aligned chunks."""
         pages = []
@@ -70,22 +70,22 @@ class PaginatedCallbackService:
         all_leads = processed_data.get('all_leads', [])
 
         # Build dictionaries keyed by lead ID for quick access
-        qualified_dict = {lead['lead_id']: lead for lead in qualified_leads}
-        structured_dict = {lead['lead_id']: lead for lead in structured_leads}
-        all_dict = {lead['lead_id']: lead for lead in all_leads}
+        qualified_dict = {lead['id']: lead for lead in qualified_leads}
+        structured_dict = {lead['id']: lead for lead in structured_leads}
+        all_dict = {lead['id']: lead for lead in all_leads}
 
-        all_ids_ordered = [lead['lead_id'] for lead in all_leads]
+        all_ids_ordered = [lead['id'] for lead in all_leads]
 
         all_ids_set = set(all_ids_ordered)
         for lead in qualified_leads:
-            if lead['lead_id'] not in all_ids_set:
-                all_ids_ordered.append(lead['lead_id'])
-                all_ids_set.add(lead['lead_id'])
+            if lead['id'] not in all_ids_set:
+                all_ids_ordered.append(lead['id'])
+                all_ids_set.add(lead['id'])
 
         for lead in structured_leads:
-            if lead['lead_id'] not in all_ids_set:
-                all_ids_ordered.append(lead['lead_id'])
-                all_ids_set.add(lead['lead_id'])
+            if lead['id'] not in all_ids_set:
+                all_ids_ordered.append(lead['id'])
+                all_ids_set.add(lead['id'])
 
         # Now we have a canonical list of IDs in the final desired order
         max_leads = len(all_ids_ordered)
@@ -221,7 +221,7 @@ class PaginatedCallbackService:
             pages = self._paginate_data(callback_data)
             total_pages = len(pages)
 
-            for i, page in enumerate(pages, 1):
+            for i, page in enumerate(pages):
                 # Update status for intermediate pages
                 # if i < total_pages:
                 #     page['status'] = 'completed'
