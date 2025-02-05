@@ -25,8 +25,6 @@ def get_current_enrichment_status(account_id: str, enrichment_type: str) -> Opti
         return AccountEnrichmentStatus.objects.select_for_update().get(
             account_id=account_id,
             enrichment_type=enrichment_type,
-            # Hack, remove this once lead linkedin research is fixed.
-            deleted_at=None,
         )
     except AccountEnrichmentStatus.DoesNotExist:
         return None
