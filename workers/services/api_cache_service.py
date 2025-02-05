@@ -8,6 +8,7 @@ from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)
 
+
 class APICacheService:
     """Service for caching external API requests and responses."""
 
@@ -201,6 +202,7 @@ class APICacheService:
         query_job.result()
         return query_job.num_dml_affected_rows
 
+
 async def cached_request(
         cache_service: APICacheService,
         url: str,
@@ -246,7 +248,7 @@ async def cached_request(
                     "method": method,
                     "tenant_id": tenant_id,
                     "status_code": cached["status_code"],
-                    "data": cached["data"]
+                    # "data": cached["data"]
                 }
             )
             return cached["data"], cached["status_code"]
@@ -272,7 +274,7 @@ async def cached_request(
         timeout=30
     )
     response_data = response.json() if response.content else {}
-    
+
     # Log the response
     log_extra = {
         "url": url,
@@ -282,7 +284,7 @@ async def cached_request(
         "response_size": len(response.content) if response.content else 0,
         "response": response_data
     }
-    
+
     if response.status_code >= 400:
         logger.error(
             "API request failed",
@@ -290,7 +292,7 @@ async def cached_request(
         )
     # else:
     #     logger.debug(
-    #         "API request successful", 
+    #         "API request successful",
     #         extra=log_extra
     #     )
 

@@ -10,9 +10,11 @@ from services.task_result_manager import TaskResultManager
 
 logger = logging.getLogger(__name__)
 
+
 class BaseTask(ABC):
     """Base class for all tasks."""
-    def __init__(self, callback_service):
+
+    def __init__(self, callback_service: CallbackService):
         """
         - result_manager: An instance of TaskResultManager
         - callback_service: An instance of CallbackService
@@ -90,7 +92,7 @@ class BaseTask(ABC):
             if existing and existing.get("status") == "completed":
                 logger.info(f"Found existing completed result for account_id={account_id}, lead_id={lead_id}, resending callback.")
                 callback_params = {k: v for k, v in existing.items() if k != 'job_id'}
-                await self.callback_service.paginated_service.send_callback(job_id = job_id, **callback_params)
+                await self.callback_service.paginated_service.send_callback(job_id=job_id, **callback_params)
                 return existing
 
             # 2. If no existing result, we do the normal flow

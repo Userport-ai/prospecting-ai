@@ -17,7 +17,8 @@ class LeadGenerationMixin:
                 "name": account.product.name,
                 "description": account.product.description,
                 "icp_description": account.product.icp_description,
-                "persona_role_titles": account.product.persona_role_titles
+                "persona_role_titles": account.product.persona_role_titles,
+                "additional_lead_signals": account.product.playbook_description
             },
             "tenant_id": str(account.tenant.id)
         }
