@@ -235,7 +235,7 @@ Lead Details:
                     filtered_results.append(result)
                     continue
 
-            return filtered_results
+            return {"personalizations": filtered_results}
         except Exception as e:
             logger.error(f"Error providing personalization signals for {self.person_name} at {self.company_name} with error: {str(e)}", exc_info=True)
             return {}
