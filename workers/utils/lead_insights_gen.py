@@ -9,6 +9,7 @@ from google.api_core.exceptions import ResourceExhausted
 from models.lead_activities import LeadResearchReport, ContentDetails, OpenAITokenUsage
 from services.ai_service import AIServiceFactory
 from utils.retry_utils import RetryConfig, RetryableError, with_retry
+from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ class LeadInsights:
             raise ValueError("GEMINI_API_TOKEN environment variable required")
 
         self.model = AIServiceFactory.create_service("openai")
+        self.gemini_model = AIServiceFactory.create_service("gemini")
 
         self.operation_tag = "insights_generation"
 
@@ -166,8 +168,8 @@ class LeadInsights:
         lead_data = json.dumps(self.input_data.get('lead_data'), indent=2)
         account_data = json.dumps(self.input_data.get('account_data'), indent=2)
         product_data = json.dumps(self.input_data.get('product_data'), indent=2)
-        date_now = datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
-        lead_engagements = json.dumps([cd.model_dump() for cd in content_details], indent=2, default=str)
+        cutoff_date = datetime.now(timezone.utc) - relativedelta(months=3)
+        lead_engagements = json.dumps([cd.model_dump(include=cd.get_outreach_personalization_serialization_fields()) for cd in content_details], indent=2, default=str)
         try:
             prompt = f"""
 You're a highly intelligent B2B Sales Development Representative tasked with performing outreach for Leads.
@@ -179,16 +181,17 @@ You will be provided the following inputs delimited by triple quotes below:
 1. Details of the Product you are selling including its description, Target Personas and a Sales Playbook with guidelines for Outreach.
 2. Details of the Lead's Company including Technologies used, their Competitors, their Customers, Employee Count etc.
 3. Details of the Lead including Current employment, Description of Role, Employment history, Education, Projects etc.
-4. Details of recent LinkedIn Activities that the Lead has engaged with i.e. has posted, reposted, commented or liked.
+4. Details of recent LinkedIn Activities of the Lead i.e. posts, reposts, comments and reactions. Use the Activity URL to determine the type of Activity of the Lead.
 
-Your goal is to use the Sales Playbook to identify the best Signals in the Lead or their Company and craft a personalized message using the specific guideline provided in the Playbook.
-The date today is {date_now}. Use it compute any time related Signals (e.g. Recent Lead promotion, Joining company, Anniversary at Company etc.) that might be relevant.
+Your goal is to use the Sales Playbook as a guideline to identify the best Signals in the Lead or their Company and craft a personalized message using the specific guideline provided in the Playbook.
+Feel free to suggest any other Signals that are not covered in the Playbook but might be relevant to the domain of your product.
 
 Return as JSON:
 {{
     "personalizations": [
         {{
             "signal": string (Cite the Signal used),
+            "signal_date": string,
             "reason": string (Explain why this Signal was chosen),
             "personalized_outreach_message" string,
         }}
@@ -213,8 +216,26 @@ Lead Details:
 
 \"\"\"
             """
-            logger.info(f"Personalization Signals prompt: {prompt}")
-            return await self.model.generate_content(prompt)
+            # logger.info(f"Personalization Signals prompt: {prompt}")
+            response = await self.gemini_model.generate_content(prompt)
+            filtered_results = []
+            for result in response.get("personalizations", []):
+                # Filter all Signals that are stale.
+                try:
+                    signal_date: Optional[datetime] = await self._extract_date(result.get("signal_date"))
+                    if not signal_date or (signal_date >= cutoff_date):
+                        # Add to final result because some signals don't have dates.
+                        # Add to final result if signal is fresher than cutoff date.
+                        filtered_results.append(result)
+                        continue
+                    else:
+                        logger.info(f"Skipping Stale Signal: {signal_date} in result: {result}")
+                except Exception as e:
+                    logger.error(f"Saw exception when handling date extraction: {str(e)}", exc_info=True)
+                    filtered_results.append(result)
+                    continue
+
+            return filtered_results
         except Exception as e:
             logger.error(f"Error providing personalization signals for {self.person_name} at {self.company_name} with error: {str(e)}", exc_info=True)
             return {}
@@ -394,6 +415,32 @@ Return as JSON:
         except Exception as e:
             logger.error(f"Error analyzing product engagement: {str(e)}", exc_info=True)
             return {}
+
+    async def _extract_date(self, date_str: Optional[str]) -> datetime:
+        """Extract and return datetime object from given date string. Use LLM to parse any format."""
+        if not date_str:
+            return None
+        try:
+            prompt = f"""
+Extract day, month and year from given date:
+
+{date_str}
+
+Return result as JSON.
+{{
+    "day": int,
+    "month": int,
+    "year": int
+}}
+"""
+            result = await self.gemini_model.generate_content(prompt)
+            if ("day" not in result) or ("month" not in result) or ("year" not in result):
+                logger.error(f"Parsing date string: {date_str}, resulted in invalid response: {result}")
+                return None
+            return datetime(year=result["year"], month=result["month"], day=result["day"], tzinfo=timezone.utc)
+        except Exception as e:
+            logger.error(f"Failed to parse date: {str(e)}", exc_info=True)
+            return None
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
         """Parse JSON from AI response."""

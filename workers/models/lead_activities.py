@@ -100,6 +100,20 @@ class ContentDetails(UserportPydanticBaseModel):
 
     openai_tokens_used: Optional[OpenAITokenUsage] = Field(default=None)
 
+    def get_outreach_personalization_serialization_fields(self) -> Dict[str, Any]:
+        """Fields that will be used to serialize content details during outreach personalization."""
+        return {
+            "url": True,
+            "publish_date_readable_str": True,
+            "author": True,
+            "author_type": True,
+            "detailed_summary": "detailed_summary",
+            "hashtags": True,
+            "num_linkedin_reactions": True,
+            "num_linkedin_comments": True,
+            "num_linkedin_reposts": True,
+        }
+
 
 class LeadResearchReport(UserportPydanticBaseModel):
     """Lead research report model."""
