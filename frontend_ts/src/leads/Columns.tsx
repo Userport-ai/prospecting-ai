@@ -231,7 +231,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
             : null,
         meta: {
           displayName: "Analysis",
-          visibleInitially: true,
+          visibleInitially: false,
           cellExpandable: true,
         } as CustomColumnMeta,
       },

@@ -15,6 +15,7 @@ export interface Product {
     end_users: string[];
     influencers: string[];
   };
+  playbook_description?: string;
   created_at?: string; // ISO 8601 format date string.
   updated_at?: string; // ISO 8601 format date string.
 }
