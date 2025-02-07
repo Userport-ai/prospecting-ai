@@ -21,6 +21,7 @@ class ProductDetailsSerializer(serializers.ModelSerializer):
             'icp_description',
             'persona_role_titles',
             'keywords',
+            'playbook_description',
             'created_at',
             'updated_at'
         ]
