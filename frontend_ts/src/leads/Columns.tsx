@@ -106,17 +106,19 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   {
     id: "enrichment_status",
     accessorFn: (row) => row.enrichment_status,
+    size: 50,
     header: "Enrichment Status",
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
     filterFn: "arrIncludesSome",
     meta: {
       displayName: "Enrichment Status",
-      visibleInitially: true,
+      visibleInitially: false,
     } as CustomColumnMeta,
   },
   {
     id: "company_name",
     accessorFn: (row) => row.account_details.name,
+    minSize: 200,
     header: "Company Name",
     meta: {
       displayName: "Company Name",
@@ -177,6 +179,21 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
     customFields.forEach((cf) => customColumnKeys.add(cf));
   }
 
+  // Helper to fetch matching signals for each lead.
+  const getMatchingSignals = (lead: LeadRow): string[] | null => {
+    if (!lead.custom_fields || !lead.custom_fields.evaluation) {
+      return null;
+    }
+    const matchingCriteria = lead.custom_fields.evaluation.matching_criteria;
+    const matchingSignals = lead.custom_fields.evaluation.matching_signals;
+    if (matchingSignals) {
+      return matchingSignals;
+    } else if (matchingCriteria) {
+      return matchingCriteria;
+    }
+    return null;
+  };
+
   var finalColumns: ColumnDef<LeadRow>[] = [...baseLeadColumns];
   // Custom columns also has AI created fields like "evaluation" which are
   // populated whenever the lead is suggested or approved by the user.
@@ -188,8 +205,8 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
       {
         id: "fit_score",
         header: "Fit Score",
-        accessorFn: (row) =>
-          row.custom_fields ? row.custom_fields.evaluation.fit_score : null,
+        size: 20,
+        accessorFn: (row) => row.score,
         meta: {
           displayName: "Fit Score",
           visibleInitially: true,
@@ -198,6 +215,8 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
       {
         id: "persona_match",
         header: "Persona Match",
+        size: 50,
+        filterFn: "arrIncludesSome",
         accessorFn: (row) =>
           row.custom_fields
             ? getCustomColumnDisplayName(
@@ -212,11 +231,29 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
       {
         id: "rationale",
         header: "Rationale",
-        minSize: 200,
+        minSize: 300,
         accessorFn: (row) =>
           row.custom_fields ? row.custom_fields.evaluation.rationale : null,
         meta: {
           displayName: "Rationale",
+          visibleInitially: true,
+          cellExpandable: true,
+        } as CustomColumnMeta,
+      },
+      {
+        id: "matching_signals",
+        header: "Matching Criteria",
+        minSize: 300,
+        accessorFn: (row) => getMatchingSignals(row),
+        cell: (info) => {
+          const matchingSignals = info.getValue() as string[] | null;
+          if (!matchingSignals) {
+            return null;
+          }
+          return <CellListView values={matchingSignals} />;
+        },
+        meta: {
+          displayName: "Matching Criteria",
           visibleInitially: true,
           cellExpandable: true,
         } as CustomColumnMeta,
@@ -279,7 +316,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         },
         meta: {
           displayName: "Products Engaged",
-          visibleInitially: true,
+          visibleInitially: false,
           cellExpandable: true,
         } as CustomColumnMeta,
       },
@@ -315,7 +352,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         },
         meta: {
           displayName: "Engagement with Colleagues",
-          visibleInitially: true,
+          visibleInitially: false,
           cellExpandable: true,
         } as CustomColumnMeta,
       },
@@ -338,7 +375,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         },
         meta: {
           displayName: "Recommended Approach",
-          visibleInitially: true,
+          visibleInitially: false,
           cellExpandable: true,
         } as CustomColumnMeta,
       },
@@ -363,7 +400,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         },
         meta: {
           displayName: "Recommended Approach",
-          visibleInitially: true,
+          visibleInitially: false,
           cellExpandable: true,
         } as CustomColumnMeta,
       },

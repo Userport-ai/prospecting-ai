@@ -6,7 +6,7 @@ const PersonalityTraitsView: React.FC<{
   return (
     <div className="flex flex-col gap-4 px-2 py-0">
       <div className="flex flex-col gap-2">
-        <p className="text-md font-semibold">Description</p>
+        {/* <p className="text-md font-semibold">Description</p> */}
         <p className="text-sm">{personalityTrait.description}</p>
       </div>
       <div className="flex flex-col gap-2">

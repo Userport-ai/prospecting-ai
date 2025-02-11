@@ -198,8 +198,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                     name=product.name,
                     description=product.description,
                     persona_role_titles=product.persona_role_titles,
-                    # TODO: This is hack, fix by adding a new column to table.
-                    playbook_description=product.playbook_description.split("---")[1] if product.playbook_description else None
+                    playbook_description=product.playbook_description
                 )
             )
 

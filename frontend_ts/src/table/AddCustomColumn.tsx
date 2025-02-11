@@ -41,7 +41,10 @@ export interface CustomColumnInput {
 
 // Get Display Name of the given custom column's key.
 // For example, if the key is "target_market", we return "Target Market".
-export const getCustomColumnDisplayName = (columnKey: string) => {
+export const getCustomColumnDisplayName = (columnKey: string | null) => {
+  if (columnKey === null) {
+    return "";
+  }
   return columnKey
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))

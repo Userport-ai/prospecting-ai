@@ -10,8 +10,10 @@ const CellListView: React.FC<{ values: string[] }> = ({ values }) => {
   }
   return (
     <div className={cn("flex flex-col gap-1", wrapColumnContentClass)}>
-      {values.map((value) => (
-        <p key={value}>{value}</p>
+      {values.map((value, index) => (
+        <p key={value}>
+          {index + 1}. {value}
+        </p>
       ))}
     </div>
   );
