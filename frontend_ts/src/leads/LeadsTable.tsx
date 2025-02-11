@@ -16,7 +16,11 @@ import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
 import { getLeadColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Lead as LeadRow, listLeads } from "@/services/Leads";
+import {
+  Lead as LeadRow,
+  listLeads,
+  listSuggestedLeads,
+} from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 
@@ -42,8 +46,12 @@ export const Table: React.FC<TableProps> = ({
   data,
   onCustomColumnAdded,
 }) => {
-  const [sorting, setSorting] = useState<ColumnSort[]>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
+  const [sorting, setSorting] = useState<ColumnSort[]>([
+    { id: "fit_score", desc: true },
+  ]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([
+    { id: "persona_match", value: ["Influencer", "Buyer"] },
+  ]);
   const [rowSelection, setRowSelection] = useState({});
   const [pagination, setPagination] = useState({
     pageIndex: 0, //initial page index
@@ -158,7 +166,8 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    listLeads(authContext, accountId)
+    // listLeads(authContext, accountId)
+    listSuggestedLeads(authContext, accountId)
       .then((leads) => {
         setLeads(leads);
         setColumns(getLeadColumns(leads));

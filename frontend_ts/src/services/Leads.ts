@@ -161,7 +161,7 @@ export const listLeads = async (
 // Fetch suggested leads for the given account.
 export const listSuggestedLeads = async (
   authContext: AuthContext,
-  accountId: string
+  accountId?: string
 ): Promise<Lead[]> => {
   return listLeadsHelper(authContext, accountId, SuggestionStatus.SUGGESTED);
 };

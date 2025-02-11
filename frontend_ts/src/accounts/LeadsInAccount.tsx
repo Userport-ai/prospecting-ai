@@ -64,7 +64,7 @@ const LeadsInAccount = () => {
         listLeads(authContext, accountId)
           .then((leads) => {
             setActiveTab(
-              leads.length > 0 ? LeadViewTab.LEADS : LeadViewTab.SUGGESTED_LEADS
+              leads.length > 0 ? LeadViewTab.LEADS : LeadViewTab.LEADS
             );
             setAccount(account);
           })

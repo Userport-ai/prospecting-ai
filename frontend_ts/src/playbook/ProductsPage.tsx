@@ -107,9 +107,6 @@ interface SingleProductDetailsProps {
   onEdit: (arg0: string) => void;
 }
 
-const playbookDescription =
-  "Here is the playbook to craft an outreach message based on Signals found:\n1. If the Lead’s company has recently raised funding in the past 6 months, ask them as they grow to bigger logos, how will they ensure each SDR can be productive from the get go?\n2. If the Lead’s company has posted new job openings for SDRs or BDRs, ask them how newly hired SDRs will follow the playbook to personalize each message?\n3. If Lead’s company is using Apollo.io, or ZoomInfo:\n    1. Explain how Userport is able to tie in context from the Playbook and recommend outreach. Userport’s UI is based on Spreadsheets and is very simple to use compared to Apollo.io  or ZoomInfo is which very unintuitive to use.\n4. If Lead’s company is using Salesloft or Outreach.io:\n    1. Explain that while Salesloft  or Outreach.io help teams with sales engagement, it doesn’t help them research before outreach. Userport researches accounts, suggests leads and also the best outreach message according to the sales playbook.\n5. If Lead’s company is Salesforce or Hubspot,\n    1. Explain that while Salesforce or Hubspot are CRMs, they don’t really help you find the most relevant Leads when doing outbound. Userport allows you to automate research preparation before starting outbound sales.\n6. If Lead has posted, commented or liked anything about AI, start a conversation on that topic by asking questions about that topic and tie in how they think about AI in sales Leading.\n7. If Lead has posted, commented or liked anything related to Sales or Strategy, use that to ask them about how they are thinking about sales Leading today.\n8. If they joined the company recently in the past 6 months, congratulate them and ask them how they are thinking about Sales Leading in their new role.\n9. If they got promoted recently in the past 6 months, ask them what their new responsibilities are and how they plan to improve Sales Leading processes.\n11. If this month is close to their Company Anniversary, then congratulate them on that and ask them their Sales Leading plan for the coming year at the company.\n11. Feel free to use anything other information from the Lead's Profile and Activities that can relevant to Sales Leading to craft an outreach message.\n";
-
 // Component to display a a single product's details.
 const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
   product,
@@ -171,12 +168,12 @@ const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
           <PersonasDisplay product={product} />
         </div>
 
-        {/* Playbook */}
+        {/* signals */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Playbook</h3>
+          <h3 className="text-sm font-semibold text-gray-600 mb-2">Signals</h3>
           <Textarea
             placeholder={product.playbook_description}
-            className="h-[20rem] border border-gray-400 font-medium"
+            className="min-h-[10rem] border border-gray-400 font-medium"
           />
         </div>
       </CardContent>
