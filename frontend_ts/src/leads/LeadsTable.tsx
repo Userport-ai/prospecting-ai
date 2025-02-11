@@ -18,7 +18,6 @@ import { getLeadColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import {
   Lead as LeadRow,
-  listLeads,
   listSuggestedLeads,
 } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
