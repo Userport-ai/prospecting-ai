@@ -137,7 +137,7 @@ def update_enrichment_status(
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
-# @verify_cloud_run_token
+@verify_cloud_run_token
 def enrichment_callback(request):
     logger.info(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} account_id: {request.data.get('account_id')}")
 
