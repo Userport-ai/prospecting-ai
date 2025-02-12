@@ -105,9 +105,7 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                       onCheckedChange={() => handleSelectLead(lead.id)}
                     />
                   </TableCell>
-                  <TableCell>
-                    {lead.custom_fields ? lead.score : null}
-                  </TableCell>
+                  <TableCell>{lead.score}</TableCell>
                   <TableCell>
                     {lead.first_name} {lead.last_name}
                   </TableCell>
