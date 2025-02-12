@@ -106,9 +106,7 @@ const RecommendationsTableView: React.FC<RecommendationsViewProps> = ({
                     />
                   </TableCell>
                   <TableCell>
-                    {lead.custom_fields
-                      ? lead.custom_fields.evaluation.fit_score
-                      : null}
+                    {lead.custom_fields ? lead.score : null}
                   </TableCell>
                   <TableCell>
                     {lead.first_name} {lead.last_name}
