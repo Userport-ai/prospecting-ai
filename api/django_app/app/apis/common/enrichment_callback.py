@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from app.apis.auth.auth_verify_cloud_run_decorator import verify_cloud_run_token
 from app.apis.leads.lead_enrichment_handler import LeadEnrichmentHandler
-from app.apis.leads.streaming_leads_callback_handler import StreamingCallbackHandler
+from app.apis.leads.streaming_leads_callback_handler_v2 import StreamingCallbackHandlerV2
 from app.models import Lead
 from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType
 from app.models.accounts import Account, EnrichmentStatus
@@ -193,7 +193,7 @@ def enrichment_callback(request):
             # Process based on enrichment type
             if enrichment_type == EnrichmentType.GENERATE_LEADS:
                 # Process through streaming handler
-                result = StreamingCallbackHandler.handle_callback(data)
+                result = StreamingCallbackHandlerV2.handle_callback(data)
                 if result is None and pagination_data:
                     current_page = pagination_data.get('page', 1)
                     total_pages = pagination_data.get('total_pages', 1)
