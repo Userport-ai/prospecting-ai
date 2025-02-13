@@ -74,13 +74,13 @@ def with_retry(
 
                     if not is_retryable:
                         logger.error(
-                            f"Non-retryable error in {operation} on attempt {attempt + 1}/{retry_config.max_attempts}: {str(e)}"
+                            f"Non-retryable error in {operation} on attempt {attempt + 1}/{retry_config.max_attempts}: {str(e)}", exc_info=True
                         )
                         raise
 
                     if attempt == retry_config.max_attempts - 1:
                         logger.error(
-                            f"Operation {operation} failed after {retry_config.max_attempts} attempts. Last error: {str(e)}"
+                            f"Operation {operation} failed after {retry_config.max_attempts} attempts. Last error: {str(e)}", exc_info=True
                         )
                         raise
 
@@ -92,7 +92,7 @@ def with_retry(
 
                     logger.warning(
                         f"Retryable error in {operation} on attempt {attempt + 1}/{retry_config.max_attempts}. "
-                        f"Retrying in {delay:.2f}s. Error: {str(e)}"
+                        f"Retrying in {delay:.2f}s. Error: {str(e)}", exc_info=True
                     )
 
                     await asyncio.sleep(delay)
