@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 GEMINI_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
     base_delay=2.0,
-    max_delay=30.0,
+    max_delay=60.0,
     retryable_exceptions=[
         RetryableError,
         GoogleAPIResourceExhausted,
@@ -197,7 +197,7 @@ class GeminiService(AIService):
             raise ValueError("GEMINI_API_TOKEN environment variable required")
 
         genai.configure(api_key=api_key)
-        name = model_name or 'gemini-2.0-flash-exp'
+        name = model_name or 'gemini-2.0-flash'
         self.model = genai.GenerativeModel(name)
 
         # Approximate token count for cost estimation

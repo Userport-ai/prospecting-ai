@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ApolloConfig:
     """Centralized configuration management."""
-    max_employees: int = 2000
+    max_employees: int = 1000
     batch_size: int = 100
     ai_batch_size: int = 10
     fit_score_threshold: float = 0.0
