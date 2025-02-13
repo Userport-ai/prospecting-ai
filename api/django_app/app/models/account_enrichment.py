@@ -7,6 +7,7 @@ class EnrichmentType(models.TextChoices):
     COMPANY_INFO = 'company_info', 'Company Information'
     GENERATE_LEADS = 'generate_leads', 'Potential Leads for a particular Account'
     LEAD_LINKEDIN_RESEARCH = 'lead_linkedin_research', 'Lead Information from LinkedIn and other sources'
+    TECHNOLOGY_INFO = 'technology_info', 'Technology Stack Information'
 
 class EnrichmentStatus(models.TextChoices):
     PENDING = 'pending', 'Pending'

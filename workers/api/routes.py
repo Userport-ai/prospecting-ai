@@ -13,6 +13,7 @@ from tasks.account_enhancement import AccountEnhancementTask
 from tasks.generate_leads_apollo import ApolloLeadsTask
 from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
+from tasks.technology_enrichment import TechnologyEnrichmentTask
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ async def register_tasks():
     await task_registry.register(GenerateLeadsTask)
     await task_registry.register(LeadLinkedInResearchTask)
     await task_registry.register(ApolloLeadsTask)
+    await task_registry.register(TechnologyEnrichmentTask)
     logger.info("All tasks successfully registered.")
 
 def get_task_manager() -> TaskManager:
