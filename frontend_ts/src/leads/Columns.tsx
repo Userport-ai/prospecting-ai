@@ -217,12 +217,18 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         header: "Persona Match",
         size: 50,
         filterFn: "arrIncludesSome",
-        accessorFn: (row) =>
-          row.custom_fields
-            ? getCustomColumnDisplayName(
-                row.custom_fields.evaluation.persona_match
-              )
-            : null,
+        accessorFn: (row) => {
+          if (
+            row.custom_fields &&
+            row.custom_fields.evaluation &&
+            row.custom_fields.evaluation.persona_match
+          ) {
+            return getCustomColumnDisplayName(
+              row.custom_fields.evaluation.persona_match
+            );
+          }
+          return null;
+        },
         meta: {
           displayName: "Persona Match",
           visibleInitially: true,
