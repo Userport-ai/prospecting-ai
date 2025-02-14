@@ -34,6 +34,7 @@ class Account(BaseMixin):
     )
 
     technologies = JSONField(null=True, blank=True)
+    full_technology_profile = JSONField(null=True, blank=True)
     funding_details = JSONField(null=True, blank=True)
     enrichment_sources = JSONField(null=True, blank=True)
     last_enriched_at = models.DateTimeField(null=True, blank=True)

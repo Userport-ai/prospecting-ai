@@ -136,10 +136,10 @@ class WebsiteParser:
             headers = {"Authorization": f"Bearer {self.jina_api_token}", "X-Return-Format": "html"}
             response_text = await self._call_jina_api(endpoint=jina_endpoint, headers=headers)
 
-            parsed_customers = await self._parse_technologies(page_html=response_text)
+            parsed_technologies = await self._parse_technologies(page_html=response_text)
 
             logger.debug(f"Successfully fetched Technologies for website: {self.website}")
-            return parsed_customers
+            return parsed_technologies
 
         except httpx.HTTPStatusError as e:
             logger.error(f"Unexpected error in making call to Jina Reader while fetching Company Technologies in website: {website}: {str(e)}", exc_info=True)
@@ -181,7 +181,7 @@ class WebsiteParser:
             response = await self._call_ai_api(prompt=prompt)
             if "technologies" not in response:
                 return []
-            return [cust["name"] for cust in response["technologies"]]
+            return [tech["name"] for tech in response["technologies"]]
         except Exception as e:
             logger.error(f"Error parsing Technologies: {str(e)}", exc_info=True)
             return []

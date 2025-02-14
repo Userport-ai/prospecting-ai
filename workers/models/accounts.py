@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from models.common import UserportPydanticBaseModel
 from pydantic import Field
@@ -182,6 +182,7 @@ class AccountInfo(UserportPydanticBaseModel):
     competitors: Optional[List[str]] = Field(default=None)
 
     financials: Optional[Financials] = Field(default=None)
+    tech_profile: Optional[Any] = Field(default=None)
 
     # Recent developments associated with the Account.
     recent_developments: Optional[RecentDevelopments] = Field(default=None)

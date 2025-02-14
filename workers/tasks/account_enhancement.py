@@ -9,8 +9,12 @@ from typing import Dict, Any, List
 
 import google.generativeai as genai
 import requests
+import tldextract
 
+from models.builtwith import EnrichmentResult
+from services.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
+from services.builtwith_service import BuiltWithService
 from services.django_callback_service import CallbackService
 from utils.website_parser import WebsiteParser
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
@@ -268,6 +272,9 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         self.bq_service = BigQueryService()
         self._configure_ai_service()
         self.prompts = PromptTemplates()
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+        dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
+        self.cache_service = APICacheService(client=self.bq_service.client, project_id=project_id, dataset=dataset)
 
     def _initialize_credentials(self) -> None:
         """Initialize and validate required API credentials."""
@@ -354,6 +361,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             processed_count += 1
             account_id = account.get('account_id')
             website = account.get('website')
+            domain = tldextract.extract(website).fqdn
 
             logger.info(f"Processing account {processed_count}/{total_accounts}: ID {account_id}, website: {website}")
 
@@ -462,11 +470,10 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 # Merge customers from website parser.
                 account_info.customers = list(set(account_info.customers) | set(wb_customers))
 
-                # Fetch technologies.
-                wb_technologies: List[str] = await wb_parser.fetch_technologies()
-                logger.debug(f"Technologies from Website for account ID {account_id} are {wb_technologies}")
-                # Merge technologies from website parser.
-                account_info.technologies = list(set(account_info.technologies) | set(wb_technologies))
+                # Fetch technologies and update account info
+                technologies, tech_profile = await self._fetch_technology_stack(domain, account_id, account_info.technologies)
+                account_info.technologies = technologies
+                account_info.tech_profile = tech_profile
 
                 # Store data in BigQuery
                 logger.debug(f"Job {job_id}, Account {account_id}: Storing processed data in BigQuery")
@@ -574,6 +581,44 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             "failed_accounts": failed_accounts,
             "results": results
         }
+
+    async def _fetch_technology_stack(self, domain: str, account_id: str,
+                                      existing_technologies) -> tuple[List[str], EnrichmentResult]:
+        """
+        Fetches technology stack from BuiltWith API and website parser if needed.
+        Returns tuple of (technologies list, raw tech profile).
+        """
+        logger.debug(f"Fetching technology stack for account ID {account_id}")
+
+        # Try BuiltWith first
+        builtwith_service = BuiltWithService(cache_service=self.cache_service)
+        tech_profile = await builtwith_service.get_technology_profile(domain=domain)
+
+        # Get BuiltWith technologies
+        bw_technologies: List[str] = []
+        if (tech_profile
+                and tech_profile.get("processed_data", {}).get("profile", {}).get("technologies")):
+            bw_technologies = [
+                str(tech["name"])
+                for tech in tech_profile["processed_data"]["profile"]["technologies"]
+                if tech.get("name")
+            ]
+            logger.debug(f"Technologies from Built With for account ID {account_id} are {bw_technologies}")
+
+        # Start with BuiltWith technologies
+        technologies = list(set(bw_technologies))
+
+        # Fallback to website parser if no BuiltWith technologies found
+        if not bw_technologies:
+            logger.debug("No BuiltWith technologies found, attempting website parse")
+            wb_parser = WebsiteParser(website=f"https://{domain}")
+            website_technologies = await wb_parser.fetch_technologies()
+            website_technologies = [str(tech) for tech in website_technologies if tech]
+            logger.debug(f"Technologies from Website for account ID {account_id} are {website_technologies}")
+            # Merge website technologies with any existing ones
+            technologies = list(set(existing_technologies) | set(website_technologies))
+
+        return technologies, tech_profile
 
     @with_retry(retry_config=API_RETRY_CONFIG, operation_name="fetch_linkedin_url")
     async def _fetch_linkedin_url(self, company_name: str) -> str:

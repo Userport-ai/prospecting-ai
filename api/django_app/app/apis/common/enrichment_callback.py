@@ -255,6 +255,7 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
             'website': processed_data.get('website'),
             'linkedin_url': processed_data.get('linkedin_url'),
             'technologies': processed_data.get('technologies'),
+            'full_technology_profile': processed_data.get('tech_profile'),
             'funding_details': processed_data.get('funding_details'),
             'company_type': processed_data.get('company_type'),
             'founded_year': processed_data.get('founded_year'),
