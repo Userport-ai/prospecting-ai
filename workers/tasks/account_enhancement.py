@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PromptTemplates:
-class PromptTemplates:`
     """Store prompt templates for AI interactions."""
     LINKEDIN_EXTRACTION_PROMPT = """
     Extract the LinkedIn company URL from the search results below.
