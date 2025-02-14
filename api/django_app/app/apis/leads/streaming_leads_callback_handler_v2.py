@@ -20,16 +20,17 @@ class StreamingCallbackHandlerV2:
     def handle_callback(cls, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle callback data by processing leads immediately."""
         try:
-            # Parse incoming data with Pydantic
-            callback_data = EnrichmentCallbackData(**data)
             logger.info(f"[handle_callback] Received callback for job_id={callback_data.job_id}")
 
-            if not callback_data.pagination:
+            if not data.get('pagination'):
                 logger.info(
                     f"[handle_callback] No pagination for job_id={callback_data.job_id}, "
                     "returning data directly."
                 )
                 return data
+
+            # Parse incoming data with Pydantic
+            callback_data = EnrichmentCallbackData(**data)
 
             current_page = callback_data.pagination.page
             total_pages = callback_data.pagination.total_pages
