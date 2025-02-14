@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PromptTemplates:
+class PromptTemplates:`
     """Store prompt templates for AI interactions."""
     LINKEDIN_EXTRACTION_PROMPT = """
     Extract the LinkedIn company URL from the search results below.
@@ -471,7 +472,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 account_info.customers = list(set(account_info.customers) | set(wb_customers))
 
                 # Fetch technologies and update account info
-                technologies, tech_profile = await self._fetch_technology_stack(domain, account_id, account_info.technologies)
+                technologies, tech_profile = await self._fetch_technology_stack(domain, job_id, account_id, account_info.technologies)
                 account_info.technologies = technologies
                 account_info.tech_profile = tech_profile
 
@@ -582,7 +583,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             "results": results
         }
 
-    async def _fetch_technology_stack(self, domain: str, account_id: str,
+    async def _fetch_technology_stack(self, domain: str, job_id:str, account_id: str,
                                       existing_technologies) -> tuple[List[str], EnrichmentResult]:
         """
         Fetches technology stack from BuiltWith API and website parser if needed.
@@ -592,7 +593,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
         # Try BuiltWith first
         builtwith_service = BuiltWithService(cache_service=self.cache_service)
-        tech_profile = await builtwith_service.get_technology_profile(domain=domain)
+        tech_profile = await builtwith_service.get_technology_profile(domain=domain, job_id=job_id, account_id=account_id)
 
         # Get BuiltWith technologies
         bw_technologies: List[str] = []
