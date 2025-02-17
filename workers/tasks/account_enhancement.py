@@ -597,7 +597,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         # Get BuiltWith technologies
         bw_technologies: List[str] = []
         if (tech_profile
-                and tech_profile.get("processed_data", {}).get("profile", {}).get("technologies")):
+                and tech_profile.processed_data.get("profile", {}).get("technologies")):
             bw_technologies = [
                 str(tech["name"])
                 for tech in tech_profile["processed_data"]["profile"]["technologies"]
