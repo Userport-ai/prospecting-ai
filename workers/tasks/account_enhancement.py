@@ -600,7 +600,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 and tech_profile.processed_data.get("profile", {}).get("technologies")):
             bw_technologies = [
                 str(tech["name"])
-                for tech in tech_profile["processed_data"]["profile"]["technologies"]
+                for tech in tech_profile.processed_data["profile"]["technologies"]
                 if tech.get("name")
             ]
             logger.debug(f"Technologies from Built With for account ID {account_id} are {bw_technologies}")
