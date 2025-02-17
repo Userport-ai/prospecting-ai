@@ -176,8 +176,6 @@ class EnrichmentError(BaseModel):
 
 class EnrichmentResult(BaseModel):
     """Complete enrichment process result."""
-    job_id: str
-    account_id: str
     enrichment_type: str = "technology_profile"
     source: str = "builtwith"
     status: str = "pending"

@@ -1,11 +1,17 @@
 import logging
-import tldextract
+import os
 from typing import List, Optional
-from services.ai_service import AIServiceFactory
-from services.jina_service import JinaService
-from services.brightdata_service import BrightDataService
-from models.accounts import BrightDataAccount, AccountInfo, RecentDevelopments
+
+import tldextract
 from pydantic import BaseModel, Field
+
+from models.accounts import BrightDataAccount, AccountInfo, RecentDevelopments
+from services.ai_service import AIServiceFactory
+from services.api_cache_service import APICacheService
+from services.bigquery_service import BigQueryService
+from services.brightdata_service import BrightDataService
+from services.builtwith_service import BuiltWithService
+from services.jina_service import JinaService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 
 # Configure logging
@@ -53,6 +59,20 @@ class AccountInfoFetcher:
 
             self.brightdata_service = BrightDataService()
             logger.info("Successfully configured Brightdata Service")
+
+            # Initialize BigQuery and cache services
+            self.bq_service = BigQueryService()
+            self.project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+            self.dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
+
+            self.cache_service = APICacheService(
+                client=self.bq_service.client,
+                project_id=self.project_id,
+                dataset=self.dataset
+            )
+
+            self.builtwith_service = BuiltWithService(cache_service=self.cache_service)
+
         except Exception as e:
             logger.error(f"Failed to configure one of AccountInfoFetcher's Services: {str(e)}", exc_info=True)
             raise
@@ -63,11 +83,35 @@ class AccountInfoFetcher:
         try:
             logger.debug(f"Starting fetch of Account information for website: {self.website}")
             domain = self._get_domain(self.website)
-            query = f"{domain} LinkedIn Page"
-            web_search_results_md: str = await self.jina_service.search_query(query=query, headers={"X-Retain-Images": "none", "X-No-Cache": "true"})
-            logger.debug(f"Fetched Jina Web search results for query {query} for website: {self.website}")
 
-            account_linkedin_urls: List[str] = await self._parse_account_linkedin_urls(web_search_results_md=web_search_results_md)
+            # First attempt: Try to get LinkedIn URL from BuiltWith
+            logger.debug(f"Attempting to get LinkedIn URL from BuiltWith for domain: {domain}")
+            builtwith_result = await self.builtwith_service.get_technology_profile(
+                domain=domain
+            )
+
+            account_linkedin_urls = []
+            if (builtwith_result and
+                    builtwith_result.status == "completed" and
+                    builtwith_result.processed_data):
+                company_info = builtwith_result.processed_data.get('company_info', {})
+                social_profiles = company_info.get('social_profiles', [])
+                linkedin_urls = [url for url in social_profiles if 'linkedin.com/company/' in url]
+                if linkedin_urls:
+                    account_linkedin_urls = linkedin_urls
+                    logger.info(f"Found LinkedIn URLs from BuiltWith: {linkedin_urls}")
+
+            # Fallback: If no LinkedIn URL found from BuiltWith, use Jina search
+            if not account_linkedin_urls:
+                logger.debug(f"No LinkedIn URLs found from BuiltWith, falling back to Jina search for domain: {domain}")
+                query = f"{domain} LinkedIn Page"
+                web_search_results_md: str = await self.jina_service.search_query(
+                    query=query,
+                    headers={"X-Retain-Images": "none", "X-No-Cache": "true"}
+                )
+                account_linkedin_urls = await self._parse_account_linkedin_urls(
+                    web_search_results_md=web_search_results_md)
+
             if len(account_linkedin_urls) == 0:
                 raise FailedToFindLinkedInURLsError(f"Failed to find Potential Account LinkedIn URLs for website: {self.website}")
             logger.debug(f"Fetched Potential Account LinkedIn URLs: {account_linkedin_urls} for website: {self.website}")

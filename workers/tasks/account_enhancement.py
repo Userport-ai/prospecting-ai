@@ -593,7 +593,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
         # Try BuiltWith first
         builtwith_service = BuiltWithService(cache_service=self.cache_service)
-        tech_profile = await builtwith_service.get_technology_profile(domain=domain, job_id=job_id, account_id=account_id)
+        tech_profile = await builtwith_service.get_technology_profile(domain=domain)
 
         # Get BuiltWith technologies
         bw_technologies: List[str] = []

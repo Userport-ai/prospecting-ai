@@ -37,7 +37,7 @@ class BuiltWithService:
         self.cache_ttl_hours = 24 * 30  # Cache for 1 month
 
     @with_retry(retry_config=RETRY_CONFIG, operation_name="get_technology_profile")
-    async def get_technology_profile(self, domain: str, job_id: str, account_id: str) -> EnrichmentResult:
+    async def get_technology_profile(self, domain: str) -> EnrichmentResult:
         """Fetch and process technology profile for a domain."""
         start_time = time()
 
@@ -68,8 +68,6 @@ class BuiltWithService:
                 quality_metrics = self._calculate_quality_metrics(tech_profile)
 
                 return EnrichmentResult(
-                    job_id=job_id,
-                    account_id=account_id,
                     status="completed",
                     completion_percentage=100,
                     processed_data={
@@ -89,8 +87,6 @@ class BuiltWithService:
         except Exception as e:
             logger.error(f"Error fetching technology data for {domain}: {str(e)}", exc_info=True)
             return EnrichmentResult(
-                job_id=job_id,
-                account_id=account_id,
                 status="failed",
                 error=EnrichmentError(
                     message=str(e),
@@ -416,19 +412,11 @@ class BuiltWithService:
 #         # Initialize BuiltWith service
 #         builtwith_service = BuiltWithService(cache_service=cache_service)
 #
-#         # Generate test IDs
-#         job_id = str(uuid.uuid4())
-#         account_id = str(uuid.uuid4())
-#
 #         logger.info(f"Starting technology profile fetch for domain: {domain}")
-#         logger.info(f"Job ID: {job_id}")
-#         logger.info(f"Account ID: {account_id}")
 #
 #         # Fetch technology profile
 #         result = await builtwith_service.get_technology_profile(
 #             domain=domain,
-#             job_id=job_id,
-#             account_id=account_id
 #         )
 #
 #         # Print results in a structured way
