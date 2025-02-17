@@ -496,7 +496,8 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     'company_type': account_info.organization_type,
                     'founded_year': account_info.founded_year,
                     'customers': account_info.customers,
-                    'competitors': account_info.competitors
+                    'competitors': account_info.competitors,
+                    'tech_profile': account_info.tech_profile.model_dump(),
                 }
 
                 # Store enrichment raw data
