@@ -20,11 +20,11 @@ class StreamingCallbackHandlerV2:
     def handle_callback(cls, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle callback data by processing leads immediately."""
         try:
-            logger.info(f"[handle_callback] Received callback for job_id={data.get("job_id", "<None>")}")
+            logger.info(f"[handle_callback] Received callback for job_id={data.get('job_id', '<None>')}")
 
             if not data.get('pagination'):
                 logger.info(
-                    f"[handle_callback] No pagination for job_id={data.get("job_id", "<None>")}, account_id={data.get("account_id")} "
+                    f"[handle_callback] No pagination for job_id={data.get('job_id', '<None>')}, account_id={data.get('account_id', '<None>')}"
                     "returning data directly."
                 )
                 return data
