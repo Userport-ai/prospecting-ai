@@ -171,20 +171,105 @@ class ApolloLead(UserportPydanticBaseModel):
 
         organization_id: Optional[str] = Field(default=None, description="Apollo Organization ID")
 
-    class Organization(UserportPydanticBaseModel):
+    class Technology(BaseModel):
+        """Model for technology stack items"""
+        category: Optional[str] = None
         name: Optional[str] = None
-        website_url: Optional[str] = None
-        linkedin_url: Optional[str] = None
-        founded_year: Optional[int] = None
-        primary_domain: Optional[str] = None
+        uid: Optional[str] = None
 
-        twitter_url: Optional[str] = None
-        facebook_url: Optional[str] = None
-        logo_url: Optional[str] = None
+    class FundingEvent(BaseModel):
+        """Model for funding events"""
+        amount: Optional[str] = None
+        currency: Optional[str] = None
+        date: Optional[datetime] = None
+        id: Optional[str] = None
+        investors: Optional[str] = None
+        news_url: Optional[str] = None
+        type: Optional[str] = None
+
+    class Organization(BaseModel):
+        """Enhanced organization model with all fields optional"""
+        id: Optional[str] = None
+        name: Optional[str] = None
         alexa_ranking: Optional[int] = None
+        angellist_url: Optional[str] = None
+        annual_revenue: Optional[int] = None
+        annual_revenue_printed: Optional[str] = None
+        blog_url: Optional[str] = None
 
-        id: Optional[str] = Field(default=None, description="Apollo ID of the org.")
-        linkedin_uid: Optional[str] = Field(default=None, description="LinkedIn Unique ID.")
+        # Location information
+        city: Optional[str] = None
+        state: Optional[str] = None
+        country: Optional[str] = None
+        postal_code: Optional[str] = None
+        street_address: Optional[str] = None
+        raw_address: Optional[str] = None
+
+        # Web presence
+        website_url: Optional[str] = None
+        primary_domain: Optional[str] = None
+        linkedin_url: Optional[str] = None
+        linkedin_uid: Optional[str] = None
+        facebook_url: Optional[str] = None
+        twitter_url: Optional[str] = None
+        crunchbase_url: Optional[str] = None
+
+        # Company details
+        founded_year: Optional[int] = None
+        estimated_num_employees: Optional[int] = None
+        industry: Optional[str] = None
+        industries: Optional[List[str]] = None
+        secondary_industries: Optional[List[str]] = None
+        industry_tag_hash: Optional[Dict[str, str]] = None
+        industry_tag_id: Optional[str] = None
+
+        # Technologies and keywords
+        current_technologies: Optional[List["ApolloLead.Technology"]] = None
+        technology_names: Optional[List[str]] = None
+        keywords: Optional[List[str]] = None
+        languages: Optional[List[str]] = None
+
+        # Description and SEO
+        short_description: Optional[str] = None
+        seo_description: Optional[str] = None
+
+        # Funding information
+        funding_events: Optional[List["ApolloLead.FundingEvent"]] = None
+        total_funding: Optional[int] = None
+        total_funding_printed: Optional[str] = None
+        latest_funding_round_date: Optional[datetime] = None
+        latest_funding_stage: Optional[str] = None
+
+        # Contact information
+        phone: Optional[str] = None
+        primary_phone: Optional[Any] = None
+
+        # Organization structure
+        num_suborganizations: Optional[int] = None
+        suborganizations: Optional[List[str]] = None
+        owned_by_organization_id: Optional[str] = None
+        retail_location_count: Optional[int] = None
+
+        # Org chart related
+        org_chart_removed: Optional[bool] = None
+        org_chart_root_people_ids: Optional[List[str]] = None
+        org_chart_sector: Optional[str] = None
+        org_chart_show_department_filter: Optional[bool] = None
+
+        # Stock market information
+        publicly_traded_symbol: Optional[str] = None
+        publicly_traded_exchange: Optional[str] = None
+
+        # Misc
+        snippets_loaded: Optional[bool] = None
+        logo_url: Optional[str] = None
+
+        class Config:
+            """Pydantic configuration"""
+            arbitrary_types_allowed = True
+            json_encoders = {
+                datetime: lambda v: v.isoformat() if v else None
+            }
 
     id: Optional[str] = Field(default=None, description="Apollo ID of the lead")
     first_name: Optional[str] = None

@@ -4,7 +4,7 @@ import logging
 import os
 import time
 import uuid
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Union
 
@@ -30,11 +30,44 @@ class ApolloConfig:
     fit_score_threshold: float = 0.0
     cache_ttl_hours: int = 24 * 30
     concurrent_requests: int = 3
+    ai_concurrent_requests: int = 4
     max_retries: int = 3
     retry_delay: float = 1.0
     max_retry_delay: float = 5.0
-    enrich_leads: bool = True  # New: Flag to control lead enrichment
+    enrich_leads: bool = True
+    confidence_threshold: int = 50
 
+    # Configuration parameters for scoring
+    seniority_thresholds: Dict[str, float] = field(default_factory=lambda: {
+        'c_suite': 50,
+        'vp': 55,
+        'head': 60,
+        'director': 65,
+        'manager': 70,
+        'senior': 80,
+        'default': 65
+    })
+
+    function_match_boost: float = 0.9  # Reduce threshold by 10%
+    department_match_boost: float = 0.9  # Reduce threshold by 10%
+    recent_promotion_boost: float = 0.85  # Reduce threshold by 15%
+    company_size_adjustments: Dict[str, float] = field(default_factory=lambda: {
+        'enterprise': 0.9,  # Reduce threshold by 10% for enterprise
+        'mid_market': 1.0,  # No adjustment for mid-market
+        'small': 1.1  # Increase threshold by 10% for small companies
+    })
+
+AI_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    base_delay=1.0,
+    max_delay=5.0,
+    retryable_exceptions=[
+        RetryableError,
+        asyncio.TimeoutError,
+        ConnectionError,
+        Exception  # Allow everything to be retryable here
+    ]
+)
 
 @dataclass
 class ProcessingMetrics:
@@ -171,6 +204,58 @@ Lead Profiles:
 """
 
 
+def _is_recent_promotion(lead: ApolloLead) -> bool:
+    """
+    Check if the lead has been recently promoted or changed roles.
+    Returns False if there are any date parsing errors.
+    """
+    if not lead.employment_history:
+        return False
+
+    current_role = next(
+        (emp for emp in lead.employment_history if emp.current),
+        None
+    )
+
+    if not current_role or not current_role.start_date:
+        return False
+
+    try:
+        start_date = datetime.strptime(current_role.start_date, "%Y-%m-%d")
+        months_in_role = (datetime.now() - start_date).days / 30
+        return months_in_role <= 6  # Consider promotions within last 6 months as recent
+    except ValueError:
+        # Handle invalid date format
+        return False
+
+
+def _determine_company_size(organization: Optional[Union[Dict[str, Any], object]]) -> str:
+    """
+    Determine company size category based on employee count and annual revenue.
+    This function handles both dictionary inputs and objects with attribute access.
+    """
+    if not organization:
+        return 'mid_market'
+
+    # Check if organization is a dict; if not, use attribute access.
+    if isinstance(organization, dict):
+        employee_count = organization.get('estimated_num_employees', 0)
+        annual_revenue = organization.get('annual_revenue', 0)
+    else:
+        employee_count = getattr(organization, 'estimated_num_employees', 0)
+        annual_revenue = getattr(organization, 'annual_revenue', 0)
+
+    if employee_count == 0 or annual_revenue == 0:
+        return "mid_market"
+
+    if employee_count > 1000 or annual_revenue > 100000000:
+        return 'enterprise'
+    elif employee_count > 100 or annual_revenue > 10000000:
+        return 'mid_market'
+    else:
+        return 'small'
+
+
 class ApolloLeadsTask(AccountEnrichmentTask):
     """Task for identifying potential leads using Apollo API, ProxyCurl enrichment and AI analysis."""
 
@@ -250,6 +335,242 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             "job_id": str(uuid.uuid4())
         }
 
+    def _get_target_departments_and_functions(self, target_personas: Dict[str, Any]) -> tuple[list[str], list[str]]:
+        """Extract target departments and functions from personas."""
+        target_departments = []
+        target_functions = []
+
+        for persona_data in target_personas.values():
+            if isinstance(persona_data, list):
+                for persona in persona_data:
+                    if isinstance(persona, dict):
+                        if 'departments' in persona:
+                            target_departments.extend(d.lower() for d in persona['departments'])
+                        if 'functions' in persona:
+                            target_functions.extend(f.lower() for f in persona['functions'])
+
+        return target_departments, target_functions
+
+    def _has_matching_terms(self, source_terms: List[str], target_terms: List[str]) -> bool:
+        """
+        Check if any source term contains or is contained within any target term.
+        This allows for partial matches while handling underscores and common variations.
+        """
+        if not source_terms or not target_terms:
+            return False
+
+        source_terms = [term.lower().replace('_', ' ') for term in source_terms]
+        target_terms = [term.lower().replace('_', ' ') for term in target_terms]
+
+        for source in source_terms:
+            for target in target_terms:
+                # Check both directions of containment
+                if source in target or target in source:
+                    logger.debug(f"Term match found: {source} ⟷ {target}")
+                    return True
+        return False
+
+    def _should_enrich_lead(
+            self,
+            evaluation: Dict[str, Any],
+            apollo_lead: ApolloLead,
+            product_data: Dict[str, Any]
+    ) -> bool:
+        """
+        Enhanced logic for determining if a lead should be enriched.
+        """
+        score = evaluation.get('initial_score', 0)
+        confidence = evaluation.get('confidence', 0)
+        career_insights = evaluation.get('career_insights', {})
+
+        # Get target personas from product data
+        target_personas = product_data.get('persona_role_titles', {})
+        target_departments, target_functions = self._get_target_departments_and_functions(target_personas)
+
+        # 1. Base threshold from configuration based on seniority
+        base_threshold = self.config.seniority_thresholds.get(
+            apollo_lead.seniority,
+            self.config.seniority_thresholds['default']
+        )
+
+        # 2. Company size adjustment
+        company_size = _determine_company_size(apollo_lead.organization)
+        size_multiplier = self.config.company_size_adjustments.get(company_size, 1.0)
+        adjusted_threshold = base_threshold * size_multiplier
+
+        # 3. Recent career changes
+        if _is_recent_promotion(apollo_lead):
+            adjusted_threshold *= self.config.recent_promotion_boost
+
+        # 4. Department and function matching with boosting
+        department_match = self._has_matching_terms(
+            apollo_lead.departments,
+            target_departments
+        )
+        function_match = self._has_matching_terms(
+            apollo_lead.functions,
+            target_functions
+        )
+
+        if department_match:
+            adjusted_threshold *= self.config.department_match_boost
+        if function_match:
+            adjusted_threshold *= self.config.function_match_boost
+
+        # 5. Industry experience validation
+        relevant_experience = career_insights.get('years_of_relevant_experience', 0)
+        industry_alignment = career_insights.get('industry_alignment', 'low')
+
+        if relevant_experience >= 5 and industry_alignment in ['high', 'medium']:
+            adjusted_threshold *= 0.9  # 10% reduction for experienced professionals
+
+        # 6. Decision making
+        meets_thresholds = (
+                score >= adjusted_threshold and
+                confidence >= self.config.confidence_threshold
+        )
+
+        # Logging for transparency
+        if meets_thresholds:
+            logger.debug(
+                f"Lead {apollo_lead.id} qualified for enrichment:\n"
+                f"Base threshold: {base_threshold}\n"
+                f"Adjusted threshold: {adjusted_threshold}\n"
+                f"Score: {score}\n"
+                f"Confidence: {confidence}\n"
+                f"Adjustments applied: company_size={size_multiplier}, "
+                f"department_match={department_match}, function_match={function_match}"
+            )
+
+        return meets_thresholds
+
+    @with_retry(retry_config=AI_RETRY_CONFIG, operation_name="pre_evaluate_apollo_leads")
+    async def pre_evaluate_apollo_leads(self, apollo_leads: List[ApolloLead], product_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Pre-evaluate Apollo leads to determine which ones warrant ProxyCurl enrichment."""
+        try:
+            if not apollo_leads:
+                logger.warning("No Apollo leads provided for evaluation")
+                return []
+
+            base_prompt = f"""
+            You are an experienced BDR/SDR tasked with quickly evaluating a list of potential leads based on limited information.
+            Your goal is to identify leads that show strong potential and warrant deeper research/enrichment.
+            
+            Product Description:
+            {product_data.get('description')}
+            
+            Target Personas:
+            {json.dumps(product_data.get('persona_role_titles', {}), indent=2)}
+            
+            Evaluation Guidelines:
+            1. Role Relevance:
+               - How closely does their title match our target personas?
+               - Is their seniority level appropriate for decision-making/influence?
+               - Do their departments/functions align with our product's use case?
+            
+            2. Company Context:
+               - Does their company profile suggest they might need our solution?
+               - Is the company in our target market/industry?
+               - Consider company size and maturity
+            
+            3. Confidence Level:
+               - How certain are we about this evaluation given limited data?
+               - What factors increase/decrease our confidence?
+            
+            Return a JSON response with this structure:
+            {{
+                "evaluated_leads": [
+                    {{
+                        "lead_id": string,
+                        "initial_score": number (0-100),
+                        "reason": string (specific reasons for the score),
+                        "enrichment_recommended": boolean,
+                        "confidence": number (0-100),
+                        "key_signals": [string] (specific positive signals found),
+                        "career_insights": {{
+                            "relevant_past_roles": [string],
+                            "years_of_relevant_experience": number,
+                            "industry_alignment": string,
+                            "function_alignment": string
+                        }}
+                    }}
+                ]
+            }}
+            """
+
+            # Configure concurrency
+            semaphore = asyncio.Semaphore(self.config.ai_concurrent_requests)
+
+            async def process_batch(batch: List[ApolloLead]) -> List[Dict[str, Any]]:
+                async with semaphore:
+                    try:
+                        batch_data = [{
+                            'id': lead.id,
+                            'name': lead.name,
+                            'headline': lead.headline,
+                            'title': lead.title,
+                            'seniority': lead.seniority,
+                            'departments': lead.departments,
+                            'subdepartments': lead.subdepartments,
+                            'functions': lead.functions,
+                            'organization': {
+                                'name': lead.organization.name if lead.organization else None,
+                                'founded_year': lead.organization.founded_year if lead.organization else None,
+                                'website_url': lead.organization.website_url if lead.organization else None,
+                                'primary_domain': lead.organization.primary_domain if lead.organization else None
+                            } if lead.organization else None,
+                            'employment_history': [{
+                                'title': emp.title,
+                                'organization_name': emp.organization_name,
+                                'current': emp.current,
+                                'description': emp.description,
+                                'start_date': emp.start_date,
+                                'end_date': emp.end_date
+                            } for emp in lead.employment_history] if lead.employment_history else [],
+                        } for lead in batch]
+
+                        batch_prompt = f"{base_prompt}\n\nThe leads to evaluate:\n{json.dumps(batch_data, indent=2)}"
+                        response = await self.model.generate_content(batch_prompt, is_json=True)
+
+                        if not response:
+                            logger.error("Empty response from AI model")
+                            self.metrics.ai_errors += 1
+                            return []
+
+                        if 'evaluated_leads' not in response:
+                            logger.error(f"Invalid response structure: {response}")
+                            self.metrics.ai_errors += 1
+                            return []
+                        return response['evaluated_leads']
+
+                    except Exception as e:
+                        logger.error(f"Error processing batch: {str(e)}")
+                        self.metrics.ai_errors += 1
+                        return []
+
+            # Create batches and tasks
+            batches = [apollo_leads[i:i + self.config.ai_batch_size]
+                       for i in range(0, len(apollo_leads), self.config.ai_batch_size)]
+            tasks = [process_batch(batch) for batch in batches]
+
+            # Execute all batches concurrently and gather results
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Combine and filter results
+            evaluated_leads = []
+            for batch_result in results:
+                if isinstance(batch_result, Exception):
+                    logger.error(f"Batch processing failed: {str(batch_result)}")
+                    self.metrics.ai_errors += 1
+                else:
+                    evaluated_leads.extend(batch_result)
+
+            return evaluated_leads
+
+        except Exception as e:
+            logger.error(f"Error in initial lead evaluation: {str(e)}", exc_info=True)
+            return []
+
     async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any], Dict[str, Any]):
         """Execute the lead identification task."""
         start_time = time.time()
@@ -296,55 +617,59 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 }
             )
 
-            # Transform employees in batches
+            # Initial evaluation of Apollo leads
+            current_stage = 'initial_evaluation'
+            pre_evaluation_results = await self.pre_evaluate_apollo_leads(apollo_leads, product_data)
+
+            # Filter leads for enrichment
+            leads_for_enrichment = []
+            skipped_leads = []
+            apollo_leads_dict = {lead.id: lead for lead in apollo_leads}
+
+            for eval_result in pre_evaluation_results:
+                lead_id = eval_result.get('id') or eval_result.get('lead_id')
+                if (eval_result.get('enrichment_recommended', False) or
+                        self._should_enrich_lead(evaluation=eval_result,apollo_lead=apollo_leads_dict[lead_id], product_data=product_data)):
+                    if apollo_leads_dict.get(lead_id):
+                        leads_for_enrichment.append(apollo_leads_dict[lead_id])
+                else:
+                    if apollo_leads_dict.get(lead_id):
+                        skipped_leads.append(apollo_leads_dict[lead_id])
+
+            logger.info(f"Selected {len(leads_for_enrichment)} out of {len(apollo_leads)} leads for enrichment")
+
+            # Transform leads in batches
             current_stage = 'structuring_leads'
-            enriched_leads: List[EnrichedLead] = await self._process_leads_in_batches(
-                apollo_leads,
-                self.config.batch_size,
-                self._transform_apollo_employee
-            )
-            self.metrics.successful_leads = len(enriched_leads)
+            enriched_leads: List[EnrichedLead] = []
 
-            await self.callback_svc.send_callback(
-                job_id=job_id,
-                account_id=account_id,
-                enrichment_type=self.ENRICHMENT_TYPE,
-                source="apollo",
-                status='processing',
-                completion_percentage=50,
-                processed_data={
-                    'stage': current_stage,
-                    'structured_leads': len(enriched_leads)
-                }
-            )
+            # Process selected leads
+            if leads_for_enrichment:
+                enriched_leads.extend(await self._process_leads_in_batches(
+                    leads_for_enrichment,
+                    self.config.batch_size,
+                    self._transform_apollo_employee
+                ))
 
-            # Enrich leads further with ProxyCurl if enabled.
-            if self.config.enrich_leads and enriched_leads:
-                current_stage = 'enriching_leads'
-                try:
-                    enriched_leads = await self.proxycurl_service.enrich_leads(enriched_leads)
-                    self.metrics.enriched_leads = len(enriched_leads)
-                except Exception as e:
-                    logger.error(f"Lead enrichment failed: {str(e)}", exc_info=True)
-                    self.metrics.enrichment_errors += 1
-                    enriched_leads = enriched_leads  # Fallback to non-enriched leads
-            else:
-                enriched_leads = enriched_leads
+                # Enrich promising leads with ProxyCurl
+                if self.config.enrich_leads:
+                    current_stage = 'enriching_leads'
+                    try:
+                        enriched_leads = await self.proxycurl_service.enrich_leads(enriched_leads)
+                        self.metrics.enriched_leads = len(enriched_leads)
+                    except Exception as e:
+                        logger.error(f"Lead enrichment failed: {str(e)}", exc_info=True)
+                        self.metrics.enrichment_errors += 1
 
-            await self.callback_svc.send_callback(
-                job_id=job_id,
-                account_id=account_id,
-                enrichment_type=self.ENRICHMENT_TYPE,
-                source="apollo",
-                status='processing',
-                completion_percentage=70,
-                processed_data={
-                    'stage': current_stage,
-                    'enriched_leads': len(enriched_leads)
-                }
-            )
+            # Process skipped leads with basic transformation
+            if skipped_leads:
+                basic_leads = await self._process_leads_in_batches(
+                    skipped_leads,
+                    self.config.batch_size,
+                    self._transform_apollo_employee
+                )
+                enriched_leads.extend(basic_leads)
 
-            # Evaluate leads
+            # Evaluate all leads
             current_stage = 'evaluating_leads'
             evaluated_leads = await self._evaluate_leads_v2(enriched_leads, product_data)
 
