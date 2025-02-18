@@ -396,7 +396,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
         # 2. Company size adjustment
         company_size = _determine_company_size(apollo_lead.organization)
-        size_multiplier = self.config.company_size_adjustments.get(company_size, 1.0)
+        size_multiplier = self.config.company_size_adjustments.get(company_size) or 1.0
         adjusted_threshold = base_threshold * size_multiplier
 
         # 3. Recent career changes
@@ -419,8 +419,8 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             adjusted_threshold *= self.config.function_match_boost
 
         # 5. Industry experience validation
-        relevant_experience = career_insights.get('years_of_relevant_experience', 0)
-        industry_alignment = career_insights.get('industry_alignment', 'low')
+        relevant_experience = career_insights.get('years_of_relevant_experience') or 0
+        industry_alignment = career_insights.get('industry_alignment') or 'low'
 
         if relevant_experience >= 5 and industry_alignment in ['high', 'medium']:
             adjusted_threshold *= 0.9  # 10% reduction for experienced professionals
