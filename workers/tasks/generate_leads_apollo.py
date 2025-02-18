@@ -239,11 +239,11 @@ def _determine_company_size(organization: Optional[Union[Dict[str, Any], object]
 
     # Check if organization is a dict; if not, use attribute access.
     if isinstance(organization, dict):
-        employee_count = organization.get('estimated_num_employees', 0)
-        annual_revenue = organization.get('annual_revenue', 0)
+        employee_count = organization.get('estimated_num_employees') or 0
+        annual_revenue = organization.get('annual_revenue') or 0
     else:
-        employee_count = getattr(organization, 'estimated_num_employees', 0)
-        annual_revenue = getattr(organization, 'annual_revenue', 0)
+        employee_count = getattr(organization, 'estimated_num_employees', 0) or 0
+        annual_revenue = getattr(organization, 'annual_revenue', 0) or 0
 
     if employee_count == 0 or annual_revenue == 0:
         return "mid_market"
@@ -379,8 +379,9 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         """
         Enhanced logic for determining if a lead should be enriched.
         """
-        score = evaluation.get('initial_score', 0)
-        confidence = evaluation.get('confidence', 0)
+        # Use 'or 0' to ensure we don't get None values for numeric comparisons.
+        score = evaluation.get('initial_score') or 0
+        confidence = evaluation.get('confidence') or 0
         career_insights = evaluation.get('career_insights', {})
 
         # Get target personas from product data
