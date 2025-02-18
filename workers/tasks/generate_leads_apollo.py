@@ -245,7 +245,7 @@ def _determine_company_size(organization: Optional[Union[Dict[str, Any], object]
         employee_count = getattr(organization, 'estimated_num_employees', 0) or 0
         annual_revenue = getattr(organization, 'annual_revenue', 0) or 0
 
-    if employee_count == 0 or annual_revenue == 0:
+    if not employee_count or not annual_revenue:
         return "mid_market"
 
     if employee_count > 1000 or annual_revenue > 100000000:
