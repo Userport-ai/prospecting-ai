@@ -36,6 +36,7 @@ class ApolloConfig:
     max_retry_delay: float = 5.0
     enrich_leads: bool = True
     confidence_threshold: int = 50
+    min_fit_threshold: int = 50
 
     # Configuration parameters for scoring
     seniority_thresholds: Dict[str, float] = field(default_factory=lambda: {
@@ -628,14 +629,31 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             apollo_leads_dict = {lead.id: lead for lead in apollo_leads}
 
             for eval_result in pre_evaluation_results:
-                lead_id = eval_result.get('id') or eval_result.get('lead_id')
-                if (eval_result.get('enrichment_recommended', False) or
-                        self._should_enrich_lead(evaluation=eval_result,apollo_lead=apollo_leads_dict[lead_id], product_data=product_data)):
-                    if apollo_leads_dict.get(lead_id):
-                        leads_for_enrichment.append(apollo_leads_dict[lead_id])
+                initial_score = eval_result.get("initial_score", 0)
+                lead_id = eval_result.get("id") or eval_result.get("lead_id")
+
+                # Skip if no valid lead_id or corresponding Apollo lead found.
+                if not lead_id or lead_id not in apollo_leads_dict:
+                    continue
+
+                apollo_lead = apollo_leads_dict[lead_id]
+
+                # Skip leads with too low a score.
+                if initial_score < ApolloConfig.min_fit_threshold:
+                    skipped_leads.append(apollo_lead)
+                    continue
+
+                recommended = eval_result.get("enrichment_recommended", False)
+
+                # Check if the lead is recommended by the LLM or passes the custom enrichment criteria.
+                if recommended or self._should_enrich_lead(
+                        evaluation=eval_result,
+                        apollo_lead=apollo_lead,
+                        product_data=product_data
+                ):
+                    leads_for_enrichment.append(apollo_lead)
                 else:
-                    if apollo_leads_dict.get(lead_id):
-                        skipped_leads.append(apollo_leads_dict[lead_id])
+                    skipped_leads.append(apollo_lead)
 
             logger.info(f"Selected {len(leads_for_enrichment)} out of {len(apollo_leads)} leads for enrichment")
 
