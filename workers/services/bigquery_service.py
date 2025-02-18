@@ -160,12 +160,15 @@ class BigQueryService:
                              structured_data: Dict[str, Any], raw_profile: str) -> Dict[str, Any]:
         """Prepare a row for insertion into account_data table."""
         try:
-            company_data = structured_data.get('company_name', {})
-            location_data = structured_data.get('location', {}).get('headquarters', {})
-            business_metrics = structured_data.get('business_metrics', {})
-            industry_data = structured_data.get('industry', {})
-            tech_data = structured_data.get('technology_stack', {})
-            financial_data = structured_data.get('financials', {})
+            # Safely get nested data with default empty dicts
+            company_data = structured_data.get('company_name', {}) or {}
+            location_data = (structured_data.get('location', {}) or {}).get('headquarters', {}) or {}
+            business_metrics = structured_data.get('business_metrics', {}) or {}
+            industry_data = structured_data.get('industry', {}) or {}
+            tech_data = structured_data.get('technology_stack', {}) or {}
+            financial_data = structured_data.get('financials', {}) or {}
+            digital_presence = structured_data.get('digital_presence', {}) or {}
+            social_media = digital_presence.get('social_media', {}) or {}
 
             # Handle technologies as repeated string field
             technologies = []
@@ -196,13 +199,16 @@ class BigQueryService:
             if not location:
                 location = None
 
-            # Handle employee count properly
-            employee_count = business_metrics.get('employee_count', {}).get('total')
-            if employee_count is not None:
-                try:
-                    employee_count = int(employee_count)
-                except (ValueError, TypeError):
-                    employee_count = None
+            # Handle employee count properly with safe navigation
+            employee_count = None
+            try:
+                emp_count_data = business_metrics.get('employee_count', {})
+                if isinstance(emp_count_data, dict):
+                    emp_total = emp_count_data.get('total')
+                    if emp_total is not None:
+                        employee_count = int(emp_total)
+            except (ValueError, TypeError):
+                employee_count = None
 
             # Prepare funding details as valid JSON
             funding_details = financial_data.get('private_data', {})
@@ -221,8 +227,8 @@ class BigQueryService:
                 'employee_count': employee_count,
                 'industry': sectors,
                 'location': location,
-                'website': structured_data.get('digital_presence', {}).get('website'),
-                'linkedin_url': structured_data.get('digital_presence', {}).get('social_media', {}).get('linkedin'),
+                'website': digital_presence.get('website'),
+                'linkedin_url': social_media.get('linkedin'),
                 'technologies': technologies,
                 'funding_details': funding_details,
                 'raw_data': raw_data,
