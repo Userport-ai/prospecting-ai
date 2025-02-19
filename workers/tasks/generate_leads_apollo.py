@@ -163,14 +163,35 @@ You will be provided the following inputs delimited by triple quotes below:
 4. The Profiles of Leads you need to evaluate.
 
 Your goal is to look for the Signals provided in these Inputs within each Leads's profile to evaluate how good of a match they are for your product.
-Here are some more guidelines to follow:
+
+Persona Types (choose one if possible):
+- end_user: Uses the product on a day-to-day basis. Typically in more hands-on, operational roles.
+- influencer: Has significant sway in purchase decisions, but may not directly hold budget. 
+             Could be team leads, department heads, or strong opinion leaders.
+- buyer: Owns or significantly influences the budget, purchase authority, or procurement process.
+
+
+Important:
+*. Role Titles of Target Personas below is the list of target personas you need to match each lead with.
+*. Always assign one of end_user, influencer, buyer to the persona type if there's *any plausible match*. 
+*. Only assign null when there is NO conceivable match at all with any persona type.
 *. Evaluate each lead independently, without referring to the other leads.
-*. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit and 0 indicates no alignment.
+*. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit to the product & persona type and 0 indicates no alignment.
 *. The more Signals you find in the Lead's profile that are relevant to your Product, the higher their score.
-*. Consider their role titles in conjunction with the content including their background, about them, role descriptions, other employments provided before deciding on persona fit. Often titles are abstract and may not describe their role comprehensively.
-*. Rationale should highlight and cit the specific Signals from the Lead's Profile that supports the score. If there are no Signals, say "No Signals found".
-*. If the Lead has a high Fit Score, assign a Persona Type (one of end_user, influencer or buyer) to them else set Persona Type to null. Use the Role Titles in the Target Personas input to figure out whether the Lead is a Buyer, Influencer or an End User Persona Type for your Product.
-*. The date today is {date_now}. Use it compute any time related Signals (e.g. Recent Lead promotion, joining company etc.) that might be relevant.
+*. Consider their role titles in conjunction with the content including their background, about them, role descriptions, employment history and their profile provided before deciding on persona fit. Often titles are abstract and may not describe their role comprehensively.
+*. Rationale should highlight and cite the specific Signals from the Lead's Profile that supports the score. If there are no Signals, say "No Signals found".
+*. Write full sentences for bullet points in signals and explain each signal with rationale from the lead's profile. Don't make up any reasons.
+*. The date today is {date_now}. Use it compute any time related Signals (e.g. Recent Lead promotion, joining company etc.) that might be relevant. Usually, events within last 6 months are considered recent.
+
+
+## Examples
+Example 1:
+- Title: "Senior Data Analyst" → Usually end_user if the product is data/analytics-related.
+Example 2:
+- Title: "Head of Engineering" → Often influencer esp if the product is technical/engineering related.
+Example 3:
+- Title: "VP of Sales" → Likely buyer, since they typically control or heavily influence budgets for products used in sales organisations.
+
 
 Evaluate each lead and return a JSON response with this structure:
 {{
