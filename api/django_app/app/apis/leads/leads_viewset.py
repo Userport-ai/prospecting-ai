@@ -1,6 +1,8 @@
 import logging
 
 from django.db import transaction
+from django.db.models import F
+from django.db.models.expressions import OrderBy
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -28,11 +30,15 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status']
     ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at', 'score']
-    ordering = ['-score']  # Default sorting
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Order by score descending, placing nulls last.
+        return queryset.order_by(F('score').desc(nulls_last=True))
 
     @action(detail=False, methods=['post'])
     def generate(self, request):
