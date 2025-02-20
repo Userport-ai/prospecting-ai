@@ -91,7 +91,7 @@ Return as JSON:
 # Example usage:
 """
 async def main():
-    ai_service = AIServiceFactory.create_service("gemini")
+    ai_service = AIServiceFactory().create_service("gemini")
     generator = RolePatternGenerator(ai_service)
     
     persona_roles = {

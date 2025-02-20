@@ -27,7 +27,7 @@ class LeadInsights:
         self.person_role_title = person_role_title
         self.person_about_me = person_about_me or "Not available"
 
-        self.model = AIServiceFactory.create_service("openai")
+        self.model = AIServiceFactory().create_service("openai")
 
         self.operation_tag = "insights_generation"
 

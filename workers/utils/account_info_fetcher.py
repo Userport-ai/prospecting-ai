@@ -54,7 +54,7 @@ class AccountInfoFetcher:
             self.jina_service = JinaService()
             logger.info("Successfully configured Jina Service")
 
-            self.model = AIServiceFactory.create_service("gemini")
+            self.model = AIServiceFactory().create_service("gemini")
             logger.info("Successfully configured AI service")
 
             self.brightdata_service = BrightDataService()

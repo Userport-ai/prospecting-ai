@@ -49,7 +49,7 @@ class WebsiteParser:
         self.jina_api_token = os.getenv('JINA_API_TOKEN')
 
         try:
-            self.model = AIServiceFactory.create_service("gemini")
+            self.model = AIServiceFactory().create_service("gemini")
             logger.info("Successfully configured Gemini API")
         except Exception as e:
             logger.error(f"Failed to configure Gemini API: {str(e)}")

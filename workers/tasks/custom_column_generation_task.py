@@ -55,7 +55,7 @@ class CustomColumnTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the AI service."""
-        self.model = AIServiceFactory.create_service("gemini")
+        self.model = AIServiceFactory().create_service("gemini")
 
     @property
     def enrichment_type(self) -> str:

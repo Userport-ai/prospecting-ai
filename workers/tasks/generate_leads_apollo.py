@@ -341,7 +341,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the Gemini AI service."""
-        self.model = AIServiceFactory.create_service("gemini")
+        self.model = AIServiceFactory().create_service("gemini")
 
     def _initialize_services(self) -> None:
         """Initialize required services."""

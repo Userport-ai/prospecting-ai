@@ -55,8 +55,8 @@ class LeadInsights:
         if not self.GEMINI_API_TOKEN:
             raise ValueError("GEMINI_API_TOKEN environment variable required")
 
-        self.model = AIServiceFactory.create_service("openai")
-        self.gemini_model = AIServiceFactory.create_service("gemini")
+        self.model = AIServiceFactory().create_service("openai")
+        self.gemini_model = AIServiceFactory().create_service("gemini")
 
         self.operation_tag = "insights_generation"
 

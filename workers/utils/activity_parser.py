@@ -43,7 +43,7 @@ class LinkedInActivityParser:
         self.person_role_title = person_role_title
 
         try:
-            self.model = AIServiceFactory.create_service("openai")
+            self.model = AIServiceFactory().create_service("openai")
             logger.info("Successfully configured Gemini API")
         except Exception as e:
             logger.error(f"Failed to configure Gemini API: {str(e)}")
