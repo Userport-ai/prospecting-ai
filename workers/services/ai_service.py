@@ -156,7 +156,7 @@ class AICacheService:
             )
 
             return {
-                "content": row.response_data if is_json else row.response_text,
+                "content": json.loads(row.response_data) if is_json else row.response_text,
                 "token_usage": token_usage
             }
 
@@ -185,7 +185,7 @@ class AICacheService:
         response_text = None
 
         if is_json:
-            response_data = response if isinstance(response, dict) else json.loads(response)
+            response_data = response if isinstance(response, dict) else json.dumps(response)
         else:
             response_text = response if isinstance(response, str) else json.dumps(response)
 
