@@ -495,6 +495,8 @@ class EvaluatedLead(UserportPydanticBaseModel):
     rationale: Optional[str] = None,
     matching_signals: Optional[List[str]] = None
     persona_match: Optional[str] = None
+    ## internal fields
+    internal_analysis: Optional[str] = None
 
 
 class EvaluateLeadsResult(UserportPydanticBaseModel):

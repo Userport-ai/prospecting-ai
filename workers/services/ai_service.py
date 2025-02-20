@@ -1,18 +1,22 @@
+import hashlib
 import json
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Union
-from google.api_core.exceptions import ResourceExhausted as GoogleAPIResourceExhausted
-from utils.retry_utils import RetryableError, RetryConfig, with_retry
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, Optional, Union, Tuple
 
+from google.api_core.exceptions import ResourceExhausted as GoogleAPIResourceExhausted
+from google.cloud import bigquery
 import google.generativeai as genai
 from openai import AsyncOpenAI
 
+from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
 
+# Retry configurations
 GEMINI_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
     base_delay=2.0,
@@ -40,57 +44,388 @@ OPENAI_RETRY_CONFIG = RetryConfig(
     ]
 )
 
+class AICacheService:
+    """Service for caching AI prompts and responses."""
+
+    def __init__(self, client: bigquery.Client, project_id: str, dataset: str):
+        """Initialize the AI cache service."""
+        self.client = client
+        self.project_id = project_id
+        self.dataset = dataset
+        self.table_name = "ai_prompt_cache"
+        self._ensure_cache_table()
+
+    def _ensure_cache_table(self) -> None:
+        """Create the cache table if it doesn't exist."""
+        schema = [
+            bigquery.SchemaField("cache_key", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("provider", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("model", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("prompt", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("is_json_response", "BOOLEAN", mode="REQUIRED"),
+            bigquery.SchemaField("operation_tag", "STRING"),
+            bigquery.SchemaField("response_data", "JSON"),
+            bigquery.SchemaField("response_text", "STRING"),
+            bigquery.SchemaField("prompt_tokens", "INTEGER"),
+            bigquery.SchemaField("completion_tokens", "INTEGER"),
+            bigquery.SchemaField("total_tokens", "INTEGER"),
+            bigquery.SchemaField("total_cost_in_usd", "FLOAT64"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("expires_at", "TIMESTAMP"),
+            bigquery.SchemaField("tenant_id", "STRING"),
+        ]
+
+        table_id = f"{self.project_id}.{self.dataset}.{self.table_name}"
+        try:
+            self.client.get_table(table_id)
+        except Exception:
+            table = bigquery.Table(table_id, schema=schema)
+            table = self.client.create_table(table)
+            logger.info(f"Created table {table_id}")
+
+    def _generate_cache_key(
+            self,
+            prompt: str,
+            provider: str,
+            model: str,
+            is_json: bool,
+            operation_tag: str
+    ) -> str:
+        """Generate a unique cache key for the AI request."""
+        cache_data = {
+            'prompt': prompt,
+            'provider': provider,
+            'model': model,
+            'is_json': is_json,
+            'operation_tag': operation_tag
+        }
+        cache_str = json.dumps(cache_data, sort_keys=True)
+        return hashlib.sha256(cache_str.encode()).hexdigest()
+
+    async def get_cached_response(
+            self,
+            prompt: str,
+            provider: str,
+            model: str,
+            is_json: bool = True,
+            operation_tag: str = "default",
+            tenant_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get cached response for the given AI prompt."""
+        cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag)
+
+        query = f"""
+        SELECT 
+            response_data,
+            response_text,
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
+            total_cost_in_usd
+        FROM `{self.project_id}.{self.dataset}.{self.table_name}`
+        WHERE cache_key = @cache_key
+        AND provider = @provider
+        AND model = @model
+        AND is_json_response = @is_json
+        AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP())
+        AND (tenant_id IS NULL OR tenant_id = @tenant_id)
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("cache_key", "STRING", cache_key),
+                bigquery.ScalarQueryParameter("provider", "STRING", provider),
+                bigquery.ScalarQueryParameter("model", "STRING", model),
+                bigquery.ScalarQueryParameter("is_json", "BOOL", is_json),
+                bigquery.ScalarQueryParameter("tenant_id", "STRING", tenant_id)
+            ]
+        )
+
+        results = list(self.client.query(query, job_config=job_config).result())
+        if results:
+            row = results[0]
+            token_usage = TokenUsage(
+                operation_tag=operation_tag,
+                prompt_tokens=row.prompt_tokens,
+                completion_tokens=row.completion_tokens,
+                total_tokens=row.total_tokens,
+                total_cost_in_usd=row.total_cost_in_usd,
+                provider=provider
+            )
+
+            return {
+                "content": row.response_data if is_json else row.response_text,
+                "token_usage": token_usage
+            }
+
+        return None
+
+    async def cache_response(
+            self,
+            prompt: str,
+            response: Union[Dict[str, Any], str],
+            token_usage: TokenUsage,
+            provider: str,
+            model: str,
+            is_json: bool = True,
+            operation_tag: str = "default",
+            tenant_id: Optional[str] = None,
+            ttl_hours: Optional[int] = None
+    ) -> None:
+        """Cache an AI response."""
+        cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag)
+        expires_at = None
+
+        if ttl_hours is not None:
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
+
+        response_data = None
+        response_text = None
+
+        if is_json:
+            response_data = response if isinstance(response, dict) else json.loads(response)
+        else:
+            response_text = response if isinstance(response, str) else json.dumps(response)
+
+        row = {
+            "cache_key": cache_key,
+            "provider": provider,
+            "model": model,
+            "prompt": prompt,
+            "is_json_response": is_json,
+            "operation_tag": operation_tag,
+            "response_data": response_data,
+            "response_text": response_text,
+            "prompt_tokens": token_usage.prompt_tokens,
+            "completion_tokens": token_usage.completion_tokens,
+            "total_tokens": token_usage.total_tokens,
+            "total_cost_in_usd": token_usage.total_cost_in_usd,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "tenant_id": tenant_id
+        }
+
+        table = self.client.get_table(f"{self.project_id}.{self.dataset}.{self.table_name}")
+        errors = self.client.insert_rows_json(table, [row])
+
+        if errors:
+            logger.error(f"Error caching AI response: {errors}")
+            raise Exception(f"Failed to cache AI response: {errors}")
+
+    async def clear_expired_cache(self, days: int = 30) -> int:
+        """Clear expired cache entries and entries older than specified days."""
+        query = f"""
+        DELETE FROM `{self.project_id}.{self.dataset}.{self.table_name}`
+        WHERE expires_at < CURRENT_TIMESTAMP()
+        OR created_at < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days DAY)
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("days", "INTEGER", days)
+            ]
+        )
+
+        query_job = self.client.query(query, job_config=job_config)
+        query_job.result()
+        return query_job.num_dml_affected_rows
+
 
 class AIService(ABC):
     """Abstract base class for AI service providers."""
 
-    def __init__(self):
-        """Initialize service with token tracking."""
-        self._token_usage = {}  # Dict to store token usage by operation tag
+    def __init__(
+            self,
+            model_name: Optional[str] = None,
+            cache_service: Optional[AICacheService] = None,
+            tenant_id: Optional[str] = None
+    ):
+        """Initialize service with token tracking and optional caching."""
         self.provider_name = "base"  # Override in subclasses
+        self.cache_service = cache_service
+        self.tenant_id = tenant_id
+        self.cache_ttl_hours = 24  # Default cache TTL
+        self.model = model_name  # Model name to be used by the service
 
-    @abstractmethod
-    async def generate_content(self, prompt: str, is_json: bool = True, operation_tag: str = "default") -> Union[Dict[str, Any], str]:
-        """Generate content from prompt."""
-        pass
-
-    def get_token_usage(self, operation_tag: str) -> Optional[TokenUsage]:
-        """Get token usage for specific operation."""
-        return self._token_usage.get(operation_tag)
-
-    def get_total_token_usage(self) -> Optional[TokenUsage]:
-        """Get combined token usage across all operations."""
-        if not self._token_usage:
-            return None
-
-        total = TokenUsage(
-            operation_tag="total",
-            prompt_tokens=0,
-            completion_tokens=0,
-            total_tokens=0,
-            total_cost_in_usd=0.0,
+    def _create_token_usage(
+            self,
+            prompt_tokens: int,
+            completion_tokens: int,
+            operation_tag: str,
+            total_cost: float = 0.0
+    ) -> TokenUsage:
+        """Create token usage object."""
+        return TokenUsage(
+            operation_tag=operation_tag,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+            total_cost_in_usd=total_cost,
             provider=self.provider_name
         )
 
-        for usage in self._token_usage.values():
-            total.add_tokens(usage)
+    @abstractmethod
+    async def _generate_content_without_cache(
+            self,
+            prompt: str,
+            is_json: bool = True,
+            operation_tag: str = "default"
+    ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
+        """Generate content from prompt without using cache."""
+        pass
 
-        return total
+    async def generate_content(
+            self,
+            prompt: str,
+            is_json: bool = True,
+            operation_tag: str = "default",
+            force_refresh: bool = False
+    ) -> Union[Dict[str, Any], str]:
+        """Generate content from prompt, using cache if available."""
+        if self.cache_service and not force_refresh:
+            cached_response = None
+            try:
+                cached_response = await self.cache_service.get_cached_response(
+                    prompt=prompt,
+                    provider=self.provider_name,
+                    model=self.model,
+                    is_json=is_json,
+                    operation_tag=operation_tag,
+                    tenant_id=self.tenant_id
+                )
+            except Exception as e:
+                logger.error(f"Cache read failed: {e}")
+                cached_response = None
 
-    def _track_usage(self, usage: TokenUsage):
-        """Track token usage by operation."""
-        if usage.operation_tag in self._token_usage:
-            self._token_usage[usage.operation_tag].add_tokens(usage)
-        else:
-            self._token_usage[usage.operation_tag] = usage
+            if cached_response:
+                return cached_response["content"]
+
+        response, token_usage = await self._generate_content_without_cache(
+            prompt=prompt,
+            is_json=is_json,
+            operation_tag=operation_tag
+        )
+
+        if self.cache_service:
+            try:
+                await self.cache_service.cache_response(
+                        prompt=prompt,
+                        response=response,
+                        token_usage=token_usage,
+                        provider=self.provider_name,
+                        model=self.model,
+                        is_json=is_json,
+                        operation_tag=operation_tag,
+                        tenant_id=self.tenant_id,
+                        ttl_hours=self.cache_ttl_hours
+                    )
+            except Exception as e:
+                logger.error(f"Failed to cache response: {e}")
+
+        return response
+
+
+class GeminiService(AIService):
+    """Gemini implementation of AI service."""
+
+    def __init__(
+            self,
+            model_name: Optional[str] = None,
+            cache_service: Optional[AICacheService] = None,
+            tenant_id: Optional[str] = None
+    ):
+        """Initialize Gemini client."""
+        super().__init__(model_name=model_name, cache_service=cache_service, tenant_id=tenant_id)
+        self.provider_name = "gemini"
+
+        api_key = os.getenv("GEMINI_API_TOKEN")
+        if not api_key:
+            raise ValueError("GEMINI_API_TOKEN environment variable required")
+
+        genai.configure(api_key=api_key)
+        self.model = model_name or 'gemini-2.0-flash'
+        self.model_instance = genai.GenerativeModel(self.model)
+
+        # Approximate token count for cost estimation
+        self.avg_chars_per_token = 4
+        self.cost_per_1k_tokens = 0.00015  # Example rate
+
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_content")
+    async def _generate_content_without_cache(
+            self,
+            prompt: str,
+            is_json: bool = True,
+            operation_tag: str = "default"
+    ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
+        """Generate content using Gemini without using cache."""
+        try:
+            if is_json:
+                prompt = f"{prompt}\n\nRespond in JSON format only."
+
+            response = self.model_instance.generate_content(prompt)
+            if not response or not response.parts:
+                logger.warning("Empty response from Gemini")
+                token_usage = self._create_token_usage(0, 0, operation_tag)
+                return {} if is_json else "", token_usage
+
+            response_text = response.parts[0].text
+            logger.debug(f"Gemini response: {response_text}")
+
+            # Estimate token usage based on character count
+            prompt_tokens = len(prompt) // self.avg_chars_per_token
+            completion_tokens = len(response_text) // self.avg_chars_per_token
+            total_tokens = prompt_tokens + completion_tokens
+            total_cost = (total_tokens / 1000) * self.cost_per_1k_tokens
+
+            token_usage = self._create_token_usage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                operation_tag=operation_tag,
+                total_cost=total_cost
+            )
+
+            if is_json:
+                return self._parse_json_response(response_text), token_usage
+            return response_text, token_usage
+
+        except Exception as e:
+            logger.error(f"Error generating content with Gemini: {str(e)}")
+            token_usage = self._create_token_usage(0, 0, operation_tag)
+            return {} if is_json else "", token_usage
+
+    def _parse_json_response(self, response: str) -> Dict[str, Any]:
+        """Parse JSON from Gemini response."""
+        try:
+            # Clean response text
+            text = response.strip()
+            if text.startswith("```json"):
+                text = text[7:]
+            if text.startswith("```"):
+                text = text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
+
+            return json.loads(text)
+
+        except Exception as e:
+            logger.error(f"Error parsing JSON response: {str(e)}")
+            return {}
 
 
 class OpenAIService(AIService):
     """OpenAI implementation of AI service."""
 
-    def __init__(self, model_name):
+    def __init__(
+            self,
+            model_name: Optional[str] = None,
+            cache_service: Optional[AICacheService] = None,
+            tenant_id: Optional[str] = None
+    ):
         """Initialize OpenAI client."""
-        super().__init__()
+        super().__init__(model_name=model_name, cache_service=cache_service, tenant_id=tenant_id)
         self.provider_name = "openai"
 
         api_key = os.getenv("OPENAI_API_KEY")
@@ -98,7 +433,7 @@ class OpenAIService(AIService):
             raise ValueError("OPENAI_API_KEY environment variable required")
 
         self.client = AsyncOpenAI(api_key=api_key)
-        self.model = model_name or "gpt-4o-mini"  # Can be configured as needed
+        self.model = model_name or "gpt-4o-mini"
 
         # OpenAI pricing per 1K tokens (can be configured)
         self.price_per_1k_tokens = {
@@ -113,8 +448,13 @@ class OpenAIService(AIService):
         }
 
     @with_retry(retry_config=OPENAI_RETRY_CONFIG, operation_name="_openai_generate_content")
-    async def generate_content(self, prompt: str, is_json: bool = True, operation_tag: str = "default") -> Union[Dict[str, Any], str]:
-        """Generate content using OpenAI."""
+    async def _generate_content_without_cache(
+            self,
+            prompt: str,
+            is_json: bool = True,
+            operation_tag: str = "default"
+    ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
+        """Generate content using OpenAI without using cache."""
         try:
             messages = [
                 {"role": "user", "content": prompt}
@@ -139,8 +479,8 @@ class OpenAIService(AIService):
 
             if not response.choices:
                 logger.warning("Empty response from OpenAI")
-                self._track_usage(self._create_token_usage(0, 0, operation_tag))
-                return {} if is_json else ""
+                token_usage = self._create_token_usage(0, 0, operation_tag)
+                return {} if is_json else "", token_usage
 
             # Calculate cost
             prompt_cost = (response.usage.prompt_tokens / 1000) * self.price_per_1k_tokens[self.model]["input"]
@@ -156,128 +496,90 @@ class OpenAIService(AIService):
                 total_cost_in_usd=total_cost,
                 provider=self.provider_name
             )
-            self._track_usage(token_usage)
 
             content = response.choices[0].message.content
-            return json.loads(content) if is_json else content
+            return (json.loads(content) if is_json else content), token_usage
 
         except Exception as e:
             logger.error(f"Error generating content with OpenAI: {str(e)}")
-            self._track_usage(self._create_token_usage(0, 0, operation_tag))
-            return {} if is_json else ""
-
-    def _create_token_usage(self, prompt_tokens: int, completion_tokens: int, operation_tag: str) -> TokenUsage:
-        """Create token usage object."""
-        total_tokens = prompt_tokens + completion_tokens
-        total_cost = (
-            (prompt_tokens / 1000) * self.price_per_1k_tokens[self.model]["input"] +
-            (completion_tokens / 1000) * self.price_per_1k_tokens[self.model]["output"]
-        )
-
-        return TokenUsage(
-            operation_tag=operation_tag,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            total_cost_in_usd=total_cost,
-            provider=self.provider_name
-        )
-
-
-class GeminiService(AIService):
-    """Gemini implementation of AI service."""
-
-    def __init__(self, model_name):
-        """Initialize Gemini client."""
-        super().__init__()
-        self.provider_name = "gemini"
-
-        api_key = os.getenv("GEMINI_API_TOKEN")
-        if not api_key:
-            raise ValueError("GEMINI_API_TOKEN environment variable required")
-
-        genai.configure(api_key=api_key)
-        name = model_name or 'gemini-2.0-flash'
-        self.model = genai.GenerativeModel(name)
-
-        # Approximate token count for cost estimation
-        self.avg_chars_per_token = 4
-        self.cost_per_1k_tokens = 0.00015  # Example rate
-
-    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_content")
-    async def generate_content(self, prompt: str, is_json: bool = True, operation_tag: str = "default") -> Union[Dict[str, Any], str]:
-        """Generate content using Gemini."""
-        try:
-            if is_json:
-                prompt = f"{prompt}\n\nRespond in JSON format only."
-
-            response = self.model.generate_content(prompt)
-            if not response or not response.parts:
-                logger.warning("Empty response from Gemini")
-                self._track_usage(self._create_token_usage(prompt, "", operation_tag))
-                return {} if is_json else ""
-
-            # Track token usage
-            response_text = response.parts[0].text
-            logger.debug(f"Gemini response: {response_text}")
-            token_usage = self._create_token_usage(prompt, response_text, operation_tag)
-            self._track_usage(token_usage)
-
-            if is_json:
-                return self._parse_json_response(response_text)
-            return response_text
-
-        except Exception as e:
-            logger.error(f"Error generating content with Gemini: {str(e)}")
-            self._track_usage(self._create_token_usage(prompt, "", operation_tag))
-            return {} if is_json else ""
-
-    def _parse_json_response(self, response: str) -> Dict[str, Any]:
-        """Parse JSON from Gemini response."""
-        try:
-            # Clean response text
-            text = response.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-
-            return json.loads(text)
-
-        except Exception as e:
-            logger.error(f"Error parsing JSON response: {str(e)}")
-            return {}
-
-    def _create_token_usage(self, prompt: str, response: str, operation_tag: str) -> TokenUsage:
-        """Estimate token usage for Gemini."""
-        # Rough estimation of tokens based on character count
-        prompt_tokens = len(prompt) // self.avg_chars_per_token
-        completion_tokens = len(response) // self.avg_chars_per_token
-        total_tokens = prompt_tokens + completion_tokens
-
-        # Approximate cost calculation
-        total_cost = total_tokens * self.cost_per_1k_tokens
-
-        return TokenUsage(
-            operation_tag=operation_tag,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            total_cost_in_usd=total_cost,
-            provider=self.provider_name
-        )
+            token_usage = self._create_token_usage(0, 0, operation_tag)
+            return {} if is_json else "", token_usage
 
 
 class AIServiceFactory:
-    """Factory for creating AI service instances."""
+    """Factory for creating AI service instances with integrated caching."""
 
-    @staticmethod
-    def create_service(provider: str = "openai", model_name=None) -> AIService:
-        """Create an AI service instance."""
+    def __init__(
+            self
+    ):
+        """
+        Initialize the factory with optional BigQuery settings for caching.
+
+        If caching is enabled, will use:
+        - GOOGLE_CLOUD_PROJECT env var if project_id not provided
+        - BIGQUERY_DATASET env var (default: 'userport_enrichment') if dataset not provided
+        """
+        self.cache_service = None
+
+        # Get project ID from args or environment
+        self.project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+        if not self.project_id:
+            raise ValueError("Project ID must be provided or GOOGLE_CLOUD_PROJECT environment variable must be set")
+
+        # Get dataset from args or environment
+        self.dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
+
+        # Initialize BigQuery client
+        try:
+            bigquery_client = bigquery.Client(project=self.project_id)
+            self.cache_service = AICacheService(
+                client=bigquery_client,
+                project_id=self.project_id,
+                dataset=self.dataset
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize BigQuery client: {str(e)}")
+            raise
+
+    #TODO(Sowrabh): Pass tenant_id from everywhere
+    def create_service(
+            self,
+            provider: str = "openai",
+            tenant_id: Optional[str] = None,
+            model_name: Optional[str] = None,
+            cache_ttl_hours: Optional[int] = 24
+    ) -> AIService:
+        """
+        Create an AI service instance with optional caching.
+
+        Args:
+            provider: AI provider ("openai" or "gemini")
+            model_name: Optional model name to use
+            tenant_id: Optional tenant ID for multi-tenancy
+            cache_ttl_hours: Cache TTL in hours (only used if caching is enabled)
+
+        Returns:
+            AIService instance (OpenAIService or GeminiService)
+        """
+        service: AIService
+
         if provider.lower() == "openai":
-            return OpenAIService(model_name)
+            service = OpenAIService(
+                model_name=model_name,
+                cache_service=self.cache_service,
+                tenant_id=tenant_id
+            )
         elif provider.lower() == "gemini":
-            return GeminiService(model_name)
+            service = GeminiService(
+                model_name=model_name,
+                cache_service=self.cache_service,
+                tenant_id=tenant_id
+            )
         else:
             raise ValueError(f"Unsupported AI provider: {provider}")
+
+        # Set cache TTL if caching is enabled
+        if self.cache_service and cache_ttl_hours is not None:
+            service.cache_ttl_hours = cache_ttl_hours
+
+        return service

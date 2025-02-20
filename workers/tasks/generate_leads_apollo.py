@@ -26,7 +26,7 @@ class ApolloConfig:
     """Centralized configuration management."""
     max_employees: int = 1000
     batch_size: int = 100
-    ai_batch_size: int = 10
+    ai_batch_size: int = 5
     fit_score_threshold: float = 0.0
     cache_ttl_hours: int = 24 * 30
     concurrent_requests: int = 3
@@ -162,7 +162,7 @@ You will be provided the following inputs delimited by triple quotes below:
 3. Additional Signals (for example Keywords or events) that makes a Lead more relevant to your Product.
 4. The Profiles of Leads you need to evaluate.
 
-Your goal is to look for the Signals provided in these Inputs within each Leads's profile to evaluate how good of a match they are for your product.
+Your goal is to look for the Signals provided within each Leads's profile to evaluate how good of a match they are for selling your product to them.
 
 Persona Types (choose one if possible):
 - end_user: Uses the product on a day-to-day basis. Typically in more hands-on, operational roles.
@@ -170,21 +170,7 @@ Persona Types (choose one if possible):
              Could be team leads, department heads, or strong opinion leaders.
 - buyer: Owns or significantly influences the budget, purchase authority, or procurement process.
 
-
-Important:
-*. Role Titles of Target Personas below is the list of target personas you need to match each lead with.
-*. Always assign one of end_user, influencer, buyer to the persona type if there's *any plausible match*. 
-*. Only assign null when there is NO conceivable match at all with any persona type.
-*. Evaluate each lead independently, without referring to the other leads.
-*. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit to the product & persona type and 0 indicates no alignment.
-*. The more Signals you find in the Lead's profile that are relevant to your Product, the higher their score.
-*. Consider their role titles in conjunction with the content including their background, about them, role descriptions, employment history and their profile provided before deciding on persona fit. Often titles are abstract and may not describe their role comprehensively.
-*. Rationale should highlight and cite the specific Signals from the Lead's Profile that supports the score. If there are no Signals, say "No Signals found".
-*. Write full sentences for bullet points in signals and explain each signal with rationale from the lead's profile. Don't make up any reasons.
-*. The date today is {date_now}. Use it compute any time related Signals (e.g. Recent Lead promotion, joining company etc.) that might be relevant. Usually, events within last 6 months are considered recent.
-
-
-## Examples
+Examples:
 Example 1:
 - Title: "Senior Data Analyst" → Usually end_user if the product is data/analytics-related.
 Example 2:
@@ -192,6 +178,17 @@ Example 2:
 Example 3:
 - Title: "VP of Sales" → Likely buyer, since they typically control or heavily influence budgets for products used in sales organisations.
 
+Important:
+*. Role Titles of Target Personas below is the list of target personas you need to match each lead with.
+*. Always assign one of end_user, influencer, buyer to the persona type if there's *any plausible match*. 
+*. Only assign null when there is NO conceivable match at all with any persona type.
+*. Evaluate each lead independently, without referring to the other leads.
+*. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit to the persona type, ICP and 0 indicates no alignment.
+*. The more Signals you find in the Lead's profile that are relevant to your Product, the higher their score.
+*. Consider their role titles in conjunction with the content including their background, about them, role descriptions, employment history and their profile provided. Often titles are abstract and the context around the title helps strengthen the conviction on the chosen persona type.
+*. Rationale should highlight and cite the specific Signals from the Lead's Profile that supports the score. If there are no Signals, say "No Signals found".
+*. Write full sentences for bullet points in `matching_signals` and explain each signal with rationale from the lead's profile. Don't make up any reasons.
+*. The date today is {date_now}. Use it compute any time related Signals (e.g. Recent Lead promotion, joining company etc.) that might be relevant. Usually, events within last 6 months are considered recent.
 
 Evaluate each lead and return a JSON response with this structure:
 {{
@@ -202,6 +199,7 @@ Evaluate each lead and return a JSON response with this structure:
             "rationale": string,
             "matching_signals": [string],
             "persona_match": string or null,
+            "internal_analysis": string
         }}
     ]
 }}
@@ -219,7 +217,24 @@ Role Titles of Target Personas:
 Additional Signals:
 {additional_signals}
 
-Lead Profiles:
+For each lead, you have:
+1. Their profile information
+2. Pre-evaluation insights showing:
+   - Initial assessment score
+   - Key signals identified
+   - Career insights
+   - Initial confidence level
+
+Consider these insights but form your own evaluation. If you disagree with the pre-evaluation:
+1. Explain why based on product fit in the `internal_analysis` field
+2. Point out what signals the pre-evaluation might have missed or overvalued
+3. Provide your reasoning based on the product context
+
+If a lead had high pre-evaluation confidence and score but you score them lower:
+- Explicitly explain the misalignment with the product in `internal_analysis` field
+- Reference specific aspects of the product that don't match
+
+Lead Profiles (with pre-evaluation insights):
 {lead_profiles}
 
 \"\"\"
@@ -711,7 +726,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
             # Evaluate all leads
             current_stage = 'evaluating_leads'
-            evaluated_leads = await self._evaluate_leads_v2(enriched_leads, product_data)
+            evaluated_leads = await self._evaluate_leads_v2(enriched_leads, product_data, pre_evaluations=pre_evaluation_results)
 
             # Store results with enhanced metadata
             current_stage = 'storing_results'
@@ -1156,46 +1171,112 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         self.metrics.processing_time = time.time() - start_time
         return evaluated_leads
 
-    async def _evaluate_leads_v2(self, enriched_leads: List[EnrichedLead], product_data: Dict[str, Any]) -> List[EvaluatedLead]:
-        """Evaluate leads in batches with enhanced error handling."""
+    async def _evaluate_leads_v2(self, enriched_leads: List[EnrichedLead], product_data: Dict[str, Any],
+                                 pre_evaluations: List[Dict]) -> List[EvaluatedLead]:
+        """
+        Evaluate leads in concurrent batches with enhanced error handling.
+        Uses semaphore to limit concurrent AI requests while maximizing throughput.
+        """
         if not enriched_leads:
             logger.warning("No enriched leads provided for evaluation")
             return []
 
         evaluated_leads: List[EvaluatedLead] = []
         start_time = time.time()
-        for i in range(0, len(enriched_leads), self.config.ai_batch_size):
-            try:
-                batch_dict_list: List[Dict[str, Any]] = [lead.model_dump(include=lead.get_lead_evaluation_serialization_fields()) for lead in enriched_leads[i:i + self.config.ai_batch_size]]
-                evaluation_prompt = self.prompts.LEAD_EVALUATION_PROMPT_V2.format(
-                    product_description=product_data["description"],
-                    persona_role_titles=json.dumps(product_data.get('persona_role_titles'), indent=2),
-                    additional_signals=product_data.get('additional_lead_signals'),
-                    lead_profiles=json.dumps(batch_dict_list, indent=2),
-                    date_now=datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
-                )
 
-                response = await self.model.generate_content(
-                    prompt=evaluation_prompt,
-                    is_json=True,
-                    operation_tag="lead_evaluation"
-                )
+        # Convert pre_evaluations list to a dict for easier lookup
+        pre_evaluations_dict = {
+            eval_result.get('id') or eval_result.get('lead_id'): eval_result
+            for eval_result in pre_evaluations
+            if eval_result.get('id') or eval_result.get('lead_id')
+        }
 
-                if not response:
-                    logger.error(f"Empty response from AI for batch {i//self.config.ai_batch_size + 1}")
+        # Configure concurrency
+        semaphore = asyncio.Semaphore(self.config.ai_concurrent_requests)
+
+        async def process_batch(batch: List[EnrichedLead]) -> List[EvaluatedLead]:
+            """Process a single batch of leads with the AI model."""
+            async with semaphore:
+                try:
+                    # Prepare lead profiles with pre-evaluation insights
+                    lead_profiles = []
+                    for lead in batch:
+                        lead_data = lead.model_dump(include=lead.get_lead_evaluation_serialization_fields())
+                        pre_eval = pre_evaluations_dict.get(lead.id)
+
+                        if pre_eval:
+                            lead_data['pre_evaluation_insights'] = {
+                                'initial_score': pre_eval.get('initial_score'),
+                                'key_signals': pre_eval.get('key_signals', []),
+                                'career_insights': pre_eval.get('career_insights', {}),
+                                'confidence': pre_eval.get('confidence')
+                            }
+                        else:
+                            lead_data['pre_evaluation_insights'] = None
+
+                        lead_profiles.append(lead_data)
+
+                    evaluation_prompt = self.prompts.LEAD_EVALUATION_PROMPT_V2.format(
+                        product_description=product_data.get("description", "Product description not available"),
+                        persona_role_titles=json.dumps(product_data.get('persona_role_titles', {}), indent=2),
+                        additional_signals=product_data.get('additional_lead_signals', ''),
+                        lead_profiles=json.dumps(lead_profiles, indent=2),
+                        date_now=datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
+                    )
+
+                    response = await self.model.generate_content(
+                        prompt=evaluation_prompt,
+                        is_json=True,
+                        operation_tag="lead_evaluation"
+                    )
+
+                    if not response or 'evaluated_leads' not in response:
+                        logger.error(f"Invalid response from AI model for batch of {len(batch)} leads")
+                        self.metrics.ai_errors += 1
+                        return []
+
+                    evaluated_leads_result = EvaluateLeadsResult(**response)
+                    self.metrics.successful_leads += len(evaluated_leads_result.evaluated_leads)
+                    return evaluated_leads_result.evaluated_leads
+
+                except Exception as e:
+                    logger.error(f"Error processing batch: {str(e)}", exc_info=True)
                     self.metrics.ai_errors += 1
-                    continue
+                    return []
 
-                evaluated_leads_result = EvaluateLeadsResult(**response)
-                evaluated_leads.extend(evaluated_leads_result.evaluated_leads)
-                self.metrics.successful_leads += len(evaluated_leads_result.evaluated_leads)
+        # Create batches and tasks
+        batches = [
+            enriched_leads[i:i + self.config.ai_batch_size]
+            for i in range(0, len(enriched_leads), self.config.ai_batch_size)
+        ]
 
-            except Exception as e:
-                logger.error(f"Error processing batch {i//self.config.ai_batch_size + 1}: {str(e)}")
-                self.metrics.ai_errors += 1
-                continue
+        logger.info(f"Processing {len(enriched_leads)} leads in {len(batches)} batches")
+        tasks = [process_batch(batch) for batch in batches]
+
+        # Execute all batches concurrently and gather results
+        try:
+            results: List[Union[List[EvaluatedLead], Exception]] = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results and handle any exceptions
+            for batch_result in results:
+                if isinstance(batch_result, Exception):
+                    logger.error(f"Batch processing failed: {str(batch_result)}")
+                    self.metrics.ai_errors += 1
+                else:
+                    evaluated_leads.extend(batch_result)
+
+        except Exception as e:
+            logger.error(f"Error in concurrent processing: {str(e)}", exc_info=True)
+            self.metrics.ai_errors += 1
 
         self.metrics.processing_time = time.time() - start_time
+
+        logger.info(
+            f"Lead evaluation completed. "
+            f"Processed {len(enriched_leads)} leads, "
+            f"successfully evaluated {len(evaluated_leads)}, "
+            f"in {self.metrics.processing_time:.2f} seconds"
+        )
         return evaluated_leads
 
     async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
