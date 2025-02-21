@@ -161,6 +161,39 @@ class AICacheService:
             }
 
         return None
+    
+    def _log_response_structure(self, response_data: Any) -> None:
+        """Log detailed structure of response data including types of all values."""
+        if not isinstance(response_data, dict):
+            logger.debug(f"Response data is not a dict, type: {type(response_data)}")
+            return
+
+        # Log first-level keys and their value types
+        type_info = {
+            key: f"{type(value).__name__} ({len(value) if isinstance(value, (list, dict, str)) else 'N/A'})"
+            for key, value in response_data.items()
+        }
+        logger.debug(f"Response data structure: {type_info}")
+
+        # For nested structures, log more details
+        for key, value in response_data.items():
+            if isinstance(value, list) and value:
+                # Log type of first item in list
+                first_item = value[0]
+                if isinstance(first_item, dict):
+                    nested_types = {
+                        nested_key: type(nested_value).__name__
+                        for nested_key, nested_value in first_item.items()
+                    }
+                    logger.debug(f"First item in '{key}' list has structure: {nested_types}")
+                else:
+                    logger.debug(f"Items in '{key}' list are of type: {type(first_item).__name__}")
+            elif isinstance(value, dict):
+                nested_types = {
+                    nested_key: type(nested_value).__name__
+                    for nested_key, nested_value in value.items()
+                }
+                logger.debug(f"Nested structure for '{key}': {nested_types}")
 
     async def cache_response(
             self,
@@ -175,7 +208,6 @@ class AICacheService:
             ttl_hours: Optional[int] = None
     ) -> None:
         """Cache an AI response."""
-        logger.debug(f"Caching response - is_json: {is_json}, response type: {type(response)}, response: {response}")
         cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag)
         expires_at = None
 
@@ -186,20 +218,35 @@ class AICacheService:
         response_text = None
 
         if is_json:
-            # Ensure response_data is always a dict/JSON object
+            # Handle JSON responses
             if isinstance(response, dict):
+                # Keep dict as is for response_data
                 response_data = response
-            else:
+            elif isinstance(response, str):
                 try:
                     # If it's a string, try to parse it as JSON
-                    response_data = json.loads(response) if isinstance(response, str) else {"data": response}
-                except json.JSONDecodeError:
-                    # If parsing fails, wrap it in a dict
+                    response_data = json.loads(response)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse response as JSON: {e}")
+                    # If parsing fails, wrap the string in a dict
                     response_data = {"data": response}
+            else:
+                # For any other type, wrap in a dict
+                response_data = {"data": str(response)}
+
+            # Validate that response_data is a dict before insertion
+            if not isinstance(response_data, dict):
+                logger.error(f"Invalid response_data type: {type(response_data)}")
+                response_data = {"data": str(response_data)}
         else:
+            # For non-JSON responses, store as string
             response_text = str(response)
 
-        logger.debug(f"Formatted response_data: {response_data} resposne_text{response_text}")
+        # Log the actual data being inserted
+        logger.debug(f"Inserting cache row - response_data type: {type(response_data)} response: {response}")
+        if response_data:
+            # Log detailed response structure
+            self._log_response_structure(response_data)
 
         row = {
             "cache_key": cache_key,
@@ -224,6 +271,8 @@ class AICacheService:
 
         if errors:
             logger.error(f"Error caching AI response: {errors}")
+            # Log the problematic data
+            logger.error(f"Failed caching ai row data: {json.dumps(row, default=str)}")
             raise Exception(f"Failed to cache AI response: {errors}")
 
     async def clear_expired_cache(self, days: int = 30) -> int:
