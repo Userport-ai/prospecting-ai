@@ -146,6 +146,8 @@ class AICacheService:
         results = list(self.client.query(query, job_config=job_config).result())
         if results:
             row = results[0]
+
+            # Create token usage object
             token_usage = TokenUsage(
                 operation_tag=operation_tag,
                 prompt_tokens=row.prompt_tokens,
@@ -155,13 +157,21 @@ class AICacheService:
                 provider=provider
             )
 
+            # Parse the response based on type
+            content = None
+            if is_json:
+                # BigQuery client already deserializes JSON fields
+                content = row.response_data
+            else:
+                content = row.response_text
+
             return {
-                "content": json.loads(row.response_data) if is_json else row.response_text,
+                "content": content,
                 "token_usage": token_usage
             }
 
         return None
-    
+
     def _log_response_structure(self, response_data: Any) -> None:
         """Log detailed structure of response data including types of all values."""
         if not isinstance(response_data, dict):
@@ -218,35 +228,14 @@ class AICacheService:
         response_text = None
 
         if is_json:
-            # Handle JSON responses
+            # Handle JSON responses - explicitly serialize to JSON string
             if isinstance(response, dict):
-                # Keep dict as is for response_data
-                response_data = response
-            elif isinstance(response, str):
-                try:
-                    # If it's a string, try to parse it as JSON
-                    response_data = json.loads(response)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse response as JSON: {e}")
-                    # If parsing fails, wrap the string in a dict
-                    response_data = {"data": response}
+                response_data = json.dumps(response)
             else:
-                # For any other type, wrap in a dict
-                response_data = {"data": str(response)}
-
-            # Validate that response_data is a dict before insertion
-            if not isinstance(response_data, dict):
-                logger.error(f"Invalid response_data type: {type(response_data)}")
-                response_data = {"data": str(response_data)}
+                # For non-dict responses, wrap in a dict and serialize
+                response_data = json.dumps({"data": str(response)})
         else:
-            # For non-JSON responses, store as string
             response_text = str(response)
-
-        # Log the actual data being inserted
-        logger.debug(f"Inserting cache row - response_data type: {type(response_data)} response: {response}")
-        if response_data:
-            # Log detailed response structure
-            self._log_response_structure(response_data)
 
         row = {
             "cache_key": cache_key,
@@ -255,7 +244,7 @@ class AICacheService:
             "prompt": prompt,
             "is_json_response": is_json,
             "operation_tag": operation_tag,
-            "response_data": response_data,
+            "response_data": response_data,  # Already JSON string
             "response_text": response_text,
             "prompt_tokens": token_usage.prompt_tokens,
             "completion_tokens": token_usage.completion_tokens,
@@ -266,13 +255,15 @@ class AICacheService:
             "tenant_id": tenant_id
         }
 
+        # For debugging
+        logger.debug(f"Inserting row with response_data type: {type(row['response_data'])}")
+
         table = self.client.get_table(f"{self.project_id}.{self.dataset}.{self.table_name}")
         errors = self.client.insert_rows_json(table, [row])
 
         if errors:
             logger.error(f"Error caching AI response: {errors}")
-            # Log the problematic data
-            logger.error(f"Failed caching ai row data: {json.dumps(row, default=str)}")
+            logger.error(f"Failed row data: {json.dumps(row, default=str)}")
             raise Exception(f"Failed to cache AI response: {errors}")
 
     async def clear_expired_cache(self, days: int = 30) -> int:
