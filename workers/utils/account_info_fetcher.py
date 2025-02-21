@@ -92,11 +92,10 @@ class AccountInfoFetcher:
 
             account_linkedin_urls = []
             if (builtwith_result and
-                    builtwith_result.status == "completed" and
                     builtwith_result.processed_data):
                 company_info = builtwith_result.processed_data.get('company_info', {})
                 social_profiles = company_info.get('social_profiles', [])
-                linkedin_urls = [url for url in social_profiles if 'linkedin.com' in url]
+                linkedin_urls = [url for url in social_profiles if 'linkedin.com/company' in url]
                 if linkedin_urls:
                     account_linkedin_urls = linkedin_urls
                     logger.info(f"Found LinkedIn URLs from BuiltWith: {linkedin_urls}")
