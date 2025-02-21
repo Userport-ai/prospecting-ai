@@ -96,10 +96,12 @@ class AccountInfoFetcher:
                     builtwith_result.processed_data):
                 company_info = builtwith_result.processed_data.get('company_info', {})
                 social_profiles = company_info.get('social_profiles', [])
-                linkedin_urls = [url for url in social_profiles if 'linkedin.com/company/' in url]
+                linkedin_urls = [url for url in social_profiles if 'linkedin.com' in url]
                 if linkedin_urls:
                     account_linkedin_urls = linkedin_urls
                     logger.info(f"Found LinkedIn URLs from BuiltWith: {linkedin_urls}")
+                else:
+                    logger.error(f"Didn't find any LinkedIn Urls in social_profiles: {social_profiles}")
 
             # Fallback: If no LinkedIn URL found from BuiltWith, use Jina search
             if not account_linkedin_urls:
