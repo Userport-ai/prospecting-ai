@@ -175,6 +175,7 @@ class AICacheService:
             ttl_hours: Optional[int] = None
     ) -> None:
         """Cache an AI response."""
+        logger.debug(f"Caching response - is_json: {is_json}, response type: {type(response)}, response: {response}")
         cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag)
         expires_at = None
 
@@ -185,9 +186,20 @@ class AICacheService:
         response_text = None
 
         if is_json:
-            response_data = response if isinstance(response, dict) else json.dumps(response)
+            # Ensure response_data is always a dict/JSON object
+            if isinstance(response, dict):
+                response_data = response
+            else:
+                try:
+                    # If it's a string, try to parse it as JSON
+                    response_data = json.loads(response) if isinstance(response, str) else {"data": response}
+                except json.JSONDecodeError:
+                    # If parsing fails, wrap it in a dict
+                    response_data = {"data": response}
         else:
-            response_text = response if isinstance(response, str) else json.dumps(response)
+            response_text = str(response)
+
+        logger.debug(f"Formatted response_data: {response_data} resposne_text{response_text}")
 
         row = {
             "cache_key": cache_key,

@@ -226,9 +226,8 @@ For each lead, you have:
    - Initial confidence level
 
 Consider these insights but form your own evaluation. If you disagree with the pre-evaluation:
-1. Explain why based on product fit in the `internal_analysis` field
-2. Point out what signals the pre-evaluation might have missed or overvalued
-3. Provide your reasoning based on the product context
+1. Explain why based on product fit in the `internal_analysis` field. You may use content from pre-evaluation in other fields however, DO NOT refer to "pre-evaluation" as a word/thing anywhere other than in `internal_analysis`.
+2. Provide your reasoning based on the product context
 
 If a lead had high pre-evaluation confidence and score but you score them lower:
 - Explicitly explain the misalignment with the product in `internal_analysis` field
@@ -241,7 +240,7 @@ Lead Profiles (with pre-evaluation insights):
 """
 
 
-def _is_recent_promotion(lead: ApolloLead) -> bool:
+def _is_recent_career_change(lead: ApolloLead) -> bool:
     """
     Check if the lead has been recently promoted or changed roles.
     Returns False if there are any date parsing errors.
@@ -437,7 +436,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         adjusted_threshold = base_threshold * size_multiplier
 
         # 3. Recent career changes
-        if _is_recent_promotion(apollo_lead):
+        if _is_recent_career_change(apollo_lead):
             adjusted_threshold *= self.config.recent_promotion_boost
 
         # 4. Department and function matching with boosting
