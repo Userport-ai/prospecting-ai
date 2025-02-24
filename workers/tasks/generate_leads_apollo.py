@@ -13,9 +13,11 @@ from services.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
 from services.jina_service import JinaService
 from services.proxycurl_service import ProxyCurlService
+from services.builtwith_service import BuiltWithService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
 from models.leads import ApolloLead, SearchApolloLeadsResponse, EnrichedLead, EvaluateLeadsResult, EvaluatedLead
+from models.accounts import SearchApolloOrganizationsResponse
 from .enrichment_task import AccountEnrichmentTask
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,7 @@ class ApolloConfig:
         'small': 1.1  # Increase threshold by 10% for small companies
     })
 
+
 AI_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
     base_delay=1.0,
@@ -69,6 +72,7 @@ AI_RETRY_CONFIG = RetryConfig(
         Exception  # Allow everything to be retryable here
     ]
 )
+
 
 @dataclass
 class ProcessingMetrics:
@@ -166,7 +170,7 @@ Your goal is to look for the Signals provided within each Leads's profile to eva
 
 Persona Types (choose one if possible):
 - end_user: Uses the product on a day-to-day basis. Typically in more hands-on, operational roles.
-- influencer: Has significant sway in purchase decisions, but may not directly hold budget. 
+- influencer: Has significant sway in purchase decisions, but may not directly hold budget.
              Could be team leads, department heads, or strong opinion leaders.
 - buyer: Owns or significantly influences the budget, purchase authority, or procurement process.
 
@@ -180,7 +184,7 @@ Example 3:
 
 Important:
 *. Role Titles of Target Personas below is the list of target personas you need to match each lead with.
-*. Always assign one of end_user, influencer, buyer to the persona type if there's *any plausible match*. 
+*. Always assign one of end_user, influencer, buyer to the persona type if there's *any plausible match*.
 *. Only assign null when there is NO conceivable match at all with any persona type.
 *. Evaluate each lead independently, without referring to the other leads.
 *. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit to the persona type, ICP and 0 indicates no alignment.
@@ -324,12 +328,15 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
     def _initialize_credentials(self) -> None:
         """Initialize and validate required API credentials."""
-        self.apollo_api_key = os.getenv('APOLLO_API_KEY')
+        self.apollo_lead_search_api_key = os.getenv('APOLLO_LEAD_SEARCH_API_KEY')
+        self.apollo_org_search_api_key = os.getenv('APOLLO_ORG_SEARCH_API_KEY')
         self.project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
         self.dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
 
-        if not self.apollo_api_key:
-            raise ValueError("APOLLO_API_KEY environment variable is required")
+        if not self.apollo_lead_search_api_key:
+            raise ValueError("APOLLO_LEAD_SEARCH_API_KEY environment variable is required")
+        if not self.apollo_org_search_api_key:
+            raise ValueError("APOLLO_ORG_SEARCH_API_KEY environment variable is required")
 
         # Initialize cache service
         self.cache_service = APICacheService(
@@ -463,8 +470,8 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
         # 6. Decision making
         meets_thresholds = (
-                score >= adjusted_threshold and
-                confidence >= self.config.confidence_threshold
+            score >= adjusted_threshold and
+            confidence >= self.config.confidence_threshold
         )
 
         # Logging for transparency
@@ -492,28 +499,28 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             base_prompt = f"""
             You are an experienced BDR/SDR tasked with quickly evaluating a list of potential leads based on limited information.
             Your goal is to identify leads that show strong potential and warrant deeper research/enrichment.
-            
+
             Product Description:
             {product_data.get('description')}
-            
+
             Target Personas:
             {json.dumps(product_data.get('persona_role_titles', {}), indent=2)}
-            
+
             Evaluation Guidelines:
             1. Role Relevance:
                - How closely does their title match our target personas?
                - Is their seniority level appropriate for decision-making/influence?
                - Do their departments/functions align with our product's use case?
-            
+
             2. Company Context:
                - Does their company profile suggest they might need our solution?
                - Is the company in our target market/industry?
                - Consider company size and maturity
-            
+
             3. Confidence Level:
                - How certain are we about this evaluation given limited data?
                - What factors increase/decrease our confidence?
-            
+
             Return a JSON response with this structure:
             {{
                 "evaluated_leads": [
@@ -617,10 +624,16 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         product_data = payload.get('product_data', {})
         current_stage = 'initialization'
 
+        name = account_data.get("name")
+        if not name:
+            raise ValueError(f"Account name is requried for lead identication for account ID: {account_id}")
         website = account_data.get('website')
         if not website:
-            raise ValueError("Account website/domain is required for lead identification")
-        account_data['domain'] = UrlUtils.extract_domain(website)
+            raise ValueError(f"Account website/domain is required for lead identification for account ID: {account_id}")
+        domain = UrlUtils.get_domain(url=website)
+        if not domain:
+            raise ValueError(f"Domain is required for lead identification for account ID: {account_id}")
+        account_data['domain'] = domain
 
         logger.info(f"Starting lead identification for job_id: {job_id}, account_id: {account_id}")
 
@@ -636,9 +649,15 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 processed_data={'stage': current_stage}
             )
 
+            # Fetch Apollo Organization ID.
+            current_stage = 'fetching_apollo_org_id'
+            apollo_org_id: Optional[str] = await self._fetch_apollo_organization_id(name=name, domain=domain)
+            if not apollo_org_id:
+                logger.error(f"Failed to fetch Apollo Organization ID for domain: {domain}")
+
             # Fetch employees with concurrent processing
             current_stage = 'fetching_employees'
-            apollo_leads: List[ApolloLead] = await self._fetch_employees_concurrent(account_data['domain'])
+            apollo_leads: List[ApolloLead] = await self._fetch_employees_concurrent(domain=domain, apollo_org_id=apollo_org_id)
             self.metrics.total_leads_processed = len(apollo_leads)
 
             await self.callback_svc.send_callback(
@@ -799,12 +818,67 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 "metrics": asdict(self.metrics)
             }
 
-    @with_retry(retry_config=APOLLO_RETRY_CONFIG, operation_name="fetch_employees_concurrent")
-    async def _fetch_employees_concurrent(self, domain: str) -> List[ApolloLead]:
-        """Fetch employees with concurrent processing."""
-        if not domain:
-            raise ValueError("Domain is required")
+    @with_retry(retry_config=APOLLO_RETRY_CONFIG, operation_name="fetch_apollo_organization_id")
+    async def _fetch_apollo_organization_id(self, name: str, domain: str) -> Optional[str]:
+        """Returns Apollo Organization ID for given domain. If not found, returns None."""
 
+        # Fetch LinkedIn URLs associated with the domain from BuiltWith.
+        bw_service = BuiltWithService(cache_service=self.cache_service)
+        builtwith_result = await bw_service.get_technology_profile(domain=domain)
+        account_linkedin_urls: Optional[List[str]] = builtwith_result.get_account_linkedin_urls()
+        if not account_linkedin_urls:
+            logger.error(f"Apollo Organization ID: Failed to find Account LinkedIn URLs for name: {name} and domain: {domain}")
+            return None
+        else:
+            logger.debug(f"Apollo Organization ID: Found LinkedIn URLs in BuiltWith response: {account_linkedin_urls}")
+
+        try:
+            # Use Account name to filter a list of organizations in Apollo.
+            # We will assume that the organization is found in the first page of results for now.
+            search_params = {
+                'q_organization_name': name,
+                'page': 1,
+                'per_page': self.config.batch_size
+            }
+            headers = {
+                'Content-Type': 'application/json',
+                'x-api-key': self.apollo_org_search_api_key
+            }
+            response, status_code = await cached_request(
+                cache_service=self.cache_service,
+                url="https://api.apollo.io/api/v1/mixed_companies/search",
+                method='POST',
+                params=search_params,
+                headers=headers,
+                ttl_hours=self.config.cache_ttl_hours
+            )
+
+            if status_code == 429:
+                raise RetryableError("Rate limit exceeded")
+
+            if status_code != 200:
+                raise ValueError(f"Got a non 200 response code: {status_code} when fetching Apollo org ID for name: {name}, domain: {domain} with response: {response}")
+
+            apollo_org_response = SearchApolloOrganizationsResponse(**response)
+            all_organizations = apollo_org_response.get_all_organizations()
+            for org in all_organizations:
+                for linkedin_url in account_linkedin_urls:
+                    if UrlUtils.are_account_linkedin_urls_same(org.linkedin_url, linkedin_url):
+                        # Found the desired organization, return ID.
+                        logger.info(f"Found Apollo Org ID: {org} for name: {name} and domain: {domain}")
+                        return org.id
+
+            logger.error(f"Failed to find linkedin URL match: {account_linkedin_urls} among all the organizations in Apollo Org Search for name: {name} and domain: {domain}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error fetching Apollo Org ID: {str(e)}")
+            self.metrics.api_errors += 1
+            return None
+
+    @with_retry(retry_config=APOLLO_RETRY_CONFIG, operation_name="fetch_employees_concurrent")
+    async def _fetch_employees_concurrent(self, domain: str, apollo_org_id: Optional[str]) -> List[ApolloLead]:
+        """Fetch employees with concurrent processing."""
         all_employees: List[ApolloLead] = []
         semaphore = asyncio.Semaphore(self.config.concurrent_requests)
 
@@ -812,18 +886,26 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             async with semaphore:
                 try:
                     search_params = {
-                        'api_key': self.apollo_api_key,
-                        'q_organization_domains': domain,
                         'page': page_num,
                         'per_page': self.config.batch_size
                     }
+                    # If Apollo Org ID is present we will search using that
+                    # else we will search using the domain.
+                    if apollo_org_id:
+                        search_params['organization_ids[]'] = apollo_org_id
+                    else:
+                        search_params['q_organization_domains'] = domain
 
+                    headers = {
+                        'Content-Type': 'application/json',
+                        'x-api-key': self.apollo_lead_search_api_key
+                    }
                     response, status_code = await cached_request(
                         cache_service=self.cache_service,
-                        url="https://api.apollo.io/v1/mixed_people/search",
+                        url="https://api.apollo.io/api/v1/mixed_people/search",
                         method='POST',
                         params=search_params,
-                        headers={'Content-Type': 'application/json'},
+                        headers=headers,
                         ttl_hours=self.config.cache_ttl_hours
                     )
 

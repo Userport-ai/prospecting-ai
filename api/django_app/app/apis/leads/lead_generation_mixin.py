@@ -11,6 +11,7 @@ class LeadGenerationMixin:
         return {
             "account_id": str(account.id),
             "account_data": {
+                "name": account.name,
                 "website": account.website
             },
             "product_data": {

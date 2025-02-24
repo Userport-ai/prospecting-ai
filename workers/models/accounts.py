@@ -154,6 +154,36 @@ class BrightDataAccount(UserportPydanticBaseModel):
     warning: Optional[str] = Field(default=None, description="Example warning text: 4XX page - dead page")
     warning_code: Optional[str] = Field(default=None, description="Example code: dead_page")
 
+
+class SearchApolloOrganizationsResponse(UserportPydanticBaseModel):
+    """Apollo Leads search response."""
+    class Pagination(UserportPydanticBaseModel):
+        page: Optional[int] = None
+        per_page: Optional[int] = None
+        total_entries: Optional[int] = None
+        total_pages: Optional[int] = None
+
+    class Account(UserportPydanticBaseModel):
+        linkedin_url: Optional[str] = None
+        organization_id: Optional[str] = None
+
+    class Organization(UserportPydanticBaseModel):
+        id: Optional[str] = None
+        linkedin_url: Optional[str] = None
+
+    pagination: Optional[Pagination] = None
+    accounts: Optional[List[Account]] = Field(default=None, description="These are Apollo Companies that have been added to our Apollo account's database during prospecting.")
+    organizations: Optional[List[Organization]] = Field(
+        default=None, description="These are Apollo Companies that have NOT been added to our Apollo account's database but are available in Apollo's public database..")
+
+    def get_all_organizations(self) -> List[Organization]:
+        """Returns all organizations (accounts + organizations) from the given response."""
+        orgs_from_accounts = []
+        if self.accounts:
+            orgs_from_accounts = [SearchApolloOrganizationsResponse.Organization(id=acc.organization_id, linkedin_url=acc.linkedin_url) for acc in self.accounts]
+        other_orgs = self.organizations if self.organizations else []
+        return orgs_from_accounts + other_orgs
+
 # ------------Main Account Information------------
 
 
