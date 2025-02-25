@@ -1,7 +1,7 @@
 steps:
   # Build the image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/omega-winter-431704/prefect-server', '.']
+    args: ['build', '-t', 'gcr.io/omega-winter-431704/prefect-server', '-f', 'workers/scripts/prefect_server/Dockerfile', '.']
 
   # Push the image
   - name: 'gcr.io/cloud-builders/docker'
