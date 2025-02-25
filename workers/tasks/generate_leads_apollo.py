@@ -567,7 +567,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                         } for lead in batch]
 
                         batch_prompt = f"{base_prompt}\n\nThe leads to evaluate:\n{json.dumps(batch_data, indent=2)}"
-                        response = await self.model.generate_content(batch_prompt, is_json=True)
+                        response = await self.model.generate_content(batch_prompt, is_json=True, operation_tag="pre_evaluate_apollo_leads")
 
                         if not response:
                             logger.error("Empty response from AI model")
