@@ -33,7 +33,7 @@ steps:
       '--add-cloudsql-instances=$PROJECT_ID:us-central1:prefect-db',
       '--set-secrets=PREFECT_DB_PASSWORD=prefect-db-password:latest'
     ]
-    waitFor: ['push-sha', 'push-latest']
+    waitFor: ['push-latest']
 
 timeout: 1800s
 
