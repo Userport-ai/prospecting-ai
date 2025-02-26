@@ -33,10 +33,14 @@ steps:
       '--add-cloudsql-instances=omega-winter-431704-u5:us-central1:prefect-db',
       '--set-secrets=PREFECT_DB_PASSWORD=prefect-db-password:latest',
       '--port=8080',
-      '--use-http2',
       '--timeout=300s',
-      '--health-checks=tcp',
-      '--no-cpu-throttling'
+      '--no-cpu-throttling',
+      '--set-env-vars=PREFECT_SERVER_API_HOST=0.0.0.0',
+      '--set-env-vars=PREFECT_SERVER_API_PORT=8080',
+      '--set-env-vars=PREFECT_UI_ENABLED=true',
+      '--health-checks=/api/health',
+      '--startup-cpu-boost',
+      '--cpu-boost-duration=300s'
     ]
     waitFor: ['push']
 
@@ -60,4 +64,4 @@ options:
   dynamicSubstitutions: true
 
 images:
-  - 'gcr.io/omega-winter-431704-u5/prefect-server:latest'
+  - 'gcr.io/omega-winter-431704-u5/prefect-server:lates
