@@ -55,15 +55,15 @@ fi
 # Use PORT environment variable provided by Cloud Run, default to 8080 if not set
 PORT=${PORT:-8080}
 
-# Get the service URL from Cloud Run environment or use a default
-SERVICE_URL=${K_SERVICE:+https://$K_SERVICE-$K_REVISION-$K_CONFIGURATION.a.run.app}
-# If running locally and K_SERVICE is not set, use localhost
-if [ -z "$SERVICE_URL" ]; then
-  SERVICE_URL="http://localhost:${PORT}"
-fi
+# Configure Prefect API settings for better accessibility
+export PREFECT_API_URL="https://prefect-server-r7y4eamgqa-ue.a.run.app/api"
+export PREFECT_UI_API_URL="https://prefect-server-r7y4eamgqa-ue.a.run.app/api"
+export PREFECT_SERVER_API_HOST="0.0.0.0"
+export PREFECT_API_SERVICES_LATE_RUNS_LOOP_SECONDS=10
+export PREFECT_API_SERVICES_PAUSE_EXPIRATION_SECONDS=10
+export PREFECT_API_SERVICES_SCHEDULER_LOOP_SECONDS=10
 
-# Configure Prefect API URL
-export PREFECT_UI_API_URL="${SERVICE_URL}/api"
+echo "Setting PREFECT_API_URL to ${PREFECT_API_URL}"
 echo "Setting PREFECT_UI_API_URL to ${PREFECT_UI_API_URL}"
 
 # Start Prefect server
