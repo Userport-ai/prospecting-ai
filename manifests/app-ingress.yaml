@@ -9,16 +9,6 @@ metadata:
     kubernetes.io/ingress.allow-http: "false"
 spec:
   rules:
-    - host: "flower.userport.ai"
-      http:
-        paths:
-          - path: /*
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: flower-service
-                port:
-                  number: 80
     - host: "app.userport.ai"
       http:
         paths:
@@ -29,24 +19,10 @@ spec:
                 name: userport-django-service
                 port:
                   number: 80
-          - path: /api/v1/
-            pathType: Prefix
-            backend:
-              service:
-                name: flask-api-service
-                port:
-                  number: 80
           - path: /api/
             pathType: Prefix
             backend:
               service:
                 name: userport-django-service
-                port:
-                  number: 80
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: react-service
                 port:
                   number: 80
