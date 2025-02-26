@@ -474,14 +474,6 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 account_info.technologies = technologies
                 account_info.tech_profile = tech_profile
 
-                # Store data in BigQuery
-                logger.debug(f"Job {job_id}, Account {account_id}: Storing processed data in BigQuery")
-                await self.bq_service.insert_account_data(
-                    account_id=account_id,
-                    structured_data=structured_data,
-                    raw_profile=company_profile
-                )
-
                 # Process and format enrichment data
                 processed_data = {
                     'company_name': account_info.name,
