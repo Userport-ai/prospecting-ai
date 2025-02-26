@@ -55,8 +55,8 @@ fi
 # Use PORT environment variable provided by Cloud Run, default to 8080 if not set
 PORT=${PORT:-8080}
 
-# Get the correct service URL
-ACTUAL_SERVICE_URL="https://prefect-server-r7y4eamgqa-ue.a.run.app"
+# Get the correct service URL - this is the publicly accessible URL
+ACTUAL_SERVICE_URL="https://prefect-server-116199002084.us-east1.run.app"
 
 # Configure Prefect API settings for better accessibility
 export PREFECT_API_URL="${ACTUAL_SERVICE_URL}/api"

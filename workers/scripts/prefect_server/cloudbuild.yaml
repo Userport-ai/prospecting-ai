@@ -36,15 +36,15 @@ steps:
     ]
     waitFor: ['push']
 
-  # Set up IAP for Cloud Run
+  # Set up public access for Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'enable-iap'
+    id: 'enable-public-access'
     entrypoint: gcloud
     args: [
       'run', 'services', 'update',
       'prefect-server',
       '--region=us-east1',
-      '--ingress=internal-and-cloud-load-balancing'
+      '--ingress=all'
     ]
     waitFor: ['deploy']
 
