@@ -25,12 +25,12 @@ steps:
       'prefect-server',
       '--image=gcr.io/omega-winter-431704-u5/prefect-server:latest',
       '--platform=managed',
-      '--region=us-central1',
+      '--region=us-east1',
       '--allow-unauthenticated',
       '--memory=1Gi',
       '--cpu=1',
       '--min-instances=1',
-      '--add-cloudsql-instances=omega-winter-431704-u5:us-central1:prefect-db',
+      '--add-cloudsql-instances=omega-winter-431704-u5:us-east1:prefect-db',
       '--set-secrets=PREFECT_DB_PASSWORD=prefect-db-password:latest',
       '--timeout=300s'
     ]
@@ -42,7 +42,7 @@ steps:
     entrypoint: gcloud
     args: [
       'beta', 'run', 'services', 'add-iam-policy-binding',
-      '--region=us-central1',
+      '--region=us-east1',
       '--member=allUsers',
       '--role=roles/run.invoker',
       'prefect-server'
