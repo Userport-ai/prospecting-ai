@@ -1,0 +1,14 @@
+bindings:
+- members:
+  - user:sowrabh@userport.ai
+  role: roles/run.admin
+- members:
+  - domain:userport.ai
+  - user:sowrabh@userport.ai
+  - serviceAccount:iap-prefect-sa@omega-winter-431704-u5.iam.gserviceaccount.com
+  role: roles/run.invoker
+- members:
+  - serviceAccount:iap-prefect-sa@omega-winter-431704-u5.iam.gserviceaccount.com
+  role: roles/iap.httpsResourceAccessor
+etag: BwYvCgWwjmY=
+version: 1

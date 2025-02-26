@@ -1,0 +1,10 @@
+name: projects/omega-winter-431704-u5/policies/iam.allowedPolicyMemberDomains
+spec:
+  rules:
+    - condition:
+        expression: "resource.matchTag('116199002084/prefect-public-access', 'true')"
+      values:
+        allowAll: true
+    - values:
+        allowedValues:
+          - "C03umtx7f"
