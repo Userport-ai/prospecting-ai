@@ -11,8 +11,8 @@ RUN wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.
 RUN pip install prefect-gcp psycopg2-binary asyncpg
 
 # Copy startup script
-COPY workers/scripts/prefect_server/start_server.sh /app/start-server.sh
-RUN chmod +x /app/start-server.sh
+COPY workers/scripts/prefect_server/start_server.sh /app/start_server.sh
+RUN chmod +x /app/start_server.sh
 
 # Start Prefect server
-ENTRYPOINT ["/app/start-server.sh"]
+ENTRYPOINT ["/app/start_server.sh"]

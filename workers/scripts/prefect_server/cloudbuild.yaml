@@ -32,7 +32,6 @@ steps:
       '--min-instances=1',
       '--add-cloudsql-instances=omega-winter-431704-u5:us-central1:prefect-db',
       '--set-secrets=PREFECT_DB_PASSWORD=prefect-db-password:latest',
-      '--port=8080',
       '--timeout=300s'
     ]
     waitFor: ['push']
