@@ -26,7 +26,8 @@ steps:
       '--image=gcr.io/omega-winter-431704-u5/prefect-server:latest',
       '--platform=managed',
       '--region=us-east1',
-      '--allow-unauthenticated',
+      # Removed '--allow-unauthenticated' due to domain restriction policy
+      # Will use IAP for authentication instead
       '--memory=1Gi',
       '--cpu=1',
       '--min-instances=1',
@@ -36,8 +37,18 @@ steps:
     ]
     waitFor: ['push']
 
-  # Note: IAM policy binding step removed as the service is already publicly accessible
-  # via the --allow-unauthenticated flag in the deployment step
+  # Set up IAM policy for authenticated access
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'set-iam'
+    entrypoint: gcloud
+    args: [
+      'run', 'services', 'add-iam-policy-binding',
+      '--region=us-east1',
+      '--member=user:sowrabh@userport.ai',
+      '--role=roles/run.invoker',
+      'prefect-server'
+    ]
+    waitFor: ['deploy']
 
 timeout: 1800s
 
