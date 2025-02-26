@@ -26,7 +26,7 @@ steps:
       '--image=gcr.io/omega-winter-431704-u5/prefect-server:latest',
       '--platform=managed',
       '--region=us-east1',
-      '--allow-unauthenticated',
+      '--no-allow-unauthenticated',
       '--memory=1Gi',
       '--cpu=1',
       '--min-instances=1',
@@ -36,15 +36,15 @@ steps:
     ]
     waitFor: ['push']
 
-  # Set up public access for Cloud Run
+  # Set up IAP for Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'enable-public-access'
+    id: 'configure-iap'
     entrypoint: gcloud
     args: [
       'run', 'services', 'update',
       'prefect-server',
       '--region=us-east1',
-      '--ingress=all'
+      '--ingress=internal-and-cloud-load-balancing'
     ]
     waitFor: ['deploy']
 
