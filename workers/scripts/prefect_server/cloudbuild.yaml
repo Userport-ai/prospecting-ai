@@ -35,19 +35,6 @@ steps:
     ]
     waitFor: ['push']
 
-  # Set IAM Policy for Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'set-iam'
-    entrypoint: gcloud
-    args: [
-      'beta', 'run', 'services', 'add-iam-policy-binding',
-      '--region=us-central1',
-      '--member=allUsers',
-      '--role=roles/run.invoker',
-      'prefect-server'
-    ]
-    waitFor: ['deploy']
-
 timeout: 1800s
 
 options:
