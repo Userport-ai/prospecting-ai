@@ -2,7 +2,7 @@
 set -e
 
 # Start Cloud SQL Proxy in the background
-cloud-sql-proxy --address 0.0.0.0 --port 5432 omega-winter-431704-u5:us-central1:prefect-db &
+cloud-sql-proxy --address 0.0.0.0 --port 5432 omega-winter-431704-u5:us-east1:prefect-db &
 
 # Wait for proxy to start
 sleep 5
