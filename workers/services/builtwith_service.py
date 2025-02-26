@@ -11,6 +11,7 @@ from utils.retry_utils import RetryConfig, RetryableError, with_retry
 
 logger = logging.getLogger(__name__)
 
+
 class BuiltWithService:
     """Service for interacting with the BuiltWith API to fetch technology data."""
 
@@ -39,10 +40,8 @@ class BuiltWithService:
     @with_retry(retry_config=RETRY_CONFIG, operation_name="get_technology_profile")
     async def get_technology_profile(self, domain: str) -> EnrichmentResult:
         """Fetch and process technology profile for a domain."""
-        start_time = time()
-
         if not domain:
-            raise ValueError("Domain is required")
+            raise ValueError("Domain is required to get technology profile")
 
         try:
             response, status_code = await cached_request(
@@ -59,7 +58,6 @@ class BuiltWithService:
 
             if status_code == 200:
                 builtwith_response = BuiltWithApiResponse(**response)
-                print (f"builtwith_response: {builtwith_response}")
 
                 if builtwith_response.Errors:
                     raise RetryableError(f"BuiltWith API errors: {builtwith_response.Errors}")

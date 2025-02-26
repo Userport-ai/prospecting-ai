@@ -9,7 +9,6 @@ from typing import Dict, Any, List
 
 import google.generativeai as genai
 import requests
-import tldextract
 
 from models.builtwith import EnrichmentResult
 from services.api_cache_service import APICacheService
@@ -20,6 +19,7 @@ from utils.website_parser import WebsiteParser
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from .enrichment_task import AccountEnrichmentTask
 from utils.account_info_fetcher import AccountInfoFetcher
+from utils.url_utils import UrlUtils
 from models.accounts import AccountInfo, Financials
 
 logger = logging.getLogger(__name__)
@@ -356,12 +356,11 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         processed_count = 0
         total_accounts = len(accounts)
 
-        callback_payload = None # result payload to be sent back to django
+        callback_payload = None  # result payload to be sent back to django
         for account in accounts:
             processed_count += 1
             account_id = account.get('account_id')
             website = account.get('website')
-            domain = tldextract.extract(website).fqdn
 
             logger.info(f"Processing account {processed_count}/{total_accounts}: ID {account_id}, website: {website}")
 
@@ -471,7 +470,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 account_info.customers = list(set(account_info.customers) | set(wb_customers))
 
                 # Fetch technologies and update account info
-                technologies, tech_profile = await self._fetch_technology_stack(domain, job_id, account_id, account_info.technologies)
+                technologies, tech_profile = await self._fetch_technology_stack(website=website, account_id=account_id, existing_technologies=account_info.technologies)
                 account_info.technologies = technologies
                 account_info.tech_profile = tech_profile
 
@@ -583,7 +582,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             "results": results
         }
 
-    async def _fetch_technology_stack(self, domain: str, job_id:str, account_id: str,
+    async def _fetch_technology_stack(self, website: str, account_id: str,
                                       existing_technologies) -> tuple[List[str], EnrichmentResult]:
         """
         Fetches technology stack from BuiltWith API and website parser if needed.
@@ -592,6 +591,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         logger.debug(f"Fetching technology stack for account ID {account_id}")
 
         # Try BuiltWith first
+        domain = UrlUtils.get_domain(url=website)
         builtwith_service = BuiltWithService(cache_service=self.cache_service)
         tech_profile = await builtwith_service.get_technology_profile(domain=domain)
 
@@ -612,7 +612,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         # Fallback to website parser if no BuiltWith technologies found
         if not bw_technologies:
             logger.debug("No BuiltWith technologies found, attempting website parse")
-            wb_parser = WebsiteParser(website=f"https://{domain}")
+            wb_parser = WebsiteParser(website=website)
             website_technologies = await wb_parser.fetch_technologies()
             website_technologies = [str(tech) for tech in website_technologies if tech]
             logger.debug(f"Technologies from Website for account ID {account_id} are {website_technologies}")

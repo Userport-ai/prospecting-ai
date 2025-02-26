@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Any, Union
 
 from pydantic import BaseModel, Field, model_validator
 
+
 class Category(BaseModel):
     """Model for technology categories."""
     name: str = Field(alias="Name")
@@ -18,10 +19,12 @@ class Category(BaseModel):
             return {"Name": value, "Confidence": None}
         return value
 
+
 class SpendHistory(BaseModel):
     """Model for spend history data."""
     D: Optional[int] = None  # Date timestamp
     S: Optional[int] = None  # Spend amount
+
 
 class TechnologyBase(BaseModel):
     """Base model for technology-related data."""
@@ -59,15 +62,18 @@ class TechnologyBase(BaseModel):
                 values['Categories'] = normalized
         return values
 
+
 class PathTechnologies(BaseModel):
     """Model for technologies within a path."""
     Technologies: Optional[List[TechnologyBase]] = Field(default_factory=list)
+
 
 class ResultData(BaseModel):
     """Model for the Result object data."""
     IsDB: Optional[str] = None
     Spend: Optional[int] = None
     Paths: Optional[List[PathTechnologies]] = Field(default_factory=list)
+
 
 class ResultGroup(BaseModel):
     """Model for a group of results."""
@@ -79,6 +85,7 @@ class ResultGroup(BaseModel):
     Url: Optional[str] = None
     SubDomain: Optional[str] = None
     Technologies: Optional[List[TechnologyBase]] = Field(default_factory=list)
+
 
 class MetaAttributes(BaseModel):
     """Model for additional metadata attributes."""
@@ -98,6 +105,7 @@ class MetaAttributes(BaseModel):
     CMetrics: int = 0
     ProductCount: int = 0
 
+
 class MetaData(BaseModel):
     """Model for BuiltWith metadata."""
     Majestic: Optional[int] = None
@@ -115,6 +123,7 @@ class MetaData(BaseModel):
     ARank: Optional[int] = None
     QRank: Optional[int] = None
 
+
 class BuiltWithApiResponse(BaseModel):
     """Complete model for BuiltWith API response."""
     Results: Optional[List[ResultGroup]] = Field(default_factory=list)
@@ -127,6 +136,7 @@ class BuiltWithApiResponse(BaseModel):
     Errors: Optional[List[str]] = Field(default_factory=list)
     Trust: Optional[Any] = None
 
+
 class TechnologyProfile(BaseModel):
     """Processed technology profile."""
     categories: Dict[str, List[str]] = Field(default_factory=dict)
@@ -138,6 +148,7 @@ class TechnologyProfile(BaseModel):
     subdomains: Dict[str, List[str]] = Field(default_factory=dict)
     meta: Dict[str, Any] = Field(default_factory=dict)
     company_info: Dict[str, Any] = Field(default_factory=dict)
+
 
 class TechnologyDetail(BaseModel):
     """Detailed information about a specific technology."""
@@ -154,6 +165,7 @@ class TechnologyDetail(BaseModel):
     paths: List[str] = Field(default_factory=list)
     subdomain: Optional[str] = None
 
+
 class QualityMetrics(BaseModel):
     """Quality metrics for technology enrichment."""
     technology_count: int = 0
@@ -167,12 +179,14 @@ class QualityMetrics(BaseModel):
     coverage_score: float = 0.0
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
+
 class EnrichmentError(BaseModel):
     """Error information for enrichment process."""
     message: str
     code: str
     details: Optional[Dict[str, Any]] = None
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
 
 class EnrichmentResult(BaseModel):
     """Complete enrichment process result."""
@@ -185,3 +199,20 @@ class EnrichmentResult(BaseModel):
     error: Optional[EnrichmentError] = None
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    def get_account_linkedin_urls(self) -> Optional[List[str]]:
+        """Helper to extract all Account linkedin URLs from given enrichment result. Returns None if no URL found."""
+        if not self.processed_data:
+            return None
+
+        company_info = self.processed_data.get('company_info', {})
+        social_profiles = company_info.get('social_profiles', [])
+        if len(social_profiles) == 0:
+            return None
+
+        linkedin_urls = [url for url in social_profiles if 'linkedin.com/company' in url]
+        # In most cases BuiltWith returns 1 LinkedIn URL.
+        # But in some cases it can return multiple LinkedIn URLs like for workable.com it returns ['http://linkedin.com/company/workable-hr', 'http://linkedin.com/company/workable-software'].
+        # In this case both the URLs work (one redirects to the other) but if the client is using this result to match the URL present
+        # in another data source like Apollo, it needs to have access to both.
+        return linkedin_urls

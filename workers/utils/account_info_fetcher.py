@@ -2,7 +2,6 @@ import logging
 import os
 from typing import List, Optional
 
-import tldextract
 from pydantic import BaseModel, Field
 
 from models.accounts import BrightDataAccount, AccountInfo, RecentDevelopments
@@ -13,6 +12,7 @@ from services.brightdata_service import BrightDataService
 from services.builtwith_service import BuiltWithService
 from services.jina_service import JinaService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
+from utils.url_utils import UrlUtils
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ class AccountInfoFetcher:
         """Get Account information for given website."""
         try:
             logger.debug(f"Starting fetch of Account information for website: {self.website}")
-            domain = self._get_domain(self.website)
+            domain = UrlUtils.get_domain(url=self.website)
 
             # First attempt: Try to get LinkedIn URL from BuiltWith
             logger.debug(f"Attempting to get LinkedIn URL from BuiltWith for domain: {domain}")
@@ -90,21 +90,15 @@ class AccountInfoFetcher:
                 domain=domain
             )
 
-            account_linkedin_urls = []
-            if (builtwith_result and
-                    builtwith_result.processed_data):
-                company_info = builtwith_result.processed_data.get('company_info', {})
-                social_profiles = company_info.get('social_profiles', [])
-                linkedin_urls = [url for url in social_profiles if 'linkedin.com/company' in url]
-                if linkedin_urls:
-                    account_linkedin_urls = linkedin_urls
-                    logger.info(f"Found LinkedIn URLs from BuiltWith: {linkedin_urls}")
-                else:
-                    logger.error(f"Didn't find any LinkedIn Urls in social_profiles: {social_profiles}")
+            account_linkedin_urls: Optional[List[str]] = None
+            if builtwith_result:
+                bw_linkedin_urls: Optional[List[str]] = builtwith_result.get_account_linkedin_urls()
+                if bw_linkedin_urls:
+                    account_linkedin_urls = bw_linkedin_urls
 
             # Fallback: If no LinkedIn URL found from BuiltWith, use Jina search
             if not account_linkedin_urls:
-                logger.debug(f"No LinkedIn URLs found from BuiltWith, falling back to Jina search for domain: {domain}")
+                logger.debug(f"No LinkedIn URLs found in domain: {domain} in BuiltWith result, falling back to Jina Search")
                 query = f"{domain} LinkedIn Page"
                 web_search_results_md: str = await self.jina_service.search_query(
                     query=query,
@@ -113,8 +107,6 @@ class AccountInfoFetcher:
                 account_linkedin_urls = await self._parse_account_linkedin_urls(
                     web_search_results_md=web_search_results_md)
 
-            if len(account_linkedin_urls) == 0:
-                raise FailedToFindLinkedInURLsError(f"Failed to find Potential Account LinkedIn URLs for website: {self.website}")
             logger.debug(f"Fetched Potential Account LinkedIn URLs: {account_linkedin_urls} for website: {self.website}")
 
             snapshot_id: str = await self.brightdata_service.trigger_account_data_collection(account_linkedin_urls=account_linkedin_urls)
@@ -236,14 +228,6 @@ class AccountInfoFetcher:
             return selected_accounts[0]
         except Exception as e:
             raise FailedToSelectAccountError(f"Failed to select Correct Account among: {brightdata_accounts} with error: {str(e)}")
-
-    def _get_domain(self, url: str):
-        """Helper to return domain for given URL.
-
-        For example: https://www.zuddle.com will return zuddle.com.
-        """
-        result = tldextract.extract(url)
-        return f"{result.domain}.{result.suffix}"
 
 
 """
