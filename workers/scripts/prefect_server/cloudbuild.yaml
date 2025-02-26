@@ -26,8 +26,7 @@ steps:
       '--image=gcr.io/omega-winter-431704-u5/prefect-server:latest',
       '--platform=managed',
       '--region=us-east1',
-      # Removed '--allow-unauthenticated' due to domain restriction policy
-      # Will use IAP for authentication instead
+      '--allow-unauthenticated',
       '--memory=1Gi',
       '--cpu=1',
       '--min-instances=1',
@@ -37,16 +36,15 @@ steps:
     ]
     waitFor: ['push']
 
-  # Set up IAM policy for authenticated access
+  # Set up IAP for Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'set-iam'
+    id: 'enable-iap'
     entrypoint: gcloud
     args: [
-      'run', 'services', 'add-iam-policy-binding',
+      'run', 'services', 'update',
+      'prefect-server',
       '--region=us-east1',
-      '--member=user:sowrabh@userport.ai',
-      '--role=roles/run.invoker',
-      'prefect-server'
+      '--ingress=internal-and-cloud-load-balancing'
     ]
     waitFor: ['deploy']
 
