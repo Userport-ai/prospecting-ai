@@ -38,9 +38,7 @@ steps:
       '--set-env-vars=PREFECT_SERVER_API_HOST=0.0.0.0',
       '--set-env-vars=PREFECT_SERVER_API_PORT=8080',
       '--set-env-vars=PREFECT_UI_ENABLED=true',
-      '--health-checks=/api/health',
-      '--startup-cpu-boost',
-      '--cpu-boost-duration=300s'
+      '--health-checks=/api/health'
     ]
     waitFor: ['push']
 
