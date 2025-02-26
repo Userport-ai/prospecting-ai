@@ -18,14 +18,15 @@ else
   echo "ERROR: Cloud SQL Proxy failed to start or is not listening on port 5432"
 fi
 
-# Get password from environment variable
-DB_PASSWORD=${PREFECT_DB_PASSWORD}
+# Get password from environment variable and trim any whitespace
+DB_PASSWORD=$(echo "${PREFECT_DB_PASSWORD}" | tr -d '[:space:]')
 if [ -z "$DB_PASSWORD" ]; then
   echo "ERROR: PREFECT_DB_PASSWORD environment variable is not set"
   exit 1
 fi
 
-echo "Password length: ${#DB_PASSWORD} characters"
+echo "Password length (after trimming whitespace): ${#DB_PASSWORD} characters"
+echo "First 2 chars: ${DB_PASSWORD:0:2}... Last 2 chars: ...${DB_PASSWORD: -2}"
 
 # If proxy is listening, use TCP connection; otherwise use socket connection
 if nc -z localhost 5432; then
