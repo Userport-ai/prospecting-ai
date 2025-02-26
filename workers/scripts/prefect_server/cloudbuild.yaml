@@ -64,4 +64,4 @@ options:
   dynamicSubstitutions: true
 
 images:
-  - 'gcr.io/omega-winter-431704-u5/prefect-server:lates
+  - 'gcr.io/omega-winter-431704-u5/prefect-server:latest'
