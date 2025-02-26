@@ -47,15 +47,6 @@ steps:
       '--ingress=internal-and-cloud-load-balancing'
     ]
     waitFor: ['deploy']
-    
-  # Create and configure IAP service account
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'setup-iap'
-    entrypoint: bash
-    args: [
-      'workers/scripts/prefect_server/setup_iap.sh'
-    ]
-    waitFor: ['configure-ingress']
 
 timeout: 1800s
 
