@@ -30,12 +30,7 @@ const InProgressStatusView: React.FC<{
       <p className="text-xs">
         Last Updated: <span>{formatDate(enrichmentStatus.last_update)}</span>
       </p>
-      <Progress
-        value={
-          (enrichmentStatus.completed / enrichmentStatus.total_enrichments) *
-          100
-        }
-      />
+      <Progress value={enrichmentStatus.avg_completion_percent} />
     </div>
   );
 };

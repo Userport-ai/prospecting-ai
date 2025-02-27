@@ -10,6 +10,7 @@ class EnrichmentStatusSerializer(serializers.Serializer):
     pending = serializers.IntegerField()
     last_update = serializers.DateTimeField(allow_null=True)
     quality_score = serializers.FloatField(allow_null=True)
+    avg_completion_percent = serializers.FloatField(allow_null=True)
 
 
 class AccountDetailsSerializer(serializers.ModelSerializer):
