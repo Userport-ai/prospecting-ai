@@ -31,7 +31,7 @@ class ApolloConfig:
     ai_batch_size: int = 5
     fit_score_threshold: float = 0.0
     cache_ttl_hours: int = 24 * 30
-    concurrent_requests: int = 3
+    concurrent_requests: int = 4
     ai_concurrent_requests: int = 4
     max_retries: int = 3
     retry_delay: float = 1.0
