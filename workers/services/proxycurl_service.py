@@ -3,7 +3,7 @@ import os
 import logging
 import asyncio
 import httpx
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from difflib import SequenceMatcher
 
 from models.leads import ProxyCurlPersonProfile, ProxyCurlSearchResponse, EnrichedLead
@@ -14,9 +14,9 @@ from services.api_cache_service import APICacheService, cached_request
 logger = logging.getLogger(__name__)
 
 PROXYCURL_RETRY_CONFIG = RetryConfig(
-    max_attempts=3,
+    max_attempts=5,
     base_delay=1.0,
-    max_delay=20.0,
+    max_delay=30.0,
     retryable_exceptions=[
         RetryableError,
         asyncio.TimeoutError,
@@ -152,149 +152,180 @@ class ProxyCurlService:
                 raise
             return None
 
-    async def enrich_leads(self, leads: List[EnrichedLead]) -> List[EnrichedLead]:
-        """Enrich multiple leads with ProxyCurl data."""
-        enriched_leads: List[EnrichedLead] = []
-        for lead in leads:
-            try:
-                linkedin_url = lead.linkedin_url
-                if not linkedin_url:
-                    logger.warning(f"Skipping proxycurl enrichment, no LinkedIn URL found for lead: {lead}")
-                    enriched_leads.append(lead)
-                    continue
-                if not lead.organization or not lead.organization.name:
-                    logger.warning(f"Skipping proxycurl enrichment, Organization or name missing for lead: {lead}")
-                    enriched_leads.append(lead)
-                    continue
+    async def enrich_leads(self, leads: List[EnrichedLead], max_workers: int = 5) -> List[EnrichedLead | None]:
+        """Enrich multiple leads with ProxyCurl data using a worker pool."""
+        if not leads:
+            logger.warning("No leads provided for enrichment")
+            return []
 
-                proxycurl_lead: Optional[ProxyCurlPersonProfile] = await self.get_person_profile(linkedin_url)
-                if not proxycurl_lead:
-                    logger.warning(f"ProxyCurl profile not found for: {linkedin_url}, continue to next lead.")
-                    enriched_leads.append(lead)
-                    continue
+        # Initialize results array and queue
+        results = [None] * len(leads)
+        queue = asyncio.Queue()
 
-                # Find current employment that matches the best with current employment in the organization.
-                current_organization_name = lead.organization.name
-                proxycurl_current_employments = proxycurl_lead.get_current_employments()
-                proxycurl_best_matched_employment: Optional[ProxyCurlPersonProfile.Experience] = self._best_organization_match(
-                    linkedin_url=linkedin_url,
-                    current_organization_name=current_organization_name,
-                    proxycurl_current_employments=proxycurl_current_employments
-                )
+        # Fill queue with tasks
+        for i, lead in enumerate(leads):
+            await queue.put((i, lead))
 
-                # Compute freshness date of current lead data and proxycurl data.
-                current_freshness_date: Optional[datetime] = lead.current_employment.get_start_date_datetime() if lead.current_employment else None
-                proxycurl_freshness_date: Optional[datetime] = proxycurl_lead.get_latest_employment_start_date()
+        # Define worker function
+        async def worker():
+            while True:
+                try:
+                    index, lead = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
 
-                if proxycurl_best_matched_employment != None:
-                    # Proxycurl current employment organization matches current organization.
-                    if current_freshness_date != None and proxycurl_freshness_date != None and proxycurl_freshness_date > current_freshness_date:
-                        logger.debug(f"[1] Proxycurl has same employment as Apollo and fresher for: {linkedin_url}")
-                        # Proxycurl data is fresher, let it take precedence.
-                        lead.headline = proxycurl_lead.headline
-                        lead.about = proxycurl_lead.summary
-                        lead.current_employment = EnrichedLead.CurrentEmployment(
-                            title=proxycurl_best_matched_employment.title,
-                            organization_name=proxycurl_best_matched_employment.company,
-                            description=proxycurl_best_matched_employment.description,
-                            start_date=proxycurl_best_matched_employment.get_formatted_date(proxycurl_best_matched_employment.starts_at),
-                            end_date=proxycurl_best_matched_employment.get_formatted_date(proxycurl_best_matched_employment.ends_at),
-                            location=proxycurl_best_matched_employment.location,
-                            apollo_organization_id=lead.current_employment.apollo_organization_id if lead.current_employment else None,
-                            company_linkedin_profile_url=proxycurl_best_matched_employment.company_linkedin_profile_url,
-                            logo_url=proxycurl_best_matched_employment.logo_url,
-                            # Seniority, Department, Subdepartment and function are lost in this case.
-                            # TODO: In the future, we should keep existing values of department etc. if they are still in the same function.
-                        )
-                        if proxycurl_lead.experiences != None and len(proxycurl_lead.experiences) > 0:
-                            # Other experiences include anything other than current title, so even a different role in the same company before.
-                            proxycurl_other_experiences = list(filter(lambda exp: exp.title != proxycurl_best_matched_employment.title, proxycurl_lead.experiences))
-                            lead.other_employments = [
-                                EnrichedLead.Employment(
-                                    title=exp.title,
-                                    organization_name=exp.company,
-                                    current=exp.ends_at == None,
-                                    description=exp.description,
-                                    start_date=exp.get_formatted_date(exp.starts_at),
-                                    end_date=exp.get_formatted_date(exp.ends_at),
-                                    location=exp.location,
-                                    company_linkedin_profile_url=exp.company_linkedin_profile_url,
-                                    logo_url=exp.logo_url,
-                                    # Apollo Organization ID is omitted here because it's hard to
-                                    # extract from existing employments and not really needed for analysis.
-                                )
-                                for exp in proxycurl_other_experiences]
+                # The worker doesn't need its own try/except since _enrich_single_lead has error handling
+                enriched_lead = await self._enrich_single_lead(lead)
+                results[index] = enriched_lead
+                queue.task_done()
 
-                        lead.location = EnrichedLead.Location(
-                            city=proxycurl_lead.city,
-                            state=proxycurl_lead.state,
-                            country=proxycurl_lead.country,
-                            country_full_name=proxycurl_lead.country_full_name
-                        )
-                    else:
-                        logger.debug(f"[2] Proxycurl has same employment as Apollo but not fresher for: {linkedin_url}")
-                        # We will assume Apollo is the source of truth.
-                        # We can still update description, location, start and end dates of each role from Proxycurl.
-                        # Descriptions usually contain valuable information about responsibilities, tools,
-                        # or achievements in past employments.
-                        lead = self._update_employment_descriptions_from_proxycurl(lead=lead, proxycurl_lead=proxycurl_lead)
+        # Start workers
+        workers = [asyncio.create_task(worker()) for _ in range(max_workers)]
 
-                else:
-                    # Proxycurl current employment organization does not match current organization.
-                    if current_freshness_date != None and proxycurl_freshness_date != None and proxycurl_freshness_date > current_freshness_date:
-                        # Proxycurl is fresher and has a different organization which means Apollo lead is stale (not in given company).
-                        logger.warning(f"[3] Skipping enriched lead: {linkedin_url} since proxycurl lead org is: {proxycurl_lead.occupation} with date: " +
-                                       f"{proxycurl_freshness_date} while expected org: {current_organization_name} with date: {current_freshness_date}")
-                    else:
-                        # We will assume Apollo is the source of truth.
-                        # We can still update description, location, start and end dates of each role from Proxycurl.
-                        # Descriptions usually contain valuable information about responsibilities, tools,
-                        # or achievements in past employments.
-                        logger.debug(f"[4] Proxycurl has different employment than Apollo but not fresher for: {linkedin_url}")
-                        lead = self._update_employment_descriptions_from_proxycurl(lead=lead, proxycurl_lead=proxycurl_lead)
+        # Wait for all tasks to complete
+        await asyncio.gather(*workers, return_exceptions=True)
 
-                # Proxycurl fields that need to be merged regardless of freshness etc.
-                lead.about = proxycurl_lead.summary
-                lead.photo_url = proxycurl_lead.profile_pic_url
-                lead.education = proxycurl_lead.education
-                lead.certifications = proxycurl_lead.certifications
-                lead.projects = proxycurl_lead.accomplishment_projects
-                lead.publications = proxycurl_lead.accomplishment_publications
-                lead.honor_awards = proxycurl_lead.accomplishment_honors_awards
-                lead.groups = proxycurl_lead.groups
-                lead.volunteer_work = proxycurl_lead.volunteer_work
-                lead.recommendations = proxycurl_lead.recommendations
-                lead.social_metrics = EnrichedLead.SocialMetrics(
-                    connections=proxycurl_lead.connections,
-                    follower_count=proxycurl_lead.follower_count
-                )
+        # Log completion
+        logger.info(f"Completed ProxyCurl enrichment for {len(leads)} leads using {max_workers} workers")
 
-                if lead.enrichment_info:
-                    lead.enrichment_info.last_enriched_at = datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
-                    if lead.enrichment_info.enrichment_sources:
-                        lead.enrichment_info.enrichment_sources.append("proxycurl")
-                    else:
-                        lead.enrichment_info.enrichment_sources = ["proxycurl"]
-                    if not lead.enrichment_info.data_quality:
-                        lead.enrichment_info.data_quality = EnrichedLead.EnrichmentInfo.Quality(
-                            has_detailed_employment=(lead.current_employment != None and lead.other_employments != None and len(lead.other_employments) > 0),
-                        )
-                else:
-                    lead.enrichment_info = EnrichedLead.EnrichmentInfo(
-                        last_enriched_at=datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d"),
-                        enrichment_sources=["proxycurl"],
-                        data_quality=EnrichedLead.EnrichmentInfo.Quality(
-                            has_detailed_employment=(lead.current_employment != None and lead.other_employments != None and len(lead.other_employments) > 0),
-                        )
+        return results
+
+    async def _enrich_single_lead(self, lead: EnrichedLead) -> EnrichedLead:
+        """Process a single lead with ProxyCurl enrichment."""
+        try:
+            linkedin_url = lead.linkedin_url
+            if not linkedin_url:
+                logger.warning(f"Skipping proxycurl enrichment, no LinkedIn URL found for lead: {lead}")
+                return lead
+
+            if not lead.organization or not lead.organization.name:
+                logger.warning(f"Skipping proxycurl enrichment, Organization or name missing for lead: {lead}")
+                return lead
+
+            proxycurl_lead: Optional[ProxyCurlPersonProfile] = await self.get_person_profile(linkedin_url)
+            if not proxycurl_lead:
+                logger.warning(f"ProxyCurl profile not found for: {linkedin_url}, continue to next lead.")
+                return lead
+
+            # Find current employment that matches the best with current employment in the organization.
+            current_organization_name = lead.organization.name
+            proxycurl_current_employments = proxycurl_lead.get_current_employments()
+            proxycurl_best_matched_employment: Optional[ProxyCurlPersonProfile.Experience] = self._best_organization_match(
+                linkedin_url=linkedin_url,
+                current_organization_name=current_organization_name,
+                proxycurl_current_employments=proxycurl_current_employments
+            )
+
+            # Compute freshness date of current lead data and proxycurl data.
+            current_freshness_date: Optional[datetime] = lead.current_employment.get_start_date_datetime() if lead.current_employment else None
+            proxycurl_freshness_date: Optional[datetime] = proxycurl_lead.get_latest_employment_start_date()
+
+            if proxycurl_best_matched_employment != None:
+                # Proxycurl current employment organization matches current organization.
+                if current_freshness_date != None and proxycurl_freshness_date != None and proxycurl_freshness_date > current_freshness_date:
+                    logger.debug(f"[1] Proxycurl has same employment as Apollo and fresher for: {linkedin_url}")
+                    # Proxycurl data is fresher, let it take precedence.
+                    lead.headline = proxycurl_lead.headline
+                    lead.about = proxycurl_lead.summary
+                    lead.current_employment = EnrichedLead.CurrentEmployment(
+                        title=proxycurl_best_matched_employment.title,
+                        organization_name=proxycurl_best_matched_employment.company,
+                        description=proxycurl_best_matched_employment.description,
+                        start_date=proxycurl_best_matched_employment.get_formatted_date(proxycurl_best_matched_employment.starts_at),
+                        end_date=proxycurl_best_matched_employment.get_formatted_date(proxycurl_best_matched_employment.ends_at),
+                        location=proxycurl_best_matched_employment.location,
+                        apollo_organization_id=lead.current_employment.apollo_organization_id if lead.current_employment else None,
+                        company_linkedin_profile_url=proxycurl_best_matched_employment.company_linkedin_profile_url,
+                        logo_url=proxycurl_best_matched_employment.logo_url,
+                        # Seniority, Department, Subdepartment and function are lost in this case.
+                        # TODO: In the future, we should keep existing values of department etc. if they are still in the same function.
                     )
+                    if proxycurl_lead.experiences != None and len(proxycurl_lead.experiences) > 0:
+                        # Other experiences include anything other than current title, so even a different role in the same company before.
+                        proxycurl_other_experiences = list(filter(lambda exp: exp.title != proxycurl_best_matched_employment.title, proxycurl_lead.experiences))
+                        lead.other_employments = [
+                            EnrichedLead.Employment(
+                                title=exp.title,
+                                organization_name=exp.company,
+                                current=exp.ends_at == None,
+                                description=exp.description,
+                                start_date=exp.get_formatted_date(exp.starts_at),
+                                end_date=exp.get_formatted_date(exp.ends_at),
+                                location=exp.location,
+                                company_linkedin_profile_url=exp.company_linkedin_profile_url,
+                                logo_url=exp.logo_url,
+                                # Apollo Organization ID is omitted here because it's hard to
+                                # extract from existing employments and not really needed for analysis.
+                            )
+                            for exp in proxycurl_other_experiences]
 
-                enriched_leads.append(lead)
+                    lead.location = EnrichedLead.Location(
+                        city=proxycurl_lead.city,
+                        state=proxycurl_lead.state,
+                        country=proxycurl_lead.country,
+                        country_full_name=proxycurl_lead.country_full_name
+                    )
+                else:
+                    logger.debug(f"[2] Proxycurl has same employment as Apollo but not fresher for: {linkedin_url}")
+                    # We will assume Apollo is the source of truth.
+                    # We can still update description, location, start and end dates of each role from Proxycurl.
+                    # Descriptions usually contain valuable information about responsibilities, tools,
+                    # or achievements in past employments.
+                    lead = self._update_employment_descriptions_from_proxycurl(lead=lead, proxycurl_lead=proxycurl_lead)
 
-            except Exception as e:
-                logger.error(f"Error enriching lead: {str(e)}", exc_info=True)
-                enriched_leads.append(lead)
+            else:
+                # Proxycurl current employment organization does not match current organization.
+                if current_freshness_date != None and proxycurl_freshness_date != None and proxycurl_freshness_date > current_freshness_date:
+                    # Proxycurl is fresher and has a different organization which means Apollo lead is stale (not in given company).
+                    logger.warning(f"[3] Skipping enriched lead: {linkedin_url} since proxycurl lead org is: {proxycurl_lead.occupation} with date: " +
+                                   f"{proxycurl_freshness_date} while expected org: {current_organization_name} with date: {current_freshness_date}")
+                else:
+                    # We will assume Apollo is the source of truth.
+                    # We can still update description, location, start and end dates of each role from Proxycurl.
+                    # Descriptions usually contain valuable information about responsibilities, tools,
+                    # or achievements in past employments.
+                    logger.debug(f"[4] Proxycurl has different employment than Apollo but not fresher for: {linkedin_url}")
+                    lead = self._update_employment_descriptions_from_proxycurl(lead=lead, proxycurl_lead=proxycurl_lead)
 
-        return enriched_leads
+            # Proxycurl fields that need to be merged regardless of freshness etc.
+            lead.about = proxycurl_lead.summary
+            lead.photo_url = proxycurl_lead.profile_pic_url
+            lead.education = proxycurl_lead.education
+            lead.certifications = proxycurl_lead.certifications
+            lead.projects = proxycurl_lead.accomplishment_projects
+            lead.publications = proxycurl_lead.accomplishment_publications
+            lead.honor_awards = proxycurl_lead.accomplishment_honors_awards
+            lead.groups = proxycurl_lead.groups
+            lead.volunteer_work = proxycurl_lead.volunteer_work
+            lead.recommendations = proxycurl_lead.recommendations
+            lead.social_metrics = EnrichedLead.SocialMetrics(
+                connections=proxycurl_lead.connections,
+                follower_count=proxycurl_lead.follower_count
+            )
+
+            if lead.enrichment_info:
+                lead.enrichment_info.last_enriched_at = datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
+                if lead.enrichment_info.enrichment_sources:
+                    lead.enrichment_info.enrichment_sources.append("proxycurl")
+                else:
+                    lead.enrichment_info.enrichment_sources = ["proxycurl"]
+                if not lead.enrichment_info.data_quality:
+                    lead.enrichment_info.data_quality = EnrichedLead.EnrichmentInfo.Quality(
+                        has_detailed_employment=(lead.current_employment != None and lead.other_employments != None and len(lead.other_employments) > 0),
+                    )
+            else:
+                lead.enrichment_info = EnrichedLead.EnrichmentInfo(
+                    last_enriched_at=datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d"),
+                    enrichment_sources=["proxycurl"],
+                    data_quality=EnrichedLead.EnrichmentInfo.Quality(
+                        has_detailed_employment=(lead.current_employment != None and lead.other_employments != None and len(lead.other_employments) > 0),
+                    )
+                )
+
+            return lead
+        except Exception as e:
+            logger.error(f"Error enriching lead: {str(e)}", exc_info=True)
+            return lead
 
     def _best_organization_match(self, linkedin_url: str, current_organization_name: str, proxycurl_current_employments: List[ProxyCurlPersonProfile.Experience]) -> Optional[ProxyCurlPersonProfile.Experience]:
         """Finds the Proxycurl employment who organization name best matches the current organization name.
