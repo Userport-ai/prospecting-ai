@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from app.models import Lead, Account, AccountEnrichmentStatus, EnrichmentType
-from app.models.accounts import EnrichmentStatus
+from app.models.account_enrichment import EnrichmentStatus
 
 logger = logging.getLogger(__name__)
 

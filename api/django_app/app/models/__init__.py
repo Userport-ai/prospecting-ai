@@ -13,6 +13,7 @@ __all__ = [
     'Config',
     'ConfigScope',
     'EnrichmentStatus',
+    'EnrichmentType',
     'Lead',
     'Product',
     'Settings',

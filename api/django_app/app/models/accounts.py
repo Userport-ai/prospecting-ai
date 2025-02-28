@@ -3,13 +3,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import JSONField
 from .common import BaseMixin
-
-
-class EnrichmentStatus(models.TextChoices):
-    PENDING = 'pending', 'Pending'
-    IN_PROGRESS = 'in_progress', 'In Progress'
-    COMPLETED = 'completed', 'Completed'
-    FAILED = 'failed', 'Failed'
+from .account_enrichment import EnrichmentStatus
 
 
 class Account(BaseMixin):

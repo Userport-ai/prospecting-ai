@@ -11,8 +11,8 @@ from app.apis.auth.auth_verify_cloud_run_decorator import verify_cloud_run_token
 from app.apis.leads.lead_enrichment_handler import LeadEnrichmentHandler
 from app.apis.leads.streaming_leads_callback_handler_v2 import StreamingCallbackHandlerV2
 from app.models import Lead
-from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType
-from app.models.accounts import Account, EnrichmentStatus
+from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType, EnrichmentStatus
+from app.models.accounts import Account
 
 logger = logging.getLogger(__name__)
 

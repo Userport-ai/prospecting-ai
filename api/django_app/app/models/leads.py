@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import JSONField
 from .common import BaseMixin
-from .accounts import EnrichmentStatus
+from .account_enrichment import EnrichmentStatus
 
 
 class Lead(BaseMixin):

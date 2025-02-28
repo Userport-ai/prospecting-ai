@@ -8,11 +8,13 @@ class EnrichmentType(models.TextChoices):
     GENERATE_LEADS = 'generate_leads', 'Potential Leads for a particular Account'
     LEAD_LINKEDIN_RESEARCH = 'lead_linkedin_research', 'Lead Information from LinkedIn and other sources'
 
+
 class EnrichmentStatus(models.TextChoices):
     PENDING = 'pending', 'Pending'
-    IN_PROGRESS = 'in_progress', 'In Progress'
+    IN_PROGRESS = 'processing', 'In Progress'
     COMPLETED = 'completed', 'Completed'
     FAILED = 'failed', 'Failed'
+
 
 class AccountEnrichmentStatus(BaseMixin):
     account = models.ForeignKey('Account', on_delete=models.CASCADE, related_name='enrichment_statuses')
