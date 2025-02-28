@@ -84,6 +84,7 @@ class AccountInfoFetcher:
             logger.debug(f"Starting fetch of Account information for website: {self.website}")
             domain = UrlUtils.get_domain(url=self.website)
 
+            linkedin_url_fetched_from_builtwith = False
             # First attempt: Try to get LinkedIn URL from BuiltWith
             logger.debug(f"Attempting to get LinkedIn URL from BuiltWith for domain: {domain}")
             builtwith_result = await self.builtwith_service.get_technology_profile(
@@ -94,7 +95,9 @@ class AccountInfoFetcher:
             if builtwith_result:
                 bw_linkedin_urls: Optional[List[str]] = builtwith_result.get_account_linkedin_urls()
                 if bw_linkedin_urls:
+                    logger.debug(f"Got LinkedIn URLs from BuiltWith: {bw_linkedin_urls}")
                     account_linkedin_urls = bw_linkedin_urls
+                    linkedin_url_fetched_from_builtwith = True
 
             # Fallback: If no LinkedIn URL found from BuiltWith, use Jina search
             if not account_linkedin_urls:
@@ -115,7 +118,19 @@ class AccountInfoFetcher:
             brightdata_accounts: List[BrightDataAccount] = await self.brightdata_service.collect_account_data(snapshot_id=snapshot_id)
             logger.debug(f"Collected Bright Data Accounts for Snapshot ID: {snapshot_id} for website: {self.website}")
 
-            bd_account = await self._select_correct_account(brightdata_accounts=brightdata_accounts)
+            if len(brightdata_accounts) == 0:
+                raise ValueError(f"Got empty list of BrightData Accounts for snapshot ID: {snapshot_id} and URLs: {account_linkedin_urls} for website: {self.website}")
+
+            bd_account: BrightDataAccount = None
+            if linkedin_url_fetched_from_builtwith:
+                logger.debug(f"Selecting first BrightData Account since URL fetched from BuiltWith for website: {self.website}")
+                # Select the first result. We assume BuiltWith is reliable and so we don't the LLM to select the correct LinkedIn URL.
+                bd_account = brightdata_accounts[0]
+            else:
+                logger.debug(f"Selecting the correct BrightData Account using LLM for website: {self.website}")
+                # Select the correct account using LLM among the ones fetched from Jina.
+                bd_account = await self._select_correct_account(brightdata_accounts=brightdata_accounts)
+
             logger.debug(f"Successfully fetched Account Information for website: {self.website}")
             return AccountInfo(
                 name=bd_account.name,
