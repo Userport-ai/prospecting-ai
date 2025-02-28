@@ -307,6 +307,16 @@ class SearchApolloLeadsResponse(UserportPydanticBaseModel):
 
     pagination: Optional[Pagination] = None
     people: Optional[List[ApolloLead]] = None
+    contacts: Optional[List[ApolloLead]] = Field(default=None, description="Same as people, just that these people have been added as contacts to Apollo org associated with the account.")
+
+    def get_leads(self) -> List[ApolloLead]:
+        """Returns all leads (people + contacts) from the given response."""
+        all_leads = []
+        if self.people:
+            all_leads.extend(self.people)
+        if self.contacts:
+            all_leads.extend(self.contacts)
+        return all_leads
 
 
 class EnrichedLead(UserportPydanticBaseModel):
@@ -495,7 +505,7 @@ class EvaluatedLead(UserportPydanticBaseModel):
     rationale: Optional[str] = None,
     matching_signals: Optional[List[str]] = None
     persona_match: Optional[str] = None
-    ## internal fields
+    # internal fields
     internal_analysis: Optional[str] = None
 
 

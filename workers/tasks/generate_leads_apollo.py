@@ -688,6 +688,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
                 # Skip if no valid lead_id or corresponding Apollo lead found.
                 if not lead_id or lead_id not in apollo_leads_dict:
+                    logger.warning(f"Skipping Lead {lead_id}, is not in Apollo Leads Dict: {apollo_leads_dict}")
                     continue
 
                 apollo_lead = apollo_leads_dict[lead_id]
@@ -698,6 +699,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                     continue
 
                 recommended = eval_result.get("enrichment_recommended", False)
+                logger.debug(f"Lead {lead_id} is recommended for enrichment by Pre Evaluation with intitial score: {initial_score}")
 
                 # Check if the lead is recommended by the LLM or passes the custom enrichment criteria.
                 if recommended or self._should_enrich_lead(
@@ -925,11 +927,11 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         if not first_page_result:
             logger.error("Failed to fetch first page")
             return []
-        if not first_page_result.people:
+        if not first_page_result.get_leads():
             logger.error(f"Failed to fetch People in Apollo Search leads result: {first_page_result}")
             return []
 
-        all_employees.extend(first_page_result.people)
+        all_employees.extend(first_page_result.get_leads())
 
         # Get total count and calculate number of pages needed
         pagination = first_page_result.pagination
@@ -943,7 +945,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             return all_employees
 
         # Calculate actual number of pages needed based on total count
-        remaining_count = total_count - len(first_page_result.people)
+        remaining_count = total_count - len(first_page_result.get_leads())
         pages_needed = (remaining_count + self.config.batch_size - 1) // self.config.batch_size
 
         logger.info(f"Fetching {remaining_count} remaining employees across {pages_needed} pages")
@@ -957,8 +959,8 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for result in results:
-                if isinstance(result, SearchApolloLeadsResponse) and result.people:
-                    all_employees.extend(result.people)
+                if isinstance(result, SearchApolloLeadsResponse) and result.get_leads():
+                    all_employees.extend(result.get_leads())
                 elif isinstance(result, Exception):
                     logger.error(f"Error in concurrent fetch: {str(result)}")
                     self.metrics.api_errors += 1
