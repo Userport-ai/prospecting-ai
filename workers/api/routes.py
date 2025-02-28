@@ -35,6 +35,8 @@ def get_task_manager() -> TaskManager:
         return MockTaskManager()
     return TaskManager()
 
+def get_task_registry() -> TaskRegistry:
+    return task_registry
 
 class TaskError(HTTPException):
     """Custom exception for task-related errors."""

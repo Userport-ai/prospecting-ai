@@ -9,9 +9,10 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from prefect import flow
 from pythonjsonlogger import jsonlogger
 
-from api.routes import register_tasks
+from api.routes import register_tasks, get_task_registry
 from api.routes import router
 from services.django_callback_service import CallbackService
 
@@ -150,3 +151,9 @@ app.include_router(router, prefix="/api/v1")
 async def health_check():
     logger.info("Health check endpoint called")
     return {"status": "healthy"}
+
+@flow
+async def execute_flow(task_name, payload):
+    task = get_task_registry().get_task(task_name)
+    task_payload = await task.create_task_payload(**payload)
+    return await task.execute(task_payload)

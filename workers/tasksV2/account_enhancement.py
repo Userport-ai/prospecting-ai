@@ -300,6 +300,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         """Get the task identifier."""
         return "account_enhancement"
 
+    @task
     async def create_task_payload(self, **kwargs) -> Dict[str, Any]:
         """Create a standardized task payload."""
         # Check if this is a bulk request
