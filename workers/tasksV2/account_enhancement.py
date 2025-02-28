@@ -326,14 +326,14 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         if missing_fields:
             raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
 
-        return {
-            "accounts": [{
-                "account_id": kwargs["account_id"],
-                "website": kwargs["website"],
-            }],
-            "job_id": str(uuid.uuid4()),
-            "is_bulk": False
-        }
+            return {
+                "accounts": [{
+                    "account_id": kwargs["account_id"],
+                    "website": kwargs["website"],
+                }],
+                "job_id": str(uuid.uuid4()),
+                "is_bulk": False
+            }
 
     @flow
     async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any], Dict[str, Any]):
