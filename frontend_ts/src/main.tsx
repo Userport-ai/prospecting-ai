@@ -12,7 +12,7 @@ import { SignUp } from "./auth/SignUp";
 import AuthProvider from "./auth/AuthProvider";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorFallback } from "./ErrorFallback.js";
-import LeadsInAccount from "./accounts/LeadsInAccount.js";
+import LeadsInAccountV2 from "./accounts/LeadsInAccountV2.js";
 import AccountsView from "./accounts/AccountsView.js";
 import LeadsView from "./leads/LeadsView.js";
 
@@ -40,7 +40,7 @@ createRoot(document.getElementById("root") as HTMLElement).render(
               </Route>
               <Route path="accounts" element={<AccountsView />}>
                 <Route index element={<AccountsTable />} />
-                <Route path=":id/leads" element={<LeadsInAccount />} />
+                <Route path=":id/leads" element={<LeadsInAccountV2 />} />
               </Route>
               <Route path="leads" element={<LeadsView />} />
             </Route>
