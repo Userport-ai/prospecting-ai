@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 import requests
 from prefect import task, flow
 
-from models.builtwith import EnrichmentResult
+from ..models.builtwith import EnrichmentResult
 from services.ai_service import AIServiceFactory
 from services.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
@@ -21,7 +21,7 @@ from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from tasks.enrichment_task import AccountEnrichmentTask
 from utils.account_info_fetcher import AccountInfoFetcher
 from utils.url_utils import UrlUtils
-from models.accounts import AccountInfo, Financials
+from ..models.accounts import AccountInfo, Financials
 
 logger = logging.getLogger(__name__)
 
