@@ -10,7 +10,6 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
         model = Lead
         fields = [
             'id',
-            'account',
             'account_details',  # Read-only nested account information
             'first_name',
             'last_name',
@@ -34,7 +33,7 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        depth=1
+        depth = 1
 
     def get_account_details(self, obj):
         """
