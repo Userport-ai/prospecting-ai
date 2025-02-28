@@ -7,11 +7,11 @@ import uuid
 from dataclasses import dataclass
 from typing import Dict, Any, List
 
-import google.generativeai as genai
 import requests
 from prefect import task, flow
 
 from models.builtwith import EnrichmentResult
+from services.ai_service import AIServiceFactory
 from services.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.builtwith_service import BuiltWithService
@@ -289,8 +289,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the Gemini AI service."""
-        genai.configure(api_key=self.google_api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.model = AIServiceFactory().create_service(provider="gemini")
 
     @property
     def enrichment_type(self) -> str:
