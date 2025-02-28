@@ -6,6 +6,7 @@ import time
 import uuid
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, List, Optional, Union
 
 from services.ai_service import AIServiceFactory
@@ -190,9 +191,9 @@ Important:
 *. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit to the persona type, ICP and 0 indicates no alignment.
 *. The more Signals you find in the Lead's profile that are relevant to your Product, the higher their score.
 *. Consider their role titles in conjunction with the content including their background, about them, role descriptions, employment history and their profile provided. Often titles are abstract and the context around the title helps strengthen the conviction on the chosen persona type.
+*. If the lead has started a new role recently or has recently been promoted, consider these as Signals as well.
 *. Rationale should highlight and cite the specific Signals from the Lead's Profile that supports the score. If there are no Signals, say "No Signals found".
 *. Write full sentences for bullet points in `matching_signals` and explain each signal with rationale from the lead's profile. Don't make up any reasons.
-*. The date today is {date_now}. Use it compute any time related Signals (e.g. Recent Lead promotion, joining company etc.) that might be relevant. Usually, events within last 6 months are considered recent.
 
 Evaluate each lead and return a JSON response with this structure:
 {{
@@ -1294,6 +1295,11 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                                 'career_insights': pre_eval.get('career_insights', {}),
                                 'confidence': pre_eval.get('confidence')
                             }
+                            # Add any time based signals for given lead.
+                            time_based_signals: List[str] = self._get_time_based_signals(lead=lead)
+                            if len(time_based_signals) > 0:
+                                # Append to key signals.
+                                lead_data['pre_evaluation_insights']['key_signals'].extend(time_based_signals)
                         else:
                             lead_data['pre_evaluation_insights'] = None
 
@@ -1303,8 +1309,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                         product_description=product_data.get("description", "Product description not available"),
                         persona_role_titles=json.dumps(product_data.get('persona_role_titles', {}), indent=2),
                         additional_signals=product_data.get('additional_lead_signals', ''),
-                        lead_profiles=json.dumps(lead_profiles, indent=2),
-                        date_now=datetime.strftime(datetime.now(timezone.utc), "%Y-%m-%d")
+                        lead_profiles=json.dumps(lead_profiles, indent=2)
                     )
 
                     response = await self.model.generate_content(
@@ -1361,6 +1366,65 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             f"in {self.metrics.processing_time:.2f} seconds"
         )
         return evaluated_leads
+
+    def _get_time_based_signals(self, lead: EnrichedLead) -> List[str]:
+        """Returns any time based signals for given lead or empty list if no signals found."""
+        time_based_signals: List[str] = []
+
+        if not lead.current_employment:
+            logger.error(f"Current employment does not exist for lead with ID: {lead.id}, name: {lead.name} and LinkedIn URL: {lead.linkedin_url}")
+            return time_based_signals
+
+        # Check if current employment start is recent.
+        current_start_date: Optional[datetime] = lead.current_employment.get_start_date_datetime()
+        if not current_start_date:
+            logger.warning(f"Start date is None for Enriched lead with ID: {lead.id}, name: {lead.name} with LinkedIn URL: {lead.linkedin_url}")
+            return None
+
+        d1 = datetime.now()
+        d2 = current_start_date
+        delta = relativedelta(d1, d2)
+        if delta.years >= 1:
+            # Too stale.
+            return time_based_signals
+        difference_in_months = delta.months
+        if difference_in_months > 6:
+            # Too stale.
+            return time_based_signals
+
+        # Fresh time signal, check if it is new job or promotion.
+        current_org_name: Optional[str] = lead.current_employment.organization_name
+        if not current_org_name:
+            logger.error(f"Current organization name is None for lead with ID: {lead.id}, name: {lead.name} with LinkedIn URL: {lead.linkedin_url}")
+            return time_based_signals
+
+        last_org_name: Optional[str] = None
+        if len(lead.other_employments) > 0:
+            # Take the most recent other employment, it should already be in reverse chronological order.
+            last_org_name = lead.other_employments[0].organization_name
+
+        if current_org_name != last_org_name:
+            # New role for the lead.
+            logger.debug(f"New role {difference_in_months} months ago for lead with ID: {lead.id}, name: {lead.name} and LinkedIn URL: {lead.linkedin_url}")
+            signal_message = "New Role:"
+            if difference_in_months == 0:
+                signal_message = f"{signal_message} Started this month"
+            elif difference_in_months == 1:
+                signal_message = f"{signal_message} Started 1 month ago"
+            else:
+                signal_message = f"{signal_message} Started {difference_in_months} months ago"
+            return [signal_message]
+        else:
+            # Recent Promotion for the lead.
+            logger.debug(f"Recent promotion {difference_in_months} months ago for lead with ID: {lead.id}, name: {lead.name} and LinkedIn URL: {lead.linkedin_url}")
+            signal_message = "Recent Promotion:"
+            if difference_in_months == 0:
+                signal_message = f"{signal_message} this month"
+            elif difference_in_months == 1:
+                signal_message = f"{signal_message} 1 month ago"
+            else:
+                signal_message = f"{signal_message} {difference_in_months} months ago"
+            return [signal_message]
 
     async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
         """Store error information with enhanced metadata in BigQuery."""
