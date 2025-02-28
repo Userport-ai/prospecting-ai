@@ -67,7 +67,7 @@ class Account(BaseMixin):
         percent = sum([s.completion_percent for s in statuses if s.completion_percent is not None]) / len(statuses) if statuses else 0
         failed = sum(1 for s in statuses if s.status == EnrichmentStatus.FAILED)
         in_progress = sum(1 for s in statuses if s.status == EnrichmentStatus.IN_PROGRESS)
-        pending = sum(1 for s in statuses if s.status == EnrichmentStatus.PENDING)
+        pending = sum(1 for s in statuses if (not s.status) or (s.status == EnrichmentStatus.PENDING))
 
         last_update = max((s.last_attempted_run for s in statuses if s.last_attempted_run), default=None)
 
