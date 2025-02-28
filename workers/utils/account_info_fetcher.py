@@ -2,6 +2,7 @@ import logging
 import os
 from typing import List, Optional
 
+from prefect import task
 from pydantic import BaseModel, Field
 
 from models.accounts import BrightDataAccount, AccountInfo, RecentDevelopments
@@ -77,6 +78,7 @@ class AccountInfoFetcher:
             logger.error(f"Failed to configure one of AccountInfoFetcher's Services: {str(e)}", exc_info=True)
             raise
 
+    @task
     @with_retry(retry_config=ACCOUNT_FETCHER_RETRY_CONFIG, operation_name="_fetch_account_info")
     async def get(self) -> AccountInfo:
         """Get Account information for given website."""
