@@ -12,8 +12,8 @@ def get_repo_info(repo_owner: str, repo_name: str):
     return repo_info
 
 # Define a simple flow to register
-@flow(name="account-enrichment-flow")
-async def account_enrichment_flow(payload):
+@flow(name="test-payload-flow")
+async def test_payload_flow(payload):
     """This is a placeholder flow that will be replaced by the actual implementation in the deployment."""
     print(f"Processing accounts: {len(payload.get('accounts', []))} account(s)")
     print(f"Job ID: {payload.get('job_id')}")
