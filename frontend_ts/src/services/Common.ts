@@ -6,5 +6,6 @@ export interface EnrichmentStatus {
   in_progress: number;
   pending: number;
   last_update: string; // ISO Date string.
-  quality_score: number;
+  quality_score: number | null;
+  avg_completion_percent: number | null;
 }
