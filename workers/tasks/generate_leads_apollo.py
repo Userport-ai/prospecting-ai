@@ -185,12 +185,12 @@ Example 3:
 
 Important:
 *. Role Titles of Target Personas below is the list of target personas you need to match each lead with.
-*. Always assign one of end_user, influencer, buyer to the persona type if there's *any plausible match*.
+*. Identify Persona Type: Use the current role as the primary factor for identifying the persona of a lead. Use their background, about them, role descriptions, employment history and their profile only to strengthen or clarify the current persona type when it is not clear.
+*. Always assign one of end_user, influencer, buyer to the persona type if there's *any plausible match*. If there's no match, then assign `null`. 
 *. Only assign null when there is NO conceivable match at all with any persona type.
 *. Evaluate each lead independently, without referring to the other leads.
 *. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit to the persona type, ICP and 0 indicates no alignment.
 *. The more Signals you find in the Lead's profile that are relevant to your Product, the higher their score.
-*. Consider their role titles in conjunction with the content including their background, about them, role descriptions, employment history and their profile provided. Often titles are abstract and the context around the title helps strengthen the conviction on the chosen persona type.
 *. If the lead has started a new role recently or has recently been promoted, consider these as Signals as well.
 *. Rationale should highlight and cite the specific Signals from the Lead's Profile that supports the score. If there are no Signals, say "No Signals found".
 *. Write full sentences for bullet points in `matching_signals` and explain each signal with rationale from the lead's profile. Don't make up any reasons.
