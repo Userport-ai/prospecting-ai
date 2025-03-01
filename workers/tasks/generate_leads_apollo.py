@@ -1379,7 +1379,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         current_start_date: Optional[datetime] = lead.current_employment.get_start_date_datetime()
         if not current_start_date:
             logger.warning(f"Start date is None for Enriched lead with ID: {lead.id}, name: {lead.name} with LinkedIn URL: {lead.linkedin_url}")
-            return None
+            return time_based_signals
 
         d1 = datetime.now()
         d2 = current_start_date
