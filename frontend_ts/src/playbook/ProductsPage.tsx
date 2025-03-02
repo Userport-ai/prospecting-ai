@@ -16,7 +16,6 @@ import { deleteProduct, listProducts, Product } from "@/services/Products";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { formatDate } from "@/common/utils";
 import ScreenLoader from "@/common/ScreenLoader";
-import { Textarea } from "@/components/ui/textarea";
 
 // Component Displaying Page Header.
 const PageHeader: React.FC<{ handleAddProduct: () => void }> = ({
@@ -101,6 +100,23 @@ const PersonasDisplay: React.FC<{ product: Product }> = ({ product }) => {
   );
 };
 
+// Display Signals that are relevant to given Product.
+const Signals: React.FC<{ product: Product }> = ({ product }) => {
+  if (!product.playbook_description) {
+    return null;
+  }
+  const allSignals: string[] = product.playbook_description.split("\n");
+  return (
+    <div className="flex flex-col gap-3">
+      {allSignals.map((signal) => (
+        <p className="text-sm text-gray-700 border border-gray-400 p-2">
+          {signal}
+        </p>
+      ))}
+    </div>
+  );
+};
+
 interface SingleProductDetailsProps {
   product: Product;
   onDelete: (arg0: string) => void;
@@ -168,13 +184,10 @@ const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
           <PersonasDisplay product={product} />
         </div>
 
-        {/* signals */}
+        {/* Signals */}
         <div>
           <h3 className="text-sm font-semibold text-gray-600 mb-2">Signals</h3>
-          <Textarea
-            placeholder={product.playbook_description}
-            className="min-h-[10rem] border border-gray-400 font-medium"
-          />
+          <Signals product={product} />
         </div>
       </CardContent>
 
