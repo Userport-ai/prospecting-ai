@@ -23,6 +23,15 @@ sowrabh@Sowrabhs-MacBook-Pro django_app % docker run -it --rm \
     userport-app:dev
 ```
 
+### GKE logs
+
+Add the following filters to GKE logs to filter out Health Check logs
+```
+-(textPayload=~".*GET /api/v2/health/.*")
+-(textPayload=~".*/api/v2/health/status/ - Status 200")
+-(textPayload=~".*/api/v2/health/ready/ - Status 200")
+```
+
 ### Installation notes
 
 For Mac OS using Python 3.13, we need to use: [1] uwsgi==2.0.27 and [2] psycopg2-binary==2.9.10 instead.
