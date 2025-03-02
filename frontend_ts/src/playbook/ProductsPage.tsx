@@ -16,6 +16,7 @@ import { deleteProduct, listProducts, Product } from "@/services/Products";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { formatDate } from "@/common/utils";
 import ScreenLoader from "@/common/ScreenLoader";
+import { USERPORT_TENANT_ID } from "@/services/Common";
 
 // Component Displaying Page Header.
 const PageHeader: React.FC<{ handleAddProduct: () => void }> = ({
@@ -252,6 +253,9 @@ const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
   // Handler when user wants to delete a product.
   const onDelete = async (id: string) => {
     try {
+      if (authContext.userContext?.tenant.id === USERPORT_TENANT_ID) {
+        return;
+      }
       setLoading(true);
       await deleteProduct(authContext, id);
     } catch (error: any) {
@@ -317,6 +321,9 @@ export default function ProductsPage() {
   }
 
   const handleAddProduct = () => {
+    if (authContext.userContext?.tenant.id === USERPORT_TENANT_ID) {
+      return;
+    }
     navigate("/playbook/add-product"); // Adjust route to the product creation page.
   };
 

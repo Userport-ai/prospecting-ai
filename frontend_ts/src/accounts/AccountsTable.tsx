@@ -160,18 +160,18 @@ const Table: React.FC<TableProps> = ({
           />
 
           {/* Status Filter */}
-          <EnumFilter
+          {/* <EnumFilter
             table={table}
             columnId={"enrichment_status"}
             columnFilters={columnFilters}
-          />
+          /> */}
         </div>
 
         {/* View visible Columns. */}
         <VisibleColumns table={table} />
 
         {/* Add custom column */}
-        <AddCustomColumn onAdded={handleCustomColumnAdd} />
+        {/* <AddCustomColumn onAdded={handleCustomColumnAdd} /> */}
       </div>
 
       {/* Table Container */}

@@ -304,7 +304,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         },
         meta: {
           displayName: "Personality Traits",
-          visibleInitially: true,
+          visibleInitially: false,
           cellExpandable: true,
         } as CustomColumnMeta,
       },
@@ -340,7 +340,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         },
         meta: {
           displayName: "Areas of Interest",
-          visibleInitially: true,
+          visibleInitially: false,
           cellExpandable: true,
         } as CustomColumnMeta,
       },

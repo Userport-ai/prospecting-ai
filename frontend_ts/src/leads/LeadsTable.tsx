@@ -154,10 +154,10 @@ export const Table: React.FC<TableProps> = ({
         </div>
 
         {/* View visible Columns. */}
-        <VisibleColumns table={table} />
+        {/* <VisibleColumns table={table} /> */}
 
         {/* Add custom column */}
-        <AddCustomColumn onAdded={handleCustomColumnAdd} />
+        {/* <AddCustomColumn onAdded={handleCustomColumnAdd} /> */}
       </div>
 
       {/* Table Container */}

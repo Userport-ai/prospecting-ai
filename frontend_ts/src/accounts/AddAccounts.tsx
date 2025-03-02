@@ -46,6 +46,7 @@ import {
 } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
+import { USERPORT_TENANT_ID } from "@/services/Common";
 
 // Component that lets the user select a product.
 const ProductSelection: React.FC<{
@@ -360,7 +361,11 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
           {/* Submit button */}
           <div className="flex justify-center gap-2">
             <Button
-              disabled={!uploadedFile || loading}
+              disabled={
+                !uploadedFile ||
+                loading ||
+                authContext.userContext?.tenant.id === USERPORT_TENANT_ID
+              }
               onClick={handleSubmit}
               className="shadow-sm"
             >
@@ -504,7 +509,13 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
 
             {/* Footer Navigation */}
             <DialogFooter className="mt-6">
-              <Button type="submit" disabled={loading}>
+              <Button
+                type="submit"
+                disabled={
+                  loading ||
+                  authContext.userContext?.tenant.id === USERPORT_TENANT_ID
+                }
+              >
                 Submit
               </Button>
             </DialogFooter>
