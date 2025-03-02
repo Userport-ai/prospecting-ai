@@ -55,20 +55,21 @@ const appItems = [
     icon: NotebookPen,
     isActive: false,
   },
-  {
-    key: "analytics",
-    title: "Analytics",
-    url: "/analytics",
-    icon: ChartNoAxesColumn,
-    isActive: false,
-  },
-  {
-    key: "settings",
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-    isActive: false,
-  },
+  // Uncomment when we have content for these items.
+  // {
+  //   key: "analytics",
+  //   title: "Analytics",
+  //   url: "/analytics",
+  //   icon: ChartNoAxesColumn,
+  //   isActive: false,
+  // },
+  // {
+  //   key: "settings",
+  //   title: "Settings",
+  //   url: "/settings",
+  //   icon: Settings,
+  //   isActive: false,
+  // },
 ];
 
 // Onboarding items.
@@ -113,7 +114,7 @@ export function AppSidebar() {
     <Sidebar className="shadow-2xl bg-sidebar-background text-sidebar-foreground h-full min-h-screen">
       {/* Header */}
       <SidebarHeader className="flex items-center justify-center p-4 hover:cursor-pointer transition">
-        <div className="w-40">
+        <div className="w-36">
           <img
             className="scale-100"
             src={logo}
@@ -151,7 +152,8 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Getting Started Group */}
-        <SidebarGroup>
+        {/* Uncomment once we have actual content for this group. */}
+        {/* <SidebarGroup>
           <SidebarGroupLabel className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">
             Getting Started
           </SidebarGroupLabel>
@@ -172,7 +174,7 @@ export function AppSidebar() {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup> */}
       </SidebarContent>
 
       {/* Footer */}
@@ -191,7 +193,8 @@ export function AppSidebar() {
                 side="top"
                 className="w-[--radix-popper-anchor-width] shadow-lg bg-card text-card-foreground rounded-md p-2"
               >
-                <DropdownMenuItem
+                {/* Uncomment once we have content for these options */}
+                {/* <DropdownMenuItem
                   className="hover:bg-muted hover:cursor-pointer rounded-md p-2"
                   onSelect={handleFooterMenuSelection}
                 >
@@ -202,7 +205,7 @@ export function AppSidebar() {
                   onSelect={handleFooterMenuSelection}
                 >
                   <span>{billingOptionText}</span>
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
                 <DropdownMenuItem
                   className="hover:bg-muted hover:cursor-pointer rounded-md p-2"
                   onSelect={handleFooterMenuSelection}
