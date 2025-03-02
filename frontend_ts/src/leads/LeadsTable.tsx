@@ -22,6 +22,7 @@ import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Lead as LeadRow, listSuggestedLeads } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
+import { USERPORT_TENANT_ID } from "@/services/Common";
 
 const ZeroStateDisplay = () => {
   return (
@@ -45,17 +46,31 @@ export const Table: React.FC<TableProps> = ({
   data,
   onCustomColumnAdded,
 }) => {
+  const authContext = useAuthContext();
   const [sorting, setSorting] = useState<ColumnSort[]>([
     { id: "fit_score", desc: true },
   ]);
+
+  var persona_filter_values: string[] = [];
+  if (authContext.userContext?.tenant.id !== USERPORT_TENANT_ID) {
+    persona_filter_values = [
+      getCustomColumnDisplayName("buyer"),
+      getCustomColumnDisplayName("influencer"),
+      getCustomColumnDisplayName("end_user"),
+    ];
+  } else {
+    // Test account, so we use only the two personas here.
+    // TODO: Change once this is no longer the test account.
+    persona_filter_values = [
+      getCustomColumnDisplayName("buyer"),
+      getCustomColumnDisplayName("influencer"),
+    ];
+  }
+
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([
     {
       id: "persona_match",
-      value: [
-        getCustomColumnDisplayName("buyer"),
-        getCustomColumnDisplayName("influencer"),
-        getCustomColumnDisplayName("end_user"),
-      ],
+      value: persona_filter_values,
     },
   ]);
   const [rowSelection, setRowSelection] = useState({});

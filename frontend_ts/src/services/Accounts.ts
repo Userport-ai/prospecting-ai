@@ -1,6 +1,7 @@
 import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall, ListObjectsResponse } from "./Api";
 import { EnrichmentStatus } from "./Common";
+import { USERPORT_TENANT_ID } from "./Common";
 
 const ACCOUNTS_ENDPOINT = "/accounts/";
 const BULK_CREATE_ACCOUNTS_ENDPOINT = "/accounts/bulk_create/";
@@ -54,8 +55,6 @@ interface FundingRound {
 }
 
 type ListAccountsResponse = ListObjectsResponse<Account>;
-
-const USERPORT_TENANT_ID = "34410fcc-83bf-4006-b7d3-fedfe0472afb";
 
 // Fetch all accounts for given tenant.
 export const listAccounts = async (

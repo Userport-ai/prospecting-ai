@@ -9,3 +9,5 @@ export interface EnrichmentStatus {
   quality_score: number | null;
   avg_completion_percent: number | null;
 }
+
+export const USERPORT_TENANT_ID = "34410fcc-83bf-4006-b7d3-fedfe0472afb";
