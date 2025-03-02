@@ -9,17 +9,17 @@ import {
   ColumnSort,
   ColumnFilter,
 } from "@tanstack/react-table";
-import AddCustomColumn, { CustomColumnInput } from "@/table/AddCustomColumn";
+import AddCustomColumn, {
+  CustomColumnInput,
+  getCustomColumnDisplayName,
+} from "@/table/AddCustomColumn";
 import CommonTable from "@/table/CommonTable";
 import EnumFilter from "@/table/EnumFilter";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
 import { getLeadColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import {
-  Lead as LeadRow,
-  listSuggestedLeads,
-} from "@/services/Leads";
+import { Lead as LeadRow, listSuggestedLeads } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 
@@ -49,7 +49,14 @@ export const Table: React.FC<TableProps> = ({
     { id: "fit_score", desc: true },
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([
-    { id: "persona_match", value: ["Influencer", "Buyer"] },
+    {
+      id: "persona_match",
+      value: [
+        getCustomColumnDisplayName("buyer"),
+        getCustomColumnDisplayName("influencer"),
+        getCustomColumnDisplayName("end_user"),
+      ],
+    },
   ]);
   const [rowSelection, setRowSelection] = useState({});
   const [pagination, setPagination] = useState({
@@ -126,7 +133,7 @@ export const Table: React.FC<TableProps> = ({
           {/* Status Filter */}
           <EnumFilter
             table={table}
-            columnId={"enrichment_status"}
+            columnId={"persona_match"}
             columnFilters={columnFilters}
           />
         </div>
