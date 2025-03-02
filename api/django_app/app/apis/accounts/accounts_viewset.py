@@ -1,5 +1,6 @@
 import logging
-
+import warnings
+from typing import List, Dict, Any
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
@@ -40,8 +41,9 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
 
-    def _trigger_enrichments(self, accounts):
-        """Helper method to trigger all enrichments for accounts"""
+    def _trigger_enrichments_old(self, accounts):
+        """[DEPRECATED] Helper method to trigger all enrichments for accounts"""
+        warnings.warn("_trigger_enrichments_old is deprecated, use _trigger_enrichments instead")
         worker_service = WorkerService()
         accounts_list = accounts if isinstance(accounts, list) else [accounts]
         results = []
@@ -73,6 +75,37 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 results.append({
                     "enrichment_type": enrichment_type,
                     "status": "failed",
+                    "error": str(e)
+                })
+
+        return results
+
+    def _trigger_enrichments(self, accounts) -> List[Dict[str, Any]]:
+        """Helper method to trigger all enrichments for accounts"""
+        worker_service = WorkerService()
+        accounts_list = accounts if isinstance(accounts, list) else [accounts]
+        results = []
+
+        for account in accounts_list:
+            try:
+                # Trigger Account Enrichment.
+                account_response = worker_service.trigger_account_enrichment(accounts=[{"account_id": str(account.id), "website": account.website}])
+                logger.debug(f"Triggered Account enrichment in worker for Account ID: {account.id}")
+
+                # Trigger Lead Enrichment.
+                lead_response = self._trigger_lead_generation(account)
+
+                logger.debug(f"Triggered Leads generation in worker for Account ID: {account.id}")
+
+                results.append({
+                    "account_id": account.id,
+                    "account_enrichment_response": account_response,
+                    "lead_generation_response": lead_response
+                })
+            except Exception as e:
+                logger.error(f"Failed to trigger enrichment for account ID: {account.id} with error: {e}")
+                results.append({
+                    "account_id": account.id,
                     "error": str(e)
                 })
 
