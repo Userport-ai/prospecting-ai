@@ -14,7 +14,6 @@ from tasks.generate_leads_apollo import ApolloLeadsTask
 from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
 
-
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
