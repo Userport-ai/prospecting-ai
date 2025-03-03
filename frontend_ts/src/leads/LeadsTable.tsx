@@ -9,13 +9,13 @@ import {
   ColumnSort,
   ColumnFilter,
 } from "@tanstack/react-table";
-import AddCustomColumn, {
+import AddCustomColumn from "@/table/AddCustomColumn";
+import {
   CustomColumnInput,
   getCustomColumnDisplayName,
 } from "@/table/AddCustomColumn";
 import CommonTable from "@/table/CommonTable";
 import EnumFilter from "@/table/EnumFilter";
-import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
 import { getLeadColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
@@ -153,11 +153,8 @@ export const Table: React.FC<TableProps> = ({
           />
         </div>
 
-        {/* View visible Columns. */}
-        {/* <VisibleColumns table={table} /> */}
-
         {/* Add custom column */}
-        {/* <AddCustomColumn onAdded={handleCustomColumnAdd} /> */}
+        <AddCustomColumn onAdded={handleCustomColumnAdd} />
       </div>
 
       {/* Table Container */}
