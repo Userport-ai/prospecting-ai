@@ -219,17 +219,24 @@ const SignalsFormField: React.FC<SignalsFormFieldProps> = ({
 
 interface ProductFormProps {
   product: Product;
+  operation: "create" | "edit"; // Whether we are creating or editing the product using this form.
   onSubmit: (addedProduct: Product) => void; // Type for the onClick callback
   onCancel: () => void;
 }
 
 const ProductForm: React.FC<ProductFormProps> = ({
   product,
+  operation,
   onSubmit,
   onCancel,
 }) => {
+  // Total number of steps in the form.
+  const numSteps: number = 7;
   // State to manage the current step of the form
-  const [step, setStep] = useState(1);
+  const initialStep = operation === "create" ? 1 : numSteps;
+  const [step, setStep] = useState(initialStep);
+  const nextButtonText = step === numSteps ? "Submit" : "Next";
+  const backButtonText = step === 1 || operation === "edit" ? "Cancel" : "Back";
 
   const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -266,10 +273,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
     defaultValues: product,
   });
 
-  const lastStepNum: number = 7;
-  const nextButtonText = step === lastStepNum ? "Submit" : "Next";
-  const backButtonText = step === 1 ? "Cancel" : "Back";
-
   // Input and textarea base styles
   const inputClassName =
     "w-full rounded-lg border border-gray-300 bg-white py-2 px-4 placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary shadow-sm";
@@ -278,7 +281,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   // Handle user clicking next on form.
   const onNext = (addedProduct: Product) => {
-    if (step === lastStepNum) {
+    if (step === numSteps || operation === "edit") {
       // Submit form.
       onSubmit(addedProduct);
     } else {
@@ -289,11 +292,11 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   // Handle clicking Back on form.
   const onBack = () => {
-    setStep(step - 1);
-    if (step === 1) {
-      // User has decided to cancel product creation.
-      // Go back to playbook home page.
+    if (step === 1 || operation === "edit") {
+      // User has decided to cancel product creation or edit.
       onCancel();
+    } else {
+      setStep(step - 1);
     }
   };
 
@@ -313,10 +316,10 @@ const ProductForm: React.FC<ProductFormProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <Progress value={(step / lastStepNum) * 100.0} />
+        <Progress value={(step / numSteps) * 100.0} />
 
         {/* Name Field */}
-        {(step === 1 || step === lastStepNum) && (
+        {(step === 1 || step === numSteps) && (
           <FormField
             control={form.control}
             name="name"
@@ -340,7 +343,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
 
         {/* Website Field */}
-        {(step === 2 || step === lastStepNum) && (
+        {(step === 2 || step === numSteps) && (
           <FormField
             control={form.control}
             name="website"
@@ -364,7 +367,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
 
         {/* Description Field */}
-        {(step === 3 || step === lastStepNum) && (
+        {(step === 3 || step === numSteps) && (
           <FormField
             control={form.control}
             name="description"
@@ -394,7 +397,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
 
         {/* ICP Field */}
-        {(step === 4 || step === lastStepNum) && (
+        {(step === 4 || step === numSteps) && (
           <FormField
             control={form.control}
             name="icp_description"
@@ -418,7 +421,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
 
         {/* Personas Field */}
-        {(step === 5 || step === lastStepNum) && (
+        {(step === 5 || step === numSteps) && (
           <div className="flex flex-col gap-8">
             <RoleTitleFormField
               form={form}
@@ -444,7 +447,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
 
         {/* Signals Field */}
-        {(step === 6 || step === lastStepNum) && (
+        {(step === 6 || step === numSteps) && (
           <SignalsFormField
             form={form}
             formStepClassName={formStepClassName}

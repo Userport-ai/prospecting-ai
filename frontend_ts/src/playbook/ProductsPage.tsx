@@ -17,7 +17,6 @@ import { useAuthContext } from "@/auth/AuthProvider";
 import { formatDate } from "@/common/utils";
 import ScreenLoader from "@/common/ScreenLoader";
 import { USERPORT_TENANT_ID } from "@/services/Common";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -163,15 +162,14 @@ const Signals: React.FC<{ product: Product }> = ({ product }) => {
 interface SingleProductDetailsProps {
   product: Product;
   onDelete: (arg0: string) => void;
-  onEdit: (arg0: string) => void;
 }
 
 // Component to display a a single product's details.
 const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
   product,
   onDelete,
-  onEdit,
 }) => {
+  const navigate = useNavigate();
   return (
     <Card className=" bg-white shadow-lg rounded-none border border-gray-200 overflow-hidden transition-transform hover:shadow-2xl">
       {/* Card Header */}
@@ -194,8 +192,9 @@ const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
         <div className="flex">
           <Pencil
             className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300"
-            onClick={() => onEdit(product.id!)}
+            onClick={() => navigate(`/products/edit/${product.id}`)}
           />
+
           <DeleteProductAlert
             name={product.name}
             handleDelete={() => onDelete(product.id!)}
@@ -292,11 +291,6 @@ const AllProducts: React.FC<{
     return <ZeroStateDisplay />;
   }
 
-  // Handler when user wants to edit a product.
-  const onEdit = (id: string) => {
-    console.log("going to edit: ", id);
-  };
-
   // Handler when user wants to delete a product.
   const onDelete = async (id: string) => {
     try {
@@ -332,7 +326,6 @@ const AllProducts: React.FC<{
             key={product.id}
             product={product}
             onDelete={onDelete}
-            onEdit={onEdit}
           />
         ))}
       </div>
@@ -348,6 +341,7 @@ export default function ProductsPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    setLoading(true);
     listProducts(authContext)
       .then((products) => setProducts(products))
       .catch((error) =>
@@ -373,7 +367,7 @@ export default function ProductsPage() {
     if (authContext.userContext?.tenant.id === USERPORT_TENANT_ID) {
       return;
     }
-    navigate("/playbook/add-product"); // Adjust route to the product creation page.
+    navigate("/products/add"); // Adjust route to the product creation page.
   };
 
   // Handle Product Deleted.

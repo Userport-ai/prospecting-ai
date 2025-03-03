@@ -29,7 +29,7 @@ function AddProduct() {
     try {
       await addProduct(authContext, addedProduct);
       setError(null);
-      navigate("/playbook");
+      navigate("/products");
     } catch (error: any) {
       setError(new Error(`Failed to Add product: ${error.message}`));
     }
@@ -37,7 +37,7 @@ function AddProduct() {
 
   // Handle canceling adding the product.
   function handleCancel() {
-    navigate("/playbook");
+    navigate("/products");
   }
 
   return (
@@ -45,6 +45,7 @@ function AddProduct() {
       {error && <p className="text-sm text-red-500">{error.message}</p>}
       <ProductForm
         product={product}
+        operation="create"
         onSubmit={handleSubmit}
         onCancel={handleCancel}
       />

@@ -40,9 +40,9 @@ const appItems = [
     isActive: false,
   },
   {
-    key: "playbook",
+    key: "products",
     title: "Playbook",
-    url: "/playbook",
+    url: "/products",
     icon: NotebookPen,
     isActive: false,
   },
