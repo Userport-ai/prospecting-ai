@@ -11,12 +11,51 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { deleteProduct, listProducts, Product } from "@/services/Products";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { formatDate } from "@/common/utils";
 import ScreenLoader from "@/common/ScreenLoader";
 import { USERPORT_TENANT_ID } from "@/services/Common";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+const DeleteProductAlert: React.FC<{
+  name: string;
+  handleDelete: () => void;
+  children: React.ReactNode;
+}> = ({ name, handleDelete, children }) => {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action will permanently delete the Product {name}. This cannot
+            be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete}>
+            Yes, Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
 
 // Component Displaying Page Header.
 const PageHeader: React.FC<{ handleAddProduct: () => void }> = ({
@@ -110,7 +149,10 @@ const Signals: React.FC<{ product: Product }> = ({ product }) => {
   return (
     <div className="flex flex-col gap-3">
       {allSignals.map((signal) => (
-        <p className="text-sm text-gray-700 border border-gray-400 p-2">
+        <p
+          key={signal}
+          className="text-sm text-gray-700 border border-gray-400 p-2"
+        >
           {signal}
         </p>
       ))}
@@ -154,10 +196,12 @@ const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
             className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300"
             onClick={() => onEdit(product.id!)}
           />
-          <Trash2
-            className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300"
-            onClick={() => onDelete(product.id!)}
-          />
+          <DeleteProductAlert
+            name={product.name}
+            handleDelete={() => onDelete(product.id!)}
+          >
+            <Trash2 className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300" />
+          </DeleteProductAlert>
         </div>
       </CardHeader>
 
@@ -236,7 +280,10 @@ const ZeroStateDisplay = () => {
 };
 
 // Component to display all products.
-const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
+const AllProducts: React.FC<{
+  products: Product[];
+  onProductDeleted: (arg0: string) => void;
+}> = ({ products, onProductDeleted }) => {
   const authContext = useAuthContext();
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -258,6 +305,7 @@ const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
       }
       setLoading(true);
       await deleteProduct(authContext, id);
+      onProductDeleted(id);
     } catch (error: any) {
       setError(new Error(`Failed to delete product: ${error.message}`));
     } finally {
@@ -320,6 +368,7 @@ export default function ProductsPage() {
     );
   }
 
+  // Handle Add Product click by user.
   const handleAddProduct = () => {
     if (authContext.userContext?.tenant.id === USERPORT_TENANT_ID) {
       return;
@@ -327,12 +376,20 @@ export default function ProductsPage() {
     navigate("/playbook/add-product"); // Adjust route to the product creation page.
   };
 
+  // Handle Product Deleted.
+  const handleProductDeleted = (id: string) => {
+    setProducts(products.filter((product, _) => product.id !== id));
+  };
+
   // Display existing products.
   return (
     <div className="w-11/12 flex flex-col">
       <PageHeader handleAddProduct={handleAddProduct} />
       <Separator />
-      <AllProducts products={products} />
+      <AllProducts
+        products={products}
+        onProductDeleted={handleProductDeleted}
+      />
     </div>
   );
 }
