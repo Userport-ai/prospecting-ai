@@ -509,13 +509,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
 
             {/* Footer Navigation */}
             <DialogFooter className="mt-6">
-              <Button
-                type="submit"
-                disabled={
-                  loading ||
-                  authContext.userContext?.tenant.id === USERPORT_TENANT_ID
-                }
-              >
+              <Button type="submit" disabled={loading}>
                 Submit
               </Button>
             </DialogFooter>
