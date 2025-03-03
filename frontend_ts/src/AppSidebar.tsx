@@ -1,13 +1,4 @@
-import {
-  ChartNoAxesColumn,
-  List,
-  Settings,
-  ChevronUp,
-  User2,
-  UsersRound,
-  NotebookPen,
-  File,
-} from "lucide-react";
+import { List, ChevronUp, User2, UsersRound, NotebookPen } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -55,31 +46,6 @@ const appItems = [
     icon: NotebookPen,
     isActive: false,
   },
-  // Uncomment when we have content for these items.
-  // {
-  //   key: "analytics",
-  //   title: "Analytics",
-  //   url: "/analytics",
-  //   icon: ChartNoAxesColumn,
-  //   isActive: false,
-  // },
-  // {
-  //   key: "settings",
-  //   title: "Settings",
-  //   url: "/settings",
-  //   icon: Settings,
-  //   isActive: false,
-  // },
-];
-
-// Onboarding items.
-const onboardingItems = [
-  {
-    key: "docs",
-    title: "Documentation",
-    url: "/docs",
-    icon: File,
-  },
 ];
 
 export function AppSidebar() {
@@ -99,8 +65,6 @@ export function AppSidebar() {
     }
   });
 
-  const accountOptionText = "Account";
-  const billingOptionText = "Billing";
   const logoutOptionText = "Log Out";
   const handleFooterMenuSelection = (e: Event) => {
     const selectedOption = (e.target as HTMLElement).innerText;
@@ -150,31 +114,6 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* Getting Started Group */}
-        {/* Uncomment once we have actual content for this group. */}
-        {/* <SidebarGroup>
-          <SidebarGroupLabel className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">
-            Getting Started
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-2">
-              {onboardingItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link
-                      to={item.url}
-                      className="flex items-center gap-4 p-3 rounded-md hover:bg-secondary hover:text-secondary-foreground transition"
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-medium">{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup> */}
       </SidebarContent>
 
       {/* Footer */}
@@ -193,19 +132,6 @@ export function AppSidebar() {
                 side="top"
                 className="w-[--radix-popper-anchor-width] shadow-lg bg-card text-card-foreground rounded-md p-2"
               >
-                {/* Uncomment once we have content for these options */}
-                {/* <DropdownMenuItem
-                  className="hover:bg-muted hover:cursor-pointer rounded-md p-2"
-                  onSelect={handleFooterMenuSelection}
-                >
-                  <span>{accountOptionText}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="hover:bg-muted hover:cursor-pointer rounded-md p-2"
-                  onSelect={handleFooterMenuSelection}
-                >
-                  <span>{billingOptionText}</span>
-                </DropdownMenuItem> */}
                 <DropdownMenuItem
                   className="hover:bg-muted hover:cursor-pointer rounded-md p-2"
                   onSelect={handleFooterMenuSelection}

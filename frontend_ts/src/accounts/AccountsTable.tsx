@@ -9,10 +9,10 @@ import {
   ColumnSort,
   ColumnFilter,
 } from "@tanstack/react-table";
-import AddCustomColumn, { CustomColumnInput } from "@/table/AddCustomColumn";
+import AddCustomColumn from "@/table/AddCustomColumn";
+import { CustomColumnInput } from "@/table/AddCustomColumn";
 import AddAccounts from "./AddAccounts";
 import CommonTable from "@/table/CommonTable";
-import EnumFilter from "@/table/EnumFilter";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
 import { getAccountColumns } from "./Columns";
@@ -158,20 +158,13 @@ const Table: React.FC<TableProps> = ({
             columnId={"name"}
             placeholder={"Filter Account name..."}
           />
-
-          {/* Status Filter */}
-          {/* <EnumFilter
-            table={table}
-            columnId={"enrichment_status"}
-            columnFilters={columnFilters}
-          /> */}
         </div>
 
         {/* View visible Columns. */}
         <VisibleColumns table={table} />
 
         {/* Add custom column */}
-        {/* <AddCustomColumn onAdded={handleCustomColumnAdd} /> */}
+        <AddCustomColumn onAdded={handleCustomColumnAdd} />
       </div>
 
       {/* Table Container */}
