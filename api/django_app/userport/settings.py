@@ -234,7 +234,7 @@ LOGGING = {
     },
     'root': {
         'handlers': ['cloudlogging'],
-        'level': 'INFO',
+        'level': 'DEBUG',
     },
 }
 
