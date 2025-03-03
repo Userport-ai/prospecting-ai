@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ControllerRenderProps, useForm } from "react-hook-form";
+import { useForm, UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,80 +14,290 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { WandSparkles } from "lucide-react";
+import { Trash } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router";
 import { addProduct, Product } from "@/services/Products";
 import { useAuthContext } from "@/auth/AuthProvider";
 
-const GenAIButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
+interface RoleTitleFormFieldProps {
+  form: UseFormReturn<Product>;
+  fieldPath:
+    | "persona_role_titles.buyers"
+    | "persona_role_titles.influencers"
+    | "persona_role_titles.end_users";
+  formStepClassName: string;
+  inputClassName: string;
+}
+
+const RoleTitleFormField: React.FC<RoleTitleFormFieldProps> = ({
+  form,
+  fieldPath,
+  formStepClassName,
+  inputClassName,
+}) => {
+  var labelName = "";
+  var labelDescription = "";
+  var roleTitlePlaceHolder = "";
+  if (fieldPath === "persona_role_titles.buyers") {
+    labelName = "Buyers *";
+    labelDescription = "Add role titles of all Buyer personas";
+    roleTitlePlaceHolder = "e.g. Director of Sales";
+  } else if (fieldPath === "persona_role_titles.influencers") {
+    labelName = "Influencers *";
+    labelDescription = "Add role titles of all Influencer personas";
+    roleTitlePlaceHolder = "e.g. Business Development Manager";
+  } else if (fieldPath === "persona_role_titles.end_users") {
+    labelName = "End Users *";
+    labelDescription = "Add role titles of all End User personas";
+    roleTitlePlaceHolder = "e.g. Business Developemnt Representative";
+  }
+  if (labelName === "") {
+    console.log(`Invalid field path value: ${fieldPath}`);
+    return null;
+  }
+
   return (
-    <div>
-      <Button
-        type="button"
-        className="w-fit rounded-xl bg-transparent border"
-        onClick={onClick}
-      >
-        <WandSparkles className="text-purple-400" />
-        <p className="text-purple-400">AI</p>
-      </Button>
-    </div>
+    <FormField
+      control={form.control}
+      name={fieldPath}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel className={formStepClassName}>{labelName}</FormLabel>
+          <FormDescription className="text-sm text-gray-500">
+            {labelDescription}
+          </FormDescription>
+          <FormControl>
+            <div>
+              {field.value.map((role, index) => (
+                <div key={index} className="flex gap-2 items-center">
+                  <Input
+                    className={inputClassName}
+                    value={role}
+                    onChange={(e) => {
+                      const updatedRoles = [...field.value];
+                      updatedRoles[index] = e.target.value;
+                      field.onChange(updatedRoles); // Update form field
+                    }}
+                    onBlur={() => {
+                      if (!field.value[index].trim()) {
+                        // Remove empty input on blur
+                        const updatedRoles = field.value.filter(
+                          (_, i) => i !== index
+                        );
+                        field.onChange(updatedRoles);
+                      }
+                    }}
+                    placeholder={roleTitlePlaceHolder}
+                  />
+                  <Button
+                    type="button"
+                    className="p-2 text-red-500 font-bold border border-gray-300 bg-white"
+                    onClick={() => {
+                      const updatedRoles = field.value.filter(
+                        (_, i) => i !== index
+                      );
+                      field.onChange(updatedRoles);
+                    }}
+                  >
+                    X
+                  </Button>
+                </div>
+              ))}
+              <Button
+                size="sm"
+                type="button"
+                className="mt-2 p-2 bg-purple-400 text-white rounded"
+                onClick={() => {
+                  if (field.value?.some((role) => !role.trim())) {
+                    return; // Prevent adding a new input if any existing one is empty
+                  }
+                  field.onChange([...(field.value || []), ""]);
+                }}
+              >
+                + Add Role
+              </Button>
+            </div>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+};
+
+interface SignalsFormFieldProps {
+  form: UseFormReturn<Product>;
+  formStepClassName: string;
+  inputClassName: string;
+}
+
+const SignalsFormField: React.FC<SignalsFormFieldProps> = ({
+  form,
+  formStepClassName,
+  inputClassName,
+}) => {
+  const getSignalsList = (
+    playbookDescription: string | undefined
+  ): string[] => {
+    if (!playbookDescription) {
+      return [];
+    }
+    return playbookDescription.split("\n");
+  };
+
+  const toSignalsString = (signalsList: string[]) => {
+    return signalsList.join("\n");
+  };
+
+  return (
+    <FormField
+      control={form.control}
+      name="playbook_description"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel className={formStepClassName}>Signals *</FormLabel>
+          <FormDescription className="text-sm text-gray-500">
+            You can add Signals that can be found on Lead's profile that make
+            them relevant. Examples of Signals are keywords they may mention on
+            their profile, use of certain technologies, use of certain
+            competitors, past experiences etc. You can describe each signal as a
+            sentence (Imagine prompting ChatGPT).
+          </FormDescription>
+          <FormControl>
+            <div className="flex flex-col gap-2">
+              {getSignalsList(field.value).map((signal, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    className={inputClassName}
+                    value={signal}
+                    onChange={(e) => {
+                      const updatedRoles = [...getSignalsList(field.value)];
+                      updatedRoles[index] = e.target.value;
+                      field.onChange(toSignalsString(updatedRoles)); // Update form field
+                    }}
+                    placeholder="Enter a signal"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => {
+                      const updatedRoles = getSignalsList(field.value).filter(
+                        (_, i) => i !== index
+                      );
+                      field.onChange(toSignalsString(updatedRoles));
+                    }}
+                  >
+                    <Trash className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                size="sm"
+                className="w-fit mt-2 p-2 bg-purple-400 text-white rounded"
+                onClick={() => {
+                  if (
+                    getSignalsList(field.value).some((role) => !role.trim())
+                  ) {
+                    return; // Prevent adding a new input if any existing one is empty
+                  }
+                  field.onChange(
+                    toSignalsString([...getSignalsList(field.value), " "])
+                  );
+                }}
+              >
+                + Add Signal
+              </Button>
+            </div>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
   );
 };
 
 interface ProductFormProps {
   product: Product;
-  step: number;
-  onNext: (addedProduct: Product) => void; // Type for the onClick callback
+  onSubmit: (addedProduct: Product) => void; // Type for the onClick callback
   onCancel: () => void;
 }
 
 const ProductForm: React.FC<ProductFormProps> = ({
   product,
-  step,
-  onNext,
+  onSubmit,
   onCancel,
 }) => {
+  // State to manage the current step of the form
+  const [step, setStep] = useState(1);
+
   const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
-    description: z.string().min(step > 1 ? 1 : 0, "Description is required"),
     website:
-      step > 2
+      step > 1
         ? z.string().startsWith("https://", "Website must start with https://")
         : z.string(),
+    description: z.string().min(step > 2 ? 1 : 0, "Description is required"),
     icp_description: z.string().min(step > 3 ? 1 : 0, "ICP is required"),
     persona_role_titles: z.object({
       buyers: z
         .array(z.string())
-        .min(step > 4 ? 1 : 0, "Buyers input is required"),
+        .min(step > 4 ? 1 : 0, "Buyers input is required")
+        .refine((values) => step <= 4 || values.every((v) => v.trim() !== ""), {
+          message: "Each Buyer role must be non-empty",
+        }),
       influencers: z
         .array(z.string())
-        .min(step > 4 ? 1 : 0, "Influencers input is required"),
+        .min(step > 4 ? 1 : 0, "Influencers input is required")
+        .refine((values) => step <= 4 || values.every((v) => v.trim() !== ""), {
+          message: "Each Influencer role must be non-empty",
+        }),
       end_users: z
         .array(z.string())
-        .min(step > 4 ? 1 : 0, "End Users input is required"),
+        .min(step > 4 ? 1 : 0, "End Users input is required")
+        .refine((values) => step <= 4 || values.every((v) => v.trim() !== ""), {
+          message: "Each End User role must be non-empty",
+        }),
     }),
+    playbook_description: z.string().min(0),
   });
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: product,
   });
 
-  const nextButtonText = step === 6 ? "Submit" : "Next";
-  const backButtonText = step === 1 || step === 6 ? "Cancel" : "Back";
-
-  // Handle user request to generate given field (name, value) using AI.
-  function generateUsingAI(field: ControllerRenderProps<Product>) {
-    // TODO: Fetch from server.
-    console.log("Generate value for field using AI: ", field);
-  }
+  const lastStepNum: number = 7;
+  const nextButtonText = step === lastStepNum ? "Submit" : "Next";
+  const backButtonText = step === 1 ? "Cancel" : "Back";
 
   // Input and textarea base styles
   const inputClassName =
     "w-full rounded-lg border border-gray-300 bg-white py-2 px-4 placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary shadow-sm";
 
-  // AI generation
-  const aiGenContainerClassName = "flex flex-row justify-between items-start";
+  const formStepClassName = "text-gray-700 text-md font-semibold";
+
+  // Handle user clicking next on form.
+  const onNext = (addedProduct: Product) => {
+    if (step === lastStepNum) {
+      // Submit form.
+      onSubmit(addedProduct);
+    } else {
+      // Go to next step.
+      setStep(step + 1);
+    }
+  };
+
+  // Handle clicking Back on form.
+  const onBack = () => {
+    setStep(step - 1);
+    if (step === 1) {
+      // User has decided to cancel product creation.
+      // Go back to playbook home page.
+      onCancel();
+    }
+  };
 
   return (
     <Form {...form}>
@@ -95,26 +305,26 @@ const ProductForm: React.FC<ProductFormProps> = ({
         onSubmit={form.handleSubmit(onNext, (err) =>
           console.log("error: ", err)
         )}
-        className="space-y-8 rounded-lg border h-fit border-gray-200 bg-white p-6 shadow-md"
+        className="space-y-6 rounded-lg border h-fit border-gray-200 bg-white p-6 shadow-md"
       >
-        {/* Progress Indicator */}
-        <Progress value={(step / 6.0) * 100.0} />
-
         {/* Form Title */}
-        <h2 className="text-xl font-semibold text-gray-800">Product Details</h2>
-        <p className="text-sm text-gray-500">
-          Fill out the form below to describe your product. Fields marked with
-          an asterisk (*) are required.
-        </p>
+        <div className="flex flex-col gap-1">
+          <h3 className="text-lg font-semibold text-gray-800">
+            Product Details
+          </h3>
+        </div>
+
+        {/* Progress Indicator */}
+        <Progress value={(step / lastStepNum) * 100.0} />
 
         {/* Name Field */}
-        {(step === 1 || step === 6) && (
+        {(step === 1 || step === lastStepNum) && (
           <FormField
             control={form.control}
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-gray-700">Name *</FormLabel>
+                <FormLabel className={formStepClassName}>Name *</FormLabel>
                 <FormDescription className="text-sm text-gray-500">
                   The name of the product you are selling.
                 </FormDescription>
@@ -131,39 +341,14 @@ const ProductForm: React.FC<ProductFormProps> = ({
           />
         )}
 
-        {/* Description Field */}
-        {(step === 2 || step === 6) && (
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-gray-700">Description *</FormLabel>
-                <FormDescription className="text-sm text-gray-500">
-                  Describe the product, what problem it solves, and its value
-                  for the customer.
-                </FormDescription>
-                <FormControl>
-                  <Textarea
-                    className={`${inputClassName} h-32`}
-                    placeholder="A sales platform that uses AI to empower SDRs by conducting account and lead research..."
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
         {/* Website Field */}
-        {(step === 3 || step === 6) && (
+        {(step === 2 || step === lastStepNum) && (
           <FormField
             control={form.control}
             name="website"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-gray-700">Website *</FormLabel>
+                <FormLabel className={formStepClassName}>Website *</FormLabel>
                 <FormDescription className="text-sm text-gray-500">
                   The website of your product.
                 </FormDescription>
@@ -180,22 +365,47 @@ const ProductForm: React.FC<ProductFormProps> = ({
           />
         )}
 
+        {/* Description Field */}
+        {(step === 3 || step === lastStepNum) && (
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className={formStepClassName}>
+                  Description *
+                </FormLabel>
+                <FormDescription className="text-sm text-gray-500">
+                  Describe the product, what problem it solves, and its value
+                  for the customer.
+                </FormDescription>
+                <FormDescription className="text-sm text-gray-500">
+                  This will be used by AI to match personas better.
+                </FormDescription>
+                <FormControl>
+                  <Textarea
+                    className={`${inputClassName} h-32`}
+                    placeholder="A sales platform that uses AI to empower BDRs by automating lead research..."
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         {/* ICP Field */}
-        {(step === 4 || step === 6) && (
+        {(step === 4 || step === lastStepNum) && (
           <FormField
             control={form.control}
             name="icp_description"
             render={({ field }) => (
               <FormItem>
-                <div className={aiGenContainerClassName}>
-                  <div>
-                    <FormLabel className="text-gray-700">ICP *</FormLabel>
-                    <FormDescription className="text-sm text-gray-500">
-                      Describe the Ideal Customer Profile you are selling to.
-                    </FormDescription>
-                  </div>
-                  <GenAIButton onClick={() => generateUsingAI(field)} />
-                </div>
+                <FormLabel className={formStepClassName}>ICP *</FormLabel>
+                <FormDescription className="text-sm text-gray-500">
+                  Describe the Ideal Customer Profile you are selling to.
+                </FormDescription>
                 <FormControl>
                   <Textarea
                     className={`${inputClassName} h-28`}
@@ -210,115 +420,38 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
 
         {/* Personas Field */}
-        {(step === 5 || step === 6) && (
-          <div className="flex flex-col gap-10">
-            <FormField
-              control={form.control}
-              name="persona_role_titles.buyers"
-              render={({ field }) => (
-                <FormItem>
-                  <div className={aiGenContainerClassName}>
-                    <div>
-                      <FormLabel className="text-gray-700">Buyers *</FormLabel>
-                      <FormDescription className="text-sm text-gray-500">
-                        Provide role titles and use commas to separate multiple
-                        personas.
-                      </FormDescription>
-                    </div>
-                    <GenAIButton onClick={() => generateUsingAI(field)} />
-                  </div>
-                  <FormControl>
-                    <Input
-                      className={`${inputClassName}`}
-                      placeholder="e.g., Director of Sales, VP of Sales, Head of Sales"
-                      onBlur={(e) => {
-                        const inputValue = e.target.value;
-                        // Convert the string to an array of strings.
-                        const arrayValue = inputValue
-                          .split(",")
-                          .map((item) => item.trim())
-                          .filter(Boolean); // Remove empty strings
-                        field.onChange(arrayValue); // Pass the array to the form state
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        {(step === 5 || step === lastStepNum) && (
+          <div className="flex flex-col gap-8">
+            <RoleTitleFormField
+              form={form}
+              fieldPath="persona_role_titles.buyers"
+              formStepClassName={formStepClassName}
+              inputClassName={inputClassName}
             />
-            <FormField
-              control={form.control}
-              name="persona_role_titles.influencers"
-              render={({ field }) => (
-                <FormItem>
-                  <div className={aiGenContainerClassName}>
-                    <div>
-                      <FormLabel className="text-gray-700">
-                        Influencers *
-                      </FormLabel>
-                      <FormDescription className="text-sm text-gray-500">
-                        Provide role titles and use commas to separate multiple
-                        personas.
-                      </FormDescription>
-                    </div>
-                    <GenAIButton onClick={() => generateUsingAI(field)} />
-                  </div>
-                  <FormControl>
-                    <Input
-                      className={`${inputClassName}`}
-                      placeholder="e.g., Sales Development Manager, Business Development Manager"
-                      onBlur={(e) => {
-                        const inputValue = e.target.value;
-                        // Convert the string to an array of strings.
-                        const arrayValue = inputValue
-                          .split(",")
-                          .map((item) => item.trim())
-                          .filter(Boolean); // Remove empty strings
-                        field.onChange(arrayValue); // Pass the array to the form state
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+
+            <RoleTitleFormField
+              form={form}
+              fieldPath="persona_role_titles.influencers"
+              formStepClassName={formStepClassName}
+              inputClassName={inputClassName}
             />
-            <FormField
-              control={form.control}
-              name="persona_role_titles.end_users"
-              render={({ field }) => (
-                <FormItem>
-                  <div className={aiGenContainerClassName}>
-                    <div>
-                      <FormLabel className="text-gray-700">
-                        End Users *
-                      </FormLabel>
-                      <FormDescription className="text-sm text-gray-500">
-                        Provide role titles and use commas to separate multiple
-                        personas.
-                      </FormDescription>
-                    </div>
-                    <GenAIButton onClick={() => generateUsingAI(field)} />
-                  </div>
-                  <FormControl>
-                    <Input
-                      className={`${inputClassName}`}
-                      placeholder="e.g., Sales Development Representatives, Account Executives"
-                      onBlur={(e) => {
-                        const inputValue = e.target.value;
-                        // Convert the string to an array of strings.
-                        const arrayValue = inputValue
-                          .split(",")
-                          .map((item) => item.trim())
-                          .filter(Boolean); // Remove empty strings
-                        field.onChange(arrayValue); // Pass the array to the form state
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+
+            <RoleTitleFormField
+              form={form}
+              fieldPath="persona_role_titles.end_users"
+              formStepClassName={formStepClassName}
+              inputClassName={inputClassName}
             />
           </div>
+        )}
+
+        {/* Signals Field */}
+        {(step === 6 || step === lastStepNum) && (
+          <SignalsFormField
+            form={form}
+            formStepClassName={formStepClassName}
+            inputClassName={inputClassName}
+          />
         )}
 
         {/* Action Buttons */}
@@ -327,7 +460,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
             type="button"
             variant="outline"
             className="rounded-lg px-6 py-2 text-gray-700 hover:bg-gray-100"
-            onClick={onCancel}
+            onClick={onBack}
           >
             {backButtonText}
           </Button>
@@ -347,7 +480,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
 function AddProduct() {
   const authContext = useAuthContext();
   // Product Details JSON.
-  const [product, setProduct] = useState<Product>({
+  const product: Product = {
     name: "",
     description: "",
     website: "",
@@ -357,47 +490,34 @@ function AddProduct() {
       influencers: [],
       end_users: [],
     },
-  });
-  // State to manage the current step of the form
-  const [step, setStep] = useState(1);
+    playbook_description: "",
+  };
+
   const [error, setError] = useState<Error | null>(null);
   const navigate = useNavigate();
 
-  // Handle user clicking next on form.
-  const handleNext = async (addedProduct: Product) => {
-    setProduct(addedProduct);
-    if (step === 6) {
-      // Submit form.
-      try {
-        await addProduct(authContext, addedProduct);
-        setError(null);
-        navigate("/playbook");
-      } catch (error: any) {
-        setError(new Error(`Failed to Add product: ${error.message}`));
-      }
-    } else {
-      // Go to next step.
-      setStep(step + 1);
+  // Handle user submitting the form
+  const handleSubmit = async (addedProduct: Product) => {
+    try {
+      await addProduct(authContext, addedProduct);
+      setError(null);
+      navigate("/playbook");
+    } catch (error: any) {
+      setError(new Error(`Failed to Add product: ${error.message}`));
     }
   };
 
-  // Handle canceling creating the product.
+  // Handle canceling adding the product.
   function handleCancel() {
-    setStep(step - 1);
-    if (step === 1 || step === 6) {
-      // User has decided to cancel product creation.
-      // Go back to playbook home page.
-      navigate("/playbook");
-    }
+    navigate("/playbook");
   }
 
   return (
-    <div className="mt-10 flex flex-col gap-4">
+    <div className="mt-10 flex flex-col gap-4 w-[40rem]">
       {error && <p className="text-sm text-red-500">{error.message}</p>}
       <ProductForm
         product={product}
-        step={step}
-        onNext={handleNext}
+        onSubmit={handleSubmit}
         onCancel={handleCancel}
       />
     </div>
