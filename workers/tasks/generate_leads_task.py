@@ -8,11 +8,13 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple, Union
 
 import google.generativeai as genai
+import httpx
 
 from services.ai_service import AIServiceFactory
 from services.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
+from utils.connection_pool import ConnectionPool
 from utils.role_pattern_generator import RolePatternGenerator
 from .enrichment_task import AccountEnrichmentTask
 
@@ -178,11 +180,21 @@ class GenerateLeadsTask(AccountEnrichmentTask):
         if not self.google_api_key:
             raise ValueError("GEMINI_API_TOKEN environment variable is required")
 
+        self.pool = ConnectionPool(
+            limits=httpx.Limits(
+                max_keepalive_connections=15,
+                max_connections=20,            # Maximum concurrent connections
+                keepalive_expiry=150.0         # Connection TTL in seconds
+            ),
+            timeout=300.0
+        )
+
         # Initialize cache service
         self.cache_service = APICacheService(
             client=self.bq_service.client,
             project_id=self.project_id,
-            dataset=self.dataset
+            dataset=self.dataset,
+            connection_pool=self.pool
         )
 
     def _configure_ai_service(self) -> None:

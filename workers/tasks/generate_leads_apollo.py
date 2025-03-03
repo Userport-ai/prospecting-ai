@@ -6,6 +6,8 @@ import time
 import uuid
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
+
+import httpx
 from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, List, Optional, Union
 
@@ -15,6 +17,7 @@ from services.bigquery_service import BigQueryService
 from services.jina_service import JinaService
 from services.proxycurl_service import ProxyCurlService
 from services.builtwith_service import BuiltWithService
+from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
 from models.leads import ApolloLead, SearchApolloLeadsResponse, EnrichedLead, EvaluateLeadsResult, EvaluatedLead
@@ -339,11 +342,21 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         if not self.apollo_org_search_api_key:
             raise ValueError("APOLLO_ORG_SEARCH_API_KEY environment variable is required")
 
+        self.pool = ConnectionPool(
+            limits=httpx.Limits(
+                max_keepalive_connections=15,
+                max_connections=20,            # Maximum concurrent connections
+                keepalive_expiry=150.0         # Connection TTL in seconds
+            ),
+            timeout=300.0
+        )
+
         # Initialize cache service
         self.cache_service = APICacheService(
             client=self.bq_service.client,
             project_id=self.project_id,
-            dataset=self.dataset
+            dataset=self.dataset,
+            connection_pool=self.pool
         )
 
     def _configure_ai_service(self) -> None:

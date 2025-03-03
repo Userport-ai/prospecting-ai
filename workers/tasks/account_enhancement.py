@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Dict, Any, List
 
 import google.generativeai as genai
+import httpx
 import requests
 
 from models.builtwith import EnrichmentResult
@@ -15,6 +16,7 @@ from services.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.builtwith_service import BuiltWithService
 from services.django_callback_service import CallbackService
+from utils.connection_pool import ConnectionPool
 from utils.website_parser import WebsiteParser
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from .enrichment_task import AccountEnrichmentTask
@@ -274,7 +276,15 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         self.prompts = PromptTemplates()
         project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
         dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
-        self.cache_service = APICacheService(client=self.bq_service.client, project_id=project_id, dataset=dataset)
+        self.pool = ConnectionPool(
+            limits=httpx.Limits(
+                max_keepalive_connections=15,
+                max_connections=20,            # Maximum concurrent connections
+                keepalive_expiry=150.0         # Connection TTL in seconds
+            ),
+            timeout=300.0
+        )
+        self.cache_service = APICacheService(self.bq_service.client, project_id=project_id, dataset=dataset, connection_pool=self.pool)
 
     def _initialize_credentials(self) -> None:
         """Initialize and validate required API credentials."""

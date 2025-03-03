@@ -2,6 +2,7 @@ import logging
 import os
 from typing import List, Optional
 
+import httpx
 from pydantic import BaseModel, Field
 
 from models.accounts import BrightDataAccount, AccountInfo, RecentDevelopments
@@ -11,6 +12,7 @@ from services.bigquery_service import BigQueryService
 from services.brightdata_service import BrightDataService
 from services.builtwith_service import BuiltWithService
 from services.jina_service import JinaService
+from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
 
@@ -65,10 +67,20 @@ class AccountInfoFetcher:
             self.project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
             self.dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
 
+            self.pool = ConnectionPool(
+                limits=httpx.Limits(
+                    max_keepalive_connections=15,
+                    max_connections=20,            # Maximum concurrent connections
+                    keepalive_expiry=150.0         # Connection TTL in seconds
+                ),
+                timeout=300.0
+            )
+
             self.cache_service = APICacheService(
                 client=self.bq_service.client,
                 project_id=self.project_id,
-                dataset=self.dataset
+                dataset=self.dataset,
+                connection_pool=self.pool
             )
 
             self.builtwith_service = BuiltWithService(cache_service=self.cache_service)

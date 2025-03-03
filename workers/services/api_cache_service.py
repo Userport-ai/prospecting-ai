@@ -4,7 +4,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple
 
+import httpx
 from google.cloud import bigquery
+
+from utils.connection_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +15,8 @@ logger = logging.getLogger(__name__)
 class APICacheService:
     """Service for caching external API requests and responses."""
 
-    def __init__(self, client: bigquery.Client, project_id: str, dataset: str):
+    def __init__(self, client: bigquery.Client, project_id: str, dataset: str,
+                 connection_pool: Optional[ConnectionPool] = None):
         """
         Initialize the cache service.
 
@@ -20,12 +24,23 @@ class APICacheService:
             client: BigQuery client instance
             project_id: GCP project ID
             dataset: BigQuery dataset name
+            connection_pool: Optional connection pool to use for HTTP requests
         """
         self.client = client
         self.project_id = project_id
         self.dataset = dataset
         self.table_name = "api_request_cache"
         self._ensure_cache_table()
+
+        # Use provided connection pool or create a new one
+        self.connection_pool = connection_pool or ConnectionPool(
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+            timeout=30.0
+        )
+
+    async def close(self) -> None:
+        """Close the connection pool to free resources."""
+        await self.connection_pool.close()
 
     def _ensure_cache_table(self) -> None:
         """Create the cache table if it doesn't exist."""
@@ -214,7 +229,7 @@ async def cached_request(
         force_refresh: bool = False
 ) -> Tuple[Dict[str, Any], int]:
     """
-    Utility function to make a cached API request.
+    Utility function to make a cached API request asynchronously.
 
     Args:
         cache_service: APICacheService instance
@@ -229,8 +244,6 @@ async def cached_request(
     Returns:
         Tuple of (response_data, status_code)
     """
-    import requests
-
     if not force_refresh:
         cached = await cache_service.get_cached_response(
             url=url,
@@ -248,7 +261,6 @@ async def cached_request(
                     "method": method,
                     "tenant_id": tenant_id,
                     "status_code": cached["status_code"],
-                    # "data": cached["data"]
                 }
             )
             return cached["data"], cached["status_code"]
@@ -259,54 +271,58 @@ async def cached_request(
             "url": url,
             "method": method,
             "params": params,
-            "headers": headers,
             "tenant_id": tenant_id,
             "force_refresh": force_refresh
         }
     )
 
-    # Make the actual API request
-    response = requests.request(
-        method=method,
-        url=url,
-        params=params,
-        headers=headers,
-        timeout=30
-    )
-    response_data = response.json() if response.content else {}
+    # Make the actual API request asynchronously using the connection pool
+    try:
+        async with cache_service.connection_pool.acquire_connection() as client:
+            response = await client.request(
+                method=method,
+                url=url,
+                params=params,
+                headers=headers,
+            )
 
-    # Log the response
-    log_extra = {
-        "url": url,
-        "method": method,
-        "tenant_id": tenant_id,
-        "status_code": response.status_code,
-        "response_size": len(response.content) if response.content else 0,
-        "response": response_data
-    }
+            response_data = response.json() if response.content else {}
 
-    if response.status_code >= 400:
-        logger.error(
-            "API request failed",
-            extra=log_extra
-        )
-    # else:
-    #     logger.debug(
-    #         "API request successful",
-    #         extra=log_extra
-    #     )
+            # Log the response
+            log_extra = {
+                "url": url,
+                "method": method,
+                "tenant_id": tenant_id,
+                "status_code": response.status_code,
+                "response_size": len(response.content) if response.content else 0,
+            }
 
-    # Cache successful responses
-    if response.status_code < 400:
-        await cache_service.cache_response(
-            url=url,
-            response_data=response_data,
-            status_code=response.status_code,
-            method=method,
-            params=params,
-            headers=headers,
-            tenant_id=tenant_id,
-            ttl_hours=ttl_hours
-        )
+            if response.status_code >= 400:
+                log_extra["response"] = response_data
+                logger.error(
+                    "API request failed",
+                    extra=log_extra
+                )
+            else:
+                logger.debug(
+                    "API request successful",
+                    extra=log_extra
+                )
 
-    return response_data, response.status_code
+            # Cache successful responses
+            if response.status_code < 400:
+                await cache_service.cache_response(
+                    url=url,
+                    response_data=response_data,
+                    status_code=response.status_code,
+                    method=method,
+                    params=params,
+                    headers=headers,
+                    tenant_id=tenant_id,
+                    ttl_hours=ttl_hours
+                )
+
+            return response_data, response.status_code
+    except Exception as e:
+        logger.error(f"Error making request to {url}: {str(e)}")
+        raise
