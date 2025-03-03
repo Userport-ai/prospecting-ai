@@ -1,6 +1,6 @@
 import ProductForm from "./ProductForm";
 import { useEffect, useState } from "react";
-import { getProduct, Product } from "@/services/Products";
+import { getProduct, Product, updateProduct } from "@/services/Products";
 import { useNavigate, useParams } from "react-router";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
@@ -31,8 +31,13 @@ const EditProduct = () => {
 
   // Handle user saving product.
   const onSave = async (savedProduct: Product) => {
-    console.log("saved product: ", savedProduct);
-    navigate("/products");
+    try {
+      await updateProduct(authContext, productId, savedProduct);
+      setError(null);
+      navigate("/products");
+    } catch (error: any) {
+      setError(new Error(`Failed to Edit product: ${error.message}`));
+    }
   };
 
   // Haadle user canceling edit.

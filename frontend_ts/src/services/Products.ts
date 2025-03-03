@@ -70,6 +70,19 @@ export const addProduct = async (
   });
 };
 
+// Update Product.
+export const updateProduct = async (
+  authContext: AuthContext,
+  productId: string,
+  newProduct: Product
+): Promise<Product> => {
+  const url = `${PRODUCTS_ENDPOINT}${productId}/`;
+  return await apiCall<Product>(authContext, async (apiClient) => {
+    const response = await apiClient.patch<Product>(url, newProduct);
+    return response.data;
+  });
+};
+
 // Fetch all products.
 export const deleteProduct = async (
   authContext: AuthContext,
