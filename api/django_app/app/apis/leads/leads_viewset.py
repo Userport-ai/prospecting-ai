@@ -1,8 +1,10 @@
 import logging
-
 from django.db import transaction
-from django.db.models import F
-from django.db.models.expressions import OrderBy
+from django.db import models
+from django.db.models import F, Case, When, FloatField, Value, ExpressionWrapper, Q
+from django.db.models.functions import Cast, Least
+from django.db.models.expressions import RawSQL
+from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -23,23 +25,260 @@ from app.services.worker_service import WorkerService
 logger = logging.getLogger(__name__)
 
 
+# Custom filter class for Lead model
+class LeadFilter(filters.FilterSet):
+    account_created_by = filters.UUIDFilter(field_name='account__created_by', lookup_expr='exact')
+
+    class Meta:
+        model = Lead
+        fields = ['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status', 'account_created_by']
+
+
 class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = LeadDetailsSerializer
     queryset = Lead.objects.all()
     http_method_names = ['get', 'post', 'patch', 'delete']
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status']
+    filterset_class = LeadFilter
     ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at', 'score']
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        # Order by score descending, placing nulls last.
-        return queryset.order_by(F('score').desc(nulls_last=True))
+    def _annotate_persona_match(self, queryset):
+        """
+        Helper method to annotate the queryset with persona_match from JSON field.
 
+        Args:
+            queryset: The base queryset to annotate
+
+        Returns:
+            QuerySet: The annotated queryset with persona_match field
+        """
+        return queryset.annotate(
+            persona_match=Cast(
+                RawSQL(
+                    "enrichment_data->'evaluation'->>'persona_match'",
+                    []
+                ),
+                models.CharField()
+            )
+        )
+
+    def _annotate_with_adjusted_scores(self, queryset, multipliers):
+        return queryset.annotate(
+            # Calculate the score with multipliers in one step
+            multiplied_score=Case(
+                When(persona_match=Value('buyer'),
+                     then=F('score') * Value(multipliers.get('buyer', 1.2))),
+                When(persona_match=Value('influencer'),
+                     then=F('score') * Value(multipliers.get('influencer', 1.0))),
+                When(persona_match=Value('end_user'),
+                     then=F('score') * Value(multipliers.get('end_user', 0.8))),
+                default=F('score'),
+                output_field=FloatField(),
+            ),
+            # Cap the score at 100 using the Least function
+            adjusted_score=Least(F('multiplied_score'), Value(100.0), output_field=FloatField())
+        )
+
+    def get_queryset(self):
+        """
+        Enhanced queryset with persona-based score adjustments.
+
+        This method applies different weights to leads based on their persona type
+        stored in enrichment_data.evaluation.persona_match:
+        - Buyers get a higher weight (1.2x)
+        - Influencers maintain their score (1.0x)
+        - End Users get a lower weight (0.8x)
+
+        This balances the results to favor buyers and influencers over end users
+        while maintaining the original scoring within each persona category.
+        """
+        queryset = super().get_queryset().select_related('account')
+
+        # Check if created_at is in query params and map to account__created_by
+        if 'created_at' in self.request.query_params:
+            created_by_value = self.request.query_params.get('created_at')
+            queryset = queryset.filter(account__created_by=created_by_value)
+
+        # Get balance parameters from query params with defaults
+        balance_personas = self.request.query_params.get('balance_personas', 'true').lower() == 'true'
+
+        # Apply persona-based score adjustment if requested
+        if balance_personas:
+            # Define multipliers
+            multipliers = {
+                'buyer': float(self.request.query_params.get('buyer_multiplier', '1.2')),
+                'influencer': float(self.request.query_params.get('influencer_multiplier', '1.0')),
+                'end_user': float(self.request.query_params.get('end_user_multiplier', '0.8'))
+            }
+
+            # First annotate with persona_match
+            queryset = self._annotate_persona_match(queryset)
+
+            # Then annotate with adjusted scores based on persona
+            queryset = self._annotate_with_adjusted_scores(queryset, multipliers)
+
+            # Order by adjusted score, then by original score for ties
+            return queryset.order_by(F('adjusted_score').desc(nulls_last=True), F('score').desc(nulls_last=True))
+        else:
+            # Use the original score ordering
+            return queryset.order_by(F('score').desc(nulls_last=True))
+
+    @action(detail=False, methods=['get'])
+    def balanced(self, request):
+        """
+        Return leads with balanced persona distribution using quotas.
+
+        This endpoint returns a balanced mix of leads with configurable quotas:
+        - min_buyers: Minimum number of buyers to include (default: 5)
+        - min_influencers: Minimum number of influencers to include (default: 5)
+        - max_end_users: Maximum number of end users to include (default: 5)
+        - total: Total number of leads to return (default: 15)
+
+        The results will contain at least the specified minimums of buyers and influencers,
+        and at most the specified maximum of end users, up to the total count.
+        Any remaining slots will be filled with the highest-scoring leads regardless of persona.
+        """
+        # Get parameters with defaults
+        account_id = request.query_params.get('account')
+        min_buyers = int(request.query_params.get('min_buyers', '5'))
+        min_influencers = int(request.query_params.get('min_influencers', '5'))
+        max_end_users = int(request.query_params.get('max_end_users', '5'))
+        total_limit = int(request.query_params.get('total', '15'))
+
+        # Validate parameters
+        if min_buyers + min_influencers + max_end_users > total_limit:
+            return Response(
+                {"error": "Sum of quota parameters exceeds total limit"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Base queryset filtered by account if provided
+        base_queryset = self.get_queryset().select_related('account')
+        if account_id:
+            base_queryset = base_queryset.filter(account_id=account_id)
+
+        # Annotate with persona_match for filtering
+        persona_queryset = self._annotate_persona_match(base_queryset)
+
+        # Filter by persona type
+        buyer_queryset = persona_queryset.filter(
+            persona_match='buyer'
+        ).order_by('-score')[:min_buyers]
+
+        influencer_queryset = persona_queryset.filter(
+            persona_match='influencer'
+        ).order_by('-score')[:min_influencers]
+
+        end_user_queryset = persona_queryset.filter(
+            persona_match='end_user'
+        ).order_by('-score')[:max_end_users]
+
+        # Apply quotas
+        buyers = list(buyer_queryset)
+        influencers = list(influencer_queryset)
+        end_users = list(end_user_queryset)
+
+        # Calculate remaining slots
+        selected_ids = [lead.id for lead in buyers + influencers + end_users]
+        remaining_slots = total_limit - len(selected_ids)
+
+        # Fill remaining slots with highest-scoring leads not yet selected
+        remaining_leads = []
+        if remaining_slots > 0:
+            remaining_leads = list(
+                base_queryset.exclude(id__in=selected_ids).order_by('-score')[:remaining_slots]
+            )
+
+        # Combine all selected leads
+        combined_leads = buyers + influencers + end_users + remaining_leads
+
+        # Sort by score for final ordering
+        combined_leads.sort(key=lambda x: x.score or 0, reverse=True)
+
+        # Serialize and return
+        serializer = self.get_serializer(combined_leads, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def quota_distribution(self, request):
+        """
+        Returns leads with a specified distribution across persona types.
+
+        This endpoint allows specifying percentages for each persona type:
+        - buyer_percent: Percentage of results to be buyers (default: 40)
+        - influencer_percent: Percentage of results to be influencers (default: 40)
+        - end_user_percent: Percentage of results to be end users (default: 20)
+        - total: Total number of leads to return (default: 15)
+
+        The results will contain approximately the specified distribution of persona types,
+        with the highest-scoring leads selected from each category.
+        """
+        # Get parameters with defaults
+        account_id = request.query_params.get('account')
+        buyer_percent = float(request.query_params.get('buyer_percent', '40'))
+        influencer_percent = float(request.query_params.get('influencer_percent', '40'))
+        end_user_percent = float(request.query_params.get('end_user_percent', '20'))
+        total_limit = int(request.query_params.get('total', '15'))
+
+        # Validate percentages sum to 100
+        total_percent = buyer_percent + influencer_percent + end_user_percent
+        if not (99.0 <= total_percent <= 101.0):  # Allow small rounding errors
+            return Response(
+                {"error": "Percentages must sum to approximately 100"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Base queryset filtered by account if provided
+        base_queryset = self.get_queryset().select_related('account')
+        if account_id:
+            base_queryset = base_queryset.filter(account_id=account_id)
+
+        # Calculate number of leads for each persona type
+        buyer_count = int(round(total_limit * buyer_percent / 100.0))
+        influencer_count = int(round(total_limit * influencer_percent / 100.0))
+        end_user_count = total_limit - buyer_count - influencer_count  # Ensure total adds up exactly
+
+        # Annotate with persona_match for filtering
+        persona_queryset = self._annotate_persona_match(base_queryset)
+
+        # Filter by persona type
+        buyers = list(persona_queryset.filter(
+            persona_match='buyer'
+        ).order_by('-score')[:buyer_count])
+
+        influencers = list(persona_queryset.filter(
+            persona_match='influencer'
+        ).order_by('-score')[:influencer_count])
+
+        end_users = list(persona_queryset.filter(
+            persona_match='end_user'
+        ).order_by('-score')[:end_user_count])
+
+        # If we don't have enough of a certain type, fill with the highest-scoring remaining leads
+        selected_ids = [lead.id for lead in buyers + influencers + end_users]
+        remaining_slots = total_limit - len(selected_ids)
+
+        remaining_leads = []
+        if remaining_slots > 0:
+            remaining_leads = list(
+                base_queryset.exclude(id__in=selected_ids).order_by('-score')[:remaining_slots]
+            )
+
+        # Combine all selected leads
+        combined_leads = buyers + influencers + end_users + remaining_leads
+
+        # Sort by score for final ordering
+        combined_leads.sort(key=lambda x: x.score or 0, reverse=True)
+
+        # Serialize and return
+        serializer = self.get_serializer(combined_leads, many=True)
+        return Response(serializer.data)
+
+    # Keep existing methods below
     @action(detail=False, methods=['post'])
     def generate(self, request):
         """
@@ -152,6 +391,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         """
         Trigger LinkedIn research enrichment for a specific lead
         """
+        lead = None
         try:
             # Get the lead with related account
             lead = Lead.objects.select_related('account').get(
@@ -173,20 +413,22 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             # Get Lead, Account and Product data.
             account: Account = lead.account
             product: Product = account.product
+            enrichment_data = lead.enrichment_data or {}
+
             linkedin_research_input_data = LinkedInResearchInputData(
                 lead_data=LinkedInResearchInputData.LeadData(
                     name=f"{lead.first_name} {lead.last_name}",
-                    headline=lead.enrichment_data.get('headline'),
-                    about=lead.enrichment_data.get('about'),
-                    location=lead.enrichment_data.get('location'),
-                    current_employment=lead.enrichment_data.get('current_employment'),
-                    employment_history=lead.enrichment_data.get('employment_history'),
-                    education=lead.enrichment_data.get('education'),
-                    projects=lead.enrichment_data.get('projects'),
-                    publications=lead.enrichment_data.get('publications'),
-                    groups=lead.enrichment_data.get('groups'),
-                    certifications=lead.enrichment_data.get('certifications'),
-                    honor_awards=lead.enrichment_data.get('honor_awards'),
+                    headline=enrichment_data.get('headline'),
+                    about=enrichment_data.get('about'),
+                    location=enrichment_data.get('location'),
+                    current_employment=enrichment_data.get('current_employment'),
+                    employment_history=enrichment_data.get('employment_history'),
+                    education=enrichment_data.get('education'),
+                    projects=enrichment_data.get('projects'),
+                    publications=enrichment_data.get('publications'),
+                    groups=enrichment_data.get('groups'),
+                    certifications=enrichment_data.get('certifications'),
+                    honor_awards=enrichment_data.get('honor_awards'),
                 ),
                 account_data=LinkedInResearchInputData.AccountData(
                     name=account.name,
@@ -251,7 +493,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             logger.error(f"Failed to trigger lead LinkedIn research: {str(e)}")
 
             # Update lead status to failed if there's an error
-            if 'lead' in locals():
+            if lead is not None and 'lead' in locals():
                 lead.enrichment_status = EnrichmentStatus.FAILED
                 lead.save(update_fields=['enrichment_status'])
 

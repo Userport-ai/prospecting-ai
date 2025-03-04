@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.db.models import JSONField
 from .common import BaseMixin
@@ -59,9 +60,10 @@ class Lead(BaseMixin):
             models.Index(fields=['enrichment_status']),
             models.Index(fields=['account']),
             models.Index(fields=['created_by']),
-            models.Index(fields=['score']),
+            models.Index(fields=['-score']),
             models.Index(fields=['source']),
             models.Index(fields=['suggestion_status']),
+            GinIndex(fields=['enrichment_data'], name='lead_enrichment_data_idx')
         ]
 
     def __str__(self):
