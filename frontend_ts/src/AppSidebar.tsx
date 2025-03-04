@@ -41,7 +41,7 @@ const appItems = [
   },
   {
     key: "products",
-    title: "Playbook",
+    title: "Products",
     url: "/products",
     icon: NotebookPen,
     isActive: false,
