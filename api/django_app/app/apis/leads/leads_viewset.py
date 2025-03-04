@@ -1,6 +1,7 @@
 import logging
+
 from django.db import transaction
-from django.db.models import F, Case, When, FloatField, Value, ExpressionWrapper
+from django.db.models import F
 from django.db.models.expressions import OrderBy
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -28,190 +29,17 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     http_method_names = ['get', 'post', 'patch', 'delete']
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['id', 'account', 'email', 'phone', 'created_by', 'suggestion_status']
-    ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at', 'score', 'adjusted_score']
+    ordering_fields = ['first_name', 'last_name', 'created_at', 'updated_at', 'score']
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
 
     def get_queryset(self):
-        """
-        Enhanced queryset with persona-based score adjustments.
-
-        This method applies different weights to leads based on their persona type:
-        - Buyers get a higher weight (1.2x)
-        - Influencers maintain their score (1.0x)
-        - End Users get a lower weight (0.8x)
-
-        This balances the results to favor buyers and influencers over end users
-        while maintaining the original scoring within each persona category.
-        """
         queryset = super().get_queryset()
+        # Order by score descending, placing nulls last.
+        return queryset.order_by(F('score').desc(nulls_last=True))
 
-        # Get balance parameters from query params with defaults
-        balance_personas = self.request.query_params.get('balance_personas', 'true').lower() == 'true'
-        buyer_multiplier = float(self.request.query_params.get('buyer_multiplier', '1.2'))
-        influencer_multiplier = float(self.request.query_params.get('influencer_multiplier', '1.0'))
-        end_user_multiplier = float(self.request.query_params.get('end_user_multiplier', '0.8'))
-
-        # Apply persona-based score adjustment if requested
-        if balance_personas:
-            queryset = queryset.annotate(
-                # Calculate the adjusted score with persona multipliers
-                raw_adjusted_score=Case(
-                    When(persona_match='buyer', then=ExpressionWrapper(
-                        F('score') * Value(buyer_multiplier), output_field=FloatField()
-                    )),
-                    When(persona_match='influencer', then=ExpressionWrapper(
-                        F('score') * Value(influencer_multiplier), output_field=FloatField()
-                    )),
-                    When(persona_match='end_user', then=ExpressionWrapper(
-                        F('score') * Value(end_user_multiplier), output_field=FloatField()
-                    )),
-                    default=F('score'),
-                    output_field=FloatField(),
-                ),
-                # Ensure the adjusted score doesn't exceed 100
-                adjusted_score=ExpressionWrapper(
-                    Case(
-                        When(raw_adjusted_score__gt=Value(100.0), then=Value(100.0)),
-                        default=F('raw_adjusted_score'),
-                        output_field=FloatField(),
-                    ),
-                    output_field=FloatField()
-                )
-            )
-            # Order by adjusted score, then by original score for ties
-            return queryset.order_by(F('adjusted_score').desc(nulls_last=True), F('score').desc(nulls_last=True))
-        else:
-            # Use the original score ordering
-            return queryset.order_by(F('score').desc(nulls_last=True))
-
-    @action(detail=False, methods=['get'])
-    def balanced(self, request):
-        """
-        Return leads with balanced persona distribution using quotas.
-
-        This endpoint returns a balanced mix of leads with configurable quotas:
-        - min_buyers: Minimum number of buyers to include (default: 5)
-        - min_influencers: Minimum number of influencers to include (default: 5)
-        - max_end_users: Maximum number of end users to include (default: 5)
-        - total: Total number of leads to return (default: 15)
-
-        The results will contain at least the specified minimums of buyers and influencers,
-        and at most the specified maximum of end users, up to the total count.
-        Any remaining slots will be filled with the highest-scoring leads regardless of persona.
-        """
-        # Get parameters with defaults
-        account_id = request.query_params.get('account')
-        min_buyers = int(request.query_params.get('min_buyers', '5'))
-        min_influencers = int(request.query_params.get('min_influencers', '5'))
-        max_end_users = int(request.query_params.get('max_end_users', '5'))
-        total_limit = int(request.query_params.get('total', '15'))
-
-        # Validate parameters
-        if min_buyers + min_influencers + max_end_users > total_limit:
-            return Response(
-                {"error": "Sum of quota parameters exceeds total limit"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Base queryset filtered by account if provided
-        base_queryset = self.get_queryset()
-        if account_id:
-            base_queryset = base_queryset.filter(account_id=account_id)
-
-        # Apply quotas
-        buyers = list(base_queryset.filter(persona_match='buyer').order_by('-score')[:min_buyers])
-        influencers = list(base_queryset.filter(persona_match='influencer').order_by('-score')[:min_influencers])
-        end_users = list(base_queryset.filter(persona_match='end_user').order_by('-score')[:max_end_users])
-
-        # Calculate remaining slots
-        selected_ids = [lead.id for lead in buyers + influencers + end_users]
-        remaining_slots = total_limit - len(selected_ids)
-
-        # Fill remaining slots with highest-scoring leads not yet selected
-        remaining_leads = []
-        if remaining_slots > 0:
-            remaining_leads = list(
-                base_queryset.exclude(id__in=selected_ids).order_by('-score')[:remaining_slots]
-            )
-
-        # Combine all selected leads
-        combined_leads = buyers + influencers + end_users + remaining_leads
-
-        # Sort by score for final ordering
-        combined_leads.sort(key=lambda x: x.score or 0, reverse=True)
-
-        # Serialize and return
-        serializer = self.get_serializer(combined_leads, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=['get'])
-    def quota_distribution(self, request):
-        """
-        Returns leads with a specified distribution across persona types.
-
-        This endpoint allows specifying percentages for each persona type:
-        - buyer_percent: Percentage of results to be buyers (default: 40)
-        - influencer_percent: Percentage of results to be influencers (default: 40)
-        - end_user_percent: Percentage of results to be end users (default: 20)
-        - total: Total number of leads to return (default: 15)
-
-        The results will contain approximately the specified distribution of persona types,
-        with the highest-scoring leads selected from each category.
-        """
-        # Get parameters with defaults
-        account_id = request.query_params.get('account')
-        buyer_percent = float(request.query_params.get('buyer_percent', '40'))
-        influencer_percent = float(request.query_params.get('influencer_percent', '40'))
-        end_user_percent = float(request.query_params.get('end_user_percent', '20'))
-        total_limit = int(request.query_params.get('total', '15'))
-
-        # Validate percentages sum to 100
-        total_percent = buyer_percent + influencer_percent + end_user_percent
-        if not (99.0 <= total_percent <= 101.0):  # Allow small rounding errors
-            return Response(
-                {"error": "Percentages must sum to approximately 100"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Base queryset filtered by account if provided
-        base_queryset = self.get_queryset()
-        if account_id:
-            base_queryset = base_queryset.filter(account_id=account_id)
-
-        # Calculate number of leads for each persona type
-        buyer_count = int(round(total_limit * buyer_percent / 100.0))
-        influencer_count = int(round(total_limit * influencer_percent / 100.0))
-        end_user_count = total_limit - buyer_count - influencer_count  # Ensure total adds up exactly
-
-        # Get leads for each persona type
-        buyers = list(base_queryset.filter(persona_match='buyer').order_by('-score')[:buyer_count])
-        influencers = list(base_queryset.filter(persona_match='influencer').order_by('-score')[:influencer_count])
-        end_users = list(base_queryset.filter(persona_match='end_user').order_by('-score')[:end_user_count])
-
-        # If we don't have enough of a certain type, fill with the highest-scoring remaining leads
-        selected_ids = [lead.id for lead in buyers + influencers + end_users]
-        remaining_slots = total_limit - len(selected_ids)
-
-        remaining_leads = []
-        if remaining_slots > 0:
-            remaining_leads = list(
-                base_queryset.exclude(id__in=selected_ids).order_by('-score')[:remaining_slots]
-            )
-
-        # Combine all selected leads
-        combined_leads = buyers + influencers + end_users + remaining_leads
-
-        # Sort by score for final ordering
-        combined_leads.sort(key=lambda x: x.score or 0, reverse=True)
-
-        # Serialize and return
-        serializer = self.get_serializer(combined_leads, many=True)
-        return Response(serializer.data)
-
-    # Keep existing methods below
     @action(detail=False, methods=['post'])
     def generate(self, request):
         """
