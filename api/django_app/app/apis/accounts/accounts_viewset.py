@@ -19,7 +19,7 @@ from app.services.worker_service import WorkerService
 
 logger = logging.getLogger(__name__)
 
-MAX_ACCOUNTS_PER_REQUEST = 2
+MAX_ACCOUNTS_PER_REQUEST = 20
 
 
 class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
