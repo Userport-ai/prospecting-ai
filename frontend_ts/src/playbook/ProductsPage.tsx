@@ -11,12 +11,50 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { deleteProduct, listProducts, Product } from "@/services/Products";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { formatDate } from "@/common/utils";
 import ScreenLoader from "@/common/ScreenLoader";
 import { USERPORT_TENANT_ID } from "@/services/Common";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+const DeleteProductAlert: React.FC<{
+  name: string;
+  handleDelete: () => void;
+  children: React.ReactNode;
+}> = ({ name, handleDelete, children }) => {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action will permanently delete the Product {name}. This cannot
+            be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete}>
+            Yes, Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
 
 // Component Displaying Page Header.
 const PageHeader: React.FC<{ handleAddProduct: () => void }> = ({
@@ -110,7 +148,10 @@ const Signals: React.FC<{ product: Product }> = ({ product }) => {
   return (
     <div className="flex flex-col gap-3">
       {allSignals.map((signal) => (
-        <p className="text-sm text-gray-700 border border-gray-400 p-2">
+        <p
+          key={signal}
+          className="text-sm text-gray-700 border border-gray-400 p-2"
+        >
           {signal}
         </p>
       ))}
@@ -121,15 +162,14 @@ const Signals: React.FC<{ product: Product }> = ({ product }) => {
 interface SingleProductDetailsProps {
   product: Product;
   onDelete: (arg0: string) => void;
-  onEdit: (arg0: string) => void;
 }
 
 // Component to display a a single product's details.
 const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
   product,
   onDelete,
-  onEdit,
 }) => {
+  const navigate = useNavigate();
   return (
     <Card className=" bg-white shadow-lg rounded-none border border-gray-200 overflow-hidden transition-transform hover:shadow-2xl">
       {/* Card Header */}
@@ -152,12 +192,15 @@ const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
         <div className="flex">
           <Pencil
             className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300"
-            onClick={() => onEdit(product.id!)}
+            onClick={() => navigate(`/products/edit/${product.id}`)}
           />
-          <Trash2
-            className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300"
-            onClick={() => onDelete(product.id!)}
-          />
+
+          <DeleteProductAlert
+            name={product.name}
+            handleDelete={() => onDelete(product.id!)}
+          >
+            <Trash2 className="pr-4 size-8 hover:cursor-pointer hover:text-yellow-300" />
+          </DeleteProductAlert>
         </div>
       </CardHeader>
 
@@ -236,7 +279,10 @@ const ZeroStateDisplay = () => {
 };
 
 // Component to display all products.
-const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
+const AllProducts: React.FC<{
+  products: Product[];
+  onProductDeleted: (arg0: string) => void;
+}> = ({ products, onProductDeleted }) => {
   const authContext = useAuthContext();
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -244,11 +290,6 @@ const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
   if (products.length === 0) {
     return <ZeroStateDisplay />;
   }
-
-  // Handler when user wants to edit a product.
-  const onEdit = (id: string) => {
-    console.log("going to edit: ", id);
-  };
 
   // Handler when user wants to delete a product.
   const onDelete = async (id: string) => {
@@ -258,6 +299,7 @@ const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
       }
       setLoading(true);
       await deleteProduct(authContext, id);
+      onProductDeleted(id);
     } catch (error: any) {
       setError(new Error(`Failed to delete product: ${error.message}`));
     } finally {
@@ -284,7 +326,6 @@ const AllProducts: React.FC<{ products: Product[] }> = ({ products }) => {
             key={product.id}
             product={product}
             onDelete={onDelete}
-            onEdit={onEdit}
           />
         ))}
       </div>
@@ -300,6 +341,7 @@ export default function ProductsPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    setLoading(true);
     listProducts(authContext)
       .then((products) => setProducts(products))
       .catch((error) =>
@@ -320,11 +362,17 @@ export default function ProductsPage() {
     );
   }
 
+  // Handle Add Product click by user.
   const handleAddProduct = () => {
     if (authContext.userContext?.tenant.id === USERPORT_TENANT_ID) {
       return;
     }
-    navigate("/playbook/add-product"); // Adjust route to the product creation page.
+    navigate("/products/add"); // Adjust route to the product creation page.
+  };
+
+  // Handle Product Deleted.
+  const handleProductDeleted = (id: string) => {
+    setProducts(products.filter((product, _) => product.id !== id));
   };
 
   // Display existing products.
@@ -332,7 +380,10 @@ export default function ProductsPage() {
     <div className="w-11/12 flex flex-col">
       <PageHeader handleAddProduct={handleAddProduct} />
       <Separator />
-      <AllProducts products={products} />
+      <AllProducts
+        products={products}
+        onProductDeleted={handleProductDeleted}
+      />
     </div>
   );
 }

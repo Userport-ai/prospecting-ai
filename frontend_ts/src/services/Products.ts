@@ -34,6 +34,28 @@ export const listProducts = async (
   });
 };
 
+// Get product with given ID.
+export const getProduct = async (
+  authContext: AuthContext,
+  id: string
+): Promise<Product> => {
+  var params: Record<string, any> = {
+    id: id,
+  };
+  return await apiCall<Product>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListProductsResponse>(
+      PRODUCTS_ENDPOINT,
+      { params }
+    );
+    if (response.data.count != 1) {
+      throw new Error(
+        `Expected 1 Product, got ${response.data.count} Products in results.`
+      );
+    }
+    return response.data.results[0];
+  });
+};
+
 // Add a new product.
 export const addProduct = async (
   authContext: AuthContext,
@@ -44,6 +66,19 @@ export const addProduct = async (
       PRODUCTS_ENDPOINT,
       newProduct
     );
+    return response.data;
+  });
+};
+
+// Update Product.
+export const updateProduct = async (
+  authContext: AuthContext,
+  productId: string,
+  newProduct: Product
+): Promise<Product> => {
+  const url = `${PRODUCTS_ENDPOINT}${productId}/`;
+  return await apiCall<Product>(authContext, async (apiClient) => {
+    const response = await apiClient.patch<Product>(url, newProduct);
     return response.data;
   });
 };

@@ -15,6 +15,7 @@ import { ErrorFallback } from "./ErrorFallback.js";
 import LeadsInAccountV2 from "./accounts/LeadsInAccountV2.js";
 import AccountsView from "./accounts/AccountsView.js";
 import LeadsView from "./leads/LeadsView.js";
+import EditProduct from "./playbook/EditProduct.js";
 
 // Error Logging Function
 function logErrorToService(error: Error, info: ErrorInfo) {
@@ -34,9 +35,10 @@ createRoot(document.getElementById("root") as HTMLElement).render(
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/" element={<App />}>
-              <Route path="playbook" element={<Playbook />}>
+              <Route path="products" element={<Playbook />}>
                 <Route index element={<ProductsPage />} />
-                <Route path="add-product" element={<AddProduct />} />
+                <Route path="add" element={<AddProduct />} />
+                <Route path="edit/:id" element={<EditProduct />} />
               </Route>
               <Route path="accounts" element={<AccountsView />}>
                 <Route index element={<AccountsTable />} />
