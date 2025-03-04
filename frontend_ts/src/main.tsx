@@ -1,6 +1,6 @@
 import { ErrorInfo, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import "./index.css";
 import App from "./App.jsx";
 import Playbook from "./playbook/Playbook";
@@ -35,6 +35,8 @@ createRoot(document.getElementById("root") as HTMLElement).render(
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/" element={<App />}>
+              <Route index element={<Navigate to="/accounts" replace />} />{" "}
+              {/* Redirect / to /accounts */}
               <Route path="products" element={<Playbook />}>
                 <Route index element={<ProductsPage />} />
                 <Route path="add" element={<AddProduct />} />

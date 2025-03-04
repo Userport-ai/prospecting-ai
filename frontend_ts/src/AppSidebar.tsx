@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import logo from "./assets/combination_mark_primary_sidebar.png";
 import { Link, useLocation, useNavigate } from "react-router";
-import { handleLogout } from "./auth/AuthProvider";
+import { AuthContext, handleLogout, useAuthContext } from "./auth/AuthProvider";
 
 // App items.
 const appItems = [
@@ -48,7 +48,20 @@ const appItems = [
   },
 ];
 
+// Get user's first name.
+const getUserFirstName = (authContext: AuthContext): string | null => {
+  if (!authContext.firebaseUser) {
+    return null;
+  }
+  const displayName = authContext.firebaseUser.displayName;
+  if (!displayName) {
+    return null;
+  }
+  return displayName.split(" ")[0];
+};
+
 export function AppSidebar() {
+  const authContext = useAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
   var activeItemMarked = false;
@@ -124,7 +137,7 @@ export function AppSidebar() {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton className="flex items-center gap-4 p-3 rounded-md hover:bg-muted hover:text-muted-foreground transition">
                   <User2 className="w-5 h-5" />
-                  <p className="font-medium">Addarsh</p>
+                  <p className="font-medium">{getUserFirstName(authContext)}</p>
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
