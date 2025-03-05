@@ -228,10 +228,10 @@ const SuggestedLeads: React.FC<SuggestedLeadsProps> = ({
 
   useEffect(() => {
     setLoading(true);
-    listSuggestedLeads(authContext, accountId)
-      .then((leads) =>
+    listSuggestedLeads(authContext, 1, accountId)
+      .then((response) =>
         setSuggestedLeads(
-          leads.sort((l1, l2) => (l2.score ?? 0) - (l1.score ?? 0))
+          response.results.sort((l1, l2) => (l2.score ?? 0) - (l1.score ?? 0))
         )
       )
       .catch((error) =>

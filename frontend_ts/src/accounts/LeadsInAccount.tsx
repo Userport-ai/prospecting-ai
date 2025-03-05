@@ -62,9 +62,11 @@ const LeadsInAccount = () => {
     getAccount(authContext, accountId)
       .then((account) => {
         listLeads(authContext, accountId)
-          .then((leads) => {
+          .then((response) => {
             setActiveTab(
-              leads.length > 0 ? LeadViewTab.LEADS : LeadViewTab.LEADS
+              response.results.length > 0
+                ? LeadViewTab.LEADS
+                : LeadViewTab.LEADS
             );
             setAccount(account);
           })
