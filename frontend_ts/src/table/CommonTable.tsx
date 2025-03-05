@@ -20,6 +20,8 @@ interface CommonTableProps<T> {
   columns: ColumnDef<T>[];
   columnResizeMode: string;
   pagination: { pageIndex: number };
+  morePagesToFetch?: boolean;
+  handleNextPageClick?: () => void;
   headerClassName?: string;
 }
 
@@ -30,6 +32,8 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   columns,
   columnResizeMode,
   pagination,
+  morePagesToFetch,
+  handleNextPageClick,
   headerClassName,
 }) => {
   const [expandedCellContext, setExpandedCellContext] = useState<CellContext<
@@ -45,6 +49,25 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   // Handler for when cell expansion panel's open state changes
   const onCellExpansionPanelOpenChange = (open: boolean) => {
     if (!open) setExpandedCellContext(null);
+  };
+
+  // Whether user can click to the next page.
+  const canClickToNextPage = (): boolean => {
+    if (morePagesToFetch) {
+      // Server has more pages, can click to next page.
+      return true;
+    }
+    // Depends on whether there are more pages to see on client side.
+    return table.getCanNextPage();
+  };
+
+  // Handle next page click.
+  const onNextPageClick = () => {
+    if (handleNextPageClick) {
+      handleNextPageClick();
+    } else {
+      table.nextPage();
+    }
   };
 
   // We use total column width (in pixel values) to set the Table Width in CSS.
@@ -209,8 +232,8 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onClick={onNextPageClick}
+              disabled={!canClickToNextPage()}
               className="shadow-sm border-gray-300"
             >
               <ChevronRight />

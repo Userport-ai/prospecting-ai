@@ -8,6 +8,8 @@ import {
   ColumnDef,
   ColumnSort,
   ColumnFilter,
+  ColumnFiltersState,
+  Updater,
 } from "@tanstack/react-table";
 import AddCustomColumn from "@/table/AddCustomColumn";
 import {
@@ -23,6 +25,7 @@ import { Lead as LeadRow, listSuggestedLeads } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import { USERPORT_TENANT_ID } from "@/services/Common";
+import LoadingOverlay from "@/common/LoadingOverlay";
 
 const ZeroStateDisplay = () => {
   return (
@@ -37,13 +40,21 @@ const ZeroStateDisplay = () => {
 
 interface TableProps {
   columns: ColumnDef<LeadRow>[];
-  data: LeadRow[];
+  leads: LeadRow[];
+  totalLeadsCount: number;
+  moreLeadsToFetch: boolean; // Whether server has more leads to fetch.
+  dataLoading: boolean;
+  onFetchNextPage: () => Promise<void>;
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
 }
 
 export const Table: React.FC<TableProps> = ({
   columns,
-  data,
+  leads,
+  totalLeadsCount,
+  moreLeadsToFetch,
+  dataLoading,
+  onFetchNextPage,
   onCustomColumnAdded,
 }) => {
   const authContext = useAuthContext();
@@ -57,6 +68,7 @@ export const Table: React.FC<TableProps> = ({
       getCustomColumnDisplayName("buyer"),
       getCustomColumnDisplayName("influencer"),
       getCustomColumnDisplayName("end_user"),
+      "null",
     ];
   } else {
     // Test account, so we use only the two personas here.
@@ -74,10 +86,12 @@ export const Table: React.FC<TableProps> = ({
     },
   ]);
   const [rowSelection, setRowSelection] = useState({});
-  const [pagination, setPagination] = useState({
+
+  const initialPaginationState = {
     pageIndex: 0, //initial page index
     pageSize: 10, //default page size
-  });
+  };
+  const [pagination, setPagination] = useState(initialPaginationState);
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
@@ -96,8 +110,18 @@ export const Table: React.FC<TableProps> = ({
   const columnResizeMode = "onChange";
   const columnResizeDirection = "ltr";
 
+  // When column filters page, we should reset pagination to state otherwise
+  // table view gets messed up (page numbers are invalid).
+  const onColumnFiltersChange = (
+    newColumnFiltersState: Updater<ColumnFiltersState>
+  ) => {
+    // Reset page page index to initial page.
+    setPagination(initialPaginationState);
+    setColumnFilters(newColumnFiltersState);
+  };
+
   const table = useReactTable({
-    data,
+    data: leads,
     columns,
     columnResizeMode,
     columnResizeDirection,
@@ -106,7 +130,7 @@ export const Table: React.FC<TableProps> = ({
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onColumnFiltersChange: onColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onPaginationChange: setPagination,
@@ -121,10 +145,29 @@ export const Table: React.FC<TableProps> = ({
     },
   });
 
-  if (data.length === 0) {
+  if (leads.length === 0) {
     // No accounts found.
     return <ZeroStateDisplay />;
   }
+
+  // User clicks on next page button in the table.
+  // We assume when this callback is called that next page on server is definitely
+  // available.
+  const handleNextPageClick = async () => {
+    if (table.getCanNextPage()) {
+      // Next page exists, just update table to next page.
+      table.nextPage();
+      return;
+    }
+    await onFetchNextPage();
+    // Fetch the row model count on the current page (before next page was fetched).
+    // If this is less than pageSize, then stay on the same page.
+    // If equal to pageSize, go to next page.
+    const currentPageRowCount = table.getRowModel().rows.length;
+    if (currentPageRowCount === initialPaginationState.pageSize) {
+      table.nextPage();
+    }
+  };
 
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
@@ -136,6 +179,10 @@ export const Table: React.FC<TableProps> = ({
 
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-gray-700 text-md mb-2">
+        Total Number of Leads:{" "}
+        <span className="font-semibold">{totalLeadsCount}</span>
+      </p>
       <div className="flex gap-6">
         {/* Filter Controls */}
         <div className="flex gap-4">
@@ -163,8 +210,12 @@ export const Table: React.FC<TableProps> = ({
         columns={columns}
         columnResizeMode={columnResizeMode}
         pagination={pagination}
+        morePagesToFetch={moreLeadsToFetch}
+        handleNextPageClick={handleNextPageClick}
         headerClassName="bg-[rgb(180,150,200)]"
       />
+
+      <LoadingOverlay loading={dataLoading} />
     </div>
   );
 };
@@ -178,20 +229,31 @@ interface LeadsTableProps {
 // Displays table with list of leads.
 const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const authContext = useAuthContext();
-  const [leads, setLeads] = useState<LeadRow[]>([]);
+  // Current list of all leads fetched from server so far in the correct pagination order.
+  const [curLeads, setCurLeads] = useState<LeadRow[]>([]);
+  // Latest Page number fetched from server.
+  const [serverPage, setServerPage] = useState(1);
+  // Whether there are more leads to fetch from server.
+  const [moreLeadsToFetch, setMoreLeadsToFetch] = useState(false);
+  // Total leads count found on the server.
+  const [totalLeadsCount, setTotalLeadsCount] = useState(0);
   const [columns, setColumns] = useState<ColumnDef<LeadRow>[]>([]);
+
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [dataLoading, setDataLoading] = useState<boolean>(false);
 
+  // Initial fetch for leads.
   useEffect(() => {
-    // listLeads(authContext, accountId)
-    listSuggestedLeads(authContext, accountId)
-      .then((leads) => {
-        setLeads(leads);
-        setColumns(getLeadColumns(leads));
+    listSuggestedLeads(authContext, serverPage, accountId)
+      .then((response) => {
+        setTotalLeadsCount(response.count);
+        setMoreLeadsToFetch(response.next !== null);
+        setCurLeads(response.results);
+        setColumns(getLeadColumns(response.results));
       })
       .catch((error) =>
-        setError(new Error(`Failed to fetch Accounts: ${error.message}`))
+        setError(new Error(`Failed to fetch Leads: ${error.message}`))
       )
       .finally(() => setLoading(false));
   }, [authContext]);
@@ -210,10 +272,37 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     console.log("custom colum info: ", customColumnInfo);
   };
 
+  // Handle user request to fetch the next page.
+  const onFetchNextPage = async () => {
+    setDataLoading(true);
+    const nextPage = serverPage + 1;
+    try {
+      const response = await listSuggestedLeads(
+        authContext,
+        nextPage,
+        accountId
+      );
+      setTotalLeadsCount(totalLeadsCount);
+      setMoreLeadsToFetch(response.next !== null);
+      const allLeads = [...curLeads, ...response.results];
+      setCurLeads(allLeads);
+      setColumns(getLeadColumns(allLeads));
+      setServerPage(nextPage);
+    } catch (error: any) {
+      setError(new Error(`Failed to fetch Accounts: ${error.message}`));
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
   return (
     <Table
       columns={columns}
-      data={leads}
+      leads={curLeads}
+      totalLeadsCount={totalLeadsCount}
+      moreLeadsToFetch={moreLeadsToFetch}
+      dataLoading={dataLoading}
+      onFetchNextPage={onFetchNextPage}
       onCustomColumnAdded={onCustomColumnAdded}
     />
   );

@@ -221,13 +221,14 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
           if (
             row.custom_fields &&
             row.custom_fields.evaluation &&
-            row.custom_fields.evaluation.persona_match
+            row.custom_fields.evaluation.persona_match &&
+            row.custom_fields.evaluation.persona_match !== "null" // LLM can mark a persona as "null" sometimes, sigh.
           ) {
             return getCustomColumnDisplayName(
               row.custom_fields.evaluation.persona_match
             );
           }
-          return null;
+          return "null";
         },
         meta: {
           displayName: "Persona Match",

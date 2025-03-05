@@ -148,22 +148,28 @@ enum SuggestionStatus {
   MANUAL = "manual",
 }
 
-type ListLeadsResponse = ListObjectsResponse<Lead>;
+export type ListLeadsResponse = ListObjectsResponse<Lead>;
 
 // Fetch all Leads. If Account Id is given, it fetches only leads in the given Account Id.
 export const listLeads = async (
   authContext: AuthContext,
   accountId?: string
-): Promise<Lead[]> => {
-  return listLeadsHelper(authContext, accountId);
+): Promise<ListLeadsResponse> => {
+  return listLeadsHelper(authContext, 1, accountId);
 };
 
 // Fetch suggested leads for the given account.
 export const listSuggestedLeads = async (
   authContext: AuthContext,
+  page: number,
   accountId?: string
-): Promise<Lead[]> => {
-  return listLeadsHelper(authContext, accountId, SuggestionStatus.SUGGESTED);
+): Promise<ListLeadsResponse> => {
+  return listLeadsHelper(
+    authContext,
+    page,
+    accountId,
+    SuggestionStatus.SUGGESTED
+  );
 };
 
 // Approve given Lead.
@@ -193,10 +199,11 @@ export const enrichLinkedInActivity = async (
 // Helper to list leads.
 const listLeadsHelper = async (
   authContext: AuthContext,
+  page: number,
   accountId?: string,
   suggestionStatus?: SuggestionStatus
-): Promise<Lead[]> => {
-  var params: Record<string, any> = {};
+): Promise<ListLeadsResponse> => {
+  var params: Record<string, any> = { page: page };
   if (accountId) {
     params["account"] = accountId;
   }
@@ -206,10 +213,10 @@ const listLeadsHelper = async (
     // Only list approved leads by default.
     params["suggestion_status"] = SuggestionStatus.APPROVED;
   }
-  return await apiCall<Lead[]>(authContext, async (apiClient) => {
+  return await apiCall<ListLeadsResponse>(authContext, async (apiClient) => {
     const response = await apiClient.get<ListLeadsResponse>(LEADS_ENDPOINT, {
       params,
     });
-    return response.data.results;
+    return response.data;
   });
 };
