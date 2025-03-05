@@ -98,7 +98,7 @@ const Table: React.FC<TableProps> = ({
   const [rowSelection, setRowSelection] = useState({});
   const initialPaginationState = {
     pageIndex: 0, //initial page index
-    pageSize: 10, //default page size
+    pageSize: 20, //default page size
   };
   const [pagination, setPagination] = useState(initialPaginationState);
 
