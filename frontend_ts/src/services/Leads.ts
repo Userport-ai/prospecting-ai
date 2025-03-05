@@ -148,7 +148,7 @@ enum SuggestionStatus {
   MANUAL = "manual",
 }
 
-export type ListLeadsResponse = ListObjectsResponse<Lead>;
+type ListLeadsResponse = ListObjectsResponse<Lead>;
 
 // Fetch all Leads. If Account Id is given, it fetches only leads in the given Account Id.
 export const listLeads = async (

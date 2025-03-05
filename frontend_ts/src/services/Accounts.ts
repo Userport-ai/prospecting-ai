@@ -56,55 +56,70 @@ interface FundingRound {
 
 type ListAccountsResponse = ListObjectsResponse<Account>;
 
+interface ListAccountsRequest {
+  page?: number; // Optional parameter for page number to fetch
+  ids?: string[]; // Optional parameter for list of IDs to filter
+}
+
 // Fetch all accounts for given tenant.
 export const listAccounts = async (
   authContext: AuthContext,
-  ids?: string[] // Optional parameter for list of IDs
-): Promise<Account[]> => {
+  request: ListAccountsRequest
+): Promise<ListAccountsResponse> => {
   const { userContext } = authContext;
   if (userContext!.tenant.id === USERPORT_TENANT_ID) {
     // Reroute to internal method.
-    return listAccountsWithinTenant(authContext, ids);
+    return listAccountsWithinTenant(authContext, request);
   }
 
-  var params: Record<string, any> = { created_by: userContext!.user.id };
+  var params: Record<string, any> = {
+    created_by: userContext!.user.id,
+  };
 
-  if (ids && ids.length > 0) {
+  if (request.page) {
+    params["page"] = request.page;
+  }
+
+  if (request.ids && request.ids.length > 0) {
     // Create a comma-separated string for 'id__in' param
-    params["id__in"] = ids.join(",");
+    params["id__in"] = request.ids.join(",");
   }
 
-  return await apiCall<Account[]>(authContext, async (apiClient) => {
+  return await apiCall<ListAccountsResponse>(authContext, async (apiClient) => {
     const response = await apiClient.get<ListAccountsResponse>(
       ACCOUNTS_ENDPOINT,
       { params }
     );
-    return response.data.results;
+    return response.data;
   });
 };
 
 // Internal method that should only be used for Userport tenant for dev purposes.
 const listAccountsWithinTenant = async (
   authContext: AuthContext,
-  ids?: string[] // Optional parameter for list of IDs
-): Promise<Account[]> => {
+  request: ListAccountsRequest
+): Promise<ListAccountsResponse> => {
   const { userContext } = authContext;
   if (userContext!.tenant.id !== USERPORT_TENANT_ID) {
     throw new Error(`Cannot call internal method to List accounts!`);
   }
   var params: Record<string, any> = {};
 
-  if (ids && ids.length > 0) {
-    // Create a comma-separated string for 'id__in' param
-    params["id__in"] = ids.join(",");
+  if (request.page) {
+    params["page"] = request.page;
   }
 
-  return await apiCall<Account[]>(authContext, async (apiClient) => {
+  if (request.ids && request.ids.length > 0) {
+    // Create a comma-separated string for 'id__in' param
+    params["id__in"] = request.ids.join(",");
+  }
+
+  return await apiCall<ListAccountsResponse>(authContext, async (apiClient) => {
     const response = await apiClient.get<ListAccountsResponse>(
       ACCOUNTS_ENDPOINT,
       { params }
     );
-    return response.data.results;
+    return response.data;
   });
 };
 

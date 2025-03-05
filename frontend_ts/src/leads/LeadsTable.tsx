@@ -289,7 +289,11 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       setColumns(getLeadColumns(allLeads));
       setServerPage(nextPage);
     } catch (error: any) {
-      setError(new Error(`Failed to fetch Accounts: ${error.message}`));
+      setError(
+        new Error(
+          `Failed to fetch Next Page: ${nextPage} for Leads: ${error.message}`
+        )
+      );
     } finally {
       setDataLoading(false);
     }
