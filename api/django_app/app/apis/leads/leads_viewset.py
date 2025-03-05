@@ -99,9 +99,9 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
         This method applies different weights to leads based on their persona type
         stored in enrichment_data.evaluation.persona_match:
-        - Buyers get a higher weight (1.2x)
+        - Buyers get a higher weight (1.05x)
         - Influencers maintain their score (1.0x)
-        - End Users get a lower weight (0.8x)
+        - End Users get a lower weight (0.85x)
 
         This balances the results to favor buyers and influencers over end users
         while maintaining the original scoring within each persona category.
