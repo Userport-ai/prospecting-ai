@@ -26,7 +26,13 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = AccountDetailsSerializer
     queryset = Account.objects.all()
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['id', 'website', 'linkedin_url', 'created_by']
+    # filterset_fields = ['id', 'website', 'linkedin_url', 'created_by']
+    filterset_fields = {
+        'id': ['exact', 'in'],  # Enable `id__in` filtering
+        'website': ['exact'],
+        'linkedin_url': ['exact'],
+        'created_by': ['exact'],
+    }
     ordering_fields = ['name', 'created_at', 'updated_at']
     ordering = ['-created_at']
 
