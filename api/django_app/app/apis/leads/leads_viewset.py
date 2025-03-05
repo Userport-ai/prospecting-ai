@@ -108,11 +108,6 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         """
         queryset = super().get_queryset().select_related('account')
 
-        # Check if created_by is in query params and map to account__created_by
-        if 'created_by' in self.request.query_params:
-            created_by_value = self.request.query_params.get('created_by')
-            queryset = queryset.filter(account__created_by=created_by_value)
-
         # Get balance parameters from query params with defaults - false by default
         balance_personas = self.request.query_params.get('balance_personas', 'false').lower() == 'true'
 
