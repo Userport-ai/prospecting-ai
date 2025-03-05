@@ -67,6 +67,16 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         )
 
     def _annotate_with_adjusted_scores(self, queryset, multipliers):
+        """
+        Helper method to annotate the queryset with adjusted scores based on persona.
+
+        Args:
+            queryset: The base queryset to annotate
+            multipliers: Dictionary of multipliers for each persona type
+
+        Returns:
+            QuerySet: The annotated queryset with adjusted scores
+        """
         return queryset.annotate(
             # Calculate the score with multipliers in one step
             multiplied_score=Case(
@@ -103,16 +113,16 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             created_by_value = self.request.query_params.get('created_at')
             queryset = queryset.filter(account__created_by=created_by_value)
 
-        # Get balance parameters from query params with defaults
-        balance_personas = self.request.query_params.get('balance_personas', 'true').lower() == 'true'
+        # Get balance parameters from query params with defaults - false by default
+        balance_personas = self.request.query_params.get('balance_personas', 'false').lower() == 'true'
 
         # Apply persona-based score adjustment if requested
         if balance_personas:
             # Define multipliers
             multipliers = {
-                'buyer': float(self.request.query_params.get('buyer_multiplier', '1.2')),
+                'buyer': float(self.request.query_params.get('buyer_multiplier', '1.05')),
                 'influencer': float(self.request.query_params.get('influencer_multiplier', '1.0')),
-                'end_user': float(self.request.query_params.get('end_user_multiplier', '0.8'))
+                'end_user': float(self.request.query_params.get('end_user_multiplier', '0.85'))
             }
 
             # First annotate with persona_match
@@ -156,8 +166,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Base queryset filtered by account if provided
-        base_queryset = self.get_queryset().select_related('account')
+        base_queryset = super().get_queryset().select_related('account').order_by('-score')
         if account_id:
             base_queryset = base_queryset.filter(account_id=account_id)
 
@@ -232,8 +241,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Base queryset filtered by account if provided
-        base_queryset = self.get_queryset().select_related('account')
+        base_queryset = super().get_queryset().select_related('account').order_by('-score')
         if account_id:
             base_queryset = base_queryset.filter(account_id=account_id)
 
