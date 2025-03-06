@@ -14,6 +14,7 @@ from pythonjsonlogger import jsonlogger
 from api.routes import register_tasks
 from api.routes import router
 from services.django_callback_service import CallbackService
+from utils.async_utils import shutdown_thread_pools
 
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
@@ -78,6 +79,9 @@ async def lifespan(fastapi_app: FastAPI):
     finally:
         # Cleanup on shutdown
         logger.info("Lifespan: Application is shutting down")
+        # cleanup thread_pools
+        await shutdown_thread_pools()
+
         callback_service = getattr(fastapi_app.state, 'callback_service', None)
         if callback_service:
             await callback_service.cleanup()

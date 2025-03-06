@@ -1,14 +1,30 @@
 # file: tasks/base.py
-
+import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 import logging
 from datetime import datetime, UTC
 
+from google.cloud import bigquery
+
+from services.ai_service import AICacheService
 from services.django_callback_service import CallbackService
 from services.task_result_manager import TaskResultManager
 
 logger = logging.getLogger(__name__)
+
+
+async def ensure_ai_cache_table():
+    project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+    bigquery_client = bigquery.Client(project=project_id)
+    dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
+    cache_service = AICacheService(
+        client=bigquery_client,
+        project_id=project_id,
+        dataset=dataset
+    )
+    await cache_service.ensure_cache_table()
+    pass
 
 
 class BaseTask(ABC):
@@ -36,6 +52,7 @@ class BaseTask(ABC):
     async def create(cls):
         try:
             callback_service = await CallbackService.get_instance()
+            await ensure_ai_cache_table()
             return cls(callback_service)
         except Exception as e:
             logger.error(f"Failed to initialize CallbackService: {e}")

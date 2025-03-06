@@ -1,16 +1,18 @@
+import asyncio
 import hashlib
 import json
 import logging
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional, Union, Tuple
+from typing import Dict, Any, Optional, Union, Tuple, List
 
+import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted as GoogleAPIResourceExhausted
 from google.cloud import bigquery
-import google.generativeai as genai
 from openai import AsyncOpenAI
 
+from utils.async_utils import to_thread, to_cpu_thread, run_in_thread
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.token_usage import TokenUsage
 
@@ -53,9 +55,10 @@ class AICacheService:
         self.project_id = project_id
         self.dataset = dataset
         self.table_name = "ai_prompt_cache"
-        self._ensure_cache_table()
 
-    def _ensure_cache_table(self) -> None:
+    # This will be called when a task is created to ensure that the cache table always exists
+    @to_thread
+    def ensure_cache_table(self) -> None:
         """Create the cache table if it doesn't exist."""
         schema = [
             bigquery.SchemaField("cache_key", "STRING", mode="REQUIRED"),
@@ -143,7 +146,8 @@ class AICacheService:
             ]
         )
 
-        results = list(self.client.query(query, job_config=job_config).result())
+        # Execute query in a separate thread
+        results = await self._execute_query(query, job_config)
         if results:
             row = results[0]
 
@@ -171,6 +175,11 @@ class AICacheService:
             }
 
         return None
+
+    @to_thread
+    def _execute_query(self, query: str, job_config: bigquery.QueryJobConfig) -> List[Any]:
+        """Execute a BigQuery query in a separate thread and return results"""
+        return list(self.client.query(query, job_config=job_config).result())
 
     def _log_response_structure(self, response_data: Any) -> None:
         """Log detailed structure of response data including types of all values."""
@@ -258,13 +267,19 @@ class AICacheService:
         # For debugging
         logger.debug(f"Inserting row with response_data type: {type(row['response_data'])}")
 
-        table = self.client.get_table(f"{self.project_id}.{self.dataset}.{self.table_name}")
-        errors = self.client.insert_rows_json(table, [row])
+        # Insert row in a separate thread
+        errors = await self._insert_row(row)
 
         if errors:
             logger.error(f"Error caching AI response: {errors}")
             logger.error(f"Failed row data: {json.dumps(row, default=str)}")
             raise Exception(f"Failed to cache AI response: {errors}")
+
+    @to_thread
+    def _insert_row(self, row: Dict[str, Any]) -> List[Any]:
+        """Insert a row into the cache table in a separate thread"""
+        table = self.client.get_table(f"{self.project_id}.{self.dataset}.{self.table_name}")
+        return self.client.insert_rows_json(table, [row])
 
     async def clear_expired_cache(self, days: int = 30) -> int:
         """Clear expired cache entries and entries older than specified days."""
@@ -280,6 +295,12 @@ class AICacheService:
             ]
         )
 
+        # Execute delete query in a separate thread
+        return await self._execute_delete_query(query, job_config)
+
+    @to_thread
+    def _execute_delete_query(self, query: str, job_config: bigquery.QueryJobConfig) -> int:
+        """Execute a delete query in a separate thread and return affected rows"""
         query_job = self.client.query(query, job_config=job_config)
         query_job.result()
         return query_job.num_dml_affected_rows
@@ -363,21 +384,20 @@ class AIService(ABC):
         if self.cache_service:
             try:
                 await self.cache_service.cache_response(
-                        prompt=prompt,
-                        response=response,
-                        token_usage=token_usage,
-                        provider=self.provider_name,
-                        model=self.model,
-                        is_json=is_json,
-                        operation_tag=operation_tag,
-                        tenant_id=self.tenant_id,
-                        ttl_hours=self.cache_ttl_hours
-                    )
+                    prompt=prompt,
+                    response=response,
+                    token_usage=token_usage,
+                    provider=self.provider_name,
+                    model=self.model,
+                    is_json=is_json,
+                    operation_tag=operation_tag,
+                    tenant_id=self.tenant_id,
+                    ttl_hours=self.cache_ttl_hours
+                )
             except Exception as e:
                 logger.error(f"Failed to cache response: {e}")
 
         return response
-
 
 class GeminiService(AIService):
     """Gemini implementation of AI service."""
@@ -416,7 +436,9 @@ class GeminiService(AIService):
             if is_json:
                 prompt = f"{prompt}\n\nRespond in JSON format only."
 
-            response = self.model_instance.generate_content(prompt)
+            # Gemini's generate_content is synchronous, so we run it in a thread
+            response = await self._generate_content_in_thread(prompt)
+
             if not response or not response.parts:
                 logger.warning("Empty response from Gemini")
                 token_usage = self._create_token_usage(0, 0, operation_tag)
@@ -439,13 +461,26 @@ class GeminiService(AIService):
             )
 
             if is_json:
-                return self._parse_json_response(response_text), token_usage
+                result = await self._parse_json_response_async(response_text)
+                return result, token_usage
             return response_text, token_usage
 
         except Exception as e:
             logger.error(f"Error generating content with Gemini: {str(e)}")
             token_usage = self._create_token_usage(0, 0, operation_tag)
             return {} if is_json else "", token_usage
+
+    @to_thread
+    def _generate_content_in_thread(self, prompt: str):
+        """Run Gemini's synchronous generate_content in a separate thread"""
+        return self.model_instance.generate_content(prompt)
+
+    @to_cpu_thread
+    async def _parse_json_response_async(self, response: str) -> Dict[str, Any]:
+        """Parse JSON from Gemini response asynchronously."""
+        # Since JSON parsing is CPU-bound rather than I/O-bound, we run it in a thread
+        # to avoid blocking the event loop for complex or large JSON payloads
+        return self._parse_json_response(response)
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
         """Parse JSON from Gemini response."""
@@ -550,13 +585,19 @@ class OpenAIService(AIService):
             )
 
             content = response.choices[0].message.content
-            return (json.loads(content) if is_json else content), token_usage
+
+            # Parse JSON response if needed
+            if is_json:
+                # JSON parsing can be CPU-intensive for large responses, so we run it in a thread
+                result = await run_in_thread(json.loads, content, pool_type="cpu")
+                return result, token_usage
+
+            return content, token_usage
 
         except Exception as e:
             logger.error(f"Error generating content with OpenAI: {str(e)}")
             token_usage = self._create_token_usage(0, 0, operation_tag)
             return {} if is_json else "", token_usage
-
 
 class AIServiceFactory:
     """Factory for creating AI service instances with integrated caching."""
@@ -593,7 +634,6 @@ class AIServiceFactory:
             logger.error(f"Failed to initialize BigQuery client: {str(e)}")
             raise
 
-    #TODO(Sowrabh): Pass tenant_id from everywhere
     def create_service(
             self,
             provider: str = "openai",
@@ -630,8 +670,12 @@ class AIServiceFactory:
         else:
             raise ValueError(f"Unsupported AI provider: {provider}")
 
-        # Set cache TTL if caching is enabled
+    # Set cache TTL if caching is enabled
         if self.cache_service and cache_ttl_hours is not None:
             service.cache_ttl_hours = cache_ttl_hours
 
         return service
+
+    async def close(self):
+        """Close any resources used by the factory."""
+        pass  # Add any cleanup code here if needed in the future
