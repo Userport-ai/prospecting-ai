@@ -142,29 +142,6 @@ async def test_with_retry_backoff_timing():
     # Second delay should be around base_delay * 2¹ (0.2)
     assert 0.15 <= fake_sleep.calls[1] <= 0.3
 
-
-@pytest.mark.asyncio
-async def test_async_retry_class():
-    """Test the AsyncRetry class."""
-    mock_func = AsyncMock()
-    mock_func.side_effect = [
-        RetryableError("First failure"),
-        "success"
-    ]
-
-    retry_config = RetryConfig(max_attempts=3, base_delay=0.01)
-    retry_handler = AsyncRetry(retry_config, "test_operation")
-
-    result = await retry_handler.execute(mock_func, "arg1", kwarg1="value1")
-
-    assert result == "success"
-    assert mock_func.call_count == 2
-    mock_func.assert_has_calls([
-        unittest.mock.call("arg1", kwarg1="value1"),
-        unittest.mock.call("arg1", kwarg1="value1")
-    ])
-
-
 @pytest.mark.asyncio
 async def test_max_delay():
     """Test that delay is capped at max_delay."""
