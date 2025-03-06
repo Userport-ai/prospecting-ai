@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ApolloConfig:
     """Centralized configuration management."""
-    max_employees: int = 1000
+    max_employees: int = 3000
     batch_size: int = 100
     ai_batch_size: int = 5
     fit_score_threshold: float = 0.0
@@ -843,10 +843,10 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         builtwith_result = await bw_service.get_technology_profile(domain=domain)
         account_linkedin_urls: Optional[List[str]] = builtwith_result.get_account_linkedin_urls()
         if not account_linkedin_urls:
-            logger.error(f"Apollo Organization ID: Failed to find Account LinkedIn URLs for name: {name} and domain: {domain}")
+            logger.error(f"Apollo Organization ID: Failed to find Account LinkedIn URLs in BuiltWith Response for name: {name} and domain: {domain}")
             return None
         else:
-            logger.debug(f"Apollo Organization ID: Found LinkedIn URLs in BuiltWith response: {account_linkedin_urls}")
+            logger.debug(f"Apollo Organization ID: Found LinkedIn URLs in BuiltWith response (name: {name}): {account_linkedin_urls}")
 
         try:
             # Use Account name to filter a list of organizations in Apollo.
