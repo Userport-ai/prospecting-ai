@@ -1385,7 +1385,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         time_based_signals: List[str] = []
 
         if not lead.current_employment:
-            logger.error(f"Current employment does not exist for lead with ID: {lead.id}, name: {lead.name} and LinkedIn URL: {lead.linkedin_url}")
+            logger.warning(f"Current employment does not exist for lead with ID: {lead.id}, name: {lead.name} and LinkedIn URL: {lead.linkedin_url}")
             return time_based_signals
 
         # Check if current employment start is recent.
