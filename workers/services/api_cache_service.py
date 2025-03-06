@@ -2,12 +2,13 @@ import hashlib
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 import httpx
 from google.cloud import bigquery
 
 from utils.connection_pool import ConnectionPool
+from utils.async_utils import to_thread
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,6 @@ class APICacheService:
         self.project_id = project_id
         self.dataset = dataset
         self.table_name = "api_request_cache"
-        self._ensure_cache_table()
 
         # Use provided connection pool or create a new one
         self.connection_pool = connection_pool or ConnectionPool(
@@ -42,7 +42,8 @@ class APICacheService:
         """Close the connection pool to free resources."""
         await self.connection_pool.close()
 
-    def _ensure_cache_table(self) -> None:
+    @to_thread
+    def ensure_cache_table(self) -> None:
         """Create the cache table if it doesn't exist."""
         schema = [
             bigquery.SchemaField("cache_key", "STRING", mode="REQUIRED"),
@@ -128,7 +129,8 @@ class APICacheService:
             ]
         )
 
-        results = list(self.client.query(query, job_config=job_config).result())
+        # Execute query in a separate thread to avoid blocking the event loop
+        results = await self._execute_query(query, job_config)
 
         if results:
             return {
@@ -137,6 +139,11 @@ class APICacheService:
             }
 
         return None
+
+    @to_thread
+    def _execute_query(self, query: str, job_config: bigquery.QueryJobConfig) -> List[Any]:
+        """Execute a BigQuery query in a separate thread and return results"""
+        return list(self.client.query(query, job_config=job_config).result())
 
     async def cache_response(
             self,
@@ -184,12 +191,18 @@ class APICacheService:
             "tenant_id": tenant_id
         }
 
-        table = self.client.get_table(f"{self.project_id}.{self.dataset}.{self.table_name}")
-        errors = self.client.insert_rows_json(table, [row])
+        # Insert row in a separate thread
+        errors = await self._insert_row(row)
 
         if errors:
             logger.error(f"Error caching response: {errors}")
             raise Exception(f"Failed to cache response: {errors}")
+
+    @to_thread
+    def _insert_row(self, row: Dict[str, Any]) -> List[Any]:
+        """Insert a row into the cache table in a separate thread"""
+        table = self.client.get_table(f"{self.project_id}.{self.dataset}.{self.table_name}")
+        return self.client.insert_rows_json(table, [row])
 
     async def clear_expired_cache(self, days: int = 30) -> int:
         """
@@ -213,6 +226,12 @@ class APICacheService:
             ]
         )
 
+        # Execute delete query in a separate thread
+        return await self._execute_delete_query(query, job_config)
+
+    @to_thread
+    def _execute_delete_query(self, query: str, job_config: bigquery.QueryJobConfig) -> int:
+        """Execute a delete query in a separate thread and return affected rows"""
         query_job = self.client.query(query, job_config=job_config)
         query_job.result()
         return query_job.num_dml_affected_rows

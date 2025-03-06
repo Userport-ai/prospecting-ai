@@ -9,6 +9,7 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 
 from utils.bigquery_json_encoder import safe_json_dumps
+from utils.async_utils import to_thread
 
 logger = logging.getLogger(__name__)
 
@@ -87,17 +88,20 @@ class BigQueryService:
                 final_row = new_row
 
             # Always insert as new row
-            table = self.client.get_table(self._get_table_ref('account_data'))
-            errors = self.client.insert_rows_json(table, [final_row])
+            errors = await self._insert_row('account_data', final_row)
             if errors:
                 error_messages = '; '.join(str(error) for error in errors)
                 raise Exception(f"BigQuery insert errors: {error_messages}")
 
-            return record_id
-
         except Exception as e:
-            logger.error(f"Error storing account data in BigQuery: {str(e)}")
+            logger.error(f"Error storing enrichment data in BigQuery: {str(e)}")
             raise
+
+    @to_thread
+    def _insert_row(self, table_name: str, row: Dict[str, Any]) -> List[Any]:
+        """Insert a row into a BigQuery table in a separate thread"""
+        table = self.client.get_table(self._get_table_ref(table_name))
+        return self.client.insert_rows_json(table, [row])
 
     async def _get_existing_account_data(self, account_id: str) -> Dict[str, Any]:
         """Retrieve existing account data if it exists."""
@@ -123,8 +127,8 @@ class BigQueryService:
                 ]
             )
 
-            query_job = self.client.query(query, job_config=job_config)
-            results = list(query_job.result())
+            # Execute query in a separate thread
+            results = await self._execute_query(query, job_config)
 
             if not results:
                 logger.debug(f"No existing data found for account_id: {account_id}")
@@ -155,6 +159,11 @@ class BigQueryService:
         except Exception as e:
             logger.error(f"Error retrieving account data from BigQuery: {str(e)}")
             return {}
+
+    @to_thread
+    def _execute_query(self, query: str, job_config: bigquery.QueryJobConfig) -> List[Any]:
+        """Execute a BigQuery query in a separate thread and return results"""
+        return list(self.client.query(query, job_config=job_config).result())
 
     def _prepare_account_row(self, record_id: str, account_id: str,
                              structured_data: Dict[str, Any], raw_profile: str) -> Dict[str, Any]:
@@ -392,8 +401,7 @@ class BigQueryService:
                 row['error_details'] = safe_json_dumps(error_info)
 
             # Insert data with proper error handling
-            table = self.client.get_table(self._get_table_ref('enrichment_raw_data'))
-            errors = self.client.insert_rows_json(table, [row])
+            errors = await self._insert_row('enrichment_raw_data', row)
 
             if errors:
                 error_messages = '; '.join(str(error) for error in errors)
@@ -427,7 +435,7 @@ class BigQueryService:
             ]
         )
 
-        results = list(self.client.query(query, job_config=job_config).result())
+        results = await self._execute_query(query, job_config)
         if not results:
             raise KeyError(f"Job {job_id} not found")
 
@@ -481,7 +489,7 @@ class BigQueryService:
             ]
         )
 
-        results = self.client.query(query, job_config=job_config).result()
+        results = await self._execute_query(query, job_config)
         return [dict(row) for row in results]
 
     # Scoring and Calculation Methods

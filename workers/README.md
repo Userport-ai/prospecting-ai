@@ -1,4 +1,4 @@
-# Workers.
+# Workers
 
 Background job workers using Cloud Tasks and Cloud Run
 
@@ -12,6 +12,8 @@ workers/
 │   └── task_manager.py
 ├── api/           # API routes
 │   └── routes.py
+├── tests/         # Unit tests
+│   └── utils/     # Utility tests
 └── main.py       # FastAPI application
 ```
 
@@ -27,6 +29,7 @@ workers/
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
+   pip install -r requirements-dev.txt  # Install development dependencies for testing
    ```
 
 3. Run locally:
@@ -57,6 +60,27 @@ workers/
    ```
 
 2. Tasks will be executed automatically via Cloud Tasks calling the worker endpoints
+
+## Testing
+
+Run the unit tests with pytest:
+
+```bash
+# Activate your virtual environment first
+source venv/bin/activate
+
+# Run all tests
+python -m pytest
+
+# Run specific tests
+python -m pytest tests/utils/test_retry_utils.py
+
+# Run tests with verbose output
+python -m pytest -v
+
+# Run tests with code coverage report
+python -m pytest --cov=workers
+```
 
 ## Deployment
 
