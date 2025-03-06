@@ -205,8 +205,8 @@ class EnrichmentResult(BaseModel):
         if not self.processed_data:
             return None
 
-        company_info = self.processed_data.get('company_info', {})
-        social_profiles = company_info.get('social_profiles', [])
+        company_info = self.processed_data.get('company_info') or {}
+        social_profiles = company_info.get('social_profiles') or []
         if len(social_profiles) == 0:
             return None
 
