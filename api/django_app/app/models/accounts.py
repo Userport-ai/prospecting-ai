@@ -79,6 +79,36 @@ class Account(BaseMixin):
             'avg_completion_percent': percent,
         }
 
+    # In accounts.py
+    def _cascade_soft_delete(self):
+        """
+        When an account is soft-deleted, also soft-delete all its related leads
+        """
+        # Use Django's app registry to get the model class
+        from django.apps import apps
+        Lead = apps.get_model('app', 'Lead')
+
+        # Soft delete all leads related to this account
+        leads = Lead.objects.filter(account=self, deleted_at__isnull=True)
+        leads.update(deleted_at=self.deleted_at)
+
+    def _cascade_restore(self, deletion_time=None):
+        """
+        When an account is restored, also restore all its leads that were deleted at the same time
+        """
+        # Use Django's app registry to get the model class
+        from django.apps import apps
+        Lead = apps.get_model('app', 'Lead')
+
+        # Only restore leads that were deleted at the same time as the account
+        dt = deletion_time or self.deleted_at
+
+        leads = Lead.all_objects.filter(
+            account=self,
+            deleted_at=dt
+        )
+        leads.update(deleted_at=None)
+
     class Meta:
         db_table = 'accounts'
         indexes = [

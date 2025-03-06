@@ -22,16 +22,44 @@ class SoftDeleteMixin(models.Model):
     class Meta:
         abstract = True
 
-    def delete(self, hard=False):
+    def delete(self, hard=False, cascade=True):
         if hard:
             return super().delete()
 
         self.deleted_at = timezone.now()
         self.save()
 
-    def restore(self):
+        # Handle cascade soft delete
+        if cascade:
+            self._cascade_soft_delete()
+
+    def _cascade_soft_delete(self):
+        """
+        Performs a cascade soft delete on related objects.
+        This method should be overridden by models that need custom cascade behavior.
+        """
+        pass
+
+    def restore(self, cascade=True):
+        # Only restore if currently deleted
+        if self.deleted_at is None:
+            return
+
+        # Store the deletion timestamp for restoring cascaded records
+        deletion_time = self.deleted_at
         self.deleted_at = None
         self.save()
+
+        # Handle cascade restore
+        if cascade:
+            self._cascade_restore(deletion_time)
+
+    def _cascade_restore(self, deletion_time=None):
+        """
+        Performs a cascade restore on related objects.
+        This method should be overridden by models that need custom restore behavior.
+        """
+        pass
 
 
 class AuditMixin(models.Model):
@@ -63,8 +91,17 @@ class BaseMixin(TenantScopeMixin, AuditMixin, SoftDeleteMixin):
 
 
 class SoftDeleteQuerySet(QuerySet):
-    def delete(self):
-        return self.update(deleted_at=timezone.now())
+    def delete(self, cascade=True):
+        deletion_time = timezone.now()
+
+        if cascade:
+            # Apply cascade delete to each object individually
+            for obj in self:
+                obj.delete(hard=False, cascade=True)
+            return len(self)
+        else:
+            # Simple bulk update without cascade
+            return self.update(deleted_at=deletion_time)
 
     def hard_delete(self):
         return super().delete()
