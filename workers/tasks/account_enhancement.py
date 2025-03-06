@@ -347,7 +347,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
     async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any], Dict[str, Any]):
         """Execute the account enhancement task."""
         job_id = payload.get('job_id')
-        accounts = payload.get('accounts', [])
+        accounts = payload.get('accounts') or []
         is_bulk = payload.get('is_bulk', False)
         callback_service = await CallbackService.get_instance()
 
@@ -451,10 +451,10 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 structured_data = await self._extract_structured_data(company_profile)
 
                 # Populate some fields from structured data to account info.
-                account_info.financials = Financials(**structured_data.get('financials'))
-                account_info.technologies = self._extract_technologies(structured_data.get('technology_stack', {}))
-                account_info.customers = structured_data.get('market_position', {}).get('customers', [])
-                account_info.competitors = structured_data.get('market_position', {}).get('competitors', [])
+                account_info.financials = Financials(**structured_data.get('financials')) if structured_data.get('financials') else None
+                account_info.technologies = self._extract_technologies(structured_data.get('technology_stack') or {})
+                account_info.customers = (structured_data.get('market_position') or {}).get('customers') or []
+                account_info.competitors = (structured_data.get('market_position') or {}).get('competitors') or []
 
                 # Ensure LinkedIn URL is properly set in structured data
                 if account_info.linkedin_url:
@@ -600,7 +600,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         # Get BuiltWith technologies
         bw_technologies: List[str] = []
         if (tech_profile
-                and tech_profile.processed_data.get("profile", {}).get("technologies")):
+                and (tech_profile.processed_data.get("profile") or {}).get("technologies")):
             bw_technologies = [
                 str(tech["name"])
                 for tech in tech_profile.processed_data["profile"]["technologies"]
@@ -622,62 +622,6 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             technologies = list(set(existing_technologies) | set(website_technologies))
 
         return technologies, tech_profile
-
-    @with_retry(retry_config=API_RETRY_CONFIG, operation_name="fetch_linkedin_url")
-    async def _fetch_linkedin_url(self, company_name: str) -> str:
-        """Fetch LinkedIn URL for a company using Jina AI and Gemini."""
-        try:
-            # Search specifically for LinkedIn company page
-            search_query = f"{company_name} company linkedin page"
-            logger.debug(f"Searching Jina AI for LinkedIn URL with query: {search_query}")
-
-            jina_url = f"https://s.jina.ai/{search_query}"
-            response = requests.get(
-                jina_url,
-                headers={"Authorization": f"Bearer {self.jina_api_token}"},
-                timeout=10  # Add timeout to prevent hanging
-            )
-            response.raise_for_status()
-            search_results = response.text
-
-            if not search_results.strip():
-                logger.warning(f"Empty search results from Jina AI for company: {company_name}")
-                return None
-
-            # Extract LinkedIn URL using Gemini
-            extraction_prompt = self.prompts.LINKEDIN_EXTRACTION_PROMPT.format(
-                search_results=search_results
-            )
-
-            try:
-                logger.debug("Sending LinkedIn URL extraction prompt to Gemini")
-                response = self.model.generate_content(extraction_prompt)
-
-                if not response or not response.parts:
-                    logger.warning(f"Empty response from Gemini AI for LinkedIn URL extraction: {company_name}")
-                    return None
-
-                parsed_response = self._parse_gemini_response(response.parts[0].text)
-                linkedin_url = parsed_response.get("linkedin_url")
-
-                # Validate LinkedIn URL format
-                if linkedin_url and self._is_valid_linkedin_url(linkedin_url):
-                    logger.info(f"Valid LinkedIn URL found for {company_name}: {linkedin_url}")
-                    return linkedin_url
-                else:
-                    logger.warning(f"Invalid or missing LinkedIn URL format for {company_name}: {linkedin_url}")
-                    return None
-
-            except Exception as e:
-                logger.error(f"Error extracting LinkedIn URL with Gemini for {company_name}: {str(e)}", exc_info=True)
-                return None
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Jina API error while fetching LinkedIn URL for {company_name}: {str(e)}", exc_info=True)
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error while fetching LinkedIn URL for {company_name}: {str(e)}", exc_info=True)
-            return None
 
     def _is_valid_linkedin_url(self, url: str) -> bool:
         """Validate LinkedIn company URL format."""
@@ -734,7 +678,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 structured_data = self._parse_gemini_response(response.parts[0].text)
 
                 # Validate essential fields
-                if not structured_data.get('company_name', {}).get('legal_name'):
+                if not (structured_data.get('company_name') or {}).get('legal_name'):
                     logger.warning("Structured data missing company legal name")
 
                 return structured_data
@@ -813,7 +757,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
     def _format_location(self, location_data: Dict) -> str:
         """Format location from structured data"""
-        hq = location_data.get('headquarters', {})
+        hq = location_data.get('headquarters') or {}
         parts = [
             hq.get('city'),
             hq.get('state'),
@@ -824,11 +768,11 @@ class AccountEnhancementTask(AccountEnrichmentTask):
     def _extract_technologies(self, tech_data: Dict) -> List[str]:
         """Extract and flatten technology information"""
         tech_lists = [
-            tech_data.get('programming_languages', []),
-            tech_data.get('frameworks', []),
-            tech_data.get('databases', []),
-            tech_data.get('cloud_services', []),
-            tech_data.get('other_tools', [])
+            tech_data.get('programming_languages') or [],
+            tech_data.get('frameworks') or [],
+            tech_data.get('databases') or [],
+            tech_data.get('cloud_services') or [],
+            tech_data.get('other_tools') or []
         ]
         return list(set(item for sublist in tech_lists for item in sublist if item))
 
@@ -841,11 +785,11 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
             # Ensure error details are properly formatted
             formatted_error = {
-                'error_type': error_details.get('error_type', 'unknown_error'),
-                'message': error_details.get('message', 'Unknown error occurred'),
+                'error_type': error_details.get('error_type') or 'unknown_error',
+                'message': error_details.get('message') or 'Unknown error occurred',
                 'timestamp': datetime.datetime.utcnow().isoformat(),
                 'retryable': error_details.get('retryable', True),
-                'additional_info': error_details.get('additional_info', {})
+                'additional_info': error_details.get('additional_info') or {}
             }
 
             logger.debug(f"Storing error state for job {job_id}, entity {entity_id}")

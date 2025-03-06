@@ -51,18 +51,18 @@ class RecentDevelopments(UserportPydanticBaseModel):
 class PrivateFundingDetails(UserportPydanticBaseModel):
     """Private Funding Details associated with the Account."""
     class TotalFunding(UserportPydanticBaseModel):
-        amount: Optional[int] = Field(default=None)
+        amount: Optional[float] = Field(default=None)
         currency: Optional[str] = Field(default=None)
         as_of_date: Optional[str] = Field(default=None)
 
     class FundingRound(UserportPydanticBaseModel):
         class Valuation(UserportPydanticBaseModel):
-            amount: Optional[int] = Field(default=None)
+            amount: Optional[float] = Field(default=None)
             currency: Optional[str] = Field(default=None)
             type: Optional[str] = Field(default=None)
 
         series: Optional[str] = Field(default=None)
-        amount: Optional[int] = Field(default=None)
+        amount: Optional[float] = Field(default=None)
         currency: Optional[str] = Field(default=None)
         date: Optional[str] = Field(default=None)
         lead_investors: Optional[List[str]] = Field(default=None)
@@ -77,7 +77,7 @@ class PublicFinancials(UserportPydanticBaseModel):
     """Public Financial Details associated with the Account."""
     class StockDetails(UserportPydanticBaseModel):
         class MarketCap(UserportPydanticBaseModel):
-            value: Optional[int] = Field(default=None)
+            value: Optional[float] = Field(default=None)
             currency: Optional[str] = Field(default=None)
             as_of_date: Optional[str] = Field(default=None)
 
@@ -87,12 +87,12 @@ class PublicFinancials(UserportPydanticBaseModel):
 
     class FinancialMetrics(UserportPydanticBaseModel):
         class Revenue(UserportPydanticBaseModel):
-            value: Optional[int] = Field(default=None)
+            value: Optional[float] = Field(default=None)
             currency: Optional[str] = Field(default=None)
             period: Optional[str] = Field(default=None)
 
         class NetIncome(UserportPydanticBaseModel):
-            value: Optional[int] = Field(default=None)
+            value: Optional[float] = Field(default=None)
             currency: Optional[str] = Field(default=None)
             period: Optional[str] = Field(default=None)
 
@@ -102,11 +102,7 @@ class PublicFinancials(UserportPydanticBaseModel):
 
 class Financials(UserportPydanticBaseModel):
     """Financials (Public/Private) associated with an Account."""
-    class Type(StrEnum):
-        PRIVATE = "private"
-        PUBLIC = "public"
-
-    type: Optional[Type] = Field(default=None)
+    type: Optional[str] = Field(default=None, description="private or public.")
     public_data: Optional[PublicFinancials] = Field(default=None)
     private_data: Optional[PrivateFundingDetails] = Field(default=None)
 
