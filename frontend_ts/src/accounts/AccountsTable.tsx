@@ -22,6 +22,7 @@ import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import { listProducts, Product } from "@/services/Products";
 import { Separator } from "@/components/ui/separator";
+import LoadingOverlay from "@/common/LoadingOverlay";
 
 const ZeroStateDisplay = () => {
   return (
@@ -63,7 +64,8 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
       return;
     }
     const intervalId = setInterval(async () => {
-      const newPolledAccounts = await listAccounts(authContext, pollAccountIds);
+      const response = await listAccounts(authContext, { ids: pollAccountIds });
+      const newPolledAccounts = response.results;
       onPollingComplete(newPolledAccounts);
     }, POLLING_INTERVAL);
     return () => clearInterval(intervalId);
@@ -73,23 +75,32 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
 
 interface TableProps {
   columns: ColumnDef<AccountRow>[];
-  data: AccountRow[];
+  accounts: AccountRow[];
+  totalAccountsCount: number;
+  moreAccountsToFetch: boolean; // Whether server has more accounts to fetch.
+  dataLoading: boolean;
+  onFetchNextPage: () => Promise<void>;
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
 }
 
 // Component to display Accounts Table.
 const Table: React.FC<TableProps> = ({
   columns,
-  data,
+  accounts,
+  totalAccountsCount,
+  moreAccountsToFetch,
+  dataLoading,
+  onFetchNextPage,
   onCustomColumnAdded,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
   const [rowSelection, setRowSelection] = useState({});
-  const [pagination, setPagination] = useState({
+  const initialPaginationState = {
     pageIndex: 0, //initial page index
-    pageSize: 10, //default page size
-  });
+    pageSize: 20, //default page size
+  };
+  const [pagination, setPagination] = useState(initialPaginationState);
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
@@ -109,7 +120,7 @@ const Table: React.FC<TableProps> = ({
   const columnResizeDirection = "ltr";
 
   const table = useReactTable({
-    data,
+    data: accounts,
     columns,
     columnResizeMode,
     columnResizeDirection,
@@ -133,10 +144,29 @@ const Table: React.FC<TableProps> = ({
     },
   });
 
-  if (data.length === 0) {
+  if (accounts.length === 0) {
     // No accounts found.
     return <ZeroStateDisplay />;
   }
+
+  // User clicks on next page button in the table.
+  // We assume when this callback is called that next page on server is definitely
+  // available.
+  const handleNextPageClick = async () => {
+    if (table.getCanNextPage()) {
+      // Next page exists, just update table to next page.
+      table.nextPage();
+      return;
+    }
+    await onFetchNextPage();
+    // Fetch the row model count on the current page (before next page was fetched).
+    // If this is less than pageSize, then stay on the same page.
+    // If equal to pageSize, go to next page.
+    const currentPageRowCount = table.getRowModel().rows.length;
+    if (currentPageRowCount === initialPaginationState.pageSize) {
+      table.nextPage();
+    }
+  };
 
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
@@ -150,6 +180,10 @@ const Table: React.FC<TableProps> = ({
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-gray-700 text-md mb-2">
+        Total Number of Accounts:{" "}
+        <span className="font-semibold">{totalAccountsCount}</span>
+      </p>
       <div className="flex items-center gap-6">
         {/* Filter Controls */}
         <div className="flex gap-4">
@@ -173,8 +207,12 @@ const Table: React.FC<TableProps> = ({
         columns={columns}
         columnResizeMode={columnResizeMode}
         pagination={pagination}
+        morePagesToFetch={moreAccountsToFetch}
+        handleNextPageClick={handleNextPageClick}
         headerClassName="bg-[rgb(122,103,171)]"
       />
+
+      <LoadingOverlay loading={dataLoading} />
     </div>
   );
 };
@@ -182,18 +220,30 @@ const Table: React.FC<TableProps> = ({
 // Displays list of accounts in a table format.
 export default function AccountsTable() {
   const authContext = useAuthContext();
-  const [loading, setLoading] = useState<boolean>(true);
-  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  // Current list of all Accounts fetched from server so far in the correct pagination order.
+  const [curAccounts, setCurAccounts] = useState<AccountRow[]>([]);
+  // Latest Page number fetched from server.
+  const [serverPage, setServerPage] = useState(1);
+  // Whether there are more accounts to fetch from server.
+  const [moreAccountsToFetch, setMoreAccountsToFetch] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  // Total cccounts count found on the server.
+  const [totalAccountsCount, setTotalAccountsCount] = useState(0);
   const [columns, setColumns] = useState<ColumnDef<AccountRow>[]>([]);
+
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const [dataLoading, setDataLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    listAccounts(authContext)
-      .then(async (accounts) => {
+    listAccounts(authContext, { page: serverPage })
+      .then(async (response) => {
         const products = await listProducts(authContext);
-        setAccounts(accounts);
-        setColumns(getAccountColumns(accounts));
+        const gotAccounts = response.results;
+        setTotalAccountsCount(response.count);
+        setMoreAccountsToFetch(response.next !== null);
+        setCurAccounts(gotAccounts);
+        setColumns(getAccountColumns(gotAccounts));
         setProducts(products);
       })
       .catch((error) =>
@@ -218,15 +268,15 @@ export default function AccountsTable() {
       {} as Record<string, AccountRow>
     );
     // Update only the accounts that were polled.
-    const updatedAccounts = accounts.map((account) =>
+    const updatedAccounts = curAccounts.map((account) =>
       account.id in polledAccountsMap ? polledAccountsMap[account.id] : account
     );
-    setAccounts(updatedAccounts);
+    setCurAccounts(updatedAccounts);
   };
 
   // Accounts added by the user which have been successfully created by the API as well.
   const onAccountsAdded = (addedAccounts: AccountRow[]) => {
-    setAccounts([...addedAccounts, ...accounts]);
+    setCurAccounts([...addedAccounts, ...curAccounts]);
   };
 
   // Handler for when custom column inputs are provided by the user.
@@ -235,10 +285,33 @@ export default function AccountsTable() {
     console.log("custom colum info ", customColumnInfo);
   };
 
+  // Handle user request to fetch the next page of Accounts.
+  const onFetchNextPage = async () => {
+    setDataLoading(true);
+    const nextPage = serverPage + 1;
+    try {
+      const response = await listAccounts(authContext, { page: nextPage });
+      setTotalAccountsCount(totalAccountsCount);
+      setMoreAccountsToFetch(response.next !== null);
+      const allAccounts = [...curAccounts, ...response.results];
+      setCurAccounts(allAccounts);
+      setColumns(getAccountColumns(allAccounts));
+      setServerPage(nextPage);
+    } catch (error: any) {
+      setError(
+        new Error(
+          `Failed to fetch Next Page: ${nextPage} for Accounts: ${error.message}`
+        )
+      );
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
   return (
     <div className="px-4 mt-2">
       <PollPendingAccounts
-        accounts={accounts}
+        accounts={curAccounts}
         onPollingComplete={onPollingComplete}
       />
       <div className="flex items-center gap-4">
@@ -251,7 +324,11 @@ export default function AccountsTable() {
 
       <Table
         columns={columns}
-        data={accounts}
+        accounts={curAccounts}
+        totalAccountsCount={totalAccountsCount}
+        moreAccountsToFetch={moreAccountsToFetch}
+        dataLoading={dataLoading}
+        onFetchNextPage={onFetchNextPage}
         onCustomColumnAdded={onCustomColumnAdded}
       />
     </div>

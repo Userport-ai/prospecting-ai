@@ -89,7 +89,7 @@ export const Table: React.FC<TableProps> = ({
 
   const initialPaginationState = {
     pageIndex: 0, //initial page index
-    pageSize: 10, //default page size
+    pageSize: 20, //default page size
   };
   const [pagination, setPagination] = useState(initialPaginationState);
 
@@ -289,7 +289,11 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       setColumns(getLeadColumns(allLeads));
       setServerPage(nextPage);
     } catch (error: any) {
-      setError(new Error(`Failed to fetch Accounts: ${error.message}`));
+      setError(
+        new Error(
+          `Failed to fetch Next Page: ${nextPage} for Leads: ${error.message}`
+        )
+      );
     } finally {
       setDataLoading(false);
     }
