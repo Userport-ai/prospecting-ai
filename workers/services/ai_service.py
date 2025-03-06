@@ -476,7 +476,7 @@ class GeminiService(AIService):
         return self.model_instance.generate_content(prompt)
 
     @to_cpu_thread
-    async def _parse_json_response_async(self, response: str) -> Dict[str, Any]:
+    def _parse_json_response_async(self, response: str) -> Dict[str, Any]:
         """Parse JSON from Gemini response asynchronously."""
         # Since JSON parsing is CPU-bound rather than I/O-bound, we run it in a thread
         # to avoid blocking the event loop for complex or large JSON payloads

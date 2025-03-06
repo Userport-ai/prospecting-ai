@@ -34,7 +34,9 @@ class RetryConfig:
 
     def __post_init__(self):
         if self.retryable_exceptions is None:
-            self.retryable_exceptions = [RetryableError]
+            self.retryable_exceptions = [RetryableError, asyncio.TimeoutError,
+                                         ConnectionError,
+                                         TimeoutError]
 
 
 def with_retry(
@@ -80,7 +82,7 @@ def with_retry(
                         )
                         break
 
-                    # Calculate delay with exponential backoff and jitter
+                    # Calculate delay(seconds) with exponential backoff and jitter
                     delay = min(
                         retry_config.base_delay * (2 ** (attempt - 1)),
                         retry_config.max_delay

@@ -588,9 +588,3 @@ class BigQueryService:
         except Exception as e:
             logger.error(f"Error calculating data quality score: {str(e)}")
             return 0.0
-
-            return record_id
-
-        except Exception as e:
-            logger.error(f"Error storing account data in BigQuery: {str(e)}")
-            raise
