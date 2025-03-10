@@ -107,8 +107,9 @@ def with_retry(
                         f"Error: {str(e)}"
                     )
 
-                    # Wait before retrying
-                    await asyncio.sleep(total_delay)
+                    # Wait before retrying, ensuring trace context is preserved
+                    from utils.async_utils import sleep_with_context
+                    await sleep_with_context(total_delay)
 
             # If we've exhausted our retries, raise the last exception
             if last_exception:

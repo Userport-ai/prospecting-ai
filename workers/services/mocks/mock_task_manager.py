@@ -30,17 +30,11 @@ class MockTaskManager:
         }
 
     async def _execute_task(self, task_id: str):
-        # Import and use tracing utilities to preserve context across sleep
-        from utils.tracing import capture_context, restore_context
+        # Import and use sleep_with_context to preserve context during sleep
+        from utils.async_utils import sleep_with_context
         
-        # Capture context before sleep
-        context = capture_context()
-        
-        # Simulate some processing time
-        await asyncio.sleep(2)
-        
-        # Restore context after sleep
-        restore_context(context)
+        # Simulate some processing time with context preservation
+        await sleep_with_context(2)
 
         task = self.tasks[task_id]
         task["status"] = "completed"

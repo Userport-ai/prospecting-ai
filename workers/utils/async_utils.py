@@ -2,7 +2,7 @@ import asyncio
 import functools
 import concurrent.futures
 import os
-from typing import Any, Callable, Coroutine, TypeVar, Optional, Literal, Dict
+from typing import Any, Callable, Coroutine, TypeVar, Optional, Literal, Dict, overload
 
 from utils.tracing import capture_context, restore_context
 
@@ -138,6 +138,59 @@ def create_task_with_context(coro):
         
     # Create and return a new task
     return asyncio.create_task(context_wrapper())
+
+
+async def sleep_with_context(delay: float) -> None:
+    """
+    A wrapper around asyncio.sleep that preserves trace context.
+    Use this instead of asyncio.sleep for better trace context propagation.
+    
+    Args:
+        delay: Sleep duration in seconds
+    """
+    # Capture the current context before yielding control
+    context = capture_context()
+    
+    # Sleep - this is where control might be lost in an async boundary
+    await asyncio.sleep(delay)
+    
+    # Restore the context after control returns from sleep
+    restore_context(context)
+
+
+@overload
+async def wait_for_with_context(aw: Coroutine[Any, Any, T], timeout: Optional[float]) -> T: ...
+
+async def wait_for_with_context(aw, timeout):
+    """
+    A wrapper around asyncio.wait_for that preserves trace context.
+    Use this instead of asyncio.wait_for for better trace context propagation.
+    
+    Args:
+        aw: Awaitable to wait for
+        timeout: Timeout in seconds
+        
+    Returns:
+        Result from the awaitable
+    
+    Raises:
+        asyncio.TimeoutError: If the operation times out
+    """
+    # Capture the current context
+    context = capture_context()
+    
+    try:
+        # Wait for the coroutine, which might lose context
+        result = await asyncio.wait_for(aw, timeout)
+        
+        # Restore the context after control returns
+        restore_context(context)
+        return result
+    except Exception as e:
+        # Make sure context is restored even if there's an exception
+        restore_context(context)
+        raise
+
 
 def setup_context_preserving_task_factory():
     """
