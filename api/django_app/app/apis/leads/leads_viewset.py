@@ -139,6 +139,61 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             # Use the original score ordering
             return queryset.order_by(F('score').desc(nulls_last=True))
 
+    def _format_pagination_response(self, results, serializer, request, next_cursor_str=None, previous_cursor_str=None, counts=None, has_more=False):
+        """
+        Helper method to format the pagination response in standard Django format
+
+        Args:
+            results: The queryset results to be serialized
+            serializer: The serializer to use
+            request: The request object for building URLs
+            next_cursor_str: Base64 encoded cursor for next page
+            previous_cursor_str: Base64 encoded cursor for previous page
+            counts: Additional count information to include
+            has_more: Boolean indicating if there are more results
+
+        Returns:
+            Response: Formatted response with standard pagination structure
+        """
+        # Serialize results
+        serialized_data = serializer(results, many=True).data
+
+        # Construct next and previous URLs
+        base_url = request.build_absolute_uri().split('?')[0]
+        # Ensure HTTPS instead of HTTP
+        if base_url.startswith('http://'):
+            base_url = base_url.replace('http://', 'https://', 1)
+
+        query_params = request.query_params.copy()
+
+        # Create next URL if we have more results
+        next_url = None
+        if next_cursor_str and has_more:
+            import urllib.parse
+            query_params['cursor'] = next_cursor_str
+            next_url = f"{base_url}?{'&'.join([f'{k}={urllib.parse.quote(str(v))}' for k, v in query_params.items()])}"
+
+        # Create previous URL if we have a previous cursor
+        previous_url = None
+        if previous_cursor_str:
+            import urllib.parse
+            query_params['cursor'] = previous_cursor_str
+            previous_url = f"{base_url}?{'&'.join([f'{k}={urllib.parse.quote(str(v))}' for k, v in query_params.items()])}"
+
+        # Format the response in standard Django pagination format
+        response_data = {
+            "count": counts.get("total_count", len(results)) if counts else len(results),
+            "next": next_url,
+            "previous": previous_url,
+            "results": serialized_data
+        }
+
+        # Include additional counts data if provided
+        if counts:
+            response_data["meta"] = {"counts": counts}
+
+        return Response(response_data)
+
     @action(detail=False, methods=['get'])
     def balanced(self, request):
         """
@@ -334,39 +389,31 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             persona = getattr(lead, 'persona_match', 'unknown')
             persona_distribution[persona] = persona_distribution.get(persona, 0) + 1
 
-        # Serialize results
-        serializer = self.get_serializer(results, many=True)
+        # Create counts dictionary for response
+        counts = {
+            "buyer_count": next_cursor["buyer_count"],
+            "influencer_count": next_cursor["influencer_count"],
+            "end_user_count": next_cursor["end_user_count"],
+            "total_count": next_cursor["total_count"],
+            "personas_in_current_page": persona_distribution
+        }
 
-        # Construct next and previous URLs
-        base_url = request.build_absolute_uri().split('?')[0]
-        query_params = request.query_params.copy()
-        
-        # Create next URL if we have more results
-        next_url = None
-        if has_more:
-            query_params['cursor'] = next_cursor_str
-            next_url = f"{base_url}?{'&'.join([f'{k}={v}' for k, v in query_params.items()])}"
-        
-        # Create previous URL if we're not on the first page
-        previous_url = None
+        # Get previous cursor for previous URL
+        previous_cursor_str = None
         if cursor["total_count"] > 0:  # If we've seen any results before this page
             prev_cursor = cursor.copy()
-            prev_cursor_str = base64.b64encode(json.dumps(prev_cursor).encode('utf-8')).decode('utf-8')
-            query_params['cursor'] = prev_cursor_str
-            previous_url = f"{base_url}?{'&'.join([f'{k}={v}' for k, v in query_params.items()])}"
-        
-        return Response({
-            "results": serializer.data,
-            "next": next_url,
-            "previous": previous_url,
-            "counts": {
-                "buyer_count": next_cursor["buyer_count"],
-                "influencer_count": next_cursor["influencer_count"],
-                "end_user_count": next_cursor["end_user_count"],
-                "total_count": next_cursor["total_count"],
-                "personas_in_current_page": persona_distribution
-            }
-        })
+            previous_cursor_str = base64.b64encode(json.dumps(prev_cursor).encode('utf-8')).decode('utf-8')
+
+        # Use the helper method to format the response
+        return self._format_pagination_response(
+            results=results,
+            serializer=self.get_serializer,
+            request=request,
+            next_cursor_str=next_cursor_str if has_more else None,
+            previous_cursor_str=previous_cursor_str,
+            counts=counts,
+            has_more=has_more
+        )
 
     @action(detail=False, methods=['get'])
     def quota_distribution(self, request):
@@ -500,44 +547,36 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             persona = getattr(lead, 'persona_match', 'unknown')
             persona_distribution[persona] = persona_distribution.get(persona, 0) + 1
 
-        # Serialize results
-        serializer = self.get_serializer(results, many=True)
+        # Create counts dictionary for response
+        counts = {
+            "buyer_count": next_cursor["buyer_count"],
+            "influencer_count": next_cursor["influencer_count"],
+            "end_user_count": next_cursor["end_user_count"],
+            "total_count": next_cursor["total_count"],
+            "distribution": {
+                "buyer_percent": buyer_percent,
+                "influencer_percent": influencer_percent,
+                "end_user_percent": end_user_percent
+            },
+            "personas_in_current_page": persona_distribution
+        }
 
-        # Construct next and previous URLs
-        base_url = request.build_absolute_uri().split('?')[0]
-        query_params = request.query_params.copy()
-        
-        # Create next URL if we have more results
-        next_url = None
-        if has_more:
-            query_params['cursor'] = next_cursor_str
-            next_url = f"{base_url}?{'&'.join([f'{k}={v}' for k, v in query_params.items()])}"
-        
-        # Create previous URL if we're not on the first page
-        previous_url = None
+        # Get previous cursor for previous URL
+        previous_cursor_str = None
         if cursor["total_count"] > 0:  # If we've seen any results before this page
             prev_cursor = cursor.copy()
-            prev_cursor_str = base64.b64encode(json.dumps(prev_cursor).encode('utf-8')).decode('utf-8')
-            query_params['cursor'] = prev_cursor_str
-            previous_url = f"{base_url}?{'&'.join([f'{k}={v}' for k, v in query_params.items()])}"
-        
-        return Response({
-            "results": serializer.data,
-            "next": next_url,
-            "previous": previous_url,
-            "counts": {
-                "buyer_count": next_cursor["buyer_count"],
-                "influencer_count": next_cursor["influencer_count"],
-                "end_user_count": next_cursor["end_user_count"],
-                "total_count": next_cursor["total_count"],
-                "distribution": {
-                    "buyer_percent": buyer_percent,
-                    "influencer_percent": influencer_percent,
-                    "end_user_percent": end_user_percent
-                },
-                "personas_in_current_page": persona_distribution
-            }
-        })
+            previous_cursor_str = base64.b64encode(json.dumps(prev_cursor).encode('utf-8')).decode('utf-8')
+
+        # Use the helper method to format the response
+        return self._format_pagination_response(
+            results=results,
+            serializer=self.get_serializer,
+            request=request,
+            next_cursor_str=next_cursor_str if has_more else None,
+            previous_cursor_str=previous_cursor_str,
+            counts=counts,
+            has_more=has_more
+        )
 
     def _annotate_persona_match(self, queryset):
         """
