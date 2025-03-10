@@ -8,7 +8,7 @@ import httpx
 from google.cloud import bigquery
 
 from utils.connection_pool import ConnectionPool
-from utils.async_utils import to_thread
+from utils.async_utils import to_thread, preserve_context
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,7 @@ class APICacheService:
         cache_str = json.dumps(cache_data, sort_keys=True)
         return hashlib.sha256(cache_str.encode()).hexdigest()
 
+    @preserve_context
     async def get_cached_response(
             self,
             url: str,
@@ -145,6 +146,7 @@ class APICacheService:
         """Execute a BigQuery query in a separate thread and return results"""
         return list(self.client.query(query, job_config=job_config).result())
 
+    @preserve_context
     async def cache_response(
             self,
             url: str,
@@ -237,6 +239,7 @@ class APICacheService:
         return query_job.num_dml_affected_rows
 
 
+@preserve_context
 async def cached_request(
         cache_service: APICacheService,
         url: str,

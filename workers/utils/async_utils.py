@@ -2,9 +2,11 @@ import asyncio
 import functools
 import concurrent.futures
 import os
-from typing import Any, Callable, Coroutine, TypeVar, Optional, Literal, Dict, overload
+from typing import Any, Callable, Coroutine, TypeVar, Optional, Literal, Dict, overload, ParamSpec, Awaitable
 
 from utils.tracing import capture_context, restore_context
+
+P = ParamSpec('P')
 
 T = TypeVar('T')
 
@@ -190,6 +192,42 @@ async def wait_for_with_context(aw, timeout):
         # Make sure context is restored even if there's an exception
         restore_context(context)
         raise
+
+
+def preserve_context(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+    """
+    Decorator for async functions to ensure trace context is preserved across async operations.
+    
+    This decorator captures the current trace context at the start of the function and
+    restores it when the function finishes, either normally or with an exception.
+    
+    Example:
+        @preserve_context
+        async def my_async_function():
+            await asyncio.sleep(1)  # Context would normally be lost here
+            # But with the decorator, context is preserved
+    
+    Args:
+        func: The async function to decorate
+        
+    Returns:
+        Decorated async function with context preservation
+    """
+    @functools.wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        # Capture current context at the beginning of the function
+        context = capture_context()
+        
+        try:
+            # Call the original function
+            return await func(*args, **kwargs)
+        finally:
+            # Always restore context when function completes
+            # This ensures context is restored whether the function returns normally
+            # or exits with an exception
+            restore_context(context)
+            
+    return wrapper
 
 
 def setup_context_preserving_task_factory():
