@@ -69,6 +69,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     def _annotate_with_adjusted_scores(self, queryset, multipliers):
         """
         Helper method to annotate the queryset with adjusted scores based on persona.
+        Modified to handle NULL scores properly.
 
         Args:
             queryset: The base queryset to annotate
@@ -78,15 +79,15 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             QuerySet: The annotated queryset with adjusted scores
         """
         return queryset.annotate(
-            # Calculate the score with multipliers in one step
+            # Calculate the score with multipliers in one step, using Coalesce to handle NULLs
             multiplied_score=Case(
                 When(persona_match=Value('buyer'),
-                     then=F('score') * Value(multipliers.get('buyer', 1.2))),
+                     then=models.functions.Coalesce('score', Value(0.0)) * Value(multipliers.get('buyer', 1.2))),
                 When(persona_match=Value('influencer'),
-                     then=F('score') * Value(multipliers.get('influencer', 1.0))),
+                     then=models.functions.Coalesce('score', Value(0.0)) * Value(multipliers.get('influencer', 1.0))),
                 When(persona_match=Value('end_user'),
-                     then=F('score') * Value(multipliers.get('end_user', 0.8))),
-                default=F('score'),
+                     then=models.functions.Coalesce('score', Value(0.0)) * Value(multipliers.get('end_user', 0.8))),
+                default=models.functions.Coalesce('score', Value(0.0)),
                 output_field=FloatField(),
             ),
             # Cap the score at 100 using the Least function
@@ -125,9 +126,11 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
             # Then annotate with adjusted scores based on persona
             queryset = self._annotate_with_adjusted_scores(queryset, multipliers)
+            
+            # order by adjusted_score before returning the results
+            return queryset.order_by(F('adjusted_score').desc(nulls_last=True))
 
-            # Order by adjusted score, then by original score for ties
-            return queryset.order_by(F('adjusted_score').desc(nulls_last=True), F('score').desc(nulls_last=True))
+
         else:
             # Use the original score ordering
             return queryset.order_by(F('score').desc(nulls_last=True))
