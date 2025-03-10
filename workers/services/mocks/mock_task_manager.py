@@ -17,8 +17,11 @@ class MockTaskManager:
             "status": "scheduled"
         }
 
-        # Simulate async task execution
-        asyncio.create_task(self._execute_task(task_id))
+        # Import utility for creating tasks with context preservation
+        from utils.async_utils import create_task_with_context
+        
+        # Simulate async task execution with context preservation
+        create_task_with_context(self._execute_task(task_id))
 
         return {
             "status": "scheduled",
@@ -27,8 +30,17 @@ class MockTaskManager:
         }
 
     async def _execute_task(self, task_id: str):
+        # Import and use tracing utilities to preserve context across sleep
+        from utils.tracing import capture_context, restore_context
+        
+        # Capture context before sleep
+        context = capture_context()
+        
         # Simulate some processing time
         await asyncio.sleep(2)
+        
+        # Restore context after sleep
+        restore_context(context)
 
         task = self.tasks[task_id]
         task["status"] = "completed"

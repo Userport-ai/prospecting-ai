@@ -189,10 +189,22 @@ class WebsiteParser:
     @with_retry(retry_config=JINA_RETRY_CONFIG, operation_name="_website_parser_call_jina_reader_api")
     async def _call_jina_api(self, endpoint: str, headers: Dict) -> str:
         """Calls Jina API (with retries) and returns response text."""
+        # Import trace context utilities to preserve context across async boundaries
+        from utils.tracing import capture_context, restore_context
+        
+        # Capture current context before creating the client
+        context = capture_context()
+        
         async with httpx.AsyncClient() as client:
-            response = await client.get(url=endpoint, headers=headers, timeout=30.0)
-            response.raise_for_status()
-            return response.text
+            # Restore context before making the API call
+            restore_context(context)
+            try:
+                response = await client.get(url=endpoint, headers=headers, timeout=30.0)
+                response.raise_for_status()
+                return response.text
+            finally:
+                # Restore context again after the API call in case it was lost
+                restore_context(context)
 
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_website_parser_call_ai_api")
     async def _call_ai_api(self, prompt: str) -> Dict[str, Any] | str:

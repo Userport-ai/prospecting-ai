@@ -557,11 +557,23 @@ class OpenAIService(AIService):
             # Configure response format for JSON if needed
             response_format = {"type": "json_object"} if is_json else None
 
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                response_format=response_format
-            )
+            # The OpenAI client doesn't preserve trace context, so we need to wrap it
+            from utils.tracing import capture_context, restore_context
+            
+            # Capture current context before the API call
+            context = capture_context()
+            
+            # Make the API call, ensuring we restore the context before and after
+            restore_context(context)
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    response_format=response_format
+                )
+            finally:
+                # Restore context again after the API call in case it was lost
+                restore_context(context)
             logger.debug(f"OpenAI response: {response}")
 
             if not response.choices:
