@@ -203,7 +203,13 @@ const listLeadsHelper = async (
   accountId?: string,
   suggestionStatus?: SuggestionStatus
 ): Promise<ListLeadsResponse> => {
-  var params: Record<string, any> = { page: page };
+  var params: Record<string, any> = {
+    page: page,
+    balance_personas: true,
+    buyer_multiplier: 1.1,
+    influencer_multiplier: 1.05,
+    end_user_multiplier: 0.8,
+  };
   if (accountId) {
     params["account"] = accountId;
   }
