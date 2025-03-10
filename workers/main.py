@@ -5,7 +5,7 @@ import time
 import traceback
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -15,6 +15,16 @@ from api.routes import register_tasks
 from api.routes import router
 from services.django_callback_service import CallbackService
 from utils.async_utils import shutdown_thread_pools
+from utils.tracing import (
+    TraceContextFilter,
+    get_trace_id,
+    get_job_id,
+    get_account_id,
+    get_lead_id,
+    get_task_name,
+    set_trace_context,
+    extract_trace_context_from_payload
+)
 
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
@@ -28,9 +38,21 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         # Add severity for GCP logging
         log_record['severity'] = record.levelname
 
-        # Add trace ID if available
-        if hasattr(record, 'trace_id'):
+        # Add trace context fields
+        if hasattr(record, 'trace_id') and record.trace_id:
             log_record['trace_id'] = record.trace_id
+            
+        if hasattr(record, 'job_id') and record.job_id:
+            log_record['job_id'] = record.job_id
+            
+        if hasattr(record, 'account_id') and record.account_id:
+            log_record['account_id'] = record.account_id
+            
+        if hasattr(record, 'lead_id') and record.lead_id:
+            log_record['lead_id'] = record.lead_id
+            
+        if hasattr(record, 'task_name') and record.task_name:
+            log_record['task_name'] = record.task_name
 
         # Add request_id if available
         if hasattr(record, 'request_id'):
@@ -56,6 +78,10 @@ formatter = CustomJsonFormatter(
     '%(timestamp)s %(severity)s %(name)s %(message)s'
 )
 console_handler.setFormatter(formatter)
+
+# Add trace context filter to inject context into log records
+trace_filter = TraceContextFilter()
+logger.addFilter(trace_filter)
 
 logger.addHandler(console_handler)
 
@@ -95,8 +121,17 @@ async def logging_middleware(request: Request, call_next):
     request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
     sensitive_headers = ['authorization', 'cookie']
     filtered_headers = {k: v for k, v in request.headers.items() if k.lower() not in sensitive_headers}
-
-
+    
+    # Extract trace context from headers or query params if available
+    trace_id = request.headers.get('X-Trace-ID') or request.query_params.get('trace_id')
+    
+    # Initialize trace context
+    # For task endpoints, we'll extract and set the context from the payload later in routes.py
+    set_trace_context(
+        trace_id=trace_id,
+        # Other fields will be set from payload for task endpoints
+    )
+    
     # Add context to logging
     logger.info(
         "Request started",
@@ -123,6 +158,12 @@ async def logging_middleware(request: Request, call_next):
                 'duration_ms': int((time.time() - start_time) * 1000)
             }
         )
+        
+        # Add trace_id to response headers for client tracking
+        trace_id = get_trace_id()
+        if trace_id:
+            response.headers['X-Trace-ID'] = trace_id
+            
         return response
 
     except Exception as e:
@@ -143,7 +184,8 @@ async def logging_middleware(request: Request, call_next):
                 "status": "error",
                 "message": str(e),
                 "type": type(e).__name__,
-                "request_id": request_id
+                "request_id": request_id,
+                "trace_id": get_trace_id()
             }
         )
 

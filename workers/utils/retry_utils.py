@@ -4,7 +4,9 @@ import logging
 import random
 import time
 from dataclasses import dataclass
-from typing import List, Type, TypeVar, Callable, Any, Coroutine, Generic, Optional, Union
+from typing import List, Type, TypeVar, Callable, Any, Coroutine, Generic, Optional, Union, Dict
+
+from utils.tracing import capture_context, restore_context
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ def with_retry(
 ) -> Callable[[Callable[..., Coroutine[Any, Any, T]]], Callable[..., Coroutine[Any, Any, T]]]:
     """
     Decorator for retrying an async function with exponential backoff.
+    Preserves trace context across retry attempts.
 
     Args:
         retry_config: Configuration for retry behavior
@@ -56,11 +59,19 @@ def with_retry(
     def decorator(func: Callable[..., Coroutine[Any, Any, T]]) -> Callable[..., Coroutine[Any, Any, T]]:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
+            # Capture the current trace context at the start of the first attempt
+            # This ensures we use the same trace context for all retry attempts
+            original_context = capture_context()
+            
             attempt = 0
             last_exception = None
 
             while attempt < retry_config.max_attempts:
                 try:
+                    # Restore the original trace context before each attempt
+                    # This ensures retry attempts maintain the same trace info
+                    restore_context(original_context)
+                    
                     return await func(*args, **kwargs)
                 except Exception as e:
                     # Check if this exception type should trigger a retry
@@ -90,6 +101,7 @@ def with_retry(
                     jitter = random.uniform(0, 0.1 * delay)
                     total_delay = delay + jitter
 
+                    # Ensure trace context is present in retry logs
                     logger.warning(
                         f"Retry attempt {attempt} for {operation_name} after {total_delay:.2f}s delay. "
                         f"Error: {str(e)}"
@@ -100,6 +112,8 @@ def with_retry(
 
             # If we've exhausted our retries, raise the last exception
             if last_exception:
+                # Make sure trace context is available in the final error log
+                restore_context(original_context)
                 logger.error(f"All retry attempts failed for {operation_name}")
                 raise last_exception
 
