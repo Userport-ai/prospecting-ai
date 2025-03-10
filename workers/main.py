@@ -14,7 +14,7 @@ from pythonjsonlogger import jsonlogger
 from api.routes import register_tasks
 from api.routes import router
 from services.django_callback_service import CallbackService
-from utils.async_utils import shutdown_thread_pools
+from utils.async_utils import shutdown_thread_pools, setup_context_preserving_task_factory
 from utils.tracing import (
     TraceContextFilter,
     get_trace_id,
@@ -23,7 +23,7 @@ from utils.tracing import (
     get_lead_id,
     get_task_name,
     set_trace_context,
-    extract_trace_context_from_payload
+    extract_trace_context_from_payload, set_trace_id
 )
 
 
@@ -97,6 +97,10 @@ async def lifespan(fastapi_app: FastAPI):
         'log_level': log_level,
         'version': os.getenv('VERSION', 'unknown')
     })
+
+    # Set up context preservation for all tasks
+    setup_context_preserving_task_factory()
+
     fastapi_app.state.callback_service = await CallbackService.get_instance()
     await register_tasks()
 
@@ -111,7 +115,6 @@ async def lifespan(fastapi_app: FastAPI):
         callback_service = getattr(fastapi_app.state, 'callback_service', None)
         if callback_service:
             await callback_service.cleanup()
-
 app = FastAPI(title="Workers API", lifespan=lifespan)
 
 
@@ -121,16 +124,12 @@ async def logging_middleware(request: Request, call_next):
     request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
     sensitive_headers = ['authorization', 'cookie']
     filtered_headers = {k: v for k, v in request.headers.items() if k.lower() not in sensitive_headers}
-    
-    # Extract trace context from headers or query params if available
+
+    # Only extract and set trace_id as a minimal context identifier
+    # This ensures early logs have at least a trace_id without overwriting other fields
     trace_id = request.headers.get('X-Trace-ID') or request.query_params.get('trace_id')
-    
-    # Initialize trace context
-    # For task endpoints, we'll extract and set the context from the payload later in routes.py
-    set_trace_context(
-        trace_id=trace_id,
-        # Other fields will be set from payload for task endpoints
-    )
+    if trace_id:
+        set_trace_id(trace_id)  # Only set trace_id, not the full context
     
     # Add context to logging
     logger.info(

@@ -113,3 +113,35 @@ async def shutdown_thread_pools():
     # First shutdown CPU pool as it might depend on I/O operations
     CPU_THREAD_POOL.shutdown(wait=True)
     IO_THREAD_POOL.shutdown(wait=True)
+
+
+def setup_context_preserving_task_factory():
+    """
+    Configure asyncio to preserve context variables across all task boundaries.
+    Call this once during application startup.
+    """
+    loop = asyncio.get_running_loop()
+
+    # Store the original task factory if it exists
+    original_task_factory = loop.get_task_factory()
+
+    def context_preserving_task_factory(loop, coro, **kwargs):
+        """Task factory that preserves context across task boundaries"""
+        # Capture current context
+        context = capture_context()
+
+        # Create a wrapper coroutine that restores context
+        async def context_wrapper():
+            # Restore the captured context
+            restore_context(context)
+            # Run the original coroutine
+            return await coro
+
+        # Use the original task factory if it exists, otherwise create a Task directly
+        if original_task_factory is not None:
+            return original_task_factory(loop, context_wrapper(), **kwargs)
+        else:
+            return asyncio.tasks.Task(context_wrapper(), loop=loop, **kwargs)
+
+    # Set our custom task factory
+    loop.set_task_factory(context_preserving_task_factory)
