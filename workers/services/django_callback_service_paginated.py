@@ -132,6 +132,9 @@ class PaginatedCallbackService:
                     'all_leads': len(paged_all_leads)
                 }
             }
+            # Make sure trace_id is included in paginated data if present
+            if 'trace_id' in data:
+                page_data['trace_id'] = data['trace_id']
 
             pages.append(page_data)
 
@@ -179,7 +182,8 @@ class PaginatedCallbackService:
             is_partial: bool = False,
             completion_percentage: int = 100,
             attempt_number: Optional[int] = None,
-            max_retries: Optional[int] = None
+            max_retries: Optional[int] = None,
+            trace_id: Optional[str] = None
     ) -> bool:
         """Send callback with automatic pagination if needed."""
         callback_data = {
@@ -197,6 +201,10 @@ class PaginatedCallbackService:
             "attempt_number": attempt_number,
             "max_retries": max_retries
         }
+        
+        # Add trace_id if provided
+        if trace_id is not None:
+            callback_data["trace_id"] = trace_id
 
         try:
             if not self._should_paginate(callback_data):
@@ -214,7 +222,8 @@ class PaginatedCallbackService:
                     is_partial=is_partial,
                     completion_percentage=completion_percentage,
                     attempt_number=attempt_number,
-                    max_retries=max_retries
+                    max_retries=max_retries,
+                    trace_id=trace_id
                 )
 
             # Handle paginated case
