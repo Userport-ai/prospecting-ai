@@ -1,9 +1,13 @@
+import base64
+import json
 import logging
-from django.db import transaction
+
 from django.db import models
-from django.db.models import F, Case, When, FloatField, Value, ExpressionWrapper, Q
-from django.db.models.functions import Cast, Least
+from django.db import transaction
+from django.db.models import F, Case, When, FloatField, Value
 from django.db.models.expressions import RawSQL
+from django.db.models.functions import Cast
+from django.db.models.functions import Cast, Least
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -14,11 +18,11 @@ from rest_framework.response import Response
 from app.apis.common.base import TenantScopedViewSet
 from app.apis.leads.lead_generation_mixin import LeadGenerationMixin
 from app.models import UserRole, Lead, Account, EnrichmentStatus, Product
+from app.models.enrichment.lead_linkedin_research import LinkedInResearchInputData
 from app.models.serializers.lead_serializers import (
     LeadDetailsSerializer,
     LeadBulkCreateSerializer
 )
-from app.models.enrichment.lead_linkedin_research import LinkedInResearchInputData
 from app.permissions import HasRole
 from app.services.worker_service import WorkerService
 
@@ -138,98 +142,250 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     @action(detail=False, methods=['get'])
     def balanced(self, request):
         """
-        Return leads with balanced persona distribution using quotas.
+        Return leads with balanced persona distribution using quotas with cursor-based pagination.
 
-        This endpoint returns a balanced mix of leads with configurable quotas:
+        Parameters:
         - min_buyers: Minimum number of buyers to include (default: 5)
         - min_influencers: Minimum number of influencers to include (default: 5)
         - max_end_users: Maximum number of end users to include (default: 5)
-        - total: Total number of leads to return (default: 15)
-
-        The results will contain at least the specified minimums of buyers and influencers,
-        and at most the specified maximum of end users, up to the total count.
-        Any remaining slots will be filled with the highest-scoring leads regardless of persona.
+        - limit: Number of leads to return per page (default: 15)
+        - cursor: Pagination cursor (optional)
         """
-        # Get parameters with defaults
+        # Parse parameters
         account_id = request.query_params.get('account')
         min_buyers = int(request.query_params.get('min_buyers', '5'))
         min_influencers = int(request.query_params.get('min_influencers', '5'))
         max_end_users = int(request.query_params.get('max_end_users', '5'))
-        total_limit = int(request.query_params.get('total', '15'))
+        limit = int(request.query_params.get('limit', '15'))
 
         # Validate parameters
-        if min_buyers + min_influencers + max_end_users > total_limit:
+        if min_buyers + min_influencers + max_end_users > limit:
             return Response(
                 {"error": "Sum of quota parameters exceeds total limit"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        base_queryset = super().get_queryset().select_related('account').order_by('-score')
+        # Define default cursor values
+        default_cursor = {
+            "buyer_page": 0,
+            "influencer_page": 0,
+            "end_user_page": 0,
+            "remaining_page": 0,
+            "buyer_count": 0,
+            "influencer_count": 0,
+            "end_user_count": 0,
+            "total_count": 0
+        }
+
+        # Parse cursor if provided
+        cursor_str = request.query_params.get('cursor')
+        cursor = default_cursor.copy()  # Start with defaults
+
+        if cursor_str:
+            try:
+                parsed_cursor = json.loads(base64.b64decode(cursor_str).decode('utf-8'))
+                # Update default cursor with any valid keys from parsed cursor
+                for key in default_cursor:
+                    if key in parsed_cursor:
+                        cursor[key] = parsed_cursor[key]
+
+                # Log any unexpected keys for debugging
+                unexpected_keys = set(parsed_cursor.keys()) - set(default_cursor.keys())
+                if unexpected_keys:
+                    logger.warning(f"Cursor contained unexpected keys: {unexpected_keys}")
+            except Exception as e:
+                logger.warning(f"Failed to parse cursor: {str(e)}")
+                # We'll continue with the default cursor rather than failing the request
+
+        # Prepare base queryset with all filters except persona
+        base_queryset = super().get_queryset().select_related('account')
         if account_id:
             base_queryset = base_queryset.filter(account_id=account_id)
 
-        # Annotate with persona_match for filtering
-        persona_queryset = self._annotate_persona_match(base_queryset)
+        # Add suggestion_status filter if provided
+        suggestion_status = request.query_params.get('suggestion_status')
+        if suggestion_status:
+            base_queryset = base_queryset.filter(suggestion_status=suggestion_status)
 
-        # Filter by persona type
-        buyer_queryset = persona_queryset.filter(
-            persona_match='buyer'
-        ).order_by('-score')[:min_buyers]
+        # Annotate with persona_match
+        base_queryset = self._annotate_persona_match(base_queryset)
 
-        influencer_queryset = persona_queryset.filter(
-            persona_match='influencer'
-        ).order_by('-score')[:min_influencers]
+        # Apply pagination and fetch leads for each persona
+        results = []
+        next_cursor = cursor.copy()
+        has_more = False
 
-        end_user_queryset = persona_queryset.filter(
-            persona_match='end_user'
-        ).order_by('-score')[:max_end_users]
+        # Fetch buyers if quota not met
+        buyer_to_fetch = min(min_buyers - cursor["buyer_count"], limit - len(results))
+        if buyer_to_fetch > 0:
+            buyer_queryset = base_queryset.filter(persona_match='buyer').order_by('-score')
+            buyer_offset = cursor["buyer_page"] * buyer_to_fetch
+            buyers = list(buyer_queryset[buyer_offset:buyer_offset + buyer_to_fetch])
 
-        # Apply quotas
-        buyers = list(buyer_queryset)
-        influencers = list(influencer_queryset)
-        end_users = list(end_user_queryset)
+            if buyers:
+                results.extend(buyers)
+                next_cursor["buyer_count"] += len(buyers)
 
-        # Calculate remaining slots
-        selected_ids = [lead.id for lead in buyers + influencers + end_users]
-        remaining_slots = total_limit - len(selected_ids)
+                # Update page number if we got a full page
+                if len(buyers) == buyer_to_fetch:
+                    next_cursor["buyer_page"] += 1
+                    has_more = True
 
-        # Fill remaining slots with highest-scoring leads not yet selected
-        remaining_leads = []
+        # Fetch influencers if quota not met
+        influencer_to_fetch = min(min_influencers - cursor["influencer_count"], limit - len(results))
+        if influencer_to_fetch > 0:
+            influencer_queryset = base_queryset.filter(persona_match='influencer').order_by('-score')
+            influencer_offset = cursor["influencer_page"] * influencer_to_fetch
+            influencers = list(influencer_queryset[influencer_offset:influencer_offset + influencer_to_fetch])
+
+            if influencers:
+                results.extend(influencers)
+                next_cursor["influencer_count"] += len(influencers)
+
+                # Update page number if we got a full page
+                if len(influencers) == influencer_to_fetch:
+                    next_cursor["influencer_page"] += 1
+                    has_more = True
+
+        # Fetch end_users if quota not met
+        end_user_to_fetch = min(max_end_users - cursor["end_user_count"], limit - len(results))
+        if end_user_to_fetch > 0:
+            end_user_queryset = base_queryset.filter(persona_match='end_user').order_by('-score')
+            end_user_offset = cursor["end_user_page"] * end_user_to_fetch
+            end_users = list(end_user_queryset[end_user_offset:end_user_offset + end_user_to_fetch])
+
+            if end_users:
+                results.extend(end_users)
+                next_cursor["end_user_count"] += len(end_users)
+
+                # Update page number if we got a full page
+                if len(end_users) == end_user_to_fetch:
+                    next_cursor["end_user_page"] += 1
+                    has_more = True
+
+        # Calculate how many more leads we need to return
+        remaining_slots = min(limit - len(results), limit)
+
+        # Fetch remaining leads if needed (highest score regardless of persona)
         if remaining_slots > 0:
-            remaining_leads = list(
-                base_queryset.exclude(id__in=selected_ids).order_by('-score')[:remaining_slots]
-            )
+            # We need to exclude leads already returned in this page and all previous pages
+            # For each persona category, construct a queryset of all leads already fetched
+            buyer_queryset = base_queryset.filter(persona_match='buyer').order_by('-score')
+            buyer_total_fetched = cursor["buyer_page"] * min_buyers + (0 if cursor["buyer_page"] == next_cursor["buyer_page"] else buyer_to_fetch)
+            already_fetched_buyers = set(lead.id for lead in buyer_queryset[:buyer_total_fetched])
 
-        # Combine all selected leads
-        combined_leads = buyers + influencers + end_users + remaining_leads
+            influencer_queryset = base_queryset.filter(persona_match='influencer').order_by('-score')
+            influencer_total_fetched = cursor["influencer_page"] * min_influencers + (0 if cursor["influencer_page"] == next_cursor["influencer_page"] else influencer_to_fetch)
+            already_fetched_influencers = set(lead.id for lead in influencer_queryset[:influencer_total_fetched])
 
-        # Sort by score for final ordering
-        combined_leads.sort(key=lambda x: x.score or 0, reverse=True)
+            end_user_queryset = base_queryset.filter(persona_match='end_user').order_by('-score')
+            end_user_total_fetched = cursor["end_user_page"] * max_end_users + (0 if cursor["end_user_page"] == next_cursor["end_user_page"] else end_user_to_fetch)
+            already_fetched_end_users = set(lead.id for lead in end_user_queryset[:end_user_total_fetched])
 
-        # Serialize and return
-        serializer = self.get_serializer(combined_leads, many=True)
-        return Response(serializer.data)
+            # Exclude already fetched IDs
+            excluded_ids = already_fetched_buyers.union(already_fetched_influencers).union(already_fetched_end_users)
+
+            # Also exclude leads already fetched in the current page
+            current_page_ids = {lead.id for lead in results}
+            excluded_ids = excluded_ids.union(current_page_ids)
+
+            # Get remaining leads - handle empty excluded_ids case
+            remaining_queryset = base_queryset.order_by('-score')
+            if excluded_ids:
+                remaining_queryset = remaining_queryset.exclude(id__in=excluded_ids)
+
+            # Use safe offset access
+            remaining_page = cursor.get("remaining_page", 0)
+            remaining_offset = remaining_page * remaining_slots
+
+            # Log pagination details for debugging
+            logger.debug(f"Remaining leads pagination: offset={remaining_offset}, slots={remaining_slots}")
+
+            # Fetch the leads
+            remaining_leads = list(remaining_queryset[remaining_offset:remaining_offset + remaining_slots])
+
+            if remaining_leads:
+                results.extend(remaining_leads)
+
+                # Check if we got a full page of remaining leads
+                if len(remaining_leads) == remaining_slots:
+                    next_cursor["remaining_page"] = remaining_page + 1
+                    has_more = True
+
+        # Update total count
+        next_cursor["total_count"] = cursor["total_count"] + len(results)
+
+        # Sort results by score - handle potential attribute errors safely
+        def safe_sort_key(lead):
+            try:
+                return lead.score if hasattr(lead, 'score') and lead.score is not None else 0
+            except Exception as e:
+                logger.debug(f"Error getting score for lead: {str(e)}")
+                return 0
+
+        results.sort(key=safe_sort_key, reverse=True)
+
+        # Encode the next cursor
+        next_cursor_str = base64.b64encode(json.dumps(next_cursor).encode('utf-8')).decode('utf-8')
+
+        # Add debug information about persona distribution
+        persona_distribution = {}
+        for lead in results:
+            persona = getattr(lead, 'persona_match', 'unknown')
+            persona_distribution[persona] = persona_distribution.get(persona, 0) + 1
+
+        # Serialize results
+        serializer = self.get_serializer(results, many=True)
+
+        # Construct next and previous URLs
+        base_url = request.build_absolute_uri().split('?')[0]
+        query_params = request.query_params.copy()
+        
+        # Create next URL if we have more results
+        next_url = None
+        if has_more:
+            query_params['cursor'] = next_cursor_str
+            next_url = f"{base_url}?{'&'.join([f'{k}={v}' for k, v in query_params.items()])}"
+        
+        # Create previous URL if we're not on the first page
+        previous_url = None
+        if cursor["total_count"] > 0:  # If we've seen any results before this page
+            prev_cursor = cursor.copy()
+            prev_cursor_str = base64.b64encode(json.dumps(prev_cursor).encode('utf-8')).decode('utf-8')
+            query_params['cursor'] = prev_cursor_str
+            previous_url = f"{base_url}?{'&'.join([f'{k}={v}' for k, v in query_params.items()])}"
+        
+        return Response({
+            "results": serializer.data,
+            "next": next_url,
+            "previous": previous_url,
+            "counts": {
+                "buyer_count": next_cursor["buyer_count"],
+                "influencer_count": next_cursor["influencer_count"],
+                "end_user_count": next_cursor["end_user_count"],
+                "total_count": next_cursor["total_count"],
+                "personas_in_current_page": persona_distribution
+            }
+        })
 
     @action(detail=False, methods=['get'])
     def quota_distribution(self, request):
         """
-        Returns leads with a specified distribution across persona types.
+        Returns leads with a specified distribution across persona types using cursor-based pagination.
 
-        This endpoint allows specifying percentages for each persona type:
+        Parameters:
         - buyer_percent: Percentage of results to be buyers (default: 40)
         - influencer_percent: Percentage of results to be influencers (default: 40)
         - end_user_percent: Percentage of results to be end users (default: 20)
-        - total: Total number of leads to return (default: 15)
-
-        The results will contain approximately the specified distribution of persona types,
-        with the highest-scoring leads selected from each category.
+        - limit: Number of leads to return per page (default: 15)
+        - cursor: Pagination cursor (optional)
         """
-        # Get parameters with defaults
+        # Parse parameters
         account_id = request.query_params.get('account')
         buyer_percent = float(request.query_params.get('buyer_percent', '40'))
         influencer_percent = float(request.query_params.get('influencer_percent', '40'))
         end_user_percent = float(request.query_params.get('end_user_percent', '20'))
-        total_limit = int(request.query_params.get('total', '15'))
+        limit = int(request.query_params.get('limit', '15'))
 
         # Validate percentages sum to 100
         total_percent = buyer_percent + influencer_percent + end_user_percent
@@ -239,51 +395,173 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        base_queryset = super().get_queryset().select_related('account').order_by('-score')
+        # Parse cursor if provided
+        cursor_str = request.query_params.get('cursor')
+        cursor = None
+        if cursor_str:
+            try:
+                cursor = json.loads(base64.b64decode(cursor_str).decode('utf-8'))
+            except Exception as e:
+                logger.warning(f"Failed to parse cursor: {str(e)}")
+                # We'll continue with the default cursor rather than failing the request
+
+        # Initialize cursor state if not provided
+        if not cursor:
+            cursor = {
+                "buyer_page": 0,
+                "influencer_page": 0,
+                "end_user_page": 0,
+                "buyer_count": 0,
+                "influencer_count": 0,
+                "end_user_count": 0,
+                "total_count": 0,
+            }
+
+        # Calculate target counts for this page
+        buyer_target = int(round(limit * buyer_percent / 100.0))
+        influencer_target = int(round(limit * influencer_percent / 100.0))
+        end_user_target = limit - buyer_target - influencer_target
+
+        # Prepare base queryset
+        base_queryset = super().get_queryset().select_related('account')
         if account_id:
             base_queryset = base_queryset.filter(account_id=account_id)
 
-        # Calculate number of leads for each persona type
-        buyer_count = int(round(total_limit * buyer_percent / 100.0))
-        influencer_count = int(round(total_limit * influencer_percent / 100.0))
-        end_user_count = total_limit - buyer_count - influencer_count  # Ensure total adds up exactly
+        # Add suggestion_status filter if provided
+        suggestion_status = request.query_params.get('suggestion_status')
+        if suggestion_status:
+            base_queryset = base_queryset.filter(suggestion_status=suggestion_status)
 
-        # Annotate with persona_match for filtering
-        persona_queryset = self._annotate_persona_match(base_queryset)
+        # Annotate with persona_match
+        base_queryset = self._annotate_persona_match(base_queryset)
 
-        # Filter by persona type
-        buyers = list(persona_queryset.filter(
-            persona_match='buyer'
-        ).order_by('-score')[:buyer_count])
+        # Apply pagination and fetch leads for each persona
+        results = []
+        next_cursor = cursor.copy()
+        has_more = False
 
-        influencers = list(persona_queryset.filter(
-            persona_match='influencer'
-        ).order_by('-score')[:influencer_count])
+        # Fetch buyers
+        if buyer_target > 0:
+            buyer_queryset = base_queryset.filter(persona_match='buyer').order_by('-score')
+            buyer_offset = cursor["buyer_page"] * buyer_target
+            buyers = list(buyer_queryset[buyer_offset:buyer_offset + buyer_target])
 
-        end_users = list(persona_queryset.filter(
-            persona_match='end_user'
-        ).order_by('-score')[:end_user_count])
+            if buyers:
+                results.extend(buyers)
+                next_cursor["buyer_count"] += len(buyers)
 
-        # If we don't have enough of a certain type, fill with the highest-scoring remaining leads
-        selected_ids = [lead.id for lead in buyers + influencers + end_users]
-        remaining_slots = total_limit - len(selected_ids)
+                # Update page if we got a full page
+                if len(buyers) == buyer_target:
+                    next_cursor["buyer_page"] += 1
+                    has_more = True
 
-        remaining_leads = []
-        if remaining_slots > 0:
-            remaining_leads = list(
-                base_queryset.exclude(id__in=selected_ids).order_by('-score')[:remaining_slots]
+        # Fetch influencers
+        if influencer_target > 0:
+            influencer_queryset = base_queryset.filter(persona_match='influencer').order_by('-score')
+            influencer_offset = cursor["influencer_page"] * influencer_target
+            influencers = list(influencer_queryset[influencer_offset:influencer_offset + influencer_target])
+
+            if influencers:
+                results.extend(influencers)
+                next_cursor["influencer_count"] += len(influencers)
+
+                # Update page if we got a full page
+                if len(influencers) == influencer_target:
+                    next_cursor["influencer_page"] += 1
+                    has_more = True
+
+        # Fetch end users
+        if end_user_target > 0:
+            end_user_queryset = base_queryset.filter(persona_match='end_user').order_by('-score')
+            end_user_offset = cursor["end_user_page"] * end_user_target
+            end_users = list(end_user_queryset[end_user_offset:end_user_offset + end_user_target])
+
+            if end_users:
+                results.extend(end_users)
+                next_cursor["end_user_count"] += len(end_users)
+
+                # Update page if we got a full page
+                if len(end_users) == end_user_target:
+                    next_cursor["end_user_page"] += 1
+                    has_more = True
+
+        # Update total count
+        next_cursor["total_count"] = cursor["total_count"] + len(results)
+
+        # Sort results by score
+        results.sort(key=lambda x: x.score if x.score is not None else 0, reverse=True)
+
+        # Encode the next cursor
+        next_cursor_str = base64.b64encode(json.dumps(next_cursor).encode('utf-8')).decode('utf-8')
+
+        # Add debug information about persona distribution
+        persona_distribution = {}
+        for lead in results:
+            persona = getattr(lead, 'persona_match', 'unknown')
+            persona_distribution[persona] = persona_distribution.get(persona, 0) + 1
+
+        # Serialize results
+        serializer = self.get_serializer(results, many=True)
+
+        # Construct next and previous URLs
+        base_url = request.build_absolute_uri().split('?')[0]
+        query_params = request.query_params.copy()
+        
+        # Create next URL if we have more results
+        next_url = None
+        if has_more:
+            query_params['cursor'] = next_cursor_str
+            next_url = f"{base_url}?{'&'.join([f'{k}={v}' for k, v in query_params.items()])}"
+        
+        # Create previous URL if we're not on the first page
+        previous_url = None
+        if cursor["total_count"] > 0:  # If we've seen any results before this page
+            prev_cursor = cursor.copy()
+            prev_cursor_str = base64.b64encode(json.dumps(prev_cursor).encode('utf-8')).decode('utf-8')
+            query_params['cursor'] = prev_cursor_str
+            previous_url = f"{base_url}?{'&'.join([f'{k}={v}' for k, v in query_params.items()])}"
+        
+        return Response({
+            "results": serializer.data,
+            "next": next_url,
+            "previous": previous_url,
+            "counts": {
+                "buyer_count": next_cursor["buyer_count"],
+                "influencer_count": next_cursor["influencer_count"],
+                "end_user_count": next_cursor["end_user_count"],
+                "total_count": next_cursor["total_count"],
+                "distribution": {
+                    "buyer_percent": buyer_percent,
+                    "influencer_percent": influencer_percent,
+                    "end_user_percent": end_user_percent
+                },
+                "personas_in_current_page": persona_distribution
+            }
+        })
+
+    def _annotate_persona_match(self, queryset):
+        """
+        Helper method to annotate the queryset with persona_match from JSON field.
+        Includes a COALESCE to handle NULL values.
+
+        Args:
+            queryset: The base queryset to annotate
+
+        Returns:
+            QuerySet: The annotated queryset with persona_match field
+        """
+        return queryset.annotate(
+            persona_match=models.functions.Coalesce(
+                Cast(
+                    RawSQL(
+                        "enrichment_data->'evaluation'->>'persona_match'",
+                        []
+                    ),
+                    models.CharField()
+                ),
+                Value('unknown')  # Default value when persona_match is NULL
             )
-
-        # Combine all selected leads
-        combined_leads = buyers + influencers + end_users + remaining_leads
-
-        # Sort by score for final ordering
-        combined_leads.sort(key=lambda x: x.score or 0, reverse=True)
-
-        # Serialize and return
-        serializer = self.get_serializer(combined_leads, many=True)
-        return Response(serializer.data)
-
+        )
     # Keep existing methods below
     @action(detail=False, methods=['post'])
     def generate(self, request):
