@@ -181,8 +181,14 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             previous_url = f"{base_url}?{'&'.join([f'{k}={urllib.parse.quote(str(v))}' for k, v in query_params.items()])}"
 
         # Format the response in standard Django pagination format
+        # Always use total_count from counts if available, following Django REST Framework standards
+        total_count = counts.get("total_count") if counts and "total_count" in counts else (
+            # If no total_count in counts, default to the length of results for backward compatibility
+            len(results)
+        )
+        
         response_data = {
-            "count": counts.get("total_count", len(results)) if counts else len(results),
+            "count": total_count,
             "next": next_url,
             "previous": previous_url,
             "results": serialized_data
@@ -264,6 +270,12 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
         # Annotate with persona_match
         base_queryset = self._annotate_persona_match(base_queryset)
+
+        # Get total counts for each persona type (for proper pagination info)
+        total_buyers_count = base_queryset.filter(persona_match='buyer').count()
+        total_influencers_count = base_queryset.filter(persona_match='influencer').count()
+        total_end_users_count = base_queryset.filter(persona_match='end_user').count()
+        total_all_leads = base_queryset.count()
 
         # Apply pagination and fetch leads for each persona
         results = []
@@ -367,7 +379,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                     next_cursor["remaining_page"] = remaining_page + 1
                     has_more = True
 
-        # Update total count
+        # Update total count in cursor for pagination consistency
         next_cursor["total_count"] = cursor["total_count"] + len(results)
 
         # Sort results by score - handle potential attribute errors safely
@@ -389,12 +401,16 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             persona = getattr(lead, 'persona_match', 'unknown')
             persona_distribution[persona] = persona_distribution.get(persona, 0) + 1
 
-        # Create counts dictionary for response
+        # Create counts dictionary for response - include actual total counts from database
         counts = {
             "buyer_count": next_cursor["buyer_count"],
             "influencer_count": next_cursor["influencer_count"],
             "end_user_count": next_cursor["end_user_count"],
-            "total_count": next_cursor["total_count"],
+            "seen_count": next_cursor["total_count"],  # this is how many we've seen so far
+            "total_count": total_all_leads,  # This is the total count across all the pages that we have
+            "total_buyers_count": total_buyers_count,
+            "total_influencers_count": total_influencers_count,
+            "total_end_users_count": total_end_users_count,
             "personas_in_current_page": persona_distribution
         }
 
@@ -482,6 +498,12 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         # Annotate with persona_match
         base_queryset = self._annotate_persona_match(base_queryset)
 
+        # Get total counts for each persona type (for proper pagination info)
+        total_buyers_count = base_queryset.filter(persona_match='buyer').count()
+        total_influencers_count = base_queryset.filter(persona_match='influencer').count()
+        total_end_users_count = base_queryset.filter(persona_match='end_user').count()
+        total_all_leads = base_queryset.count()
+
         # Apply pagination and fetch leads for each persona
         results = []
         next_cursor = cursor.copy()
@@ -532,7 +554,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                     next_cursor["end_user_page"] += 1
                     has_more = True
 
-        # Update total count
+        # Update running count in cursor for pagination consistency
         next_cursor["total_count"] = cursor["total_count"] + len(results)
 
         # Sort results by score
@@ -547,12 +569,16 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             persona = getattr(lead, 'persona_match', 'unknown')
             persona_distribution[persona] = persona_distribution.get(persona, 0) + 1
 
-        # Create counts dictionary for response
+        # Create counts dictionary for response - include actual total counts from database
         counts = {
             "buyer_count": next_cursor["buyer_count"],
             "influencer_count": next_cursor["influencer_count"],
             "end_user_count": next_cursor["end_user_count"],
-            "total_count": next_cursor["total_count"],
+            "seen_count": next_cursor["total_count"],  # this is how many we've seen so far
+            "total_count": total_all_leads,  # this is the total count across all the pages that we have
+            "total_buyers_count": total_buyers_count,
+            "total_influencers_count": total_influencers_count,
+            "total_end_users_count": total_end_users_count,
             "distribution": {
                 "buyer_percent": buyer_percent,
                 "influencer_percent": influencer_percent,
