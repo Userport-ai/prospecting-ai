@@ -15,6 +15,7 @@ from google.oauth2 import service_account
 from services.django_callback_service_paginated import PaginatedCallbackService
 from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE_STATUS_CODES
+from utils.async_utils import preserve_context
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,7 @@ class CallbackService:
             logger.error(f"Failed to initialize credentials: {str(e)}", exc_info=True)
             raise
 
+    @preserve_context
     async def get_id_token(self) -> str:
         """Get fresh ID token for Django callback authentication"""
         logger.debug("Attempting to get fresh ID token")
@@ -121,6 +123,7 @@ class CallbackService:
             raise
 
     @with_retry(retry_config=CALLBACK_RETRY_CONFIG, operation_name="send_callback")
+    @preserve_context
     async def _send_callback_internal(
             self,
             job_id: str,
@@ -219,6 +222,7 @@ class CallbackService:
             logger.error(f"Callback failed for job {job_id}: {str(e)}", exc_info=True)
             raise RetryableError(f"Unexpected error: {str(e)}") from e
 
+    @preserve_context
     async def send_callback(
             self,
             job_id: str,
