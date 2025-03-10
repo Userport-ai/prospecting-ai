@@ -58,9 +58,7 @@ export const Table: React.FC<TableProps> = ({
   onCustomColumnAdded,
 }) => {
   const authContext = useAuthContext();
-  const [sorting, setSorting] = useState<ColumnSort[]>([
-    { id: "fit_score", desc: true },
-  ]);
+  const [sorting, setSorting] = useState<ColumnSort[]>([]);
 
   var persona_filter_values: string[] = [];
   if (authContext.userContext?.tenant.id !== USERPORT_TENANT_ID) {
