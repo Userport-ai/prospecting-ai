@@ -2,9 +2,7 @@ import asyncio
 import functools
 import concurrent.futures
 import os
-from typing import Any, Callable, Coroutine, TypeVar, Optional, Literal, Dict
-
-from utils.tracing import capture_context, restore_context
+from typing import Any, Callable, Coroutine, TypeVar, Optional, Literal
 
 T = TypeVar('T')
 
@@ -31,7 +29,6 @@ def to_thread(
 ) -> Callable[..., Coroutine[Any, Any, T]]:
     """
     Decorator to run a synchronous function in a dedicated thread pool.
-    Propagates trace context from the calling coroutine to the thread.
 
     Args:
         func: The synchronous function to run in a thread
@@ -43,21 +40,11 @@ def to_thread(
     """
     @functools.wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> T:
-        # Capture the current trace context before switching to a thread
-        context = capture_context()
-        
-        # Define a function that restores context in the thread before calling the original function
-        def run_with_context():
-            # Restore trace context in the thread
-            restore_context(context)
-            # Execute the original function
-            return func(*args, **kwargs)
-        
         loop = asyncio.get_running_loop()
         executor = IO_THREAD_POOL if pool_type == "io" else CPU_THREAD_POOL
         return await loop.run_in_executor(
             executor,
-            run_with_context
+            lambda: func(*args, **kwargs)
         )
     return wrapper
 
@@ -79,7 +66,6 @@ async def run_in_thread(
 ) -> T:
     """
     Run a function in the specified thread pool.
-    Propagates trace context from the calling coroutine to the thread.
 
     Args:
         func: Function to run
@@ -90,21 +76,11 @@ async def run_in_thread(
     Returns:
         Result of the function
     """
-    # Capture the current trace context before switching to a thread
-    context = capture_context()
-    
-    # Define a function that restores context in the thread before calling the original function
-    def run_with_context():
-        # Restore trace context in the thread
-        restore_context(context)
-        # Execute the original function
-        return func(*args, **kwargs)
-    
     loop = asyncio.get_running_loop()
     executor = IO_THREAD_POOL if pool_type == "io" else CPU_THREAD_POOL
     return await loop.run_in_executor(
         executor,
-        run_with_context
+        lambda: func(*args, **kwargs)
     )
 
 # To properly clean up the thread pools when the application shuts down

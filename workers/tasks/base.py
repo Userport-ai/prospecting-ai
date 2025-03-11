@@ -10,12 +10,6 @@ from google.cloud import bigquery
 from services.ai_service import AICacheService
 from services.django_callback_service import CallbackService
 from services.task_result_manager import TaskResultManager
-from utils.tracing import (
-    get_trace_id,
-    set_trace_context,
-    extract_trace_context_from_payload,
-    inject_trace_context_to_payload
-)
 
 logger = logging.getLogger(__name__)
 
@@ -92,15 +86,6 @@ class BaseTask(ABC):
         attempt_number = payload.get("attempt_number")
         job_id = payload.get("job_id")
         start_time = datetime.now(UTC)
-        
-        # Extract and set trace context from payload
-        trace_context = extract_trace_context_from_payload(payload)
-        
-        # Set task_name in trace context
-        trace_context['task_name'] = self.task_name
-        
-        # Initialize trace context for this execution
-        set_trace_context(**trace_context)
 
         # Log task start
         logger.info(
@@ -124,28 +109,11 @@ class BaseTask(ABC):
             if existing and existing.get("status") == "completed":
                 logger.info(f"Found existing completed result for account_id={account_id}, lead_id={lead_id}, resending callback.")
                 callback_params = {k: v for k, v in existing.items() if k != 'job_id'}
-                
-                # Add trace context to callback
-                if get_trace_id():
-                    callback_params['trace_id'] = get_trace_id()
-                
                 await self.callback_service.paginated_service.send_callback(job_id=job_id, **callback_params)
-                
-                # Add trace_id to existing result before returning
-                if get_trace_id() and isinstance(existing, dict):
-                    existing['trace_id'] = get_trace_id()
-                    
                 return existing
 
             # 2. If no existing result, we do the normal flow
             result, summary = await self.execute(payload)
-
-            # Add trace context to result and summary
-            if get_trace_id():
-                if isinstance(result, dict):
-                    result['trace_id'] = get_trace_id()
-                if isinstance(summary, dict):
-                    summary['trace_id'] = get_trace_id()
 
             # Store final result if successful
             await self.result_manager.store_result(enrichment_type=self.enrichment_type, callback_payload=result)

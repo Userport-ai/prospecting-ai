@@ -13,12 +13,6 @@ from tasks.account_enhancement import AccountEnhancementTask
 from tasks.generate_leads_apollo import ApolloLeadsTask
 from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
-from utils.tracing import (
-    get_trace_id,
-    set_trace_context,
-    extract_trace_context_from_payload,
-    inject_trace_context_to_payload
-)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -63,36 +57,9 @@ async def create_task(
         task_manager: Injected task manager instance
     """
     try:
-        # Set trace context from payload or create a new trace ID if none exists
-        trace_context = extract_trace_context_from_payload(payload)
-        
-        # Set task_name in trace context
-        trace_context['task_name'] = task_name
-        
-        # Initialize trace context
-        set_trace_context(**trace_context)
-        
-        # Add trace context to payload for later retrieval
-        enhanced_payload = payload.copy()
-        
-        # Only add trace_id if not already in the payload
-        if 'trace_id' not in enhanced_payload:
-            enhanced_payload['trace_id'] = get_trace_id()
-            
-        enhanced_payload['task_name'] = task_name
-        
         task = task_registry.get_task(task_name)
-        task_payload = await task.create_task_payload(**enhanced_payload)
-        
-        # Inject current trace context into task payload
-        task_payload = inject_trace_context_to_payload(task_payload)
-        
+        task_payload = await task.create_task_payload(**payload)
         result = await task_manager.create_task(task_name, task_payload)
-        
-        # Include trace ID in the result
-        if get_trace_id():
-            result['trace_id'] = get_trace_id()
-            
         logger.info(f"Task created: name: {task_name}, account ID: {payload.get('account_id', '<account id not found>')}", extra={
             'result': result,
             'task_name': task_name,
@@ -136,21 +103,6 @@ async def execute_task(
             'task_retry_reason': request.headers.get('X-CloudTasks-TaskRetryReason'),
             'deadline': request.headers.get('X-CloudTasks-TaskDeadline')
         }
-        
-        # Extract trace context from payload
-        trace_context = extract_trace_context_from_payload(payload)
-        
-        # If no trace_id in payload, use the one from headers or generate a new one
-        if 'trace_id' not in trace_context:
-            trace_id = request.headers.get('X-Trace-ID')
-            if trace_id:
-                trace_context['trace_id'] = trace_id
-                
-        # Set task_name in trace context
-        trace_context['task_name'] = task_name
-        
-        # Initialize trace context for this execution
-        set_trace_context(**trace_context)
 
         logger.info(f"Task execution request received", extra={
             'task_name': task_name,
@@ -163,12 +115,6 @@ async def execute_task(
 
         task = task_registry.get_task(task_name)
         result = await task.run_task(payload)
-        
-        # Include trace ID in the result
-        if get_trace_id():
-            if isinstance(result, dict):
-                result['trace_id'] = get_trace_id()
-        
         return JSONResponse(content=result)
 
     except KeyError:
