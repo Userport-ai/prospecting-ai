@@ -135,8 +135,7 @@ class CallbackService:
             is_partial: bool = False,
             completion_percentage: int = 100,
             attempt_number: Optional[int] = None,
-            max_retries: Optional[int] = None,
-            trace_id: Optional[str] = None
+            max_retries: Optional[int] = None
     ) -> bool:
         """Send callback to Django with enrichment results"""
         logger.info(f"Sending callback for job_id: {job_id}, account_id: {account_id}, lead_id: {lead_id}, status: {status}, processed_data: {processed_data}, error_details: {error_details}")
@@ -170,8 +169,6 @@ class CallbackService:
                 callback_data["attempt_number"] = attempt_number
             if max_retries is not None:
                 callback_data["max_retries"] = max_retries
-            if trace_id is not None:
-                callback_data["trace_id"] = trace_id
 
             logger.debug(f"Prepared callback data for job {job_id}: {json.dumps({k: '...' if k in ['raw_data', 'processed_data', 'error_details'] else v for k, v in callback_data.items()})}")
 
@@ -233,8 +230,7 @@ class CallbackService:
             is_partial: bool = False,
             completion_percentage: int = 100,
             attempt_number: Optional[int] = None,
-            max_retries: Optional[int] = None,
-            trace_id: Optional[str] = None
+            max_retries: Optional[int] = None
     ) -> bool:
         """Public wrapper that maintains backward compatibility"""
         try:
@@ -251,8 +247,7 @@ class CallbackService:
                 is_partial=is_partial,
                 completion_percentage=completion_percentage,
                 attempt_number=attempt_number,
-                max_retries=max_retries,
-                trace_id=trace_id
+                max_retries=max_retries
             )
         except Exception as e:
             logger.error(

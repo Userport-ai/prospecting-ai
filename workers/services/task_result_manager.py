@@ -154,13 +154,13 @@ class TaskResultManager:
             logger.debug("Stack trace:", exc_info=True)
             return None
 
-    async def resend_callback(self, callback_service, enrichment_type: str, account_id: str, lead_id: str) -> None:
+    async def resend_callback(self, callback_service,  account_id: str, lead_id: str) -> None:
         """
         Convenience method: fetch stored callback payload and re-send it
         through the callback service.
         """
-        stored = await self.get_result(enrichment_type, account_id, lead_id)
+        stored = await self.get_result(account_id, lead_id)
         if not stored:
-            raise ValueError(f"No stored callback payload for enrichment_type {enrichment_type}, account_id {account_id}, lead_id {lead_id}")
+            raise ValueError(f"No stored callback payload for account_id {account_id}, lead_id {lead_id}")
 
         await callback_service.paginated_service.send_callback(**stored)
