@@ -16,12 +16,10 @@ from utils.tracing import (
     extract_trace_context_from_payload,
     inject_trace_context_to_payload
 )
-from utils.async_utils import preserve_context
 
 logger = logging.getLogger(__name__)
 
 
-@preserve_context
 async def ensure_ai_cache_table():
     project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
     bigquery_client = bigquery.Client(project=project_id)
@@ -57,7 +55,6 @@ class BaseTask(ABC):
         pass
 
     @classmethod
-    @preserve_context
     async def create(cls):
         try:
             callback_service = await CallbackService.get_instance()
@@ -83,7 +80,6 @@ class BaseTask(ABC):
         """Execute the task's logic and return the final callback dict."""
         pass
 
-    @preserve_context
     async def run_task(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute task with idempotency:

@@ -9,7 +9,6 @@ from google.api_core.exceptions import ResourceExhausted
 from models.lead_activities import LeadResearchReport, ContentDetails, OpenAITokenUsage
 from services.ai_service import AIServiceFactory
 from utils.retry_utils import RetryConfig, RetryableError, with_retry
-from utils.async_utils import preserve_context
 from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger(__name__)
@@ -61,7 +60,6 @@ class LeadInsights:
 
         self.operation_tag = "insights_generation"
 
-    @preserve_context
     async def generate(self, all_content_details: List[ContentDetails]) -> LeadResearchReport.Insights:
         """Generate comprehensive insights from activities."""
         insights = LeadResearchReport.Insights()
