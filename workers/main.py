@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import sys
@@ -17,13 +18,7 @@ from services.django_callback_service import CallbackService
 from utils.async_utils import shutdown_thread_pools, setup_context_preserving_task_factory
 from utils.tracing import (
     TraceContextFilter,
-    get_trace_id,
-    get_job_id,
-    get_account_id,
-    get_lead_id,
-    get_task_name,
-    set_trace_context,
-    extract_trace_context_from_payload, set_trace_id
+    get_trace_id, set_trace_id, set_trace_context, get_job_id, get_account_id, get_lead_id, get_task_name
 )
 
 
@@ -195,3 +190,47 @@ app.include_router(router, prefix="/api/v1")
 async def health_check():
     logger.info("Health check endpoint called")
     return {"status": "healthy"}
+
+
+@app.get("/diagnose-tracing")
+async def diagnose_tracing():
+    """Diagnostic endpoint to test trace context propagation"""
+    # Set trace context
+    trace_id = str(uuid.uuid4())
+    set_trace_context(
+        trace_id=trace_id,
+        job_id="test-job-id",
+        account_id="test-account-id",
+        lead_id="test-lead-id",
+        task_name="test-task-name"
+    )
+    
+    # Log with context
+    logger.info("Trace diagnostic started")
+    
+    # Do some async work
+    await asyncio.sleep(0.1)
+    
+    # Log after async work
+    logger.info("After first sleep")
+    
+    # Create a subtask
+    async def subtask():
+        logger.info("Inside subtask")
+        await asyncio.sleep(0.1)
+        logger.info("After sleep in subtask")
+    
+    # Run the subtask
+    await asyncio.create_task(subtask())
+    
+    # Log final message
+    logger.info("Trace diagnostic completed")
+    
+    # Return the context values
+    return {
+        "trace_id": get_trace_id(),
+        "job_id": get_job_id(),
+        "account_id": get_account_id(),
+        "lead_id": get_lead_id(),
+        "task_name": get_task_name()
+    }
