@@ -15,7 +15,7 @@ from pythonjsonlogger import jsonlogger
 from api.routes import register_tasks
 from api.routes import router
 from services.django_callback_service import CallbackService
-from utils.async_utils import shutdown_thread_pools, setup_context_preserving_task_factory, preserve_context
+from utils.async_utils import shutdown_thread_pools, setup_context_preserving_task_factory
 from utils.tracing import (
     TraceContextFilter,
     get_trace_id, set_trace_id, set_trace_context, get_job_id, get_account_id, get_lead_id, get_task_name
@@ -114,41 +114,17 @@ app = FastAPI(title="Workers API", lifespan=lifespan)
 
 
 @app.middleware("http")
-@preserve_context
 async def logging_middleware(request: Request, call_next):
     # Generate request ID
     request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
     sensitive_headers = ['authorization', 'cookie']
     filtered_headers = {k: v for k, v in request.headers.items() if k.lower() not in sensitive_headers}
 
-    # Extract all trace context from headers and query params
-    trace_context = {}
-    
-    # Get trace_id from headers or query params
+    # Only extract and set trace_id as a minimal context identifier
+    # This ensures early logs have at least a trace_id without overwriting other fields
     trace_id = request.headers.get('X-Trace-ID') or request.query_params.get('trace_id')
     if trace_id:
-        trace_context['trace_id'] = trace_id
-        set_trace_id(trace_id)
-    
-    # Get other context fields from headers if available
-    job_id = request.headers.get('X-Job-ID')
-    if job_id:
-        trace_context['job_id'] = job_id
-        
-    account_id = request.headers.get('X-Account-ID')
-    if account_id:
-        trace_context['account_id'] = account_id
-        
-    lead_id = request.headers.get('X-Lead-ID')
-    if lead_id:
-        trace_context['lead_id'] = lead_id
-        
-    task_name = request.headers.get('X-Task-Name')
-    if task_name:
-        trace_context['task_name'] = task_name
-    
-    # Store context in request.state for handlers to access
-    request.state.trace_context = trace_context
+        set_trace_id(trace_id)  # Only set trace_id, not the full context
     
     # Add context to logging
     logger.info(
