@@ -231,6 +231,8 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
         response_data = {
             "count": total_count,
+            "next_cursor": next_cursor_str,
+            "prev_cursor": previous_cursor_str,
             "next": next_url,
             "previous": previous_url,
             "results": serialized_data
