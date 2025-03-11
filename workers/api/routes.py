@@ -52,8 +52,11 @@ class TaskError(HTTPException):
 async def create_task(
         task_name: str,
         payload: Dict[str, Any],
+        request: Request,
         task_manager: TaskManager = Depends(get_task_manager, use_cache=True)
 ) -> JSONResponse:
+    # Restore context from request if available
+    restore_context_from_request(request)
     """
     Create a new task with the given name and payload.
 
@@ -106,6 +109,12 @@ async def create_task(
         raise TaskError(status_code=404, detail="Task not found")
 
 
+def restore_context_from_request(request: Request) -> None:
+    """Restore trace context from request.state if available."""
+    if hasattr(request.state, 'trace_context') and request.state.trace_context:
+        # This will merge with any existing context rather than overwriting completely
+        set_trace_context(**request.state.trace_context)
+
 @router.post("/tasks/{task_name}")
 async def execute_task(
         task_name: str,
@@ -113,6 +122,8 @@ async def execute_task(
         request: Request,
         x_cloudtasks_queuename: Optional[str] = Header(None, alias="X-CloudTasks-QueueName")
 ) -> JSONResponse:
+    # Restore context from request if available
+    restore_context_from_request(request)
     """
     Execute a task with the given name and payload.
 
