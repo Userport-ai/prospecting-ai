@@ -159,39 +159,8 @@ class TaskResultManager:
         Convenience method: fetch stored callback payload and re-send it
         through the callback service.
         """
-        from utils.tracing import get_trace_context
-        
         stored = await self.get_result(enrichment_type, account_id, lead_id)
         if not stored:
             raise ValueError(f"No stored callback payload for enrichment_type {enrichment_type}, account_id {account_id}, lead_id {lead_id}")
 
-        # Extract just the fields that are expected by send_callback
-        # This prevents errors when new fields are added to the callback service
-        callback_params = {
-            "job_id": stored.get("job_id"),
-            "account_id": stored.get("account_id"),
-            "lead_id": stored.get("lead_id"),
-            "status": stored.get("status"),
-            "enrichment_type": stored.get("enrichment_type"),
-            "raw_data": stored.get("raw_data"),
-            "processed_data": stored.get("processed_data"),
-            "error_details": stored.get("error_details"),
-            "source": stored.get("source", "jina_ai"),
-            "is_partial": stored.get("is_partial", False),
-            "completion_percentage": stored.get("completion_percentage", 100),
-            "attempt_number": stored.get("attempt_number"),
-            "max_retries": stored.get("max_retries"),
-            "trace_id": stored.get("trace_id")
-        }
-        
-        # Get the current trace context to include any information from the current execution
-        current_context = get_trace_context()
-        
-        # Add trace_id from current context if not in stored result
-        if current_context.get('trace_id') and not callback_params.get('trace_id'):
-            callback_params['trace_id'] = current_context['trace_id']
-        
-        # Only include fields that actually have values
-        callback_params = {k: v for k, v in callback_params.items() if v is not None}
-        
-        await callback_service.paginated_service.send_callback(**callback_params)
+        await callback_service.paginated_service.send_callback(**stored)
