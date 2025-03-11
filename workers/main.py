@@ -10,7 +10,8 @@ from api.routes import register_tasks
 from api.routes import router
 from services.django_callback_service import CallbackService
 from utils.async_utils import shutdown_thread_pools
-from utils.loguru_setup import logger
+from utils.loguru_setup import logger, setup_context_preserving_task_factory, set_trace_context
+
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
@@ -21,6 +22,9 @@ async def lifespan(fastapi_app: FastAPI):
         log_level=log_level,
         version=os.getenv('VERSION', 'unknown')
     )
+
+    setup_context_preserving_task_factory()
+
     fastapi_app.state.callback_service = await CallbackService.get_instance()
     await register_tasks()
 
@@ -43,6 +47,10 @@ app = FastAPI(title="Workers API", lifespan=lifespan)
 async def logging_middleware(request: Request, call_next):
     # Generate request ID
     request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
+
+    # Set trace context for the entire request
+    set_trace_context(trace_id=request_id)
+
     sensitive_headers = ['authorization', 'cookie']
     filtered_headers = {k: v for k, v in request.headers.items() if k.lower() not in sensitive_headers}
 
@@ -50,7 +58,6 @@ async def logging_middleware(request: Request, call_next):
     # Add context to logging
     logger.info(
         "Request started",
-        request_id=request_id,
         method=request.method,
         url=str(request.url),
         client_host=request.client.host if request.client else None,
@@ -65,7 +72,6 @@ async def logging_middleware(request: Request, call_next):
         # Log successful response
         logger.info(
             "Request completed",
-            request_id=request_id,
             status_code=response.status_code,
             duration_ms=int((time.time() - start_time) * 1000)
         )
@@ -75,7 +81,6 @@ async def logging_middleware(request: Request, call_next):
         # Log exception details with full traceback
         logger.opt(exception=True).error(
             f"Request failed: {e}",
-            request_id=request_id,
             duration_ms=int((time.time() - start_time) * 1000)
         )
 
@@ -88,7 +93,6 @@ async def logging_middleware(request: Request, call_next):
                 "request_id": request_id
             }
         )
-
 # Include router
 app.include_router(router, prefix="/api/v1")
 
