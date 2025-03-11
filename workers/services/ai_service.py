@@ -12,7 +12,7 @@ from google.api_core.exceptions import ResourceExhausted as GoogleAPIResourceExh
 from google.cloud import bigquery
 from openai import AsyncOpenAI
 
-from utils.async_utils import to_thread, to_cpu_thread, run_in_thread, preserve_context
+from utils.async_utils import to_thread, to_cpu_thread, run_in_thread
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.token_usage import TokenUsage
 
@@ -349,7 +349,6 @@ class AIService(ABC):
         """Generate content from prompt without using cache."""
         pass
 
-    @preserve_context
     async def generate_content(
             self,
             prompt: str,
@@ -426,7 +425,6 @@ class GeminiService(AIService):
         self.cost_per_1k_tokens = 0.00015  # Example rate
 
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_content")
-    @preserve_context
     async def _generate_content_without_cache(
             self,
             prompt: str,
@@ -537,7 +535,6 @@ class OpenAIService(AIService):
         }
 
     @with_retry(retry_config=OPENAI_RETRY_CONFIG, operation_name="_openai_generate_content")
-    @preserve_context
     async def _generate_content_without_cache(
             self,
             prompt: str,

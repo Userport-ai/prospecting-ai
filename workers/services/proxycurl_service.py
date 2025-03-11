@@ -8,7 +8,6 @@ from difflib import SequenceMatcher
 
 from models.leads import ProxyCurlPersonProfile, ProxyCurlSearchResponse, EnrichedLead
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
-from utils.async_utils import preserve_context
 from services.api_cache_service import APICacheService, cached_request
 
 # Configure logging
@@ -43,7 +42,6 @@ class ProxyCurlService:
         self.DEFAULT_CACHE_TTL = 24 * 30  # 30 days in hours
 
     @with_retry(retry_config=PROXYCURL_RETRY_CONFIG, operation_name="get_person_profile")
-    @preserve_context
     async def get_person_profile(self, linkedin_url: str) -> Optional[ProxyCurlPersonProfile]:
         """Fetch person profile data from ProxyCurl API."""
         try:
@@ -77,7 +75,6 @@ class ProxyCurlService:
             return None
 
     @with_retry(retry_config=PROXYCURL_RETRY_CONFIG, operation_name="search_employees")
-    @preserve_context
     async def search_employees(
             self,
             company_url: str,
@@ -123,7 +120,6 @@ class ProxyCurlService:
             return None
 
     @with_retry(retry_config=PROXYCURL_RETRY_CONFIG, operation_name="get_company_profile")
-    @preserve_context
     async def get_company_profile(self, linkedin_url: str) -> Optional[Dict[str, Any]]:
         """Fetch company profile data from ProxyCurl API."""
         try:
@@ -156,7 +152,6 @@ class ProxyCurlService:
                 raise
             return None
 
-    @preserve_context
     async def enrich_leads(self, leads: List[EnrichedLead], max_workers: int = 5) -> List[EnrichedLead | None]:
         """Enrich multiple leads with ProxyCurl data using a worker pool."""
         if not leads:

@@ -7,7 +7,6 @@ from services.ai_service import AIServiceFactory
 from google.api_core.exceptions import ResourceExhausted
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.connection_pool import ConnectionPool
-from utils.async_utils import preserve_context
 from contextlib import asynccontextmanager
 from utils.tracing import capture_context, restore_context
 
@@ -74,7 +73,6 @@ class WebsiteParser:
             logger.error(f"Failed to configure Gemini API: {str(e)}")
             raise
 
-    @preserve_context
     async def fetch_company_customers(self) -> List[str]:
         """
         Fetches list of customers names listed on given Company Website.
@@ -101,7 +99,6 @@ class WebsiteParser:
             logger.error(f"Unexpected error while fetching Company customers: {str(e)}", exc_info=True)
             return []
 
-    @preserve_context
     async def _parse_customers(self, page_markdown: str) -> List[str]:
         """Extract customers from given Page markdown."""
         logger.info(f"Start parsing customers from Page Markdown for website: {self.website}")
@@ -143,7 +140,6 @@ class WebsiteParser:
             logger.error(f"Error parsing customers: {str(e)}", exc_info=True)
             return []
 
-    @preserve_context
     async def fetch_technologies(self) -> List[str]:
         """
         Fetches list of technologies found on given Company Website.
@@ -170,7 +166,6 @@ class WebsiteParser:
             logger.error(f"Unexpected error while fetching Company Technologies: {str(e)}", exc_info=True)
             return []
 
-    @preserve_context
     async def _parse_technologies(self, page_html: str) -> List[str]:
         """Extract technologies from given page HTML."""
 
@@ -210,7 +205,6 @@ class WebsiteParser:
             return []
 
     @with_retry(retry_config=JINA_RETRY_CONFIG, operation_name="_website_parser_call_jina_reader_api")
-    @preserve_context
     async def _call_jina_api(self, endpoint: str, headers: Dict) -> str:
         """Calls Jina API (with retries) and returns response text."""
         # Use the connection pool which preserves context across async boundaries
@@ -220,7 +214,6 @@ class WebsiteParser:
             return response.text
 
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_website_parser_call_ai_api")
-    @preserve_context
     async def _call_ai_api(self, prompt: str) -> Dict[str, Any] | str:
         """Calls AI API with retries and returns response."""
         response = await self.model.generate_content(prompt, is_json=True)
