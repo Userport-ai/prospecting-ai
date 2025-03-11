@@ -196,6 +196,8 @@ export const enrichLinkedInActivity = async (
   });
 };
 
+const HEVO_DATA_TENANT_ID = "b68c54a8-7677-4747-8fac-53d53665bed9";
+
 // Helper to list leads.
 const listLeadsHelper = async (
   authContext: AuthContext,
@@ -210,6 +212,11 @@ const listLeadsHelper = async (
     influencer_multiplier: 1.05,
     end_user_multiplier: 0.8,
   };
+  if (authContext.userContext!.tenant.id === HEVO_DATA_TENANT_ID) {
+    // Bump up influencer higher than buyer.
+    params["influencer_multiplier"] = 1.1;
+    params["buyer_multiplier"] = 0.9;
+  }
   if (accountId) {
     params["account"] = accountId;
   }
