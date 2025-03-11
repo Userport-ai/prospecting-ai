@@ -490,11 +490,7 @@ class GenerateLeadsTask(AccountEnrichmentTask):
                     logger.warning(
                         f"Rate limit exceeded. Waiting {wait_time} seconds before retry"
                     )
-                    # Import and use tracing utilities to preserve context across sleep
-                    from utils.tracing import capture_context, restore_context
-                    context = capture_context()
                     await asyncio.sleep(wait_time)
-                    restore_context(context)
                     continue
 
                 elif status_code == 404:

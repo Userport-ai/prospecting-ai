@@ -179,11 +179,8 @@ class ProxyCurlService:
                 results[index] = enriched_lead
                 queue.task_done()
 
-        # Import utility for creating tasks with context preservation
-        from utils.async_utils import create_task_with_context
-        
-        # Start workers with context preservation
-        workers = [create_task_with_context(worker()) for _ in range(max_workers)]
+        # Start workers
+        workers = [asyncio.create_task(worker()) for _ in range(max_workers)]
 
         # Wait for all tasks to complete
         await asyncio.gather(*workers, return_exceptions=True)

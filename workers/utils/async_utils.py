@@ -115,38 +115,10 @@ async def shutdown_thread_pools():
     IO_THREAD_POOL.shutdown(wait=True)
 
 
-def create_task_with_context(coro):
-    """
-    Create an asyncio task that preserves the current trace context.
-    Use this instead of asyncio.create_task when you want to ensure trace context is preserved.
-    
-    Args:
-        coro: The coroutine to run in the task
-        
-    Returns:
-        An asyncio Task object
-    """
-    # Capture current context
-    context = capture_context()
-    
-    # Create a wrapper coroutine that restores context
-    async def context_wrapper():
-        # Restore the captured context
-        restore_context(context)
-        # Run the original coroutine
-        return await coro
-        
-    # Create and return a new task
-    return asyncio.create_task(context_wrapper())
-
 def setup_context_preserving_task_factory():
     """
     Configure asyncio to preserve context variables across all task boundaries.
     Call this once during application startup.
-    
-    Note: This only affects tasks created with asyncio.create_task() AFTER this function is called.
-    It won't affect tasks created by third-party libraries or before this is called.
-    For those cases, use create_task_with_context() instead.
     """
     loop = asyncio.get_running_loop()
 
