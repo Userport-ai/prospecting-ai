@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
@@ -11,8 +10,9 @@ from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from tasks.enrichment_task import AccountEnrichmentTask
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
+from utils.loguru_setup import logger
 
-logger = logging.getLogger(__name__)
+
 
 # Retry configuration for AI operations
 AI_RETRY_CONFIG = RetryConfig(

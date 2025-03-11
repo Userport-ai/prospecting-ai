@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import os
 import time
 import uuid
@@ -22,9 +21,10 @@ from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
 from models.leads import ApolloLead, SearchApolloLeadsResponse, EnrichedLead, EvaluateLeadsResult, EvaluatedLead
 from models.accounts import SearchApolloOrganizationsResponse
+from utils.loguru_setup import logger
 from .enrichment_task import AccountEnrichmentTask
 
-logger = logging.getLogger(__name__)
+
 
 
 @dataclass

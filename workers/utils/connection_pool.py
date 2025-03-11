@@ -1,10 +1,10 @@
 import httpx
 import asyncio
-import logging
 from utils.retry_utils import RetryableError
 from contextlib import asynccontextmanager
+from utils.loguru_setup import logger
 
-logger = logging.getLogger(__name__)
+
 
 class ConnectionPool:
     def __init__(self, limits=None, timeout=None):

@@ -1,6 +1,5 @@
 
 import os
-import logging
 import asyncio
 import httpx
 import json
@@ -8,9 +7,10 @@ from typing import List
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from models.accounts import BrightDataAccount
 from pydantic import BaseModel, Field
+from utils.loguru_setup import logger
 
 # Configure logging
-logger = logging.getLogger(__name__)
+
 
 BRIGHTDATA_RETRY_CONFIG = RetryConfig(
     max_attempts=3,

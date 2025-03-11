@@ -1,19 +1,18 @@
-import logging
 import math
 from typing import Dict, Any, Optional
 import httpx
 
 from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE_STATUS_CODES
 from typing import Dict, Any, List
-import logging
 import math
 from typing import Dict, Any, Optional
 
 import httpx
 
 from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE_STATUS_CODES
+from utils.loguru_setup import logger
 
-logger = logging.getLogger(__name__)
+
 
 
 class PaginatedCallbackService:

@@ -1,12 +1,12 @@
 import asyncio
 import functools
-import logging
 import random
 import time
 from dataclasses import dataclass
 from typing import List, Type, TypeVar, Callable, Any, Coroutine, Generic, Optional, Union
+from utils.loguru_setup import logger
 
-logger = logging.getLogger(__name__)
+
 
 RETRYABLE_STATUS_CODES = {
     408,  # Request Timeout

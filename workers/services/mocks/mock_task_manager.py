@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from typing import Dict, Any
+from utils.loguru_setup import logger
 
 
 class MockTaskManager:

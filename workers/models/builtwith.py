@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 
 from pydantic import BaseModel, Field, model_validator
+from utils.loguru_setup import logger
 
 
 class Category(BaseModel):

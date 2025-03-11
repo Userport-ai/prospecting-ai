@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
+from utils.loguru_setup import logger
 
 
 class UserportPydanticBaseModel(BaseModel):

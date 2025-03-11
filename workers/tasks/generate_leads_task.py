@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import os
 import uuid
 from dataclasses import dataclass
@@ -16,11 +15,10 @@ from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from utils.connection_pool import ConnectionPool
 from utils.role_pattern_generator import RolePatternGenerator
+from utils.loguru_setup import logger
 from .enrichment_task import AccountEnrichmentTask
 
 FIT_SCORE_THRESHOLD = 0.0
-
-logger = logging.getLogger(__name__)
 
 @dataclass
 class PromptTemplates:

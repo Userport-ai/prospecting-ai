@@ -1,5 +1,6 @@
 import httpx   # an HTTP client library and dependency of Prefect
 from prefect import flow, task
+from utils.loguru_setup import logger
 
 
 @task(retries=2)
