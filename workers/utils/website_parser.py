@@ -2,13 +2,10 @@ import os
 import asyncio
 import logging
 import httpx
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from services.ai_service import AIServiceFactory
 from google.api_core.exceptions import ResourceExhausted
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
-from utils.connection_pool import ConnectionPool
-from contextlib import asynccontextmanager
-from utils.tracing import capture_context, restore_context
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -44,27 +41,12 @@ JINA_RETRY_CONFIG = RetryConfig(
 class WebsiteParser:
     """Parser for a Company website."""
 
-    # Shared connection pool for all instances
-    _connection_pool: Optional[ConnectionPool] = None
-    
-    @classmethod
-    def get_connection_pool(cls) -> ConnectionPool:
-        """Get or create the shared connection pool."""
-        if cls._connection_pool is None:
-            cls._connection_pool = ConnectionPool(
-                limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
-                timeout=30.0
-            )
-        return cls._connection_pool
-
     def __init__(self, website: str):
         logger.info(f"Initializing Website parser for website: {website}")
         self.website = website
         # Use Jina Reader API to fetch customers from website.
         self.BASE_URL = "https://r.jina.ai/"
         self.jina_api_token = os.getenv('JINA_API_TOKEN')
-        # Use the shared connection pool
-        self.connection_pool = self.get_connection_pool()
 
         try:
             self.model = AIServiceFactory().create_service("gemini")
@@ -207,11 +189,22 @@ class WebsiteParser:
     @with_retry(retry_config=JINA_RETRY_CONFIG, operation_name="_website_parser_call_jina_reader_api")
     async def _call_jina_api(self, endpoint: str, headers: Dict) -> str:
         """Calls Jina API (with retries) and returns response text."""
-        # Use the connection pool which preserves context across async boundaries
-        async with self.connection_pool.acquire_connection() as client:
-            response = await client.get(url=endpoint, headers=headers, timeout=30.0)
-            response.raise_for_status()
-            return response.text
+        # Import trace context utilities to preserve context across async boundaries
+        from utils.tracing import capture_context, restore_context
+        
+        # Capture current context before creating the client
+        context = capture_context()
+        
+        async with httpx.AsyncClient() as client:
+            # Restore context before making the API call
+            restore_context(context)
+            try:
+                response = await client.get(url=endpoint, headers=headers, timeout=30.0)
+                response.raise_for_status()
+                return response.text
+            finally:
+                # Restore context again after the API call in case it was lost
+                restore_context(context)
 
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_website_parser_call_ai_api")
     async def _call_ai_api(self, prompt: str) -> Dict[str, Any] | str:

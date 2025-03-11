@@ -67,9 +67,11 @@ class BrightDataService:
                     response.raise_for_status()
                     if response.status_code == 202:
                         # Collection still in progress, wait for 10 seconds and retry.
-                        # Use sleep_with_context to preserve trace context
-                        from utils.async_utils import sleep_with_context
-                        await sleep_with_context(10)
+                        # Import and use tracing utilities to preserve context across sleep
+                        from utils.tracing import capture_context, restore_context
+                        context = capture_context()
+                        await asyncio.sleep(10)
+                        restore_context(context)
                     else:
                         # Successful response.
                         results: List = response.json()
