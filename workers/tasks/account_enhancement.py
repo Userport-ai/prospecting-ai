@@ -22,9 +22,7 @@ from .enrichment_task import AccountEnrichmentTask
 from utils.account_info_fetcher import AccountInfoFetcher
 from utils.url_utils import UrlUtils
 from models.accounts import AccountInfo, Financials
-from utils.loguru_setup import logger
-
-
+from utils.loguru_setup import logger, set_trace_context
 
 
 @dataclass
@@ -371,6 +369,9 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             processed_count += 1
             account_id = account.get('account_id')
             website = account.get('website')
+
+            # Update account_id
+            set_trace_context(account_id=account_id)
 
             logger.info(f"Processing account {processed_count}/{total_accounts}: ID {account_id}, website: {website}")
 
