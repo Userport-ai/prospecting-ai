@@ -225,15 +225,6 @@ class TraceContextAdapter:
         bind_logger = self._logger.bind(**kwargs)
         return TraceContextAdapter(bind_logger)
 
-    # Add this method to fix the error
-    def level(self, name):
-        """Forward level calls to the underlying logger."""
-        return self._logger.level(name)
-
-    def __getattr__(self, name):
-        """Forward any other attribute access to the underlying logger."""
-        return getattr(self._logger, name)
-
 
 def setup_logging():
     """Configure loguru with custom formatting and enhanced exception handling."""
