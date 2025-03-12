@@ -1,14 +1,14 @@
 import os
 import asyncio
-import logging
 import httpx
 from typing import List, Dict, Any
 from services.ai_service import AIServiceFactory
 from google.api_core.exceptions import ResourceExhausted
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
+from utils.loguru_setup import logger
 
 # Configure logging
-logger = logging.getLogger(__name__)
+
 
 GEMINI_RETRY_CONFIG = RetryConfig(
     max_attempts=3,

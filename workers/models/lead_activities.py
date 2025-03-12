@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 from models.common import UserportPydanticBaseModel
+from utils.loguru_setup import logger
 
 
 class OpenAITokenUsage(UserportPydanticBaseModel):
