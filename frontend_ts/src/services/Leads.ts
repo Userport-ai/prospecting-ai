@@ -4,6 +4,7 @@ import { EnrichmentStatus } from "./Common";
 import { ParsedHTML } from "./Extension";
 
 const LEADS_ENDPOINT = "/leads/";
+const LEADS_QUOTA_DISTRIBUTION_ENDPOINT = "/leads/quota_distribution/";
 
 // Lead as returned by the backend API.
 export interface Lead {
@@ -230,6 +231,36 @@ const listLeadsHelper = async (
     const response = await apiClient.get<ListLeadsResponse>(LEADS_ENDPOINT, {
       params,
     });
+    return response.data;
+  });
+};
+
+// Helper to list leads.
+export const listLeadsWithQuota = async (
+  authContext: AuthContext,
+  cursor: string | null,
+  accountId?: string
+): Promise<ListLeadsResponse> => {
+  var params: Record<string, any> = {
+    limit: 20,
+    buyer_percent: 60,
+    influencer_percent: 35,
+    end_user_percent: 5,
+    suggestion_status: SuggestionStatus.SUGGESTED,
+  };
+  if (cursor) {
+    params["cursor"] = cursor;
+  }
+  if (accountId) {
+    params["account"] = accountId;
+  }
+  return await apiCall<ListLeadsResponse>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListLeadsResponse>(
+      LEADS_QUOTA_DISTRIBUTION_ENDPOINT,
+      {
+        params,
+      }
+    );
     return response.data;
   });
 };

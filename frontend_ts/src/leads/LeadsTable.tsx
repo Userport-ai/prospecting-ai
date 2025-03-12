@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   getCoreRowModel,
   useReactTable,
-  getPaginationRowModel,
   getSortedRowModel,
   getFilteredRowModel,
   ColumnDef,
@@ -21,7 +20,7 @@ import EnumFilter from "@/table/EnumFilter";
 import TextFilter from "@/table/TextFilter";
 import { getLeadColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Lead as LeadRow, listSuggestedLeads } from "@/services/Leads";
+import { Lead as LeadRow, listLeadsWithQuota } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import { USERPORT_TENANT_ID } from "@/services/Common";
@@ -42,9 +41,9 @@ interface TableProps {
   columns: ColumnDef<LeadRow>[];
   leads: LeadRow[];
   totalLeadsCount: number;
-  moreLeadsToFetch: boolean; // Whether server has more leads to fetch.
+  curPageNum: number;
+  handlePageClick: (goToNextPage: boolean) => Promise<void>;
   dataLoading: boolean;
-  onFetchNextPage: () => Promise<void>;
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
 }
 
@@ -52,9 +51,9 @@ export const Table: React.FC<TableProps> = ({
   columns,
   leads,
   totalLeadsCount,
-  moreLeadsToFetch,
+  curPageNum,
+  handlePageClick,
   dataLoading,
-  onFetchNextPage,
   onCustomColumnAdded,
 }) => {
   const authContext = useAuthContext();
@@ -90,6 +89,7 @@ export const Table: React.FC<TableProps> = ({
     pageSize: 20, //default page size
   };
   const [pagination, setPagination] = useState(initialPaginationState);
+  const pageCount = Math.ceil(totalLeadsCount / pagination.pageSize);
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
@@ -124,7 +124,7 @@ export const Table: React.FC<TableProps> = ({
     columnResizeMode,
     columnResizeDirection,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    pageCount: pageCount,
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
@@ -147,25 +147,6 @@ export const Table: React.FC<TableProps> = ({
     // No accounts found.
     return <ZeroStateDisplay />;
   }
-
-  // User clicks on next page button in the table.
-  // We assume when this callback is called that next page on server is definitely
-  // available.
-  const handleNextPageClick = async () => {
-    if (table.getCanNextPage()) {
-      // Next page exists, just update table to next page.
-      table.nextPage();
-      return;
-    }
-    await onFetchNextPage();
-    // Fetch the row model count on the current page (before next page was fetched).
-    // If this is less than pageSize, then stay on the same page.
-    // If equal to pageSize, go to next page.
-    const currentPageRowCount = table.getRowModel().rows.length;
-    if (currentPageRowCount === initialPaginationState.pageSize) {
-      table.nextPage();
-    }
-  };
 
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
@@ -207,9 +188,9 @@ export const Table: React.FC<TableProps> = ({
         table={table}
         columns={columns}
         columnResizeMode={columnResizeMode}
-        pagination={pagination}
-        morePagesToFetch={moreLeadsToFetch}
-        handleNextPageClick={handleNextPageClick}
+        curPageNum={curPageNum}
+        totalPageCount={pageCount}
+        handlePageClick={handlePageClick}
         headerClassName="bg-[rgb(180,150,200)]"
       />
 
@@ -229,10 +210,11 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const authContext = useAuthContext();
   // Current list of all leads fetched from server so far in the correct pagination order.
   const [curLeads, setCurLeads] = useState<LeadRow[]>([]);
-  // Latest Page number fetched from server.
-  const [serverPage, setServerPage] = useState(1);
-  // Whether there are more leads to fetch from server.
-  const [moreLeadsToFetch, setMoreLeadsToFetch] = useState(false);
+  // Current Page number (fetched from server). Valid page numbers start from 1.
+  const [curPageNum, setCurPageNum] = useState<number>(0);
+  // Cursor values associated with the pages fetched from server.
+  // Initially null since page 1 always has null cursor value.
+  const [cursorValues, setCursorValues] = useState<(string | null)[]>([null]);
   // Total leads count found on the server.
   const [totalLeadsCount, setTotalLeadsCount] = useState(0);
   const [columns, setColumns] = useState<ColumnDef<LeadRow>[]>([]);
@@ -241,14 +223,20 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
 
+  const listLeads = async (cursor: string | null) => {
+    const response = await listLeadsWithQuota(authContext, cursor, accountId);
+    setTotalLeadsCount(response.count);
+    setCurLeads(response.results);
+    setColumns(getLeadColumns(response.results));
+    return response;
+  };
+
   // Initial fetch for leads.
   useEffect(() => {
-    listSuggestedLeads(authContext, serverPage, accountId)
+    listLeads(cursorValues[0])
       .then((response) => {
-        setTotalLeadsCount(response.count);
-        setMoreLeadsToFetch(response.next !== null);
-        setCurLeads(response.results);
-        setColumns(getLeadColumns(response.results));
+        setCurPageNum(1);
+        setCursorValues([...cursorValues, response.next_cursor ?? null]);
       })
       .catch((error) =>
         setError(new Error(`Failed to fetch Leads: ${error.message}`))
@@ -270,26 +258,30 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     console.log("custom colum info: ", customColumnInfo);
   };
 
-  // Handle user request to fetch the next page.
-  const onFetchNextPage = async () => {
+  // Handle user request to go to page.
+  // If goToNextPage is true, fetch next page, otherwise fetch previous page.
+  // We assume this callback can be called only if next or prev page buttons
+  // are enabled in the UI. In other words, we assume those validations are already done.
+  const handlePageClick = async (goToNextPage: boolean) => {
     setDataLoading(true);
-    const nextPage = serverPage + 1;
+    const nextPageNum = goToNextPage ? curPageNum + 1 : curPageNum - 1;
+    const cursor = cursorValues[nextPageNum - 1];
     try {
-      const response = await listSuggestedLeads(
-        authContext,
-        nextPage,
-        accountId
-      );
-      setTotalLeadsCount(totalLeadsCount);
-      setMoreLeadsToFetch(response.next !== null);
-      const allLeads = [...curLeads, ...response.results];
-      setCurLeads(allLeads);
-      setColumns(getLeadColumns(allLeads));
-      setServerPage(nextPage);
+      const response = await listLeads(cursor);
+      setCurPageNum(nextPageNum);
+      // We assume that user can only go forward or back one page at a time.
+      // TODO: If we allow user to go page X directly, then this logic has to be updated.
+      if (goToNextPage) {
+        // Append next cursor value.
+        setCursorValues([...cursorValues, response.next_cursor ?? null]);
+      } else {
+        // Remove cursor values whose index values are larger than next page num.
+        setCursorValues(cursorValues.filter((_, idx) => idx <= nextPageNum));
+      }
     } catch (error: any) {
       setError(
         new Error(
-          `Failed to fetch Next Page: ${nextPage} for Leads: ${error.message}`
+          `Failed to fetch Leads nextPage: ${goToNextPage} with next page num: ${nextPageNum} cursor: ${cursor} with error: ${error.message}`
         )
       );
     } finally {
@@ -302,9 +294,9 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       columns={columns}
       leads={curLeads}
       totalLeadsCount={totalLeadsCount}
-      moreLeadsToFetch={moreLeadsToFetch}
+      curPageNum={curPageNum}
+      handlePageClick={handlePageClick}
       dataLoading={dataLoading}
-      onFetchNextPage={onFetchNextPage}
       onCustomColumnAdded={onCustomColumnAdded}
     />
   );

@@ -19,9 +19,9 @@ interface CommonTableProps<T> {
   table: TanstackTable<T>;
   columns: ColumnDef<T>[];
   columnResizeMode: string;
-  pagination: { pageIndex: number };
-  morePagesToFetch?: boolean;
-  handleNextPageClick?: () => void;
+  curPageNum: number;
+  totalPageCount: number;
+  handlePageClick: (nextPage: boolean) => void;
   headerClassName?: string;
 }
 
@@ -31,9 +31,9 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   table,
   columns,
   columnResizeMode,
-  pagination,
-  morePagesToFetch,
-  handleNextPageClick,
+  curPageNum,
+  totalPageCount,
+  handlePageClick,
   headerClassName,
 }) => {
   const [expandedCellContext, setExpandedCellContext] = useState<CellContext<
@@ -49,25 +49,6 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   // Handler for when cell expansion panel's open state changes
   const onCellExpansionPanelOpenChange = (open: boolean) => {
     if (!open) setExpandedCellContext(null);
-  };
-
-  // Whether user can click to the next page.
-  const canClickToNextPage = (): boolean => {
-    if (morePagesToFetch) {
-      // Server has more pages, can click to next page.
-      return true;
-    }
-    // Depends on whether there are more pages to see on client side.
-    return table.getCanNextPage();
-  };
-
-  // Handle next page click.
-  const onNextPageClick = () => {
-    if (handleNextPageClick) {
-      handleNextPageClick();
-    } else {
-      table.nextPage();
-    }
   };
 
   // We use total column width (in pixel values) to set the Table Width in CSS.
@@ -223,14 +204,14 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
           <div className="flex items-center justify-start gap-4">
             <div>
               <p className=" text-sm text-gray-600">
-                Page {pagination.pageIndex + 1} of {table.getPageCount()}
+                Page {curPageNum} of {totalPageCount}
               </p>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() => handlePageClick(false)}
+              disabled={curPageNum === 1}
               className="shadow-sm border-gray-300"
             >
               <ChevronLeft />
@@ -238,8 +219,8 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={onNextPageClick}
-              disabled={!canClickToNextPage()}
+              onClick={() => handlePageClick(true)}
+              disabled={curPageNum >= totalPageCount}
               className="shadow-sm border-gray-300"
             >
               <ChevronRight />
