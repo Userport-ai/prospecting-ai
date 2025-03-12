@@ -5,7 +5,6 @@ from typing import Dict, Any, List, Optional
 
 from google.cloud import tasks_v2
 from google.protobuf import duration_pb2
-from utils.loguru_setup import logger
 
 from .bigquery_service import BigQueryService  # Import BigQueryService for reuse
 

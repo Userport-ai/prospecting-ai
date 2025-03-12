@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import uuid
 from datetime import datetime
@@ -9,9 +10,8 @@ from google.oauth2 import service_account
 
 from utils.bigquery_json_encoder import safe_json_dumps
 from utils.async_utils import to_thread
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 
 class BigQueryService:

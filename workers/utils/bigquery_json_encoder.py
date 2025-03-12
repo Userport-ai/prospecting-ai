@@ -1,10 +1,10 @@
 import json
+import logging
 from datetime import datetime, date
 from enum import Enum
 from typing import Any
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 class BigQueryJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder to handle datetime, date, enum, and other special types."""

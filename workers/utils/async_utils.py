@@ -3,7 +3,6 @@ import functools
 import concurrent.futures
 import os
 from typing import Any, Callable, Coroutine, TypeVar, Optional, Literal
-from utils.loguru_setup import logger
 
 T = TypeVar('T')
 

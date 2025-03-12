@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -9,9 +10,8 @@ from tasks.base import BaseTask
 from tasks.enrichment_task import AccountEnrichmentTask
 from utils.activity_parser import LinkedInActivityParser
 from utils.lead_insights_gen import LeadInsights
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 
 class LeadLinkedInResearchTask(AccountEnrichmentTask):

@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import List, Optional
 
@@ -14,10 +15,9 @@ from services.jina_service import JinaService
 from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
-from utils.loguru_setup import logger
 
 # Configure logging
-
+logger = logging.getLogger(__name__)
 
 
 class FailedToFindLinkedInURLsError(Exception):
@@ -272,8 +272,9 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
-    
-    # Logging configuration is now in utils/loguru_setup.py
+    import logging
+
+    logging.basicConfig(level=logging.DEBUG)
 
     from dotenv import load_dotenv
     load_dotenv()

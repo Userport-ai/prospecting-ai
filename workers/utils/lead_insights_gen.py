@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 from typing import List, Optional, Dict, Any
@@ -9,9 +10,8 @@ from models.lead_activities import LeadResearchReport, ContentDetails, OpenAITok
 from services.ai_service import AIServiceFactory
 from utils.retry_utils import RetryConfig, RetryableError, with_retry
 from dateutil.relativedelta import relativedelta
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 
 GEMINI_RETRY_CONFIG = RetryConfig(

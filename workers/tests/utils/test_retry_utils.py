@@ -9,7 +9,6 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from utils.retry_utils import (
-from utils.loguru_setup import logger
     RetryConfig,
     RetryableError,
     with_retry,

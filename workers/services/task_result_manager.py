@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
@@ -7,9 +8,8 @@ from utils.json_utils import JSONUtils
 
 from google.cloud import bigquery
 from google.oauth2 import service_account
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 
 class TaskResultManager:

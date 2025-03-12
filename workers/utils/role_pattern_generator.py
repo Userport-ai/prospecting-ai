@@ -1,7 +1,7 @@
+import logging
 from typing import Dict, Union, List
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 class RolePatternGenerator:
     """Generate standard regex patterns for role matching using AI service."""

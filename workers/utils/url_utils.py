@@ -1,9 +1,9 @@
+import logging
 from typing import Optional
 from urllib.parse import urlparse
 import tldextract
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 
 class UrlUtils:

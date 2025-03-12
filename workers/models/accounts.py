@@ -3,7 +3,6 @@ from datetime import datetime
 from models.common import UserportPydanticBaseModel
 from pydantic import Field
 from enum import StrEnum
-from utils.loguru_setup import logger
 
 # ------------RECENT DEVELOPMENTS------------
 

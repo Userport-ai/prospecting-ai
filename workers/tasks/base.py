@@ -2,6 +2,7 @@
 import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any
+import logging
 from datetime import datetime, UTC
 
 from google.cloud import bigquery
@@ -9,7 +10,8 @@ from google.cloud import bigquery
 from services.ai_service import AICacheService
 from services.django_callback_service import CallbackService
 from services.task_result_manager import TaskResultManager
-from utils.loguru_setup import logger
+
+logger = logging.getLogger(__name__)
 
 
 async def ensure_ai_cache_table():

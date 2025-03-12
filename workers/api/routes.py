@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
@@ -12,9 +13,8 @@ from tasks.account_enhancement import AccountEnhancementTask
 from tasks.generate_leads_apollo import ApolloLeadsTask
 from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Initialize task registry and register tasks
@@ -104,7 +104,7 @@ async def execute_task(
             'deadline': request.headers.get('X-CloudTasks-TaskDeadline')
         }
 
-        logger.info(f"Task execution request received", **{
+        logger.info(f"Task execution request received", extra={
             'task_name': task_name,
             'job_id': payload.get('job_id'),
             'account_id': payload.get('account_id', '<account id not found>'),

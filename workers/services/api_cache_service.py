@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple, List
 
@@ -8,9 +9,8 @@ from google.cloud import bigquery
 
 from utils.connection_pool import ConnectionPool
 from utils.async_utils import to_thread
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 
 class APICacheService:

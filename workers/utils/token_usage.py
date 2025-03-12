@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Optional
-from utils.loguru_setup import logger
 
 @dataclass
 class TokenUsage:

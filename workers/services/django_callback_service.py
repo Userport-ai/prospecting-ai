@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import math
 import os
 from datetime import datetime
@@ -14,9 +15,8 @@ from google.oauth2 import service_account
 from services.django_callback_service_paginated import PaginatedCallbackService
 from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE_STATUS_CODES
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 class CallbackService:
     CALLBACK_RETRY_CONFIG = RetryConfig(

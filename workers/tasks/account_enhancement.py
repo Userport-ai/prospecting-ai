@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import json
+import logging
 import os
 import uuid
 from dataclasses import dataclass
@@ -22,9 +23,8 @@ from .enrichment_task import AccountEnrichmentTask
 from utils.account_info_fetcher import AccountInfoFetcher
 from utils.url_utils import UrlUtils
 from models.accounts import AccountInfo, Financials
-from utils.loguru_setup import logger
 
-
+logger = logging.getLogger(__name__)
 
 
 @dataclass

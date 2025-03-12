@@ -1,7 +1,6 @@
 from typing import Dict, Type
 
 from tasks.base import BaseTask
-from utils.loguru_setup import logger
 
 
 class TaskRegistry:
