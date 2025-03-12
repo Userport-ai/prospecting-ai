@@ -138,7 +138,7 @@ class CallbackService:
             max_retries: Optional[int] = None
     ) -> bool:
         """Send callback to Django with enrichment results"""
-        logger.info(f"Sending callback")
+        # logger.info(f"Sending callback for job_id: {job_id}, account_id: {account_id}, lead_id: {lead_id}, status: {status}, processed_data: {processed_data}, error_details: {error_details}")
 
         try:
             # Get fresh OIDC token
@@ -170,7 +170,7 @@ class CallbackService:
             if max_retries is not None:
                 callback_data["max_retries"] = max_retries
 
-            logger.debug(f"Prepared callback data for job {job_id}: {json.dumps({k: '...' if k in ['raw_data', 'processed_data', 'error_details'] else v for k, v in callback_data.items()})}")
+            # logger.debug(f"Prepared callback data for job {job_id}: {json.dumps({k: '...' if k in ['raw_data', 'processed_data', 'error_details'] else v for k, v in callback_data.items()})}")
 
             # Make async request to Django
             callback_url = f"{self.django_base_url}{self.callback_path}"
