@@ -94,7 +94,7 @@ const Table: React.FC<TableProps> = ({
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
-  const [rowSelection, setRowSelection] = useState({});
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const initialPaginationState = {
     pageIndex: 0, //initial page index
     pageSize: 20, //default page size
@@ -132,6 +132,7 @@ const Table: React.FC<TableProps> = ({
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    getRowId: (row) => row.id, //use the account's ID
     onPaginationChange: setPagination,
     // Needed to solve this error: https://github.com/TanStack/table/issues/5026.
     autoResetPageIndex: false,
@@ -190,6 +191,7 @@ const Table: React.FC<TableProps> = ({
         curPageNum={curPageNum}
         totalPageCount={pageCount}
         handlePageClick={handlePageClick}
+        numSelectedRows={Object.keys(rowSelection).length}
         headerClassName="bg-[rgb(122,103,171)]"
       />
 

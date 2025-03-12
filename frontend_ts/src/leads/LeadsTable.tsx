@@ -11,10 +11,7 @@ import {
   Updater,
 } from "@tanstack/react-table";
 import AddCustomColumn from "@/table/AddCustomColumn";
-import {
-  CustomColumnInput,
-  getCustomColumnDisplayName,
-} from "@/table/AddCustomColumn";
+import { CustomColumnInput } from "@/table/AddCustomColumn";
 import CommonTable from "@/table/CommonTable";
 import EnumFilter from "@/table/EnumFilter";
 import TextFilter from "@/table/TextFilter";
@@ -61,19 +58,11 @@ export const Table: React.FC<TableProps> = ({
 
   var persona_filter_values: string[] = [];
   if (authContext.userContext?.tenant.id !== USERPORT_TENANT_ID) {
-    persona_filter_values = [
-      getCustomColumnDisplayName("buyer"),
-      getCustomColumnDisplayName("influencer"),
-      getCustomColumnDisplayName("end_user"),
-      "null",
-    ];
+    persona_filter_values = ["buyer", "influencer", "end_user", "null"];
   } else {
     // Test account, so we use only the two personas here.
     // TODO: Change once this is no longer the test account.
-    persona_filter_values = [
-      getCustomColumnDisplayName("buyer"),
-      getCustomColumnDisplayName("influencer"),
-    ];
+    persona_filter_values = ["buyer", "influencer"];
   }
 
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([
@@ -82,7 +71,7 @@ export const Table: React.FC<TableProps> = ({
       value: persona_filter_values,
     },
   ]);
-  const [rowSelection, setRowSelection] = useState({});
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
   const initialPaginationState = {
     pageIndex: 0, //initial page index
@@ -113,6 +102,7 @@ export const Table: React.FC<TableProps> = ({
   const onColumnFiltersChange = (
     newColumnFiltersState: Updater<ColumnFiltersState>
   ) => {
+    // TODO call server to fetch new set of filters.
     // Reset page page index to initial page.
     setPagination(initialPaginationState);
     setColumnFilters(newColumnFiltersState);
@@ -131,6 +121,7 @@ export const Table: React.FC<TableProps> = ({
     onColumnFiltersChange: onColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    getRowId: (row) => row.id, //use the lead's ID
     onPaginationChange: setPagination,
     // Needed to solve this error: https://github.com/TanStack/table/issues/5026.
     autoResetPageIndex: false,
@@ -191,6 +182,7 @@ export const Table: React.FC<TableProps> = ({
         curPageNum={curPageNum}
         totalPageCount={pageCount}
         handlePageClick={handlePageClick}
+        numSelectedRows={Object.keys(rowSelection).length}
         headerClassName="bg-[rgb(180,150,200)]"
       />
 

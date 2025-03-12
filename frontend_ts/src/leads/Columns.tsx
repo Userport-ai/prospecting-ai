@@ -224,11 +224,13 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
             row.custom_fields.evaluation.persona_match &&
             row.custom_fields.evaluation.persona_match !== "null" // LLM can mark a persona as "null" sometimes, sigh.
           ) {
-            return getCustomColumnDisplayName(
-              row.custom_fields.evaluation.persona_match
-            );
+            return row.custom_fields.evaluation.persona_match;
           }
           return "null";
+        },
+        cell: (info) => {
+          const personaMatchValue = info.getValue() as string;
+          return getCustomColumnDisplayName(personaMatchValue);
         },
         meta: {
           displayName: "Persona Match",
@@ -300,7 +302,6 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
           if (!personalityTraits) {
             return null;
           }
-          // return JSON.stringify(info.getValue());
           return <PersonalityTraitsView personalityTrait={personalityTraits} />;
         },
         meta: {

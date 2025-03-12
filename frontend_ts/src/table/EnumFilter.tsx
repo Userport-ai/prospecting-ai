@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ColumnFilter, Table } from "@tanstack/react-table";
 import { CheckedState } from "@radix-ui/react-checkbox";
 import { CustomColumnMeta } from "./CustomColumnMeta";
+import { getCustomColumnDisplayName } from "./AddCustomColumn";
 
 // The 'columnFilters' state contains the current global state of filters
 // on the entire table. We use it to set "checked" to the correct value
@@ -101,7 +102,9 @@ const EnumFilter: React.FC<EnumFilterProps> = ({
           <div className="flex gap-1">
             {curSelectedFilter &&
               (curSelectedFilter.value as string[]).map((filterVal) => (
-                <Badge key={filterVal}>{filterVal}</Badge>
+                <Badge key={filterVal}>
+                  {getCustomColumnDisplayName(filterVal)}
+                </Badge>
               ))}
           </div>
         </PopoverTrigger>
@@ -126,7 +129,7 @@ const EnumFilter: React.FC<EnumFilterProps> = ({
                   htmlFor={columnVal}
                   className="flex justify-between items-center w-full text-sm text-gray-600"
                 >
-                  <span>{columnVal}</span>
+                  <span>{getCustomColumnDisplayName(columnVal)}</span>
                   <span className="text-gray-500 text-xs">{count}</span>
                 </label>
               </div>

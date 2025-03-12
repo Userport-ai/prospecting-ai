@@ -22,6 +22,7 @@ interface CommonTableProps<T> {
   curPageNum: number;
   totalPageCount: number;
   handlePageClick: (nextPage: boolean) => void;
+  numSelectedRows: number;
   headerClassName?: string;
 }
 
@@ -34,6 +35,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   curPageNum,
   totalPageCount,
   handlePageClick,
+  numSelectedRows,
   headerClassName,
 }) => {
   const [expandedCellContext, setExpandedCellContext] = useState<CellContext<
@@ -193,38 +195,47 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
           </div>
         </div>
 
-        <div className="w-full flex flex-col items-end">
+        <div className="w-full flex justify-between">
           {/* Selected Rows Information */}
           <div className="flex p-1 text-sm text-muted-foreground">
-            {table.getFilteredSelectedRowModel().rows.length} of{" "}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
+            {numSelectedRows} row(s) selected.
           </div>
 
           {/* Pagination Controls */}
-          <div className="flex items-center justify-start gap-4">
+          <div className="flex items-center justify-start gap-8">
+            <div className="text-sm text-gray-600">
+              <p>
+                Rows in page{" "}
+                <span className="ml-2 p-2 border border-gray-400">
+                  {table.getRowCount()}
+                </span>
+              </p>
+            </div>
             <div>
-              <p className=" text-sm text-gray-600">
+              <p className="text-sm text-gray-600">
                 Page {curPageNum} of {totalPageCount}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageClick(false)}
-              disabled={curPageNum === 1}
-              className="shadow-sm border-gray-300"
-            >
-              <ChevronLeft />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageClick(true)}
-              disabled={curPageNum >= totalPageCount}
-              className="shadow-sm border-gray-300"
-            >
-              <ChevronRight />
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageClick(false)}
+                disabled={curPageNum === 1}
+                className="shadow-sm border-gray-300"
+              >
+                <ChevronLeft />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageClick(true)}
+                disabled={curPageNum >= totalPageCount}
+                className="shadow-sm border-gray-300"
+              >
+                <ChevronRight />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
