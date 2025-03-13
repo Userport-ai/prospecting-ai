@@ -539,7 +539,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                         results.extend(additional_leads)
                         print(f"results: {len(additional_leads)}")
                         next_cursor[count_key] += len(additional_leads)
-                        next_cursor[offset_key] = next_offset
+                        next_cursor[offset_key] = next_offset + (next_cursor.get(offset_key, 0) - cursor.get(offset_key, 0))
                         remaining_slots -= len(additional_leads)
                         existing_ids.update({lead.id for lead in additional_leads})
 
