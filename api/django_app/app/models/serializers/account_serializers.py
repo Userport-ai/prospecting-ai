@@ -8,6 +8,7 @@ class AccountEnrichmentStatusSerializer(serializers.ModelSerializer):
         fields = [
             'enrichment_type',
             'status',
+            'completion_percent',
         ]
 
 
