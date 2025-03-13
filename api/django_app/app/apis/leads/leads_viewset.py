@@ -1,7 +1,7 @@
 import base64
 import json
 import logging
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Optional
 
 from django.db import models, transaction
 from django.db.models import F, Case, When, FloatField, Value, Q
@@ -33,10 +33,21 @@ class LeadFilter(filters.FilterSet):
     account_created_by = filters.UUIDFilter(field_name='account__created_by', lookup_expr='exact')
     persona_match = filters.CharFilter(method='filter_persona_match')
 
-    @staticmethod
-    def apply_persona_match_filter(queryset, value: Optional[str] = None):
+    # Define known persona types for consistency
+    PERSONA_BUYER = 'buyer'
+    PERSONA_INFLUENCER = 'influencer'
+    PERSONA_END_USER = 'end_user'
+    PERSONA_UNKNOWN = 'unknown'
+
+    # List of all known persona types for easy reference
+    KNOWN_PERSONA_TYPES = [PERSONA_BUYER, PERSONA_INFLUENCER, PERSONA_END_USER]
+
+    @classmethod
+    def apply_persona_match_filter(cls, queryset, value: Optional[str] = None):
         """
         Apply persona_match filtering with support for comma-separated values.
+        Handle 'unknown' persona type in accordance with SQL:
+        ((custom_fields->'evaluation'->>'persona_match' IS NULL) OR (custom_fields->'evaluation'->>'persona_match' NOT IN ('buyer', 'influencer', 'end_user')))
 
         Args:
             queryset: The base queryset to filter
@@ -51,16 +62,39 @@ class LeadFilter(filters.FilterSet):
         # Split by comma and strip whitespace for all values
         personas = [p.strip() for p in value.split(',') if p.strip()]
 
-        # Use the __in lookup for better performance
-        if personas:
-            return queryset.filter(enrichment_data__evaluation__persona_match__in=personas)
+        if not personas:
+            return queryset
 
-        return queryset
+        # Handle special case for 'unknown' persona
+        if cls.PERSONA_UNKNOWN in personas:
+            # Remove 'unknown' from the list since we'll handle it differently
+            other_personas = [p for p in personas if p != cls.PERSONA_UNKNOWN]
+
+            # Create a combined filter
+            if other_personas:
+                # If there are other personas, we need to combine the 'unknown' logic with them
+                return queryset.filter(
+                    # Either match one of the specified personas
+                    Q(enrichment_data__evaluation__persona_match__in=other_personas) |
+                    # Or match the criteria for 'unknown' - updated to match the SQL query
+                    (Q(enrichment_data__evaluation__persona_match__isnull=True) |
+                     ~Q(enrichment_data__evaluation__persona_match__in=cls.KNOWN_PERSONA_TYPES))
+                )
+            else:
+                # If 'unknown' is the only persona in the filter
+                return queryset.filter(
+                    Q(enrichment_data__evaluation__persona_match__isnull=True) |
+                    ~Q(enrichment_data__evaluation__persona_match__in=cls.KNOWN_PERSONA_TYPES)
+                )
+        else:
+            # If 'unknown' is not in the list, just use a simple filter
+            return queryset.filter(enrichment_data__evaluation__persona_match__in=personas)
 
     def filter_persona_match(self, queryset, name, value):
         """
         Filter by persona_match in enrichment_data->evaluation->persona_match
         Supports comma-separated values for OR filtering (e.g. 'buyer,influencer')
+        Also supports special handling for 'unknown' persona type.
         """
         return self.apply_persona_match_filter(queryset, value)
 
@@ -82,6 +116,9 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     PERSONA_INFLUENCER = 'influencer'
     PERSONA_END_USER = 'end_user'
     PERSONA_UNKNOWN = 'unknown'
+
+    # List of all known persona types for easy reference
+    KNOWN_PERSONA_TYPES = [PERSONA_BUYER, PERSONA_INFLUENCER, PERSONA_END_USER]
 
     PERSONA_PRIORITY = [PERSONA_BUYER, PERSONA_INFLUENCER, PERSONA_END_USER, PERSONA_UNKNOWN]
 
@@ -290,14 +327,11 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         if existing_ids is None:
             existing_ids = set()
 
-        # For unknown personas, use a different filter
+        # For unknown personas, use the SQL equivalent of:
+        # ((custom_fields->'evaluation'->>'persona_match' IS NULL) OR (custom_fields->'evaluation'->>'persona_match' NOT IN ('buyer', 'influencer', 'end_user')))
         if persona == self.PERSONA_UNKNOWN:
             persona_queryset = queryset.filter(
-                Q(persona_match__isnull=True) |
-                Q(persona_match='') |
-                Q(persona_match=self.PERSONA_UNKNOWN)
-            ).exclude(
-                persona_match__in=[self.PERSONA_BUYER, self.PERSONA_INFLUENCER, self.PERSONA_END_USER]
+                Q(persona_match__isnull=True) | ~Q(persona_match__in=self.KNOWN_PERSONA_TYPES)
             )
         else:
             persona_queryset = queryset.filter(persona_match=persona)
@@ -403,13 +437,10 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             for persona in [self.PERSONA_BUYER, self.PERSONA_INFLUENCER, self.PERSONA_END_USER]:
                 persona_counts[f"total_{persona}s_count"] = base_queryset.filter(persona_match=persona).count()
 
-            # Count unknown personas
+            # Count unknown personas - updated to match the SQL query
+            # ((custom_fields->'evaluation'->>'persona_match' IS NULL) OR (custom_fields->'evaluation'->>'persona_match' NOT IN ('buyer', 'influencer', 'end_user')))
             persona_counts["total_unknown_count"] = base_queryset.filter(
-                Q(persona_match__isnull=True) |
-                Q(persona_match='') |
-                Q(persona_match=self.PERSONA_UNKNOWN)
-            ).exclude(
-                persona_match__in=[self.PERSONA_BUYER, self.PERSONA_INFLUENCER, self.PERSONA_END_USER]
+                Q(persona_match__isnull=True) | ~Q(persona_match__in=self.KNOWN_PERSONA_TYPES)
             ).count()
 
             # Total count of all leads
@@ -499,12 +530,14 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                         base_queryset,
                         persona,
                         remaining_slots,
-                        next_cursor.get(offset_key, 0),
+                        cursor.get(offset_key, 0),
                         existing_ids
                     )
 
                     if additional_leads:
+                        print(f"additional_leads: {len(additional_leads)}")
                         results.extend(additional_leads)
+                        print(f"results: {len(additional_leads)}")
                         next_cursor[count_key] += len(additional_leads)
                         next_cursor[offset_key] = next_offset
                         remaining_slots -= len(additional_leads)
@@ -512,6 +545,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
                         if additional_has_more:
                             has_more = True
+
 
             # Update running count in cursor for pagination consistency
             next_cursor["total_count"] = cursor["total_count"] + len(results)
@@ -572,29 +606,6 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 has_more=has_more
             )
 
-    def _annotate_persona_match(self, queryset):
-        """
-        Helper method to annotate the queryset with persona_match from JSON field.
-        Includes a COALESCE to handle NULL values.
-
-        Args:
-            queryset: The base queryset to annotate
-
-        Returns:
-            QuerySet: The annotated queryset with persona_match field
-        """
-        return queryset.annotate(
-            persona_match=models.functions.Coalesce(
-                Cast(
-                    RawSQL(
-                        "enrichment_data->'evaluation'->>'persona_match'",
-                        []
-                    ),
-                    models.CharField()
-                ),
-                Value('unknown')  # Default value when persona_match is NULL
-            )
-        )
     # Keep existing methods below
     @action(detail=False, methods=['post'])
     def generate(self, request):
