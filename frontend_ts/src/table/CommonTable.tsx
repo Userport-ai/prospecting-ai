@@ -75,6 +75,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   // allow for string interpolation created classnames per: https://tailwindcss.com/docs/content-configuration#dynamic-class-names
   // Instead we set the table width as an inline style per https://stackoverflow.com/questions/76855056/unable-to-set-arbitrary-value-for-a-background-in-tailwindcss.
   const totalColumnsWidth = table.getCenterTotalSize();
+  const maxRowHeight = "max-h-[6rem]";
 
   return (
     <div>
@@ -165,7 +166,12 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                         >
                           <div className="flex justify-between gap-2">
                             {/* Clamping Cell content height */}
-                            <div className="max-h-[5rem] overflow-hidden text-ellipsis line-clamp-3">
+                            <div
+                              className={cn(
+                                "overflow-hidden text-ellipsis line-clamp-3",
+                                maxRowHeight
+                              )}
+                            >
                               {flexRender(
                                 cell.column.columnDef.cell,
                                 cell.getContext()
