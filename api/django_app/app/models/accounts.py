@@ -55,6 +55,7 @@ class Account(BaseMixin):
                 'last_update': None,
                 'quality_score': None,
                 'avg_completion_percent': 0,
+                'statuses': None,
             }
 
         completed = sum(1 for s in statuses if s.status == EnrichmentStatus.COMPLETED)
@@ -77,6 +78,7 @@ class Account(BaseMixin):
             'last_update': last_update,
             'quality_score': avg_score,
             'avg_completion_percent': percent,
+            'statuses': statuses,
         }
 
     # In accounts.py
