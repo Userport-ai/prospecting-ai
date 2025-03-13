@@ -234,12 +234,12 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
       );
       return;
     }
-    // Validate that website rows all start with https://
+    // Validate that website rows all start with http
     for (const row of data) {
       const websiteVal = row[AccountWebsiteColumnHeader] as string;
-      if (!websiteVal.startsWith("https://")) {
+      if (!websiteVal.startsWith("http")) {
         setErrorMessage(
-          `Invalid data! Atleast one Row under ${AccountWebsiteColumnHeader} column does not start with 'https://'`
+          `Invalid data! Atleast one Row under ${AccountWebsiteColumnHeader} column does not start with 'http'`
         );
         return;
       }
@@ -329,7 +329,11 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
         <div className="flex flex-col gap-2 text-sm text-gray-500">
           <p>Ensure the uploaded CSV file has one column named:</p>
           <p className="ml-4">
-            1. <span className="font-bold">{AccountWebsiteColumnHeader}</span>{" "}
+            1. <span className="font-bold">{AccountNameColumnHeader}</span>{" "}
+            which contains the Name of the Accounts
+          </p>
+          <p className="ml-4">
+            2. <span className="font-bold">{AccountWebsiteColumnHeader}</span>{" "}
             which contains the Website of the Accounts
           </p>
           <p>
@@ -400,7 +404,10 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   const formSchema = z.object({
     productId: z.string().min(1, "Product is required"),
     name: z.string().min(1, "Name is required"),
-    website: z.string().min(1).startsWith("https://", "Website is required"),
+    website: z
+      .string()
+      .min(1)
+      .startsWith("http", "Website must start with http"),
   });
 
   const form = useForm({
