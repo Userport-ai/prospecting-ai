@@ -1,5 +1,15 @@
 from rest_framework import serializers
-from app.models import Account
+from app.models import Account, AccountEnrichmentStatus
+
+
+class AccountEnrichmentStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AccountEnrichmentStatus
+        fields = [
+            'enrichment_type',
+            'status',
+            'completion_percent',
+        ]
 
 
 class EnrichmentStatusSerializer(serializers.Serializer):
@@ -11,6 +21,7 @@ class EnrichmentStatusSerializer(serializers.Serializer):
     last_update = serializers.DateTimeField(allow_null=True)
     quality_score = serializers.FloatField(allow_null=True)
     avg_completion_percent = serializers.FloatField(allow_null=True)
+    statuses = AccountEnrichmentStatusSerializer(many=True, allow_null=True)
 
 
 class AccountDetailsSerializer(serializers.ModelSerializer):
