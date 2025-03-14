@@ -47,6 +47,16 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     } as CustomColumnMeta,
   },
   {
+    id: "created_at",
+    accessorFn: (row) => formatDate(row.created_at),
+    header: "Created On",
+    size: 50,
+    meta: {
+      displayName: "Created On",
+      visibleInitially: true,
+    } as CustomColumnMeta,
+  },
+  {
     id: "name",
     accessorFn: (row) => row.name,
     accessorKey: "name",
@@ -87,6 +97,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "enrichment_status",
     accessorFn: (row) => row.enrichment_status,
     header: "Enrichment Status",
+    minSize: 200,
     cell: (info) => {
       const enrichmentStatus = info.getValue() as EnrichmentStatus | null;
       if (!enrichmentStatus) {
@@ -299,15 +310,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     },
     meta: {
       displayName: "Company Type",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
-    id: "created_at",
-    accessorFn: (row) => formatDate(row.created_at),
-    header: "Created On",
-    meta: {
-      displayName: "Created On",
       visibleInitially: true,
     } as CustomColumnMeta,
   },
