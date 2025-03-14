@@ -337,7 +337,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             persona_queryset = queryset.filter(persona_match=persona)
 
         # Order by score
-        persona_queryset = persona_queryset.order_by('-score')
+        persona_queryset = persona_queryset.order_by('-score', 'id') # Add 'id' as secondary sort to ensure stability across pages
 
         # Exclude existing IDs
         if existing_ids:
@@ -551,7 +551,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             next_cursor["total_count"] = cursor["total_count"] + len(results)
 
             # Sort results by score for consistent ordering - do this in memory since we have a limited set
-            results.sort(key=lambda x: x.score if x.score is not None else 0, reverse=True)
+            results.sort(key=lambda x: (x.score if x.score is not None else 0, str(x.id)), reverse=True)
 
             # Encode the next cursor
             next_cursor_str = base64.b64encode(json.dumps(next_cursor).encode('utf-8')).decode('utf-8')
