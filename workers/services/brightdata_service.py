@@ -42,7 +42,7 @@ class BrightDataService:
     async def trigger_account_data_collection(self, account_linkedin_urls: List[str]) -> str:
         """Triggers Data collection for given Account LinkedIn URLs and returns Snapshot ID that client will use to poll collection status."""
         with httpx.Client() as client:
-            logger.debug(f"Triggering Account data collection for URLs:m{account_linkedin_urls}")
+            logger.debug(f"Triggering Account data collection for URLs: {account_linkedin_urls}")
             headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.brightdata_api_key}"}
             data = [{"url": url} for url in account_linkedin_urls]
             json_data = json.dumps(data)

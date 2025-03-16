@@ -248,16 +248,16 @@ class AccountInfoFetcher:
             matched_website: Optional[str] = result.matched_website
             reason: str = result.matched_website
             if not matched_website:
-                raise ValueError(f"Failed to match any website with reason: {reason} among accounts: {brightdata_accounts}")
+                raise ValueError(f"Failed to match any website with reason: {reason} among accounts Brightdata accounts")
 
             # Find the Selected account.
             selected_accounts: List[BrightDataAccount] = list(filter(lambda account: account.website.strip("/").strip() == matched_website.strip("/").strip(),  accounts_with_websites))
             if len(selected_accounts) == 0:
-                raise ValueError(f"Expected at least 1 Selected Account with matched website: {matched_website}, got {len(selected_accounts)} Accounts among all accounts: {brightdata_accounts}")
+                raise ValueError(f"Expected at least 1 Selected Account with matched website: {matched_website}, got {len(selected_accounts)} Accounts among all Brightdata accounts")
             # Pick the first one. Sometimes there can be more than 1 result with the same website like https://brdta.com/3go77R5 for Bright Data.
             return selected_accounts[0]
         except Exception as e:
-            raise FailedToSelectAccountError(f"Failed to select Correct Account among: {brightdata_accounts} with error: {str(e)}")
+            raise FailedToSelectAccountError(f"Failed to select Correct Brightdata Account with error: {str(e)}")
 
 
 """
