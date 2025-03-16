@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
 from app.apis.common.base import TenantScopedViewSet
 from app.apis.leads.lead_generation_mixin import LeadGenerationMixin
@@ -22,6 +23,11 @@ logger = logging.getLogger(__name__)
 MAX_ACCOUNTS_PER_REQUEST = 20
 
 
+class ClientControlledPagination(PageNumberPagination):
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     serializer_class = AccountDetailsSerializer
     queryset = Account.objects.all()
@@ -35,6 +41,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
     }
     ordering_fields = ['name', 'created_at', 'updated_at']
     ordering = ['-created_at']
+    pagination_class = ClientControlledPagination
 
     def get_queryset(self):
         base_queryset = super().get_queryset()
