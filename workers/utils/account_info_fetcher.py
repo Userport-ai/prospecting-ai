@@ -19,7 +19,6 @@ from utils.loguru_setup import logger
 # Configure logging
 
 
-
 class FailedToFindLinkedInURLsError(Exception):
     pass
 
@@ -139,9 +138,13 @@ class AccountInfoFetcher:
                 # Select the first result. We assume BuiltWith is reliable and so we don't the LLM to select the correct LinkedIn URL.
                 bd_account = brightdata_accounts[0]
             else:
-                logger.debug(f"Selecting the correct BrightData Account using LLM for website: {self.website}")
-                # Select the correct account using LLM among the ones fetched from Jina.
-                bd_account = await self._select_correct_account(brightdata_accounts=brightdata_accounts)
+                if len(brightdata_accounts) == 1:
+                    logger.debug(f"Selecting first BrightData account since there is only 1 returned from Jina for website: {self.website}")
+                    bd_account = brightdata_accounts[0]
+                else:
+                    logger.debug(f"Selecting the correct BrightData Account using LLM for website: {self.website}")
+                    # Select the correct account using LLM among the ones fetched from Jina.
+                    bd_account = await self._select_correct_account(brightdata_accounts=brightdata_accounts)
 
             logger.debug(f"Successfully fetched Account Information for website: {self.website}")
             return AccountInfo(
