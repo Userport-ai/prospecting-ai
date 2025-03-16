@@ -1,4 +1,3 @@
-import logging
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
@@ -13,8 +12,9 @@ from tasks.account_enhancement import AccountEnhancementTask
 from tasks.generate_leads_apollo import ApolloLeadsTask
 from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
+from utils.loguru_setup import logger, set_trace_context
 
-logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 # Initialize task registry and register tasks
@@ -56,17 +56,16 @@ async def create_task(
         payload: Task configuration and parameters
         task_manager: Injected task manager instance
     """
+    # Set trace context using task_name and account_id from payload
+    job_id = payload.get('job_id')
+    account_id = payload.get('account_id', '<account id not found>')
+    set_trace_context(trace_id=job_id, account_id=account_id, task_name=task_name)
+
     try:
         task = task_registry.get_task(task_name)
         task_payload = await task.create_task_payload(**payload)
         result = await task_manager.create_task(task_name, task_payload)
-        logger.info(f"Task created: name: {task_name}, account ID: {payload.get('account_id', '<account id not found>')}", extra={
-            'result': result,
-            'task_name': task_name,
-            'job_id': payload.get('job_id'),
-            'account_id': payload.get('account_id', '<account id not found>'),
-            'attempt_number': payload.get('attempt_number', 1)
-        })
+        logger.info(f"Task created: name: {task_name}, account ID: {account_id}")
         return JSONResponse(content=result)
     except KeyError as e:
         logger.error(f"Failed to find task: {task_name} and payload: {payload} with error: {e}")
@@ -89,6 +88,11 @@ async def execute_task(
         request: Request object
         x_cloudtasks_queuename: Queuename by Google Cloud tasks
     """
+    # Set trace context using job_id, account_id and task_name
+    job_id = payload.get('job_id')
+    account_id = payload.get('account_id', '<account id not found>')
+    set_trace_context(trace_id=job_id, account_id=account_id, task_name=task_name)
+
     try:
         # Check if this is a Cloud Tasks execution or direct API call
         is_cloud_task = x_cloudtasks_queuename is not None
@@ -104,14 +108,11 @@ async def execute_task(
             'deadline': request.headers.get('X-CloudTasks-TaskDeadline')
         }
 
-        logger.info(f"Task execution request received", extra={
-            'task_name': task_name,
-            'job_id': payload.get('job_id'),
-            'account_id': payload.get('account_id', '<account id not found>'),
-            'is_cloud_task': is_cloud_task,
-            'cloud_tasks_headers': cloudtasks_headers,
-            'attempt_number': payload.get('attempt_number', 1)
-        })
+        logger.info("Task execution request received",
+                    is_cloud_task=is_cloud_task,
+                    cloud_tasks_headers=cloudtasks_headers,
+                    attempt_number=payload.get('attempt_number', 1)
+                    )
 
         task = task_registry.get_task(task_name)
         result = await task.run_task(payload)
@@ -133,6 +134,9 @@ async def get_task_status(
         job_id: ID of the job to query
         task_manager: Injected task manager instance
     """
+    # Set trace context using job_id
+    set_trace_context(trace_id=job_id, task_name="get_task_status")
+
     try:
         return await task_manager.get_job_status(job_id)
     except KeyError:
@@ -159,6 +163,9 @@ async def list_failed_tasks(
         limit: Maximum number of tasks to return
         task_manager: Injected task manager instance
     """
+    # Set trace context for this operation
+    set_trace_context(task_name="list_failed_tasks")
+
     try:
         return await task_manager.list_failed_jobs(
             start_date=start_date or (datetime.utcnow() - timedelta(days=7)),
@@ -185,6 +192,9 @@ async def retry_task(
     Raises:
         TaskError: If the task cannot be retried
     """
+    # Set trace context using job_id
+    set_trace_context(trace_id=job_id, task_name="retry_task")
+
     try:
         status = await task_manager.get_job_status(job_id)
 
@@ -205,6 +215,9 @@ async def retry_task(
             'max_retries': status['max_retries'],
             'original_job_id': job_id
         }
+
+        # Update account_id in trace context
+        set_trace_context(account_id=status['entity_id'])
 
         return await task_manager.create_task('account_enhancement', new_payload)
 

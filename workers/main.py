@@ -1,76 +1,30 @@
-import logging
 import os
-import sys
 import time
-import traceback
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from pythonjsonlogger import jsonlogger
 
 from api.routes import register_tasks
 from api.routes import router
 from services.django_callback_service import CallbackService
 from utils.async_utils import shutdown_thread_pools
+from utils.loguru_setup import logger, setup_context_preserving_task_factory, set_trace_context
 
-
-class CustomJsonFormatter(jsonlogger.JsonFormatter):
-    def add_fields(self, log_record: dict[str, Any], record: logging.LogRecord, message_dict: dict[str, Any]) -> None:
-        super().add_fields(log_record, record, message_dict)
-
-        # Add timestamp if not present
-        if not log_record.get('timestamp'):
-            log_record['timestamp'] = time.strftime('%Y-%m-%dT%H:%M:%S.%fZ', time.gmtime())
-
-        # Add severity for GCP logging
-        log_record['severity'] = record.levelname
-
-        # Add trace ID if available
-        if hasattr(record, 'trace_id'):
-            log_record['trace_id'] = record.trace_id
-
-        # Add request_id if available
-        if hasattr(record, 'request_id'):
-            log_record['request_id'] = record.request_id
-
-        # Add error details if present
-        if record.exc_info:
-            log_record['error'] = {
-                'type': record.exc_info[0].__name__,
-                'message': str(record.exc_info[1]),
-                'stacktrace': traceback.format_exception(*record.exc_info)
-            }
-
-logger = logging.getLogger()
-
-# Remove any existing handlers
-for handler in logger.handlers[:]:
-    logger.removeHandler(handler)
-
-console_handler = logging.StreamHandler(sys.stdout)
-
-formatter = CustomJsonFormatter(
-    '%(timestamp)s %(severity)s %(name)s %(message)s'
-)
-console_handler.setFormatter(formatter)
-
-logger.addHandler(console_handler)
-
-log_level = os.getenv('LOG_LEVEL', 'DEBUG').upper()
-logger.setLevel(getattr(logging, log_level))
-logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
     # Initialize on startup
-    logger.info("Application starting up", extra={
-        'environment': os.getenv('ENVIRONMENT', 'development'),
-        'log_level': log_level,
-        'version': os.getenv('VERSION', 'unknown')
-    })
+    log_level = os.getenv('LOG_LEVEL', 'DEBUG').upper()
+    logger.info("Application starting up", 
+        environment=os.getenv('ENVIRONMENT', 'development'),
+        log_level=log_level,
+        version=os.getenv('VERSION', 'unknown')
+    )
+
+    setup_context_preserving_task_factory()
+
     fastapi_app.state.callback_service = await CallbackService.get_instance()
     await register_tasks()
 
@@ -93,6 +47,10 @@ app = FastAPI(title="Workers API", lifespan=lifespan)
 async def logging_middleware(request: Request, call_next):
     # Generate request ID
     request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
+
+    # Set trace context for the entire request
+    set_trace_context(trace_id=request_id)
+
     sensitive_headers = ['authorization', 'cookie']
     filtered_headers = {k: v for k, v in request.headers.items() if k.lower() not in sensitive_headers}
 
@@ -100,13 +58,10 @@ async def logging_middleware(request: Request, call_next):
     # Add context to logging
     logger.info(
         "Request started",
-        extra={
-            'request_id': request_id,
-            'method': request.method,
-            'url': str(request.url),
-            'client_host': request.client.host if request.client else None,
-            'headers': dict(filtered_headers)
-        }
+        method=request.method,
+        url=str(request.url),
+        client_host=request.client.host if request.client else None,
+        headers=dict(filtered_headers)
     )
 
     start_time = time.time()
@@ -117,24 +72,16 @@ async def logging_middleware(request: Request, call_next):
         # Log successful response
         logger.info(
             "Request completed",
-            extra={
-                'request_id': request_id,
-                'status_code': response.status_code,
-                'duration_ms': int((time.time() - start_time) * 1000)
-            }
+            status_code=response.status_code,
+            duration_ms=int((time.time() - start_time) * 1000)
         )
         return response
 
     except Exception as e:
-        # Log exception details
-        logger.exception(
-            "Request failed",
-            extra={
-                'request_id': request_id,
-                'error_type': type(e).__name__,
-                'error_message': str(e),
-                'duration_ms': int((time.time() - start_time) * 1000)
-            }
+        # Log exception details with full traceback
+        logger.opt(exception=True).error(
+            f"Request failed: {e}",
+            duration_ms=int((time.time() - start_time) * 1000)
         )
 
         return JSONResponse(
@@ -146,7 +93,6 @@ async def logging_middleware(request: Request, call_next):
                 "request_id": request_id
             }
         )
-
 # Include router
 app.include_router(router, prefix="/api/v1")
 

@@ -1,4 +1,3 @@
-import logging
 import os
 from datetime import datetime
 from time import time
@@ -8,8 +7,9 @@ from models.builtwith import EnrichmentResult, BuiltWithApiResponse, TechnologyP
     TechnologyDetail, QualityMetrics, MetaData
 from services.api_cache_service import APICacheService, cached_request
 from utils.retry_utils import RetryConfig, RetryableError, with_retry
+from utils.loguru_setup import logger
 
-logger = logging.getLogger(__name__)
+
 
 
 class BuiltWithService:
@@ -480,7 +480,7 @@ class BuiltWithService:
 #     #     exit(1)
 #
 #     # Run the test
-#     logging.basicConfig(level=logging.DEBUG)
+#     # Logging configuration is now in utils/loguru_setup.py
 #
 #     from dotenv import load_dotenv
 #     load_dotenv()

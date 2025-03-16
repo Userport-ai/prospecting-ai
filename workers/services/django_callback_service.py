@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import math
 import os
 from datetime import datetime
@@ -15,8 +14,9 @@ from google.oauth2 import service_account
 from services.django_callback_service_paginated import PaginatedCallbackService
 from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryConfig, RetryableError, with_retry, RETRYABLE_STATUS_CODES
+from utils.loguru_setup import logger
 
-logger = logging.getLogger(__name__)
+
 
 class CallbackService:
     CALLBACK_RETRY_CONFIG = RetryConfig(
@@ -170,7 +170,7 @@ class CallbackService:
             if max_retries is not None:
                 callback_data["max_retries"] = max_retries
 
-            logger.debug(f"Prepared callback data for job {job_id}: {json.dumps({k: '...' if k in ['raw_data', 'processed_data', 'error_details'] else v for k, v in callback_data.items()})}")
+            # logger.debug(f"Prepared callback data for job {job_id}: {json.dumps({k: '...' if k in ['raw_data', 'processed_data', 'error_details'] else v for k, v in callback_data.items()})}")
 
             # Make async request to Django
             callback_url = f"{self.django_base_url}{self.callback_path}"

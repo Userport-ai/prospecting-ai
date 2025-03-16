@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import json
-import logging
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
@@ -15,8 +14,9 @@ from openai import AsyncOpenAI
 from utils.async_utils import to_thread, to_cpu_thread, run_in_thread
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.token_usage import TokenUsage
+from utils.loguru_setup import logger
 
-logger = logging.getLogger(__name__)
+
 
 # Retry configurations
 GEMINI_RETRY_CONFIG = RetryConfig(

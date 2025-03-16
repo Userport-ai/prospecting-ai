@@ -1,4 +1,5 @@
 from datetime import datetime
+from utils.loguru_setup import logger
 
 
 class JSONUtils:

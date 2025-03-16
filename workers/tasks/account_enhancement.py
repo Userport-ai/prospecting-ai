@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import json
-import logging
 import os
 import uuid
 from dataclasses import dataclass
@@ -23,8 +22,7 @@ from .enrichment_task import AccountEnrichmentTask
 from utils.account_info_fetcher import AccountInfoFetcher
 from utils.url_utils import UrlUtils
 from models.accounts import AccountInfo, Financials
-
-logger = logging.getLogger(__name__)
+from utils.loguru_setup import logger, set_trace_context
 
 
 @dataclass
@@ -371,6 +369,9 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             processed_count += 1
             account_id = account.get('account_id')
             website = account.get('website')
+
+            # Update account_id
+            set_trace_context(account_id=account_id)
 
             logger.info(f"Processing account {processed_count}/{total_accounts}: ID {account_id}, website: {website}")
 

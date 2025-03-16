@@ -2,7 +2,6 @@
 import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-import logging
 from datetime import datetime, UTC
 
 from google.cloud import bigquery
@@ -10,8 +9,7 @@ from google.cloud import bigquery
 from services.ai_service import AICacheService
 from services.django_callback_service import CallbackService
 from services.task_result_manager import TaskResultManager
-
-logger = logging.getLogger(__name__)
+from utils.loguru_setup import logger, set_trace_context
 
 
 async def ensure_ai_cache_table():
@@ -92,6 +90,13 @@ class BaseTask(ABC):
         attempt_number = payload.get("attempt_number")
         job_id = payload.get("job_id")
         start_time = datetime.now(UTC)
+
+        # Set trace context at the task execution level
+        set_trace_context(
+            trace_id=job_id,
+            account_id=account_id,
+            task_name=self.task_name
+        )
 
         # Log task start
         logger.info(

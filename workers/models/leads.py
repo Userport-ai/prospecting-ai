@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from models.common import UserportPydanticBaseModel
 from datetime import datetime
+from utils.loguru_setup import logger
 
 
 class ProxyCurlSearchResponse(BaseModel):

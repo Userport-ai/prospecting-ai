@@ -1,5 +1,4 @@
 import json
-import logging
 import re
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -12,9 +11,7 @@ from markdownify import markdownify
 from models.lead_activities import LinkedInActivity, ContentDetails, OpenAITokenUsage
 from services.ai_service import AIServiceFactory
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
-
-# Configure logging
-logger = logging.getLogger(__name__)
+from utils.loguru_setup import logger
 
 GEMINI_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
