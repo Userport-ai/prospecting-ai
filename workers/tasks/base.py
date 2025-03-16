@@ -82,7 +82,13 @@ class BaseTask(ABC):
           3. Otherwise, call `execute()`, store, and callback
         """
         lead_id = payload.get("lead_id")
+        # Account ID key is present only for lead_generation task
         account_id = payload.get("account_id")
+        if not account_id:
+            # Accounts key is for account enhancement task.
+            accounts = payload.get('accounts')
+            if accounts and len(accounts) > 0:
+                account_id = accounts[0]["account_id"]
         attempt_number = payload.get("attempt_number")
         job_id = payload.get("job_id")
         start_time = datetime.now(UTC)

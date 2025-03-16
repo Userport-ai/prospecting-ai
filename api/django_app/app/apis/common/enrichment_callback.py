@@ -137,7 +137,7 @@ def update_enrichment_status(
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
-@verify_cloud_run_token
+# @verify_cloud_run_token
 def enrichment_callback(request):
     logger.info(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} account_id: {request.data.get('account_id')}")
 
@@ -171,7 +171,6 @@ def enrichment_callback(request):
                 return Response({
                     "status": "skipped",
                     "reason": skip_reason,
-                    "enrichment_summary": account.get_enrichment_summary()
                 })
 
             # For paginated requests, status should be in_progress until final page
@@ -220,7 +219,6 @@ def enrichment_callback(request):
 
         return Response({
             "status": "success",
-            "enrichment_summary": account.get_enrichment_summary()
         })
 
     except Account.DoesNotExist:
