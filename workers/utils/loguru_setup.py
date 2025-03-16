@@ -3,9 +3,11 @@ import contextvars
 import json
 import logging
 import os
+import re
 import sys
 import traceback
 import uuid
+from functools import wraps
 from typing import Dict, Any, Optional
 
 from loguru import logger
@@ -42,6 +44,7 @@ def restore_context(context: Dict[str, Any]) -> None:
 
     if 'task_name' in context:
         task_name_var.set(context['task_name'])
+
 
 def setup_context_preserving_task_factory():
     """
@@ -96,6 +99,7 @@ def create_task_with_context(coro, *, name=None):
 
     # Create and return the task
     return asyncio.create_task(context_wrapper(), name=name)
+
 
 # Create context variables for trace_id, account_id, and task_name
 trace_id_var = contextvars.ContextVar('trace_id', default=None)
@@ -159,8 +163,57 @@ def reset_trace_context(tokens: Dict[str, Any]) -> None:
             task_name_var.reset(token)
 
 
-class TraceContextAdapter:
-    """Adapter class to add trace context to logger calls."""
+class SafeFormattingMixin:
+    """
+    Mixin that provides safe string formatting capabilities.
+    Prevents formatting errors when message contains curly braces.
+    """
+
+    def _safe_format_message(self, message, **kwargs):
+        """
+        Safely format a message, handling potential formatting errors.
+
+        Args:
+            message: The message to format
+            **kwargs: Formatting variables and extra context
+
+        Returns:
+            tuple: (formatted_message, extra_kwargs)
+        """
+        # Convert message to string if it's not already
+        if not isinstance(message, str):
+            message = str(message)
+
+        # Extract variables that appear to be for formatting
+        format_vars = {}
+        extra_vars = {}
+
+        # Look for {name} patterns in the message to determine format variables
+        pattern = r'\{([^{}]+)\}'
+        format_names = re.findall(pattern, message)
+
+        # Split kwargs into formatting variables and extra context
+        for key, value in kwargs.items():
+            if key in format_names:
+                format_vars[key] = value
+            else:
+                extra_vars[key] = value
+
+        # Format the message manually if there are variables to insert
+        if format_vars:
+            try:
+                formatted_message = message.format(**format_vars)
+            except (KeyError, ValueError, IndexError):
+                # If formatting fails, just use the original message
+                formatted_message = message
+        else:
+            formatted_message = message
+
+        return formatted_message, extra_vars
+
+
+class TraceContextAdapter(SafeFormattingMixin):
+    """Adapter class to add trace context to logger calls with safe formatting."""
 
     def __init__(self, logger_instance):
         self._logger = logger_instance
@@ -188,32 +241,43 @@ class TraceContextAdapter:
         return kwargs
 
     def debug(self, message, **kwargs):
-        kwargs = self._add_context(kwargs)
-        return self._logger.debug(message, **kwargs)
+        formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
+        extra_kwargs = self._add_context(extra_kwargs)
+        return self._logger.bind(**extra_kwargs).debug(formatted_message)
 
     def info(self, message, **kwargs):
-        kwargs = self._add_context(kwargs)
-        return self._logger.info(message, **kwargs)
+        # First safely format the message
+        formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
+        # Add trace context variables
+        extra_kwargs = self._add_context(extra_kwargs)
+        # Use bind only for the extra kwargs, preserving any previously bound variables
+        # The underlying logger already has any variables from previous bind() calls
+        return self._logger.bind(**extra_kwargs).info(formatted_message)
 
     def warning(self, message, **kwargs):
-        kwargs = self._add_context(kwargs)
-        return self._logger.warning(message, **kwargs)
+        formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
+        extra_kwargs = self._add_context(extra_kwargs)
+        return self._logger.bind(**extra_kwargs).warning(formatted_message)
 
     def error(self, message, **kwargs):
-        kwargs = self._add_context(kwargs)
-        return self._logger.error(message, **kwargs)
+        formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
+        extra_kwargs = self._add_context(extra_kwargs)
+        return self._logger.bind(**extra_kwargs).error(formatted_message)
 
     def critical(self, message, **kwargs):
-        kwargs = self._add_context(kwargs)
-        return self._logger.critical(message, **kwargs)
+        formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
+        extra_kwargs = self._add_context(extra_kwargs)
+        return self._logger.bind(**extra_kwargs).critical(formatted_message)
 
     def exception(self, message, **kwargs):
-        kwargs = self._add_context(kwargs)
-        return self._logger.exception(message, **kwargs)
+        formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
+        extra_kwargs = self._add_context(extra_kwargs)
+        return self._logger.bind(**extra_kwargs).exception(formatted_message)
 
     def log(self, level, message, **kwargs):
-        kwargs = self._add_context(kwargs)
-        return self._logger.log(level, message, **kwargs)
+        formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
+        extra_kwargs = self._add_context(extra_kwargs)
+        return self._logger.bind(**extra_kwargs).log(level, formatted_message)
 
     def opt(self, *args, **kwargs):
         # Create a new adapter with the opt result
@@ -225,7 +289,6 @@ class TraceContextAdapter:
         bind_logger = self._logger.bind(**kwargs)
         return TraceContextAdapter(bind_logger)
 
-    # Add this method to fix the error
     def level(self, name):
         """Forward level calls to the underlying logger."""
         return self._logger.level(name)
