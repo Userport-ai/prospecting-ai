@@ -7,7 +7,6 @@ import re
 import sys
 import traceback
 import uuid
-from functools import wraps
 from typing import Dict, Any, Optional
 
 from loguru import logger
@@ -243,43 +242,47 @@ class TraceContextAdapter(SafeFormattingMixin):
     def debug(self, message, **kwargs):
         formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
         extra_kwargs = self._add_context(extra_kwargs)
-        return self._logger.bind(**extra_kwargs).debug(formatted_message)
+        return self._logger.opt(depth=1).bind(**extra_kwargs).debug(formatted_message)
 
     def info(self, message, **kwargs):
-        # First safely format the message
         formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
-        # Add trace context variables
         extra_kwargs = self._add_context(extra_kwargs)
-        # Use bind only for the extra kwargs, preserving any previously bound variables
-        # The underlying logger already has any variables from previous bind() calls
-        return self._logger.bind(**extra_kwargs).info(formatted_message)
+        return self._logger.opt(depth=1).bind(**extra_kwargs).info(formatted_message)
 
     def warning(self, message, **kwargs):
         formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
         extra_kwargs = self._add_context(extra_kwargs)
-        return self._logger.bind(**extra_kwargs).warning(formatted_message)
+        return self._logger.opt(depth=1).bind(**extra_kwargs).warning(formatted_message)
 
     def error(self, message, **kwargs):
         formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
         extra_kwargs = self._add_context(extra_kwargs)
-        return self._logger.bind(**extra_kwargs).error(formatted_message)
+        return self._logger.opt(depth=1).bind(**extra_kwargs).error(formatted_message)
 
     def critical(self, message, **kwargs):
         formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
         extra_kwargs = self._add_context(extra_kwargs)
-        return self._logger.bind(**extra_kwargs).critical(formatted_message)
+        return self._logger.opt(depth=1).bind(**extra_kwargs).critical(formatted_message)
 
     def exception(self, message, **kwargs):
         formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
         extra_kwargs = self._add_context(extra_kwargs)
-        return self._logger.bind(**extra_kwargs).exception(formatted_message)
+        return self._logger.opt(depth=1, exception=True).bind(**extra_kwargs).error(formatted_message)
 
     def log(self, level, message, **kwargs):
         formatted_message, extra_kwargs = self._safe_format_message(message, **kwargs)
         extra_kwargs = self._add_context(extra_kwargs)
-        return self._logger.bind(**extra_kwargs).log(level, formatted_message)
+        return self._logger.opt(depth=1).bind(**extra_kwargs).log(level, formatted_message)
 
     def opt(self, *args, **kwargs):
+        # Forward depth properly if specified
+        if 'depth' in kwargs:
+            # Increment depth by 1 to account for this adapter
+            kwargs['depth'] += 1
+        else:
+            # Default to depth 1 if not specified
+            kwargs['depth'] = 1
+
         # Create a new adapter with the opt result
         opt_logger = self._logger.opt(*args, **kwargs)
         return TraceContextAdapter(opt_logger)
@@ -296,7 +299,6 @@ class TraceContextAdapter(SafeFormattingMixin):
     def __getattr__(self, name):
         """Forward any other attribute access to the underlying logger."""
         return getattr(self._logger, name)
-
 
 def setup_logging():
     """Configure loguru with custom formatting and enhanced exception handling."""
@@ -407,8 +409,16 @@ def setup_logging():
                 frame = frame.f_back
                 depth += 1
 
-            # Gather extra data
-            extras = {}
+            # Extract location info from the record
+            # This is the key change - use the record's location info directly
+            extras = {
+                'file': record.pathname,
+                'line': record.lineno,
+                'function': record.funcName,
+                'name': record.name
+            }
+
+            # Add any other extra fields from the record
             for key, value in record.__dict__.items():
                 if key not in {"args", "asctime", "created", "exc_info", "exc_text",
                                "filename", "funcName", "id", "levelname", "levelno",
@@ -430,9 +440,10 @@ def setup_logging():
             if task_name and 'task_name' not in extras:
                 extras['task_name'] = task_name
 
-            # Pass exception info if present
-            logger.opt(depth=depth, exception=record.exc_info is not None).bind(**extras).log(
-                level, record.getMessage())
+            # Don't use opt(depth) since we're providing the location info directly
+            # Instead, use the original message and location info in extras
+            logger.bind(**extras).log(
+                level, record.getMessage(), exc_info=record.exc_info)
 
     # Set up interception for existing standard loggers
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
