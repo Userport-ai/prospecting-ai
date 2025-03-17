@@ -25,8 +25,6 @@ from utils.loguru_setup import logger
 from .enrichment_task import AccountEnrichmentTask
 
 
-
-
 @dataclass
 class ApolloConfig:
     """Centralized configuration management."""
@@ -41,6 +39,7 @@ class ApolloConfig:
     retry_delay: float = 1.0
     max_retry_delay: float = 5.0
     enrich_leads: bool = True
+    max_leads_to_enrich: int = 100
     confidence_threshold: int = 50
     min_fit_threshold: int = 50
 
@@ -716,11 +715,11 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 logger.debug(f"Lead {lead_id} is recommended for enrichment by Pre Evaluation with intitial score: {initial_score}")
 
                 # Check if the lead is recommended by the LLM or passes the custom enrichment criteria.
-                if recommended or self._should_enrich_lead(
+                if (recommended or self._should_enrich_lead(
                         evaluation=eval_result,
                         apollo_lead=apollo_lead,
                         product_data=product_data
-                ):
+                )) and len(leads_for_enrichment) < self.config.max_leads_to_enrich:
                     leads_for_enrichment.append(apollo_lead)
                 else:
                     skipped_leads.append(apollo_lead)
