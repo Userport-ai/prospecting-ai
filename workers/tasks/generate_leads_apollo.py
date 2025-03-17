@@ -639,7 +639,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
         name = account_data.get("name")
         if not name:
-            raise ValueError(f"Account name is requried for lead identication for account ID: {account_id}")
+            raise ValueError(f"Account name is required for lead identification. Account ID: {account_id}")
         website = account_data.get('website')
         if not website:
             raise ValueError(f"Account website/domain is required for lead identification for account ID: {account_id}")
