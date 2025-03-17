@@ -691,7 +691,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             pre_evaluation_results = await self.pre_evaluate_apollo_leads(apollo_leads, product_data)
 
             # Filter leads for enrichment
-            leads_for_enrichment = []
+            leads_for_enrichment_with_scores = []
             skipped_leads = []
             apollo_leads_dict = {lead.id: lead for lead in apollo_leads}
 
@@ -719,12 +719,23 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                         evaluation=eval_result,
                         apollo_lead=apollo_lead,
                         product_data=product_data
-                )) and len(leads_for_enrichment) < self.config.max_leads_to_enrich:
-                    leads_for_enrichment.append(apollo_lead)
+                )):
+                    leads_for_enrichment_with_scores.append((apollo_lead, initial_score))
                 else:
                     skipped_leads.append(apollo_lead)
 
-            logger.info(f"Selected {len(leads_for_enrichment)} out of {len(apollo_leads)} leads for enrichment")
+            # Cap final list of leads for enrichment based on Proxycurl limits.
+            leads_for_enrichment = []
+            if len(leads_for_enrichment_with_scores) > self.config.max_leads_to_enrich:
+                # Top leads by score will be enriched by Proxycurl, and remaining will be added to skipped leads list.
+                sorted_leads_for_enrichment_with_scores = sorted(leads_for_enrichment_with_scores, key=lambda x: -x[1])
+                sorted_leads_for_enrichment = [lws[0] for lws in sorted_leads_for_enrichment_with_scores]
+                leads_for_enrichment = sorted_leads_for_enrichment[:self.config.max_leads_to_enrich]
+                skipped_leads.extend(sorted_leads_for_enrichment[self.config.max_leads_to_enrich:])
+                logger.info(f"Capped {len(leads_for_enrichment)} for enrichment out of initially selected {len(sorted_leads_for_enrichment)} leads out of total {len(apollo_leads)} leads")
+            else:
+                leads_for_enrichment = [lws[0] for lws in leads_for_enrichment_with_scores]
+                logger.info(f"Selected {len(leads_for_enrichment)} out of {len(apollo_leads)} leads for enrichment")
 
             # Transform leads in batches
             current_stage = 'structuring_leads'
