@@ -80,6 +80,8 @@ interface TableProps {
   handlePageClick: (goToNextPage: boolean) => Promise<void>;
   dataLoading: boolean;
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
+  curPageSize: number;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 // Component to display Accounts Table.
@@ -91,16 +93,13 @@ const Table: React.FC<TableProps> = ({
   handlePageClick,
   dataLoading,
   onCustomColumnAdded,
+  curPageSize,
+  onPageSizeChange,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
-  const initialPaginationState = {
-    pageIndex: 0, //initial page index
-    pageSize: 20, //default page size
-  };
-  const [pagination, setPagination] = useState(initialPaginationState);
-  const pageCount = Math.ceil(totalAccountsCount / pagination.pageSize);
+  const pageCount = Math.ceil(totalAccountsCount / curPageSize);
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
@@ -133,7 +132,6 @@ const Table: React.FC<TableProps> = ({
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     getRowId: (row) => row.id, //use the account's ID
-    onPaginationChange: setPagination,
     // Needed to solve this error: https://github.com/TanStack/table/issues/5026.
     autoResetPageIndex: false,
     state: {
@@ -141,7 +139,6 @@ const Table: React.FC<TableProps> = ({
       columnFilters,
       columnVisibility,
       rowSelection,
-      pagination,
     },
   });
 
@@ -193,6 +190,8 @@ const Table: React.FC<TableProps> = ({
         handlePageClick={handlePageClick}
         numSelectedRows={Object.keys(rowSelection).length}
         headerClassName="bg-[rgb(122,103,171)]"
+        curPageSize={curPageSize}
+        onPageSizeChange={onPageSizeChange}
       />
 
       <LoadingOverlay loading={dataLoading} />
@@ -207,6 +206,8 @@ export default function AccountsTable() {
   const [curAccounts, setCurAccounts] = useState<AccountRow[]>([]);
   // Current Page number (fetched from server). Valid page numbers start from 1.
   const [curPageNum, setCurPageNum] = useState(0);
+  // Current page size.
+  const [curPageSize, setCurPageSize] = useState<number>(20);
   const [products, setProducts] = useState<Product[]>([]);
   // Total cccounts count found on the server.
   const [totalAccountsCount, setTotalAccountsCount] = useState(0);
@@ -217,7 +218,10 @@ export default function AccountsTable() {
   const [dataLoading, setDataLoading] = useState<boolean>(false);
 
   const listAccountsHelper = async (pageNum: number) => {
-    const response = await listAccounts(authContext, { page: pageNum });
+    const response = await listAccounts(authContext, {
+      page: pageNum,
+      page_size: curPageSize,
+    });
     setTotalAccountsCount(response.count);
     setCurAccounts(response.results);
     setColumns(getAccountColumns(response.results));
@@ -225,6 +229,7 @@ export default function AccountsTable() {
   };
 
   useEffect(() => {
+    setLoading(true);
     listAccountsHelper(1)
       .then(async () => {
         const products = await listProducts(authContext);
@@ -234,7 +239,7 @@ export default function AccountsTable() {
         setError(new Error(`Failed to fetch Accounts: ${error.message}`))
       )
       .finally(() => setLoading(false));
-  }, [authContext]);
+  }, [authContext, curPageSize]);
 
   if (loading) {
     return <ScreenLoader />;
@@ -311,6 +316,8 @@ export default function AccountsTable() {
         handlePageClick={handlePageClick}
         dataLoading={dataLoading}
         onCustomColumnAdded={onCustomColumnAdded}
+        curPageSize={curPageSize}
+        onPageSizeChange={setCurPageSize}
       />
     </div>
   );

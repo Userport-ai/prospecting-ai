@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { CustomColumnMeta } from "./CustomColumnMeta";
 import CellExpansionSidebar from "./CellExpansionSidebar";
 import { useState } from "react";
+import PageSizeSelect from "./PageSizeSelect";
 
 interface CommonTableProps<T> {
   table: TanstackTable<T>;
@@ -24,6 +25,8 @@ interface CommonTableProps<T> {
   handlePageClick: (nextPage: boolean) => void;
   numSelectedRows: number;
   headerClassName?: string;
+  curPageSize: number;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 // Common Table component that renders a common table used by Accounts and Leads.
@@ -37,6 +40,8 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   handlePageClick,
   numSelectedRows,
   headerClassName,
+  curPageSize,
+  onPageSizeChange,
 }) => {
   const [expandedCellContext, setExpandedCellContext] = useState<CellContext<
     any,
@@ -203,14 +208,10 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
 
           {/* Pagination Controls */}
           <div className="flex items-center justify-start gap-8">
-            <div className="text-sm text-gray-600">
-              <p>
-                Rows in page{" "}
-                <span className="ml-2 p-2 border border-gray-400">
-                  {table.getRowCount()}
-                </span>
-              </p>
-            </div>
+            <PageSizeSelect
+              curPageSize={curPageSize}
+              onPageSizeChange={onPageSizeChange}
+            />
             <div>
               <p className="text-sm text-gray-600">
                 Page {curPageNum} of {totalPageCount}

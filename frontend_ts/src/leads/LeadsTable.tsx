@@ -39,9 +39,11 @@ interface TableProps {
   leads: LeadRow[];
   totalLeadsCount: number;
   curPageNum: number;
+  curPageSize: number;
   handlePageClick: (goToNextPage: boolean) => Promise<void>;
   dataLoading: boolean;
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 export const Table: React.FC<TableProps> = ({
@@ -49,9 +51,11 @@ export const Table: React.FC<TableProps> = ({
   leads,
   totalLeadsCount,
   curPageNum,
+  curPageSize,
   handlePageClick,
   dataLoading,
   onCustomColumnAdded,
+  onPageSizeChange,
 }) => {
   const authContext = useAuthContext();
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
@@ -72,13 +76,7 @@ export const Table: React.FC<TableProps> = ({
     },
   ]);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
-
-  const initialPaginationState = {
-    pageIndex: 0, //initial page index
-    pageSize: 20, //default page size
-  };
-  const [pagination, setPagination] = useState(initialPaginationState);
-  const pageCount = Math.ceil(totalLeadsCount / pagination.pageSize);
+  const pageCount = Math.ceil(totalLeadsCount / curPageSize);
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
@@ -103,8 +101,6 @@ export const Table: React.FC<TableProps> = ({
     newColumnFiltersState: Updater<ColumnFiltersState>
   ) => {
     // TODO call server to fetch new set of filters.
-    // Reset page page index to initial page.
-    setPagination(initialPaginationState);
     setColumnFilters(newColumnFiltersState);
   };
 
@@ -122,7 +118,6 @@ export const Table: React.FC<TableProps> = ({
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     getRowId: (row) => row.id, //use the lead's ID
-    onPaginationChange: setPagination,
     // Needed to solve this error: https://github.com/TanStack/table/issues/5026.
     autoResetPageIndex: false,
     state: {
@@ -130,7 +125,6 @@ export const Table: React.FC<TableProps> = ({
       columnFilters,
       columnVisibility,
       rowSelection,
-      pagination,
     },
   });
 
@@ -184,6 +178,8 @@ export const Table: React.FC<TableProps> = ({
         handlePageClick={handlePageClick}
         numSelectedRows={Object.keys(rowSelection).length}
         headerClassName="bg-[rgb(180,150,200)]"
+        curPageSize={curPageSize}
+        onPageSizeChange={onPageSizeChange}
       />
 
       <LoadingOverlay loading={dataLoading} />
@@ -204,6 +200,8 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const [curLeads, setCurLeads] = useState<LeadRow[]>([]);
   // Current Page number (fetched from server). Valid page numbers start from 1.
   const [curPageNum, setCurPageNum] = useState<number>(0);
+  // Current page size.
+  const [curPageSize, setCurPageSize] = useState<number>(20);
   // Cursor values associated with the pages fetched from server.
   // Initially null since page 1 always has null cursor value.
   const [cursorValues, setCursorValues] = useState<(string | null)[]>([null]);
@@ -216,7 +214,14 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const [dataLoading, setDataLoading] = useState<boolean>(false);
 
   const listLeads = async (cursor: string | null) => {
-    const response = await listLeadsWithQuota(authContext, cursor, accountId);
+    const response = await listLeadsWithQuota(authContext, {
+      accountId: accountId ?? null,
+      cursor: cursor,
+      limit: curPageSize,
+      buyer_percent: 60,
+      influencer_percent: 35,
+      end_user_percent: 5,
+    });
     setTotalLeadsCount(response.count);
     setCurLeads(response.results);
     setColumns(getLeadColumns(response.results));
@@ -225,16 +230,17 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
 
   // Initial fetch for leads.
   useEffect(() => {
-    listLeads(cursorValues[0])
+    setLoading(true);
+    listLeads(null)
       .then((response) => {
         setCurPageNum(1);
-        setCursorValues([...cursorValues, response.next_cursor ?? null]);
+        setCursorValues([null, response.next_cursor ?? null]);
       })
       .catch((error) =>
         setError(new Error(`Failed to fetch Leads: ${error.message}`))
       )
       .finally(() => setLoading(false));
-  }, [authContext]);
+  }, [authContext, curPageSize]);
 
   if (loading) {
     return <ScreenLoader />;
@@ -287,9 +293,11 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       leads={curLeads}
       totalLeadsCount={totalLeadsCount}
       curPageNum={curPageNum}
+      curPageSize={curPageSize}
       handlePageClick={handlePageClick}
       dataLoading={dataLoading}
       onCustomColumnAdded={onCustomColumnAdded}
+      onPageSizeChange={setCurPageSize}
     />
   );
 };

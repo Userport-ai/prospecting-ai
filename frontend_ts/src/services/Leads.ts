@@ -235,24 +235,32 @@ const listLeadsHelper = async (
   });
 };
 
+interface ListLeadsWithQuotaRequest {
+  accountId: string | null; // Present when listing leads within account and absent when listing leads globally.
+  cursor: string | null; // Cursor value of page to request on server.
+  limit: number; // Max number of leads to request in current page.
+  buyer_percent: number; // Max Percentage of Buyers we want in given page
+  influencer_percent: number; // Max Percentage of Influencers we want in given page.
+  end_user_percent: number; // Max Percentage of End users we want in given page.
+}
+
 // Helper to list leads.
 export const listLeadsWithQuota = async (
   authContext: AuthContext,
-  cursor: string | null,
-  accountId?: string
+  request: ListLeadsWithQuotaRequest
 ): Promise<ListLeadsResponse> => {
   var params: Record<string, any> = {
-    limit: 20,
-    buyer_percent: 60,
-    influencer_percent: 35,
-    end_user_percent: 5,
+    limit: request.limit,
+    buyer_percent: request.buyer_percent,
+    influencer_percent: request.influencer_percent,
+    end_user_percent: request.end_user_percent,
     suggestion_status: SuggestionStatus.SUGGESTED,
   };
-  if (cursor) {
-    params["cursor"] = cursor;
+  if (request.cursor) {
+    params["cursor"] = request.cursor;
   }
-  if (accountId) {
-    params["account"] = accountId;
+  if (request.accountId) {
+    params["account"] = request.accountId;
   }
   return await apiCall<ListLeadsResponse>(authContext, async (apiClient) => {
     const response = await apiClient.get<ListLeadsResponse>(
