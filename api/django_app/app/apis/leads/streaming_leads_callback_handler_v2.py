@@ -22,11 +22,34 @@ class StreamingCallbackHandlerV2:
         try:
             logger.info(f"[handle_callback] Received callback for job_id={data.get('job_id', '<None>')}")
 
+            # For non-paginated requests, we need to process the leads
             if not data.get('pagination'):
                 logger.info(
                     f"[handle_callback] No pagination for job_id={data.get('job_id', '<None>')}, account_id={data.get('account_id', '<None>')}"
-                    "returning data directly."
+                    "processing data."
                 )
+                # Parse incoming data with Pydantic
+                callback_data = EnrichmentCallbackData(**data)
+
+                with transaction.atomic():
+                    # Get account
+                    account = Account.objects.select_for_update().get(id=callback_data.account_id)
+                    logger.debug(f"[handle_callback] Locked account id={callback_data.account_id} for update")
+
+                    # Process leads from this data
+                    cls._process_leads_batch(
+                        account=account,
+                        source=callback_data.source,
+                        processed_data=callback_data.processed_data
+                    )
+
+                    # Update account final status
+                    cls._update_account_final_status(
+                        account=account,
+                        processed_data=callback_data.processed_data
+                    )
+
+                # Return data for consistency with original behavior
                 return data
 
             # Parse incoming data with Pydantic
@@ -77,7 +100,6 @@ class StreamingCallbackHandlerV2:
         except Exception as e:
             logger.error(f"[handle_callback] Error processing callback: {str(e)}", exc_info=True)
             raise
-
     @classmethod
     def _build_lead_mapping(
             cls,
