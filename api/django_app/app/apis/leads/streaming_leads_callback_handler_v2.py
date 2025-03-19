@@ -22,38 +22,44 @@ class StreamingCallbackHandlerV2:
         try:
             logger.info(f"[handle_callback] Received callback for job_id={data.get('job_id', '<None>')}")
 
+            # Parse incoming data with Pydantic
+            callback_data = EnrichmentCallbackData(**data)
+
             # For non-paginated requests, we need to process the leads
             if not data.get('pagination'):
                 logger.info(
                     f"[handle_callback] No pagination for job_id={data.get('job_id', '<None>')}, account_id={data.get('account_id', '<None>')}"
                     "processing data."
                 )
-                # Parse incoming data with Pydantic
-                callback_data = EnrichmentCallbackData(**data)
 
                 with transaction.atomic():
                     # Get account
                     account = Account.objects.select_for_update().get(id=callback_data.account_id)
                     logger.debug(f"[handle_callback] Locked account id={callback_data.account_id} for update")
 
+                    # Initialize processed_data with empty lists if None
+                    processed_data = callback_data.processed_data or ProcessedData(
+                        all_leads=[],
+                        structured_leads=[],
+                        qualified_leads=[],
+                        score_distribution={}
+                    )
+
                     # Process leads from this data
                     cls._process_leads_batch(
                         account=account,
                         source=callback_data.source,
-                        processed_data=callback_data.processed_data
+                        processed_data=processed_data
                     )
 
                     # Update account final status
                     cls._update_account_final_status(
                         account=account,
-                        processed_data=callback_data.processed_data
+                        processed_data=processed_data
                     )
 
                 # Return data for consistency with original behavior
                 return data
-
-            # Parse incoming data with Pydantic
-            callback_data = EnrichmentCallbackData(**data)
 
             current_page = callback_data.pagination.page
             total_pages = callback_data.pagination.total_pages
@@ -69,11 +75,19 @@ class StreamingCallbackHandlerV2:
                 account = Account.objects.select_for_update().get(id=callback_data.account_id)
                 logger.debug(f"[handle_callback] Locked account id={callback_data.account_id} for update")
 
+                # Initialize processed_data with empty lists if None
+                processed_data = callback_data.processed_data or ProcessedData(
+                    all_leads=[],
+                    structured_leads=[],
+                    qualified_leads=[],
+                    score_distribution={}
+                )
+
                 # Process leads from this page
                 cls._process_leads_batch(
                     account=account,
                     source=callback_data.source,
-                    processed_data=callback_data.processed_data
+                    processed_data=processed_data
                 )
 
                 if current_page < total_pages:
@@ -89,7 +103,7 @@ class StreamingCallbackHandlerV2:
                 )
                 cls._update_account_final_status(
                     account=account,
-                    processed_data=callback_data.processed_data
+                    processed_data=processed_data
                 )
                 logger.info(
                     f"[handle_callback] Completed final page for job_id={callback_data.job_id}. "
@@ -100,6 +114,7 @@ class StreamingCallbackHandlerV2:
         except Exception as e:
             logger.error(f"[handle_callback] Error processing callback: {str(e)}", exc_info=True)
             raise
+
     @classmethod
     def _build_lead_mapping(
             cls,
@@ -108,6 +123,10 @@ class StreamingCallbackHandlerV2:
     ) -> Dict[str, Tuple[StructuredLead, EvaluationData]]:
         """Build a comprehensive mapping of lead data combining evaluation and structure."""
         lead_mapping = {}
+
+        # Safety check for None values
+        all_leads = all_leads or []
+        structured_leads = structured_leads or []
 
         # First, process all_leads to get evaluation data
         evaluation_mapping = {}
@@ -149,16 +168,20 @@ class StreamingCallbackHandlerV2:
     ) -> None:
         """Process a batch of leads for an account."""
         try:
+            # Ensure lists are not None before trying to get their length
+            all_leads = processed_data.all_leads or []
+            structured_leads = processed_data.structured_leads or []
+
             logger.debug(
                 f"[_process_leads_batch] Starting lead batch processing: "
-                f"{len(processed_data.all_leads)} leads in 'all_leads', "
-                f"{len(processed_data.structured_leads)} leads in 'structured_leads'."
+                f"{len(all_leads)} leads in 'all_leads', "
+                f"{len(structured_leads)} leads in 'structured_leads'."
             )
 
             # Build comprehensive lead mapping using Pydantic models
             lead_mapping = cls._build_lead_mapping(
-                processed_data.all_leads,
-                processed_data.structured_leads
+                all_leads,
+                structured_leads
             )
 
             # Process each lead with complete data
@@ -291,8 +314,13 @@ class StreamingCallbackHandlerV2:
     ) -> None:
         """Update account status after processing all leads."""
         try:
-            all_leads_count = len(processed_data.all_leads)
-            qualified_leads_count = len(processed_data.qualified_leads)
+            # Ensure lists are not None before trying to get their length
+            all_leads = processed_data.all_leads or []
+            qualified_leads = processed_data.qualified_leads or []
+
+            all_leads_count = len(all_leads)
+            qualified_leads_count = len(qualified_leads)
+            score_distribution = processed_data.score_distribution or {}
 
             # Update account enrichment sources
             account.enrichment_sources = account.enrichment_sources or {}
@@ -300,7 +328,7 @@ class StreamingCallbackHandlerV2:
                 'last_run': timezone.now().isoformat(),
                 'leads_found': all_leads_count,
                 'qualified_leads': qualified_leads_count,
-                'score_distribution': processed_data.score_distribution or {}
+                'score_distribution': score_distribution
             }
 
             # Update enrichment status to completed
