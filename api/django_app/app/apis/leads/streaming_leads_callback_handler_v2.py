@@ -45,18 +45,26 @@ class StreamingCallbackHandlerV2:
                         score_distribution={}
                     )
 
-                    # Process leads from this data
-                    cls._process_leads_batch(
-                        account=account,
-                        source=callback_data.source,
-                        processed_data=processed_data
-                    )
+                    # Check if this is just an initial callback with no actual leads
+                    all_leads = processed_data.all_leads or []
+                    structured_leads = processed_data.structured_leads or []
+                    has_data = len(all_leads) > 0 or len(structured_leads) > 0
 
-                    # Update account final status
-                    cls._update_account_final_status(
-                        account=account,
-                        processed_data=processed_data
-                    )
+                    if has_data:
+                        # Only process leads if there are actually leads to process
+                        cls._process_leads_batch(
+                            account=account,
+                            source=callback_data.source,
+                            processed_data=processed_data
+                        )
+
+                        # Only update account final status if we have actual leads
+                        cls._update_account_final_status(
+                            account=account,
+                            processed_data=processed_data
+                        )
+                    else:
+                        logger.info(f"[handle_callback] Received callback with no leads for account_id={account.id}. Skipping processing.")
 
                 # Return data for consistency with original behavior
                 return data
@@ -83,12 +91,20 @@ class StreamingCallbackHandlerV2:
                     score_distribution={}
                 )
 
-                # Process leads from this page
-                cls._process_leads_batch(
-                    account=account,
-                    source=callback_data.source,
-                    processed_data=processed_data
-                )
+                # Check if this page has any leads
+                all_leads = processed_data.all_leads or []
+                structured_leads = processed_data.structured_leads or []
+                has_data = len(all_leads) > 0 or len(structured_leads) > 0
+
+                if has_data:
+                    # Only process leads if there are actually leads to process
+                    cls._process_leads_batch(
+                        account=account,
+                        source=callback_data.source,
+                        processed_data=processed_data
+                    )
+                else:
+                    logger.info(f"[handle_callback] Page {current_page} has no leads for account_id={account.id}. Skipping processing.")
 
                 if current_page < total_pages:
                     logger.debug(
@@ -99,12 +115,22 @@ class StreamingCallbackHandlerV2:
 
                 logger.debug(
                     f"[handle_callback] Final page reached (page={current_page} of {total_pages}) "
-                    f"for job_id={callback_data.job_id}. Updating account status."
+                    f"for job_id={callback_data.job_id}."
                 )
-                cls._update_account_final_status(
-                    account=account,
-                    processed_data=processed_data
-                )
+
+                # On the final page, check if the current page has leads before updating status
+                if has_data:
+                    logger.debug(f"[handle_callback] Final page has leads. Updating account status.")
+                    cls._update_account_final_status(
+                        account=account,
+                        processed_data=processed_data
+                    )
+                else:
+                    logger.info(
+                        f"[handle_callback] Final page has no leads for job_id={callback_data.job_id}. "
+                        f"Not marking enrichment as completed."
+                    )
+
                 logger.info(
                     f"[handle_callback] Completed final page for job_id={callback_data.job_id}. "
                     "Returning full data."
@@ -317,10 +343,10 @@ class StreamingCallbackHandlerV2:
             # Ensure lists are not None before trying to get their length
             all_leads = processed_data.all_leads or []
             qualified_leads = processed_data.qualified_leads or []
+            score_distribution = processed_data.score_distribution or {}
 
             all_leads_count = len(all_leads)
             qualified_leads_count = len(qualified_leads)
-            score_distribution = processed_data.score_distribution or {}
 
             # Update account enrichment sources
             account.enrichment_sources = account.enrichment_sources or {}
