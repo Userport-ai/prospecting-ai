@@ -17,7 +17,6 @@ from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
 
 
-
 # Retry configurations
 GEMINI_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
@@ -67,6 +66,7 @@ class AICacheService:
             bigquery.SchemaField("prompt", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("is_json_response", "BOOLEAN", mode="REQUIRED"),
             bigquery.SchemaField("operation_tag", "STRING"),
+            bigquery.SchemaField("temperature", "FLOAT"),  # Add temperature to schema
             bigquery.SchemaField("response_data", "JSON"),
             bigquery.SchemaField("response_text", "STRING"),
             bigquery.SchemaField("prompt_tokens", "INTEGER"),
@@ -92,15 +92,17 @@ class AICacheService:
             provider: str,
             model: str,
             is_json: bool,
-            operation_tag: str
+            operation_tag: str,
+            temperature: Optional[float] = None
     ) -> str:
-        """Generate a unique cache key for the AI request."""
+        """Generate a unique cache key for the AI request including temperature."""
         cache_data = {
             'prompt': prompt,
             'provider': provider,
             'model': model,
             'is_json': is_json,
-            'operation_tag': operation_tag
+            'operation_tag': operation_tag,
+            'temperature': temperature  # Include temperature in cache key
         }
         cache_str = json.dumps(cache_data, sort_keys=True)
         return hashlib.sha256(cache_str.encode()).hexdigest()
@@ -112,10 +114,11 @@ class AICacheService:
             model: str,
             is_json: bool = True,
             operation_tag: str = "default",
-            tenant_id: Optional[str] = None
+            tenant_id: Optional[str] = None,
+            temperature: Optional[float] = None
     ) -> Optional[Dict[str, Any]]:
         """Get cached response for the given AI prompt."""
-        cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag)
+        cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag, temperature)
 
         query = f"""
         SELECT 
@@ -130,6 +133,7 @@ class AICacheService:
         AND provider = @provider
         AND model = @model
         AND is_json_response = @is_json
+        AND (temperature IS NULL OR temperature = @temperature)
         AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP())
         AND (tenant_id IS NULL OR tenant_id = @tenant_id)
         ORDER BY created_at DESC
@@ -142,7 +146,8 @@ class AICacheService:
                 bigquery.ScalarQueryParameter("provider", "STRING", provider),
                 bigquery.ScalarQueryParameter("model", "STRING", model),
                 bigquery.ScalarQueryParameter("is_json", "BOOL", is_json),
-                bigquery.ScalarQueryParameter("tenant_id", "STRING", tenant_id)
+                bigquery.ScalarQueryParameter("tenant_id", "STRING", tenant_id),
+                bigquery.ScalarQueryParameter("temperature", "FLOAT", temperature)
             ]
         )
 
@@ -224,10 +229,11 @@ class AICacheService:
             is_json: bool = True,
             operation_tag: str = "default",
             tenant_id: Optional[str] = None,
-            ttl_hours: Optional[int] = None
+            ttl_hours: Optional[int] = None,
+            temperature: Optional[float] = None
     ) -> None:
         """Cache an AI response."""
-        cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag)
+        cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag, temperature)
         expires_at = None
 
         if ttl_hours is not None:
@@ -253,6 +259,7 @@ class AICacheService:
             "prompt": prompt,
             "is_json_response": is_json,
             "operation_tag": operation_tag,
+            "temperature": temperature,  # Store temperature value
             "response_data": response_data,  # Already JSON string
             "response_text": response_text,
             "prompt_tokens": token_usage.prompt_tokens,
@@ -313,7 +320,8 @@ class AIService(ABC):
             self,
             model_name: Optional[str] = None,
             cache_service: Optional[AICacheService] = None,
-            tenant_id: Optional[str] = None
+            tenant_id: Optional[str] = None,
+            default_temperature: Optional[float] = None
     ):
         """Initialize service with token tracking and optional caching."""
         self.provider_name = "base"  # Override in subclasses
@@ -321,6 +329,7 @@ class AIService(ABC):
         self.tenant_id = tenant_id
         self.cache_ttl_hours = 24  # Default cache TTL
         self.model = model_name  # Model name to be used by the service
+        self.default_temperature = default_temperature  # Default temperature
 
     def _create_token_usage(
             self,
@@ -344,7 +353,8 @@ class AIService(ABC):
             self,
             prompt: str,
             is_json: bool = True,
-            operation_tag: str = "default"
+            operation_tag: str = "default",
+            temperature: Optional[float] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content from prompt without using cache."""
         pass
@@ -354,9 +364,13 @@ class AIService(ABC):
             prompt: str,
             is_json: bool = True,
             operation_tag: str = "default",
-            force_refresh: bool = False
+            force_refresh: bool = False,
+            temperature: Optional[float] = None
     ) -> Union[Dict[str, Any], str]:
         """Generate content from prompt, using cache if available."""
+        # Use provided temperature or fall back to default
+        used_temperature = temperature if temperature is not None else self.default_temperature
+
         if self.cache_service and not force_refresh:
             cached_response = None
             try:
@@ -366,7 +380,8 @@ class AIService(ABC):
                     model=self.model,
                     is_json=is_json,
                     operation_tag=operation_tag,
-                    tenant_id=self.tenant_id
+                    tenant_id=self.tenant_id,
+                    temperature=used_temperature
                 )
             except Exception as e:
                 logger.error(f"Cache read failed: {e}")
@@ -378,7 +393,8 @@ class AIService(ABC):
         response, token_usage = await self._generate_content_without_cache(
             prompt=prompt,
             is_json=is_json,
-            operation_tag=operation_tag
+            operation_tag=operation_tag,
+            temperature=used_temperature
         )
 
         if self.cache_service:
@@ -392,7 +408,8 @@ class AIService(ABC):
                     is_json=is_json,
                     operation_tag=operation_tag,
                     tenant_id=self.tenant_id,
-                    ttl_hours=self.cache_ttl_hours
+                    ttl_hours=self.cache_ttl_hours,
+                    temperature=used_temperature
                 )
             except Exception as e:
                 logger.error(f"Failed to cache response: {e}")
@@ -406,10 +423,16 @@ class GeminiService(AIService):
             self,
             model_name: Optional[str] = None,
             cache_service: Optional[AICacheService] = None,
-            tenant_id: Optional[str] = None
+            tenant_id: Optional[str] = None,
+            default_temperature: Optional[float] = 0.0  # Default to 0.0 for deterministic outputs
     ):
         """Initialize Gemini client."""
-        super().__init__(model_name=model_name, cache_service=cache_service, tenant_id=tenant_id)
+        super().__init__(
+            model_name=model_name,
+            cache_service=cache_service,
+            tenant_id=tenant_id,
+            default_temperature=default_temperature
+        )
         self.provider_name = "gemini"
 
         api_key = os.getenv("GEMINI_API_TOKEN")
@@ -429,15 +452,19 @@ class GeminiService(AIService):
             self,
             prompt: str,
             is_json: bool = True,
-            operation_tag: str = "default"
+            operation_tag: str = "default",
+            temperature: Optional[float] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content using Gemini without using cache."""
         try:
             if is_json:
                 prompt = f"{prompt}\n\nRespond in JSON format only."
 
+            # Use provided temperature or default
+            used_temperature = temperature if temperature is not None else self.default_temperature
+
             # Gemini's generate_content is synchronous, so we run it in a thread
-            response = await self._generate_content_in_thread(prompt)
+            response = await self._generate_content_in_thread(prompt, used_temperature)
 
             if not response or not response.parts:
                 logger.warning("Empty response from Gemini")
@@ -471,9 +498,16 @@ class GeminiService(AIService):
             return {} if is_json else "", token_usage
 
     @to_thread
-    def _generate_content_in_thread(self, prompt: str):
+    def _generate_content_in_thread(self, prompt: str, temperature: Optional[float] = None):
         """Run Gemini's synchronous generate_content in a separate thread"""
-        return self.model_instance.generate_content(prompt)
+        generation_config = {}
+        if temperature is not None:
+            generation_config['temperature'] = temperature
+
+        return self.model_instance.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
 
     @to_cpu_thread
     def _parse_json_response_async(self, response: str) -> Dict[str, Any]:
@@ -509,10 +543,16 @@ class OpenAIService(AIService):
             self,
             model_name: Optional[str] = None,
             cache_service: Optional[AICacheService] = None,
-            tenant_id: Optional[str] = None
+            tenant_id: Optional[str] = None,
+            default_temperature: Optional[float] = 0.0  # Default to 0.0 for deterministic outputs
     ):
         """Initialize OpenAI client."""
-        super().__init__(model_name=model_name, cache_service=cache_service, tenant_id=tenant_id)
+        super().__init__(
+            model_name=model_name,
+            cache_service=cache_service,
+            tenant_id=tenant_id,
+            default_temperature=default_temperature
+        )
         self.provider_name = "openai"
 
         api_key = os.getenv("OPENAI_API_KEY")
@@ -539,7 +579,8 @@ class OpenAIService(AIService):
             self,
             prompt: str,
             is_json: bool = True,
-            operation_tag: str = "default"
+            operation_tag: str = "default",
+            temperature: Optional[float] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content using OpenAI without using cache."""
         try:
@@ -557,10 +598,14 @@ class OpenAIService(AIService):
             # Configure response format for JSON if needed
             response_format = {"type": "json_object"} if is_json else None
 
+            # Use provided temperature or default
+            used_temperature = temperature if temperature is not None else self.default_temperature
+
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                response_format=response_format
+                response_format=response_format,
+                temperature=used_temperature
             )
             logger.debug(f"OpenAI response: {response}")
 
@@ -639,7 +684,8 @@ class AIServiceFactory:
             provider: str = "openai",
             tenant_id: Optional[str] = None,
             model_name: Optional[str] = None,
-            cache_ttl_hours: Optional[int] = 24
+            cache_ttl_hours: Optional[int] = 24,
+            default_temperature: Optional[float] = 0.2
     ) -> AIService:
         """
         Create an AI service instance with optional caching.
@@ -649,6 +695,7 @@ class AIServiceFactory:
             model_name: Optional model name to use
             tenant_id: Optional tenant ID for multi-tenancy
             cache_ttl_hours: Cache TTL in hours (only used if caching is enabled)
+            default_temperature: Default temperature setting (0.0 for deterministic outputs)
 
         Returns:
             AIService instance (OpenAIService or GeminiService)
@@ -659,18 +706,20 @@ class AIServiceFactory:
             service = OpenAIService(
                 model_name=model_name,
                 cache_service=self.cache_service,
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
+                default_temperature=default_temperature
             )
         elif provider.lower() == "gemini":
             service = GeminiService(
                 model_name=model_name,
                 cache_service=self.cache_service,
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
+                default_temperature=default_temperature
             )
         else:
             raise ValueError(f"Unsupported AI provider: {provider}")
 
-    # Set cache TTL if caching is enabled
+        # Set cache TTL if caching is enabled
         if self.cache_service and cache_ttl_hours is not None:
             service.cache_ttl_hours = cache_ttl_hours
 

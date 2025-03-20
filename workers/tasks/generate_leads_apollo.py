@@ -42,6 +42,8 @@ class ApolloConfig:
     max_leads_to_enrich: int = 100
     confidence_threshold: int = 50
     min_fit_threshold: int = 50
+    default_temperature: float = 0.15
+    pre_eval_temperature: float = 0.0
 
     # Configuration parameters for scoring
     seniority_thresholds: Dict[str, float] = field(default_factory=lambda: {
@@ -360,7 +362,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the Gemini AI service."""
-        self.model = AIServiceFactory().create_service("gemini")
+        self.model = AIServiceFactory().create_service("gemini", default_temperature=ApolloConfig.default_temperature)
 
     def _initialize_services(self) -> None:
         """Initialize required services."""
@@ -587,7 +589,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                         } for lead in batch]
 
                         batch_prompt = f"{base_prompt}\n\nThe leads to evaluate:\n{json.dumps(batch_data, indent=2)}"
-                        response = await self.model.generate_content(batch_prompt, is_json=True, operation_tag="pre_evaluate_apollo_leads")
+                        response = await self.model.generate_content(batch_prompt, is_json=True, operation_tag="pre_evaluate_apollo_leads", temperature=ApolloConfig.pre_eval_temperature)
 
                         if not response:
                             logger.error("Empty response from AI model")
