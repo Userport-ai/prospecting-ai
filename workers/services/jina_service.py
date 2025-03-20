@@ -1,5 +1,7 @@
 import os
 import asyncio
+
+import httpcore
 import httpx
 from typing import Dict, Optional
 
@@ -18,6 +20,7 @@ JINA_RETRY_CONFIG = RetryConfig(
         httpx.ConnectTimeout,
         httpx.ConnectError,
         httpx.ReadError,
+        httpcore.ReadTimeout,
     ]
 )
 
