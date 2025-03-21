@@ -1102,20 +1102,25 @@ class OpenAIService(AIService):
 
         # Handle refusals if present
         if "refusal" in result or "error" in result:
-            logger.warning(f"Model refused to respond: {result['refusal']}")
+            empty_response = {field: [] for field in response_schema.model_fields.keys()}
+            if "refusal" in result:
+                logger.warning(f"Model refused to respond: {result['refusal']}")
+                empty_response["_refusal_message"] = result["refusal"]
+            elif "error" in result:
+                logger.warning(f"Error in response: {result['error']}")
+                empty_response["_refusal_message"] = result["error"]
             # Provide a minimal valid response structure
             if hasattr(response_schema, "model_fields"):
-                empty_response = {field: [] for field in response_schema.model_fields.keys()}
-                empty_response["_refusal_message"] = result["refusal"]
                 result = empty_response
 
-        # Store result in cache
-        await self._store_search_result(
-            cache_key=cache_key,
-            result=result,
-            token_usage=token_usage,
-            prompt=prompt
-        )
+        else:
+            # Store result in cache
+            await self._store_search_result(
+                cache_key=cache_key,
+                result=result,
+                token_usage=token_usage,
+                prompt=prompt
+            )
 
         # Try to validate and convert the result using the schema
         if hasattr(response_schema, "model_validate"):

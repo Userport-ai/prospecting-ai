@@ -106,42 +106,14 @@ class OpenAISearchService:
     def _create_intelligence_prompt(self, website: str) -> str:
         """Create prompt for the intelligence gathering."""
         return f"""
-Perform a comprehensive search to compile detailed information about the competitors, customers, and recent events related to the website {website}. Use data from both the company's own website and other reputable sources. Present the output strictly as plain JSON with no additional text. Use the following structure:
-
-{{
-        "competitors": [
-    {{
-        "name": "Competitor Name",
-      "description": "A brief description of the competitor and its offerings.",
-      "source": "URL or reference to the source"
-    }},
-    ...
-  ],
-  "customers": [
-    {{
-        "name": "Customer Name",
-      "description": "A brief description of how this customer uses or benefits from the service.",
-      "source": "URL or reference to the source"
-    }},
-    ...
-  ],
-  "recent_events": [
-    {{
-        "title": "Event Title",
-      "description": "A brief description of the event and its significance.",
-      "date": "YYYY-MM-DD",
-      "source": "URL or reference to the source"
-    }},
-    ...
-  ]
-}}
+Perform a comprehensive search to compile detailed information about the competitors, customers, and recent events related to the website {website}. Use data from both the company's own website and other reputable sources.
 
 Ensure that:
 - The JSON is properly formatted.
+- Keep the descriptions brief.
 - Each entry is supported by at least one reputable source.
-- The output includes multiple examples for each category.
 - There is no additional commentary or text outside the JSON structure.
-- Try and give 10 results each for competitors and customers and at least 3 most recent events for recent_events
+- Give at least 10 results each for competitors and customers and at least 3 most recent events for recent_events
 """
 
     def _get_empty_intelligence(self) -> Dict[str, Any]:
