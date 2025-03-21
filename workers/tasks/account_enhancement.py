@@ -485,6 +485,74 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 account_info.technologies = technologies
                 account_info.tech_profile = tech_profile
 
+                # Fetch market intelligence using OpenAI
+                logger.debug(f"Job {job_id}, Account {account_id}: Fetching market intelligence")
+                intelligence_data = await self._fetch_market_intelligence(website)
+
+                # Enhance the account info with intelligence data
+                openai_competitors = intelligence_data.get("competitors", [])
+                if openai_competitors:
+                    # Prioritize OpenAI competitors but keep any unique competitors from previous enrichment
+                    original_competitors = account_info.competitors
+                    # Replace with OpenAI data first
+                    account_info.competitors = openai_competitors
+
+                    # Add any unique competitors from original data
+                    for competitor in original_competitors:
+                        if competitor.lower() not in [c.lower() for c in account_info.competitors]:
+                            account_info.competitors.append(competitor)
+
+                    logger.debug(f"Job {job_id}, Account {account_id}: Updated competitors list with {len(account_info.competitors)} items")
+
+                # Merge customers similarly
+                openai_customers = intelligence_data.get("customers", [])
+                if openai_customers:
+                    original_customers = account_info.customers
+                    # Replace with OpenAI data first
+                    account_info.customers = openai_customers
+
+                    # Add any unique customers from original data
+                    for customer in original_customers:
+                        if customer.lower() not in [c.lower() for c in account_info.customers]:
+                            account_info.customers.append(customer)
+
+                    logger.debug(f"Job {job_id}, Account {account_id}: Updated customers list with {len(account_info.customers)} items")
+
+                # Get recent events
+                recent_events = intelligence_data.get("recent_events", [])
+
+                # Then continue with your existing code for processed_data, but update it to include recent events:
+                processed_data = {
+                    'company_name': account_info.name,
+                    'employee_count': account_info.employee_count,
+                    'industry': account_info.industries,
+                    'location': account_info.formatted_hq(),
+                    'website': website,
+                    'linkedin_url': account_info.linkedin_url,
+                    'technologies': account_info.technologies,
+                    'funding_details': account_info.financials.private_data.model_dump(),
+                    'company_type': account_info.organization_type,
+                    'founded_year': account_info.founded_year,
+                    'customers': account_info.customers,
+                    'competitors': account_info.competitors,
+                    'tech_profile': account_info.tech_profile.model_dump(),
+                    'recent_events': recent_events,  # Add the recent events data
+                }
+
+                # Update the raw data to include OpenAI intelligence when storing in BigQuery
+                await self.bq_service.insert_enrichment_raw_data(
+                    job_id=job_id,
+                    entity_id=account_id,
+                    source='jina_ai',
+                    raw_data={
+                        'jina_response': company_profile,
+                        'gemini_structured': structured_data,
+                        'gemini_analysis': analysis_text,
+                        'openai_intelligence': intelligence_data.get("raw_intelligence", {})  # Store the raw intelligence data
+                    },
+                    processed_data=processed_data
+                )
+
                 # Process and format enrichment data
                 processed_data = {
                     'company_name': account_info.name,
@@ -725,6 +793,62 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         except Exception as e:
             logger.error(f"Error parsing Gemini response: {str(e)}", exc_info=True)
             raise
+
+    async def _fetch_market_intelligence(self, website: str) -> Dict[str, Any]:
+        """
+        Fetch market intelligence including competitors and customers using OpenAI with web search.
+
+        Args:
+            website: Company website URL
+
+        Returns:
+            Dict containing intelligence data
+        """
+        try:
+            from services.openai_market_intel_service import OpenAISearchService
+            from services.ai_service import AIServiceFactory
+
+            logger.debug(f"Fetching market intelligence for website: {website}")
+
+            # Use AIServiceFactory to create an OpenAI service
+            factory = AIServiceFactory()
+            openai_service = factory.create_service(
+                provider="openai",
+                model_name="gpt-4o",  # The model that supports web search
+                cache_ttl_hours=24  # Cache for 24 hours since competitor data can change
+            )
+
+            # Create intelligence service
+            intelligence_service = OpenAISearchService(openai_service)
+
+            # Fetch intelligence data with web search
+            intelligence_data = await intelligence_service.fetch_company_intelligence(website)
+
+            # Extract structured data
+            competitors = intelligence_service.extract_competitor_names(intelligence_data)
+            customers = intelligence_service.extract_customer_names(intelligence_data)
+            recent_events = intelligence_service.extract_recent_events(intelligence_data)
+            citations = intelligence_service.extract_citations(intelligence_data)
+
+            logger.debug(f"Found {len(competitors)} competitors and {len(customers)} customers with {len(citations)} citations")
+
+            return {
+                "competitors": competitors,
+                "customers": customers,
+                "recent_events": recent_events,
+                "citations": citations,
+                "raw_intelligence": intelligence_data
+            }
+        except Exception as e:
+            logger.error(f"Error fetching market intelligence: {str(e)}", exc_info=True)
+            # Return empty data rather than failing the entire enrichment
+            return {
+                "competitors": [],
+                "customers": [],
+                "recent_events": [],
+                "citations": [],
+                "raw_intelligence": {}
+            }
 
     async def _generate_analysis(self, company_profile: str) -> str:
         """Generate business analysis using Gemini AI."""

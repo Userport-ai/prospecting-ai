@@ -416,6 +416,54 @@ class AIService(ABC):
 
         return response
 
+    @abstractmethod
+    async def generate_search_content(
+            self,
+            prompt: str,
+            search_context_size: str = "medium",
+            user_location: Optional[Dict[str, Any]] = None,
+            operation_tag: str = "search",
+            force_refresh: bool = False
+    ) -> Dict[str, Any]:
+        """Generate content with web search capability.
+
+        Args:
+            prompt: The input prompt for the model
+            search_context_size: Amount of search context to include ('low', 'medium', 'high')
+            user_location: Optional location information for geographically relevant searches
+            operation_tag: Identifier for the operation (used for token tracking)
+            force_refresh: Whether to bypass cache
+
+        Returns:
+            Generated content with web search results
+        """
+        pass
+
+    @abstractmethod
+    async def generate_structured_search_content(
+            self,
+            prompt: str,
+            response_schema: Any,  # Pydantic model class
+            search_context_size: str = "medium",
+            user_location: Optional[Dict[str, Any]] = None,
+            operation_tag: str = "structured_search",
+            force_refresh: bool = False
+    ) -> Dict[str, Any]:
+        """Generate content with web search capability and structured output format.
+
+        Args:
+            prompt: The input prompt for the model
+            response_schema: Pydantic model class defining the response schema
+            search_context_size: Amount of search context to include ('low', 'medium', 'high')
+            user_location: Optional location information for geographically relevant searches
+            operation_tag: Identifier for the operation (used for token tracking)
+            force_refresh: Whether to bypass cache
+
+        Returns:
+            Generated content with web search results conforming to the schema
+        """
+        pass
+
 class GeminiService(AIService):
     """Gemini implementation of AI service."""
 
@@ -536,6 +584,28 @@ class GeminiService(AIService):
             return {}
 
 
+    def generate_search_content(
+            self,
+            prompt: str,
+            search_context_size: str = "medium",
+            user_location: Optional[Dict[str, Any]] = None,
+            operation_tag: str = "search",
+            force_refresh: bool = False
+    ) -> Dict[str, Any]:
+        raise NotImplementedError("Generate search content is not implemented yet for Gemini AI Service")
+
+    def generate_structured_search_content(
+            self,
+            prompt: str,
+            response_schema: Any,  # Pydantic model class
+            search_context_size: str = "medium",
+            user_location: Optional[Dict[str, Any]] = None,
+            operation_tag: str = "structured_search",
+            force_refresh: bool = False
+    ) -> Dict[str, Any]:
+        raise NotImplementedError("Generate structured search content is not implemented yet for Gemini AI Service")
+
+
 class OpenAIService(AIService):
     """OpenAI implementation of AI service."""
 
@@ -643,6 +713,422 @@ class OpenAIService(AIService):
             logger.error(f"Error generating content with OpenAI: {str(e)}")
             token_usage = self._create_token_usage(0, 0, operation_tag)
             return {} if is_json else "", token_usage
+
+    # Helper methods for both search functions
+
+    def _create_search_tool(
+            self,
+            search_context_size: str = "medium",
+            user_location: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create a search tool configuration object."""
+        # Validate search_context_size
+        if search_context_size not in ["low", "medium", "high"]:
+            logger.warning(f"Invalid search_context_size: {search_context_size}, defaulting to 'medium'")
+            search_context_size = "medium"
+
+        # Configure search tool
+        search_tool = {"type": "web_search_preview", "search_context_size": search_context_size}
+
+        # Add user location if provided
+        if user_location:
+            search_tool["user_location"] = {"type": "approximate", **user_location}
+
+        return search_tool
+
+    def _generate_search_cache_key(
+            self,
+            prompt: str,
+            search_context_size: str,
+            operation_tag: str,
+            user_location: Optional[Dict[str, Any]] = None,
+            schema_info: Optional[str] = None
+    ) -> str:
+        """Generate a cache key for search operations."""
+        cache_data = {
+            'prompt': prompt,
+            'provider': self.provider_name,
+            'model': self.model,
+            'search_context_size': search_context_size,
+            'operation_tag': operation_tag,
+            'schema_info': schema_info
+        }
+
+        # Add user location to cache key if provided
+        if user_location:
+            cache_data['user_location'] = json.dumps(user_location, sort_keys=True)
+
+        # Generate cache key
+        return hashlib.sha256(json.dumps(cache_data, sort_keys=True).encode()).hexdigest()
+
+    async def _check_search_cache(
+            self,
+            cache_key: str,
+            operation_tag: str
+    ) -> Optional[Dict[str, Any]]:
+        """Check if there's a cached response for the given cache key."""
+        if not self.cache_service:
+            return None
+
+        try:
+            query = f"""
+            SELECT 
+                response_data,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
+                total_cost_in_usd
+            FROM `{self.cache_service.project_id}.{self.cache_service.dataset}.{self.cache_service.table_name}`
+            WHERE cache_key = @cache_key
+            AND provider = @provider
+            AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP())
+            AND (tenant_id IS NULL OR tenant_id = @tenant_id)
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("cache_key", "STRING", cache_key),
+                    bigquery.ScalarQueryParameter("provider", "STRING", self.provider_name),
+                    bigquery.ScalarQueryParameter("tenant_id", "STRING", self.tenant_id)
+                ]
+            )
+
+            results = None # await self.cache_service._execute_query(query, job_config)
+
+            if results:
+                row = results[0]
+                logger.info(f"Cache hit for search query with key: {cache_key[:8]}...")
+                return row.response_data
+
+        except Exception as e:
+            logger.error(f"Cache read failed: {e}")
+
+        return None
+
+    async def _store_search_result(
+            self,
+            cache_key: str,
+            result: Dict[str, Any],
+            token_usage: TokenUsage,
+            prompt: str
+    ) -> None:
+        """Store a search result in cache."""
+        if not self.cache_service:
+            return
+
+        try:
+            # Prepare expiration time
+            expires_at = None
+            if self.cache_ttl_hours is not None:
+                expires_at = datetime.now(timezone.utc) + timedelta(hours=self.cache_ttl_hours)
+
+            # Prepare row for insertion
+            row = {
+                "cache_key": cache_key,
+                "provider": self.provider_name,
+                "model": self.model,
+                "prompt": prompt,
+                "is_json_response": True,
+                "operation_tag": token_usage.operation_tag,
+                "response_data": json.dumps(result),
+                "response_text": None,
+                "prompt_tokens": token_usage.prompt_tokens,
+                "completion_tokens": token_usage.completion_tokens,
+                "total_tokens": token_usage.total_tokens,
+                "total_cost_in_usd": token_usage.total_cost_in_usd,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "expires_at": expires_at.isoformat() if expires_at else None,
+                "tenant_id": self.tenant_id
+            }
+
+            # Insert row
+            errors = await self.cache_service._insert_row(row)
+
+            if errors:
+                logger.error(f"Error caching search response: {errors}")
+
+        except Exception as e:
+            logger.error(f"Failed to cache search response: {e}")
+
+    def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
+        """Extract JSON content from text response."""
+        try:
+            # Strategy 1: Find JSON between braces
+            json_start = text.find('{')
+            json_end = text.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(text[json_start:json_end])
+
+            # Strategy 2: Parse the whole text
+            return json.loads(text)
+        except json.JSONDecodeError:
+            try:
+                # Strategy 3: Use regex to find JSON pattern
+                import re
+                match = re.search(r'(\{[\s\S]*\})', text)
+                if match:
+                    return json.loads(match.group(1))
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+            # Fallback: Return the text in a structured format
+            logger.warning(f"Failed to parse JSON from response: {text[:100]}...")
+            return {"text": text, "error": "Failed to parse as JSON"}
+
+    def _extract_citations(self, response) -> List[Dict[str, Any]]:
+        """Extract citation information from response."""
+        citations = []
+        try:
+            for message in response.messages:
+                if message.role == "assistant" and hasattr(message, "content"):
+                    for content_item in message.content:
+                        if hasattr(content_item, "annotations"):
+                            for annotation in content_item.annotations:
+                                if annotation.type == "url_citation":
+                                    citations.append({
+                                        "url": annotation.url,
+                                        "title": annotation.title,
+                                        "start_index": annotation.start_index,
+                                        "end_index": annotation.end_index
+                                    })
+        except Exception as e:
+            logger.error(f"Error extracting citations: {str(e)}")
+
+        return citations
+
+    def _estimate_search_token_usage(
+            self,
+            prompt: str,
+            output: str,
+            search_context_size: str,
+            operation_tag: str
+    ) -> TokenUsage:
+        """Estimate token usage and cost for search operations."""
+        # Rough token estimation
+        prompt_tokens = len(prompt) // 4 or 1
+        completion_tokens = len(output) // 4 or 1
+        total_tokens = prompt_tokens + completion_tokens
+
+        # Cost calculation
+        input_price = self.price_per_1k_tokens.get(self.model, {}).get("input", 0.01)
+        output_price = self.price_per_1k_tokens.get(self.model, {}).get("output", 0.03)
+        search_multiplier = {"low": 1.0, "medium": 2.0, "high": 3.0}[search_context_size]
+
+        prompt_cost = (prompt_tokens / 1000) * input_price
+        completion_cost = (completion_tokens / 1000) * output_price
+        search_cost = (total_tokens / 1000) * 0.01 * search_multiplier
+        total_cost = prompt_cost + completion_cost + search_cost
+
+        return TokenUsage(
+            operation_tag=operation_tag,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            total_cost_in_usd=total_cost,
+            provider=self.provider_name
+        )
+
+
+    async def _execute_search_request(
+            self,
+            prompt: str,
+            search_tool: Dict[str, Any],
+            response_schema: Optional[Any] = None,
+            operation_tag: str = "search"
+    ) -> Tuple[Dict[str, Any], TokenUsage]:
+        """
+        Execute a search API request to OpenAI.
+
+        Args:
+            prompt: The input prompt
+            search_tool: Configured search tool
+            response_schema: Optional response schema for structured outputs
+            operation_tag: Operation identifier for token tracking
+
+        Returns:
+            Tuple of (result, token_usage)
+        """
+        try:
+            # For structured outputs, prepare schema information
+            schema_description = ""
+
+            if response_schema and hasattr(response_schema, "model_fields"):
+                # Since the prompt already contains schema info, we'll only add minimal guidance
+                schema_description = "Make sure your response follows the exact schema structure specified in the prompt."
+
+            # For structured outputs, we want to use the prompt directly without adding extra system messages
+            # that might conflict with the schema already in the prompt
+            if response_schema:
+                # The prompt already contains the schema and format instructions
+                enhanced_prompt = prompt
+            else:
+                # For non-structured requests, add JSON formatting instruction
+                system_message = "You are a helpful assistant that provides accurate information based on web search results. Format your response as valid JSON."
+                enhanced_prompt = f"{system_message}\n\n{prompt}"
+
+            # Use the responses API - web search doesn't support parse method
+            response = await self.client.responses.create(
+                model=self.model,
+                tools=[search_tool],
+                input=enhanced_prompt,
+                temperature=self.default_temperature
+            )
+
+            # Extract the output text
+            output_content = response.output_text
+
+            # Parse the JSON response
+            result = self._extract_json_from_text(output_content)
+
+            # If we have a schema, validate the response structure
+            if response_schema and hasattr(response_schema, "model_fields"):
+                # Check if required fields exist, add empty arrays if missing
+                for field_name in response_schema.model_fields:
+                    if field_name not in result:
+                        field_type = str(response_schema.model_fields[field_name].annotation)
+                        # If it's a list type, add an empty list
+                        if "List" in field_type:
+                            result[field_name] = []
+
+            # Extract citations if available
+            citations = self._extract_citations(response)
+            if citations:
+                result["citations"] = citations
+
+            # Estimate token usage
+            token_usage = self._estimate_search_token_usage(
+                prompt=prompt,
+                output=output_content,
+                search_context_size=search_tool["search_context_size"],
+                operation_tag=operation_tag
+            )
+
+            return result, token_usage
+
+        except Exception as e:
+            logger.error(f"Error in search request: {str(e)}", exc_info=True)
+            error_result = {"error": str(e)}
+
+            # Create minimal token usage for error case
+            token_usage = TokenUsage(
+                operation_tag=operation_tag,
+                prompt_tokens=len(prompt) // 4 or 1,
+                completion_tokens=10,  # Minimal value for error
+                total_tokens=(len(prompt) // 4 or 1) + 10,
+                total_cost_in_usd=0.001,  # Minimal cost for tracking
+                provider=self.provider_name
+            )
+
+            return error_result, token_usage
+
+    async def generate_search_content(
+            self,
+            prompt: str,
+            search_context_size: str = "medium",
+            user_location: Optional[Dict[str, Any]] = None,
+            operation_tag: str = "search",
+            force_refresh: bool = False
+    ) -> Dict[str, Any]:
+        """Generate content with web search capability."""
+        search_tool = self._create_search_tool(search_context_size, user_location)
+
+        cache_key = self._generate_search_cache_key(
+            prompt=prompt,
+            search_context_size=search_context_size,
+            operation_tag=operation_tag,
+            user_location=user_location
+        )
+
+        if not force_refresh:
+            cached_result = await self._check_search_cache(cache_key, operation_tag)
+            if cached_result:
+                return cached_result
+
+        result, token_usage = await self._execute_search_request(
+            prompt=prompt,
+            search_tool=search_tool,
+            operation_tag=operation_tag
+        )
+
+        await self._store_search_result(
+            cache_key=cache_key,
+            result=result,
+            token_usage=token_usage,
+            prompt=prompt
+        )
+
+        return result
+
+    async def generate_structured_search_content(
+            self,
+            prompt: str,
+            response_schema: Any,  # Pydantic model class
+            search_context_size: str = "medium",
+            user_location: Optional[Dict[str, Any]] = None,
+            operation_tag: str = "structured_search",
+            force_refresh: bool = False
+    ) -> Dict[str, Any]:
+        """Generate content with web search capability and structured output format."""
+        # Create search tool
+        search_tool = self._create_search_tool(search_context_size, user_location)
+
+        # Create schema_info for cache key
+        schema_info = str(response_schema) if response_schema else None
+
+        # Generate cache key
+        cache_key = self._generate_search_cache_key(
+            prompt=prompt,
+            search_context_size=search_context_size,
+            operation_tag=operation_tag,
+            user_location=user_location,
+            schema_info=schema_info
+        )
+
+        # Check cache if not forcing refresh
+        if not force_refresh:
+            cached_result = await self._check_search_cache(cache_key, operation_tag)
+            if cached_result:
+                return cached_result
+
+        # Execute search request with schema
+        result, token_usage = await self._execute_search_request(
+            prompt=prompt,
+            search_tool=search_tool,
+            response_schema=response_schema,
+            operation_tag=operation_tag
+        )
+
+        # Handle refusals if present
+        if "refusal" in result or "error" in result:
+            logger.warning(f"Model refused to respond: {result['refusal']}")
+            # Provide a minimal valid response structure
+            if hasattr(response_schema, "model_fields"):
+                empty_response = {field: [] for field in response_schema.model_fields.keys()}
+                empty_response["_refusal_message"] = result["refusal"]
+                result = empty_response
+
+        # Store result in cache
+        await self._store_search_result(
+            cache_key=cache_key,
+            result=result,
+            token_usage=token_usage,
+            prompt=prompt
+        )
+
+        # Try to validate and convert the result using the schema
+        if hasattr(response_schema, "model_validate"):
+            try:
+                # This will raise an exception if the result doesn't match the schema
+                validated_model = response_schema.model_validate(result)
+                # Convert back to dict for consistency
+                if hasattr(validated_model, "model_dump"):
+                    result = validated_model.model_dump()
+            except Exception as e:
+                logger.warning(f"Schema validation failed: {str(e)}. Using unvalidated result.")
+
+        return result
 
 class AIServiceFactory:
     """Factory for creating AI service instances with integrated caching."""

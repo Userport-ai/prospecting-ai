@@ -134,7 +134,7 @@ class AccountInfoFetcher:
 
             bd_account: BrightDataAccount = None
             if linkedin_url_fetched_from_builtwith:
-                logger.debug(f"Selecting first BrightData Account since URL fetched from BuiltWith for website: {self.website}")
+                logger.debug(f"Selecting first BrightData Account since URL was fetched from BuiltWith for website: {self.website}")
                 # Select the first result. We assume BuiltWith is reliable and so we don't the LLM to select the correct LinkedIn URL.
                 bd_account = brightdata_accounts[0]
             else:

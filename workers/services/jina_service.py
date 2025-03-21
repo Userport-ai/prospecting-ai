@@ -3,11 +3,10 @@ import asyncio
 
 import httpcore
 import httpx
-from typing import Dict, Optional
+from typing import Dict
 
 from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
-from utils.loguru_setup import logger
 
 JINA_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
