@@ -1,23 +1,32 @@
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from utils.loguru_setup import logger
 from services.ai_service import AIService
 
 class Competitor(BaseModel):
-    name: str
+    name: str = Field(alias="company_name")
     description: str
     source: str
+
+    class Config:
+        populate_by_name = True
 
 class Customer(BaseModel):
-    name: str
+    name: str = Field(alias="company_name")
     description: str
     source: str
 
+    class Config:
+        populate_by_name = True
+
 class RecentEvent(BaseModel):
-    title: str
+    title: str = Field(alias="event_title")
     description: str
     date: str
     source: str
+
+    class Config:
+        populate_by_name = True
 
 class CompetitorIntelligence(BaseModel):
     competitors: List[Competitor]
@@ -170,13 +179,25 @@ class OpenAISearchService:
 Perform a comprehensive search to identify the main competitors of the company associated with the website {website}.
 
 Focus only on direct competitors in the same industry or market segment. For each competitor:
-- Provide the company name.
-- Give a brief description of what they do.
-- Include the source where you found this information.
+- Provide the company name under the "name" field.
+- Give a brief description of what they do under the "description" field.
+- Include the source where you found this information under the "source" field.
 
 Give at least 10 results in ranked order of most direct competitors first.
 
+The response must follow this exact JSON structure:
+{{
+  "competitors": [
+    {{
+      "name": "Competitor Name",
+      "description": "Description of what they do",
+      "source": "URL or reference"
+    }}
+  ]
+}}
+
 Ensure that:
+- Field names are exactly as specified: "name", "description", and "source".
 - The JSON is properly formatted with the "competitors" array.
 - Each entry is supported by at least one reputable source.
 - There is no additional commentary or text outside the JSON structure.
@@ -188,15 +209,34 @@ Ensure that:
 Perform a comprehensive search to compile detailed information about:
 
 1. Notable customers of the company associated with website {website}:
-   - Provide the customer company name.
-   - Give a brief description of what they do.
-   - Include the source where you found this information.
+   - Provide the customer company name under the "name" field.
+   - Give a brief description of what they do under the "description" field.
+   - Include the source where you found this information under the "source" field.
 
 2. Recent significant events related to the company (past 6 months):
    - Include news, product launches, events, acquisitions, leadership changes, funding rounds, layoffs.
-   - Provide the event title, description, date, and source.
+
+The response must follow this exact JSON structure:
+{{
+  "customers": [
+    {{
+      "name": "Customer Name",
+      "description": "Description of what they do",
+      "source": "URL or reference"
+    }}
+  ],
+  "recent_events": [
+    {{
+      "title": "Event Title",
+      "description": "Event Description",
+      "date": "Event Date",
+      "source": "URL or reference"
+    }}
+  ]
+}}
 
 Ensure that:
+- Field names are exactly as specified: "name", "description", "source", "title", "date".
 - The JSON is properly formatted with "customers" and "recent_events" arrays.
 - Give at least 10 customer results.
 - Give at least 3 most recent events.
