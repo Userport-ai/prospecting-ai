@@ -19,8 +19,10 @@ class RecentEvent(BaseModel):
     date: str
     source: str
 
-class CompanyIntelligence(BaseModel):
+class CompetitorIntelligence(BaseModel):
     competitors: List[Competitor]
+
+class CustomerEventIntelligence(BaseModel):
     customers: List[Customer]
     recent_events: List[RecentEvent]
 
@@ -48,28 +50,87 @@ class OpenAISearchService:
         try:
             logger.debug(f"Fetching company intelligence for website: {website}")
 
-            # Set up the search prompt
-            prompt = self._create_intelligence_prompt(website)
+            # Fetch competitors separately
+            competitors_result = await self.fetch_competitors(website)
 
-            # Use the Responses API with web search and structured output
-            result = await self.openai_service.generate_structured_search_content(
-                prompt=prompt,
-                response_schema=CompanyIntelligence,
-                search_context_size="medium",  # Default for balance between quality and speed
-                operation_tag="market_intelligence"
-            )
+            # Fetch customers and recent events together
+            customers_events_result = await self.fetch_customers_and_events(website)
 
-            # Validate and parse the response
-            if not result or not isinstance(result, dict):
-                logger.warning(f"Invalid response format from OpenAI search: {type(result)}")
-                return self._get_empty_intelligence()
+            # Combine the results
+            combined_result = {
+                "competitors": competitors_result.get("competitors", []),
+                "customers": customers_events_result.get("customers", []),
+                "recent_events": customers_events_result.get("recent_events", [])
+            }
 
             logger.debug(f"Successfully fetched company intelligence for {website}")
-            return result
+            return combined_result
 
         except Exception as e:
             logger.error(f"Error fetching company intelligence: {str(e)}", exc_info=True)
             return self._get_empty_intelligence()
+
+    async def fetch_competitors(self, website: str) -> Dict[str, Any]:
+        """
+        Fetch only competitor intelligence for a company website.
+
+        Args:
+            website: The company website URL
+
+        Returns:
+            Dict containing competitor data
+        """
+        try:
+            logger.debug(f"Fetching competitor intelligence for website: {website}")
+
+            # Set up the competitors prompt
+            prompt = self._create_competitors_prompt(website)
+
+            # Use the Responses API with web search and structured output
+            result = await self.openai_service.generate_structured_search_content(
+                prompt=prompt,
+                response_schema=CompetitorIntelligence,
+                search_context_size="medium",
+                operation_tag="competitor_intelligence"
+            )
+
+            logger.debug(f"Successfully fetched competitor intelligence for {website}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error fetching competitor intelligence: {str(e)}", exc_info=True)
+            return {"competitors": []}
+
+    async def fetch_customers_and_events(self, website: str) -> Dict[str, Any]:
+        """
+        Fetch customer and recent event intelligence for a company website.
+
+        Args:
+            website: The company website URL
+
+        Returns:
+            Dict containing customer and recent event data
+        """
+        try:
+            logger.debug(f"Fetching customer and event intelligence for website: {website}")
+
+            # Set up the customers and events prompt
+            prompt = self._create_customers_events_prompt(website)
+
+            # Use the Responses API with web search and structured output
+            result = await self.openai_service.generate_structured_search_content(
+                prompt=prompt,
+                response_schema=CustomerEventIntelligence,
+                search_context_size="medium",
+                operation_tag="customer_event_intelligence"
+            )
+
+            logger.debug(f"Successfully fetched customer and event intelligence for {website}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error fetching customer and event intelligence: {str(e)}", exc_info=True)
+            return {"customers": [], "recent_events": []}
 
     def extract_competitor_names(self, intelligence_data: Dict[str, Any]) -> List[str]:
         """Extract competitor names from intelligence data."""
@@ -103,17 +164,44 @@ class OpenAISearchService:
     def extract_citations(self, intelligence_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         return intelligence_data.get("citations", [])
 
-    def _create_intelligence_prompt(self, website: str) -> str:
-        """Create prompt for the intelligence gathering."""
+    def _create_competitors_prompt(self, website: str) -> str:
+        """Create prompt for the competitor intelligence gathering."""
         return f"""
-Perform a comprehensive search to compile detailed information about the competitors, customers, and recent events related to the website {website}. Use data from both the company's own website and other reputable sources.
+Perform a comprehensive search to identify the main competitors of the company associated with the website {website}.
+
+Focus only on direct competitors in the same industry or market segment. For each competitor:
+- Provide the company name.
+- Give a brief description of what they do.
+- Include the source where you found this information.
+
+Give at least 10 results in ranked order of most direct competitors first.
 
 Ensure that:
-- The JSON is properly formatted.
-- Keep the descriptions brief.
+- The JSON is properly formatted with the "competitors" array.
 - Each entry is supported by at least one reputable source.
 - There is no additional commentary or text outside the JSON structure.
-- Give at least 10 results each for competitors and customers and at least 3 most recent events for recent_events
+"""
+
+    def _create_customers_events_prompt(self, website: str) -> str:
+        """Create prompt for the customer and recent events intelligence gathering."""
+        return f"""
+Perform a comprehensive search to compile detailed information about:
+
+1. Notable customers of the company associated with website {website}:
+   - Provide the customer company name.
+   - Give a brief description of what they do.
+   - Include the source where you found this information.
+
+2. Recent significant events related to the company (past 6 months):
+   - Include news, product launches, events, acquisitions, leadership changes, funding rounds, layoffs.
+   - Provide the event title, description, date, and source.
+
+Ensure that:
+- The JSON is properly formatted with "customers" and "recent_events" arrays.
+- Give at least 10 customer results.
+- Give at least 3 most recent events.
+- Each entry is supported by at least one reputable source.
+- There is no additional commentary or text outside the JSON structure.
 """
 
     def _get_empty_intelligence(self) -> Dict[str, Any]:
