@@ -1,7 +1,7 @@
 # app/models/products.py
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import JSONField
+from django.db.models import JSONField, UniqueConstraint, Q
 from .common import BaseMixin
 
 
@@ -32,7 +32,14 @@ class Product(BaseMixin):
             models.Index(fields=['name']),
             models.Index(fields=['created_by']),
         ]
-        unique_together = [['tenant', 'name']]
+
+        constraints = [
+            UniqueConstraint(
+                fields=['tenant', 'name'],
+                condition=Q(deleted_at__isnull=True),
+                name='unique_active_product_name_per_tenant'
+            )
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.tenant.name})"
