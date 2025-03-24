@@ -34,6 +34,7 @@ class Account(BaseMixin):
     last_enriched_at = models.DateTimeField(null=True, blank=True)
     custom_fields = JSONField(null=True, blank=True)
     settings = JSONField(null=True, blank=True)
+    recent_events = JSONField(null=True, blank=True, default=[])
 
     created_by = models.ForeignKey(
         'app.User',

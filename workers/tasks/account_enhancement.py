@@ -536,7 +536,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     'customers': account_info.customers,
                     'competitors': account_info.competitors,
                     'tech_profile': account_info.tech_profile.model_dump(),
-                    'recent_events': recent_events,  # Add the recent events data
+                    'recent_events': recent_events,
                 }
 
                 # Update the raw data to include OpenAI intelligence when storing in BigQuery
@@ -552,23 +552,6 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     },
                     processed_data=processed_data
                 )
-
-                # Process and format enrichment data
-                processed_data = {
-                    'company_name': account_info.name,
-                    'employee_count': account_info.employee_count,
-                    'industry': account_info.industries,
-                    'location': account_info.formatted_hq(),
-                    'website': website,
-                    'linkedin_url': account_info.linkedin_url,
-                    'technologies': account_info.technologies,
-                    'funding_details': account_info.financials.private_data.model_dump(),
-                    'company_type': account_info.organization_type,
-                    'founded_year': account_info.founded_year,
-                    'customers': account_info.customers,
-                    'competitors': account_info.competitors,
-                    'tech_profile': account_info.tech_profile.model_dump(),
-                }
 
                 # Store enrichment raw data
                 logger.debug(f"Job {job_id}, Account {account_id}: Storing enrichment raw data")
