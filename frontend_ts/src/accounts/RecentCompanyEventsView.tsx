@@ -1,4 +1,4 @@
-import { RecentCompanyEvent } from "@/services/Accounts";
+import { RecentCompanyEvent } from "@/services/Common";
 
 const RecentCompanyEventsView: React.FC<{
   recentEvents: RecentCompanyEvent[];
@@ -9,7 +9,7 @@ const RecentCompanyEventsView: React.FC<{
   return (
     <div className="flex flex-col gap-6">
       {recentEvents.map((rEvent) => (
-        <div className="flex flex-col">
+        <div key={rEvent.source} className="flex flex-col">
           <p className="text-md text-gray-800">{rEvent.title}</p>
           <a
             href={rEvent.source}

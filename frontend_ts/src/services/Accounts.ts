@@ -1,6 +1,6 @@
 import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall, ListObjectsResponse } from "./Api";
-import { EnrichmentStatus } from "./Common";
+import { EnrichmentStatus, RecentCompanyEvent } from "./Common";
 import { USERPORT_TENANT_ID } from "./Common";
 
 const ACCOUNTS_ENDPOINT = "/accounts/";
@@ -30,14 +30,6 @@ export interface Account {
   recent_events?: RecentCompanyEvent[];
   created_at: string;
   updated_at: string;
-}
-
-// Recent company event.
-export interface RecentCompanyEvent {
-  date: string;
-  title: string;
-  source: string;
-  description: string;
 }
 
 export interface FundingDetails {

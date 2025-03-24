@@ -3,14 +3,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { ColumnDef, Table } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import {
-  Account as AccountRow,
-  FundingDetails,
-  RecentCompanyEvent,
-} from "@/services/Accounts";
+import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
-import { EnrichmentStatus } from "@/services/Common";
+import { EnrichmentStatus, RecentCompanyEvent } from "@/services/Common";
 import FundingDetailsView from "./FundingDetailsView";
 import CellListView from "../table/CellListView";
 import { cn } from "@/lib/utils";
