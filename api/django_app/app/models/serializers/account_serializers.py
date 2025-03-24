@@ -49,6 +49,7 @@ class AccountDetailsSerializer(serializers.ModelSerializer):
             'last_enriched_at',
             'custom_fields',
             'settings',
+            'recent_events',
             'created_at',
             'updated_at'
         ]
