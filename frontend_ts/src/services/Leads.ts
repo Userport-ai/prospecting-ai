@@ -242,6 +242,7 @@ interface ListLeadsWithQuotaRequest {
   buyer_percent: number; // Max Percentage of Buyers we want in given page
   influencer_percent: number; // Max Percentage of Influencers we want in given page.
   end_user_percent: number; // Max Percentage of End users we want in given page.
+  persona_filter_values: string[]; // Persona values to filter on.
 }
 
 // Helper to list leads.
@@ -255,6 +256,7 @@ export const listLeadsWithQuota = async (
     influencer_percent: request.influencer_percent,
     end_user_percent: request.end_user_percent,
     suggestion_status: SuggestionStatus.SUGGESTED,
+    persona_match: request.persona_filter_values.join(","),
   };
   if (request.cursor) {
     params["cursor"] = request.cursor;

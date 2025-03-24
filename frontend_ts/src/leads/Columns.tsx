@@ -226,7 +226,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
           ) {
             return row.custom_fields.evaluation.persona_match;
           }
-          return "null";
+          return "unknown";
         },
         cell: (info) => {
           const personaMatchValue = info.getValue() as string;

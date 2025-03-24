@@ -6,22 +6,20 @@ import {
   getFilteredRowModel,
   ColumnDef,
   ColumnSort,
-  ColumnFilter,
-  ColumnFiltersState,
-  Updater,
 } from "@tanstack/react-table";
-import AddCustomColumn from "@/table/AddCustomColumn";
+import AddCustomColumn, {
+  getCustomColumnDisplayName,
+} from "@/table/AddCustomColumn";
 import { CustomColumnInput } from "@/table/AddCustomColumn";
 import CommonTable from "@/table/CommonTable";
-import EnumFilter from "@/table/EnumFilter";
 import TextFilter from "@/table/TextFilter";
 import { getLeadColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Lead as LeadRow, listLeadsWithQuota } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
-import { USERPORT_TENANT_ID } from "@/services/Common";
 import LoadingOverlay from "@/common/LoadingOverlay";
+import EnumFilterV2 from "@/table/EnumFilterV2";
 
 const ZeroStateDisplay = () => {
   return (
@@ -44,6 +42,9 @@ interface TableProps {
   dataLoading: boolean;
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
   onPageSizeChange: (pageSize: number) => void;
+  allPersonaFilterValues: string[];
+  personaFilterValues: string[];
+  onPersonaFilterValuesChange: (newPersonaFilterValues: string[]) => void;
 }
 
 export const Table: React.FC<TableProps> = ({
@@ -56,25 +57,11 @@ export const Table: React.FC<TableProps> = ({
   dataLoading,
   onCustomColumnAdded,
   onPageSizeChange,
+  allPersonaFilterValues,
+  personaFilterValues,
+  onPersonaFilterValuesChange,
 }) => {
-  const authContext = useAuthContext();
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
-
-  var persona_filter_values: string[] = [];
-  if (authContext.userContext?.tenant.id !== USERPORT_TENANT_ID) {
-    persona_filter_values = ["buyer", "influencer", "end_user", "null"];
-  } else {
-    // Test account, so we use only the two personas here.
-    // TODO: Change once this is no longer the test account.
-    persona_filter_values = ["buyer", "influencer"];
-  }
-
-  const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([
-    {
-      id: "persona_match",
-      value: persona_filter_values,
-    },
-  ]);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const pageCount = Math.ceil(totalLeadsCount / curPageSize);
 
@@ -95,15 +82,6 @@ export const Table: React.FC<TableProps> = ({
   const columnResizeMode = "onChange";
   const columnResizeDirection = "ltr";
 
-  // When column filters page, we should reset pagination to state otherwise
-  // table view gets messed up (page numbers are invalid).
-  const onColumnFiltersChange = (
-    newColumnFiltersState: Updater<ColumnFiltersState>
-  ) => {
-    // TODO call server to fetch new set of filters.
-    setColumnFilters(newColumnFiltersState);
-  };
-
   const table = useReactTable({
     data: leads,
     columns,
@@ -114,7 +92,6 @@ export const Table: React.FC<TableProps> = ({
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
-    onColumnFiltersChange: onColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     getRowId: (row) => row.id, //use the lead's ID
@@ -122,7 +99,7 @@ export const Table: React.FC<TableProps> = ({
     autoResetPageIndex: false,
     state: {
       sorting,
-      columnFilters,
+      // columnFilters,
       columnVisibility,
       rowSelection,
     },
@@ -156,11 +133,11 @@ export const Table: React.FC<TableProps> = ({
             placeholder={"Filter Lead name..."}
           />
 
-          {/* Status Filter */}
-          <EnumFilter
-            table={table}
-            columnId={"persona_match"}
-            columnFilters={columnFilters}
+          <EnumFilterV2
+            displayName={getCustomColumnDisplayName("persona_match")}
+            allFilterValues={allPersonaFilterValues}
+            initialFilterValues={personaFilterValues}
+            onFilterValuesChanged={onPersonaFilterValuesChange}
           />
         </div>
 
@@ -208,6 +185,11 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   // Total leads count found on the server.
   const [totalLeadsCount, setTotalLeadsCount] = useState(0);
   const [columns, setColumns] = useState<ColumnDef<LeadRow>[]>([]);
+  // Filters used for Persona Match.
+  const allPersonaFilterValues = ["buyer", "influencer", "end_user", "unknown"];
+  const [personaFilterValues, setPersonaFilterValues] = useState<string[]>(
+    allPersonaFilterValues
+  );
 
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -221,6 +203,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       buyer_percent: 60,
       influencer_percent: 35,
       end_user_percent: 5,
+      persona_filter_values: personaFilterValues,
     });
     setTotalLeadsCount(response.count);
     setCurLeads(response.results);
@@ -240,7 +223,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
         setError(new Error(`Failed to fetch Leads: ${error.message}`))
       )
       .finally(() => setLoading(false));
-  }, [authContext, curPageSize]);
+  }, [authContext, curPageSize, personaFilterValues]);
 
   if (loading) {
     return <ScreenLoader />;
@@ -287,6 +270,23 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     }
   };
 
+  // Handle change to persona filters.
+  const onPersonaFilterValuesChange = (newPersonaFilterValues: string[]) => {
+    const newPersonaFiltersSet = new Set(newPersonaFilterValues);
+    const curPersonaFiltersSet = new Set(personaFilterValues);
+    if (
+      newPersonaFiltersSet.size == curPersonaFiltersSet.size &&
+      [...newPersonaFiltersSet].every((filter) =>
+        curPersonaFiltersSet.has(filter)
+      )
+    ) {
+      // Filters have not changed.
+      return;
+    }
+    // Filters have changed.
+    setPersonaFilterValues(newPersonaFilterValues);
+  };
+
   return (
     <Table
       columns={columns}
@@ -298,6 +298,9 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       dataLoading={dataLoading}
       onCustomColumnAdded={onCustomColumnAdded}
       onPageSizeChange={setCurPageSize}
+      allPersonaFilterValues={allPersonaFilterValues}
+      personaFilterValues={personaFilterValues}
+      onPersonaFilterValuesChange={onPersonaFilterValuesChange}
     />
   );
 };
