@@ -43,6 +43,7 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'id': obj.account.id,
             'name': obj.account.name,
             'industry': obj.account.industry,
+            'recent_events': obj.account.recent_events,
         }
 
     def validate_custom_fields(self, value):
