@@ -27,8 +27,17 @@ export interface Account {
   last_enriched_at: string | null;
   custom_fields: Record<string, any> | null;
   settings: Record<string, any> | null;
+  recent_events?: RecentCompanyEvent[];
   created_at: string;
   updated_at: string;
+}
+
+// Recent company event.
+export interface RecentCompanyEvent {
+  date: string;
+  title: string;
+  source: string;
+  description: string;
 }
 
 export interface FundingDetails {

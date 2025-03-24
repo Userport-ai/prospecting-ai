@@ -70,7 +70,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
           <div
             className="max-w-[80rem] min-w-full overflow-x-auto" // Ensures content width adapts dynamically
           >
-            <Table style={{ width: totalColumnsWidth }}>
+            <Table style={{ width: totalColumnsWidth, minWidth: "100%" }}>
               {/* Header */}
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (

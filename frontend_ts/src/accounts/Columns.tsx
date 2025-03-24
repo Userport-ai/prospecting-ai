@@ -1,9 +1,13 @@
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown, Link } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { ColumnDef, Table } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
+import {
+  Account as AccountRow,
+  FundingDetails,
+  RecentCompanyEvent,
+} from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 import { EnrichmentStatus } from "@/services/Common";
@@ -12,6 +16,7 @@ import CellListView from "../table/CellListView";
 import { cn } from "@/lib/utils";
 import { wrapColumnContentClass } from "@/common/utils";
 import EnrichmentStatusView from "./EnrichmentStatusView";
+import RecentCompanyEventsView from "./RecentCompanyEventsView";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -51,6 +56,10 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     accessorFn: (row) => formatDate(row.created_at),
     header: "Created On",
     size: 50,
+    cell: (info) => {
+      const dateStr = info.getValue() as string;
+      return <p className="text-xs">{dateStr}</p>;
+    },
     meta: {
       displayName: "Created On",
       visibleInitially: true,
@@ -60,7 +69,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "name",
     accessorFn: (row) => row.name,
     accessorKey: "name",
-    minSize: 100,
+    minSize: 80,
     header: ({ column }) => {
       return (
         <div className="flex justify-between items-center gap-2 mr-2">
@@ -222,6 +231,29 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     } as CustomColumnMeta,
   },
   {
+    id: "recent_events",
+    header: "Recent Events",
+    accessorFn: (row) => {
+      if (!row.recent_events || row.recent_events.length == 0) {
+        return null;
+      }
+      return row.recent_events;
+    },
+    minSize: 600,
+    cell: (info) => {
+      const recentEvents = info.getValue() as RecentCompanyEvent[] | null;
+      if (!recentEvents) {
+        return null;
+      }
+      return <RecentCompanyEventsView recentEvents={recentEvents} />;
+    },
+    meta: {
+      displayName: "Recent Events",
+      visibleInitially: true,
+      cellExpandable: true,
+    } as CustomColumnMeta,
+  },
+  {
     id: "industry",
     accessorFn: (row) => row.industry,
     header: "Industry",
@@ -242,7 +274,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "website",
     accessorFn: (row) => row.website,
     header: "Website",
-    minSize: 200,
+    minSize: 20,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -258,7 +290,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
             wrapColumnContentClass
           )}
         >
-          {url}
+          <Link size={18} />
         </a>
       );
     },
@@ -271,7 +303,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "linkedin_url",
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
-    minSize: 300,
+    minSize: 20,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -287,7 +319,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
             wrapColumnContentClass
           )}
         >
-          {url}
+          <Link size={18} />
         </a>
       );
     },
