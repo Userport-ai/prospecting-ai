@@ -9,6 +9,7 @@ from services.mocks.mock_task_manager import MockTaskManager
 from services.task_manager import TaskManager
 from services.task_registry import TaskRegistry
 from tasks.account_enhancement import AccountEnhancementTask
+from tasks.custom_column_generation_task import CustomColumnTask
 from tasks.generate_leads_apollo import ApolloLeadsTask
 from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
@@ -26,6 +27,7 @@ async def register_tasks():
     await task_registry.register(GenerateLeadsTask)
     await task_registry.register(LeadLinkedInResearchTask)
     await task_registry.register(ApolloLeadsTask)
+    await task_registry.register(CustomColumnTask)
     logger.info("All tasks successfully registered.")
 
 def get_task_manager() -> TaskManager:

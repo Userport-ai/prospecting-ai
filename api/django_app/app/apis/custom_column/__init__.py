@@ -1,0 +1,1 @@
+from .custom_column_urls import urlpatterns

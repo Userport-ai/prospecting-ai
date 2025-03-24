@@ -181,3 +181,48 @@ class WorkerService:
         except Exception as e:
             logger.error(f"Failed to trigger lead enrichment: {str(e)}")
             raise Exception(f"Failed to trigger lead enrichment: {str(e)}")
+
+    def trigger_custom_column_generation(self, payload):
+        """
+        Triggers custom column value generation in the worker service.
+
+        Args:
+            payload (dict): A dictionary containing:
+                - column_id: ID of the CustomColumn
+                - entity_type: 'lead' or 'account'
+                - entity_ids: List of entity IDs to process
+                - question: The question to answer
+                - response_type: The type of response expected
+                - response_config: Configuration for the response
+                - ai_config: Configuration for the AI model
+                - context_type: Types of context to include
+                - tenant_id: ID of the tenant
+                - product_id: ID of the product
+                - request_id: Unique ID for this request (for idempotency)
+
+        Returns:
+            dict: Response from worker service, including job_id
+        """
+        url = f"{self.base_url}/api/v1/tasks/create/custom_column"
+
+        # Get an OIDC token for authentication
+        id_token = self._get_id_token()
+
+        headers = {
+            "Authorization": f"Bearer {id_token}",
+            "Content-Type": "application/json"
+        }
+
+        # Make request to worker service
+        response = requests.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=self.timeout
+        )
+
+        # Check if the request was successful
+        if response.status_code != 200:
+            raise Exception(f"Failed to trigger custom column generation: {response.text}")
+
+        return response.json()

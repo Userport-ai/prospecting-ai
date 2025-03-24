@@ -4,6 +4,7 @@ from app.models.common import BaseMixin
 
 
 class EnrichmentType(models.TextChoices):
+    CUSTOM_COLUMN = 'custom_column', 'Ask AI'
     COMPANY_INFO = 'company_info', 'Company Information'
     GENERATE_LEADS = 'generate_leads', 'Potential Leads for a particular Account'
     LEAD_LINKEDIN_RESEARCH = 'lead_linkedin_research', 'Lead Information from LinkedIn and other sources'
