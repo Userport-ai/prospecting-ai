@@ -251,7 +251,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
       },
       {
         id: "matching_signals",
-        header: "Matching Criteria",
+        header: "Matching Signals",
         minSize: 300,
         accessorFn: (row) => getMatchingSignals(row),
         cell: (info) => {
@@ -262,7 +262,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
           return <CellListView values={matchingSignals} />;
         },
         meta: {
-          displayName: "Matching Criteria",
+          displayName: "Matching Signals",
           visibleInitially: true,
           cellExpandable: true,
         } as CustomColumnMeta,

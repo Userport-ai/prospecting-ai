@@ -20,6 +20,9 @@ import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import LoadingOverlay from "@/common/LoadingOverlay";
 import EnumFilterV2 from "@/table/EnumFilterV2";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { exportToCSV } from "@/common/utils";
 
 const ZeroStateDisplay = () => {
   return (
@@ -62,8 +65,18 @@ export const Table: React.FC<TableProps> = ({
   onPersonaFilterValuesChange,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
+  // This is only a JSON object mapping selected Row ID to true.
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const pageCount = Math.ceil(totalLeadsCount / curPageSize);
+
+  // Create list of selected leads.
+  var leadMap: Record<string, LeadRow> = {};
+  for (const l of leads) {
+    leadMap[l.id] = l;
+  }
+  const selectedLeads: LeadRow[] = Object.keys(rowSelection).map(
+    (id) => leadMap[id]
+  );
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
@@ -99,7 +112,6 @@ export const Table: React.FC<TableProps> = ({
     autoResetPageIndex: false,
     state: {
       sorting,
-      // columnFilters,
       columnVisibility,
       rowSelection,
     },
@@ -118,13 +130,44 @@ export const Table: React.FC<TableProps> = ({
     onCustomColumnAdded(customColumnInfo);
   };
 
+  // Handler to export selected leads to CSV.
+  const exportSelectedLeadsToCSV = () => {
+    // Transform selected leads before export.
+    const transformedLeads = selectedLeads.map((lead: LeadRow) => {
+      return {
+        Name: lead.first_name + " " + lead.last_name,
+        "LinkedIn URL": lead.linkedin_url,
+        "Company Name": lead.account_details.name,
+        "Role Title": lead.role_title,
+        "Fit Score": lead.score,
+        "Persona Match":
+          lead.custom_fields &&
+          lead.custom_fields.evaluation &&
+          lead.custom_fields.evaluation.persona_match &&
+          lead.custom_fields.evaluation.persona_match !== "null"
+            ? lead.custom_fields.evaluation.persona_match
+            : "unknown",
+        Rationale: lead.custom_fields
+          ? lead.custom_fields.evaluation.rationale
+          : "unknown",
+        "Matching Signals":
+          lead.custom_fields && lead.custom_fields.evaluation.matching_signals
+            ? lead.custom_fields.evaluation.matching_signals.join("\n\n")
+            : "unknown",
+      };
+    });
+    exportToCSV(transformedLeads, "userport-leads");
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-gray-700 text-md mb-2">
         Total Number of Leads:{" "}
         <span className="font-semibold">{totalLeadsCount}</span>
       </p>
-      <div className="flex gap-6">
+
+      {/* Floating Toolbar */}
+      <div className="sticky top-0 z-50 border border-gray-200 shadow-md bg-white p-2 flex gap-6">
         {/* Filter Controls */}
         <div className="flex gap-4">
           <TextFilter
@@ -143,6 +186,22 @@ export const Table: React.FC<TableProps> = ({
 
         {/* Add custom column */}
         <AddCustomColumn onAdded={handleCustomColumnAdd} />
+
+        {/* Floating Action Bar */}
+        {selectedLeads.length > 0 && (
+          <div className="flex gap-4 px-2 items-center">
+            <p className="text-sm text-gray-700">
+              {selectedLeads.length} selected
+            </p>
+            <Button
+              className="border border-gray-300 bg-white"
+              onClick={exportSelectedLeadsToCSV}
+              variant="outline"
+            >
+              <Download /> Export
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Table Container */}
@@ -153,7 +212,6 @@ export const Table: React.FC<TableProps> = ({
         curPageNum={curPageNum}
         totalPageCount={pageCount}
         handlePageClick={handlePageClick}
-        numSelectedRows={Object.keys(rowSelection).length}
         headerClassName="bg-[rgb(180,150,200)]"
         curPageSize={curPageSize}
         onPageSizeChange={onPageSizeChange}

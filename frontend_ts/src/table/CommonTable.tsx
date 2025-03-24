@@ -23,7 +23,6 @@ interface CommonTableProps<T> {
   curPageNum: number;
   totalPageCount: number;
   handlePageClick: (nextPage: boolean) => void;
-  numSelectedRows: number;
   headerClassName?: string;
   curPageSize: number;
   onPageSizeChange: (pageSize: number) => void;
@@ -38,7 +37,6 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   curPageNum,
   totalPageCount,
   handlePageClick,
-  numSelectedRows,
   headerClassName,
   curPageSize,
   onPageSizeChange,
@@ -200,12 +198,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
           </div>
         </div>
 
-        <div className="w-full flex justify-between">
-          {/* Selected Rows Information */}
-          <div className="flex p-1 text-sm text-muted-foreground">
-            {numSelectedRows} row(s) selected.
-          </div>
-
+        <div className="w-full flex justify-end">
           {/* Pagination Controls */}
           <div className="flex items-center justify-start gap-8">
             <PageSizeSelect
