@@ -4,6 +4,7 @@ import { EnrichmentStatus } from "./Common";
 import { ParsedHTML } from "./Extension";
 
 const LEADS_ENDPOINT = "/leads/";
+const LEADS_QUOTA_DISTRIBUTION_ENDPOINT = "/leads/quota_distribution/";
 
 // Lead as returned by the backend API.
 export interface Lead {
@@ -230,6 +231,46 @@ const listLeadsHelper = async (
     const response = await apiClient.get<ListLeadsResponse>(LEADS_ENDPOINT, {
       params,
     });
+    return response.data;
+  });
+};
+
+interface ListLeadsWithQuotaRequest {
+  accountId: string | null; // Present when listing leads within account and absent when listing leads globally.
+  cursor: string | null; // Cursor value of page to request on server.
+  limit: number; // Max number of leads to request in current page.
+  buyer_percent: number; // Max Percentage of Buyers we want in given page
+  influencer_percent: number; // Max Percentage of Influencers we want in given page.
+  end_user_percent: number; // Max Percentage of End users we want in given page.
+  persona_filter_values: string[]; // Persona values to filter on.
+}
+
+// Helper to list leads.
+export const listLeadsWithQuota = async (
+  authContext: AuthContext,
+  request: ListLeadsWithQuotaRequest
+): Promise<ListLeadsResponse> => {
+  var params: Record<string, any> = {
+    limit: request.limit,
+    buyer_percent: request.buyer_percent,
+    influencer_percent: request.influencer_percent,
+    end_user_percent: request.end_user_percent,
+    suggestion_status: SuggestionStatus.SUGGESTED,
+    persona_match: request.persona_filter_values.join(","),
+  };
+  if (request.cursor) {
+    params["cursor"] = request.cursor;
+  }
+  if (request.accountId) {
+    params["account"] = request.accountId;
+  }
+  return await apiCall<ListLeadsResponse>(authContext, async (apiClient) => {
+    const response = await apiClient.get<ListLeadsResponse>(
+      LEADS_QUOTA_DISTRIBUTION_ENDPOINT,
+      {
+        params,
+      }
+    );
     return response.data;
   });
 };

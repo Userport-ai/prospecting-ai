@@ -58,6 +58,7 @@ type ListAccountsResponse = ListObjectsResponse<Account>;
 
 interface ListAccountsRequest {
   page?: number; // Optional parameter for page number to fetch
+  page_size?: number; // Optional parameter for page size to request.
   ids?: string[]; // Optional parameter for list of IDs to filter
 }
 
@@ -78,6 +79,10 @@ export const listAccounts = async (
 
   if (request.page) {
     params["page"] = request.page;
+  }
+
+  if (request.page_size) {
+    params["page_size"] = request.page_size;
   }
 
   if (request.ids && request.ids.length > 0) {

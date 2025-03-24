@@ -14,15 +14,18 @@ import { cn } from "@/lib/utils";
 import { CustomColumnMeta } from "./CustomColumnMeta";
 import CellExpansionSidebar from "./CellExpansionSidebar";
 import { useState } from "react";
+import PageSizeSelect from "./PageSizeSelect";
 
 interface CommonTableProps<T> {
   table: TanstackTable<T>;
   columns: ColumnDef<T>[];
   columnResizeMode: string;
-  pagination: { pageIndex: number };
-  morePagesToFetch?: boolean;
-  handleNextPageClick?: () => void;
+  curPageNum: number;
+  totalPageCount: number;
+  handlePageClick: (nextPage: boolean) => void;
   headerClassName?: string;
+  curPageSize: number;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 // Common Table component that renders a common table used by Accounts and Leads.
@@ -31,10 +34,12 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   table,
   columns,
   columnResizeMode,
-  pagination,
-  morePagesToFetch,
-  handleNextPageClick,
+  curPageNum,
+  totalPageCount,
+  handlePageClick,
   headerClassName,
+  curPageSize,
+  onPageSizeChange,
 }) => {
   const [expandedCellContext, setExpandedCellContext] = useState<CellContext<
     any,
@@ -49,25 +54,6 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   // Handler for when cell expansion panel's open state changes
   const onCellExpansionPanelOpenChange = (open: boolean) => {
     if (!open) setExpandedCellContext(null);
-  };
-
-  // Whether user can click to the next page.
-  const canClickToNextPage = (): boolean => {
-    if (morePagesToFetch) {
-      // Server has more pages, can click to next page.
-      return true;
-    }
-    // Depends on whether there are more pages to see on client side.
-    return table.getCanNextPage();
-  };
-
-  // Handle next page click.
-  const onNextPageClick = () => {
-    if (handleNextPageClick) {
-      handleNextPageClick();
-    } else {
-      table.nextPage();
-    }
   };
 
   // We use total column width (in pixel values) to set the Table Width in CSS.
@@ -212,38 +198,38 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
           </div>
         </div>
 
-        <div className="w-full flex flex-col items-end">
-          {/* Selected Rows Information */}
-          <div className="flex p-1 text-sm text-muted-foreground">
-            {table.getFilteredSelectedRowModel().rows.length} of{" "}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
-          </div>
-
+        <div className="w-full flex justify-end">
           {/* Pagination Controls */}
-          <div className="flex items-center justify-start gap-4">
+          <div className="flex items-center justify-start gap-8">
+            <PageSizeSelect
+              curPageSize={curPageSize}
+              onPageSizeChange={onPageSizeChange}
+            />
             <div>
-              <p className=" text-sm text-gray-600">
-                Page {pagination.pageIndex + 1} of {table.getPageCount()}
+              <p className="text-sm text-gray-600">
+                Page {curPageNum} of {totalPageCount}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              className="shadow-sm border-gray-300"
-            >
-              <ChevronLeft />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onNextPageClick}
-              disabled={!canClickToNextPage()}
-              className="shadow-sm border-gray-300"
-            >
-              <ChevronRight />
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageClick(false)}
+                disabled={curPageNum === 1}
+                className="shadow-sm border-gray-300"
+              >
+                <ChevronLeft />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageClick(true)}
+                disabled={curPageNum >= totalPageCount}
+                className="shadow-sm border-gray-300"
+              >
+                <ChevronRight />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

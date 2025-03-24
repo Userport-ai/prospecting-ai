@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   getCoreRowModel,
   useReactTable,
-  getPaginationRowModel,
   getSortedRowModel,
   getFilteredRowModel,
   ColumnDef,
@@ -77,10 +76,12 @@ interface TableProps {
   columns: ColumnDef<AccountRow>[];
   accounts: AccountRow[];
   totalAccountsCount: number;
-  moreAccountsToFetch: boolean; // Whether server has more accounts to fetch.
+  curPageNum: number;
+  handlePageClick: (goToNextPage: boolean) => Promise<void>;
   dataLoading: boolean;
-  onFetchNextPage: () => Promise<void>;
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
+  curPageSize: number;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 // Component to display Accounts Table.
@@ -88,19 +89,17 @@ const Table: React.FC<TableProps> = ({
   columns,
   accounts,
   totalAccountsCount,
-  moreAccountsToFetch,
+  curPageNum,
+  handlePageClick,
   dataLoading,
-  onFetchNextPage,
   onCustomColumnAdded,
+  curPageSize,
+  onPageSizeChange,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
-  const [rowSelection, setRowSelection] = useState({});
-  const initialPaginationState = {
-    pageIndex: 0, //initial page index
-    pageSize: 20, //default page size
-  };
-  const [pagination, setPagination] = useState(initialPaginationState);
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const pageCount = Math.ceil(totalAccountsCount / curPageSize);
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
@@ -125,14 +124,14 @@ const Table: React.FC<TableProps> = ({
     columnResizeMode,
     columnResizeDirection,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    pageCount: pageCount,
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    onPaginationChange: setPagination,
+    getRowId: (row) => row.id, //use the account's ID
     // Needed to solve this error: https://github.com/TanStack/table/issues/5026.
     autoResetPageIndex: false,
     state: {
@@ -140,7 +139,6 @@ const Table: React.FC<TableProps> = ({
       columnFilters,
       columnVisibility,
       rowSelection,
-      pagination,
     },
   });
 
@@ -148,25 +146,6 @@ const Table: React.FC<TableProps> = ({
     // No accounts found.
     return <ZeroStateDisplay />;
   }
-
-  // User clicks on next page button in the table.
-  // We assume when this callback is called that next page on server is definitely
-  // available.
-  const handleNextPageClick = async () => {
-    if (table.getCanNextPage()) {
-      // Next page exists, just update table to next page.
-      table.nextPage();
-      return;
-    }
-    await onFetchNextPage();
-    // Fetch the row model count on the current page (before next page was fetched).
-    // If this is less than pageSize, then stay on the same page.
-    // If equal to pageSize, go to next page.
-    const currentPageRowCount = table.getRowModel().rows.length;
-    if (currentPageRowCount === initialPaginationState.pageSize) {
-      table.nextPage();
-    }
-  };
 
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
@@ -206,10 +185,12 @@ const Table: React.FC<TableProps> = ({
         table={table}
         columns={columns}
         columnResizeMode={columnResizeMode}
-        pagination={pagination}
-        morePagesToFetch={moreAccountsToFetch}
-        handleNextPageClick={handleNextPageClick}
+        curPageNum={curPageNum}
+        totalPageCount={pageCount}
+        handlePageClick={handlePageClick}
         headerClassName="bg-[rgb(122,103,171)]"
+        curPageSize={curPageSize}
+        onPageSizeChange={onPageSizeChange}
       />
 
       <LoadingOverlay loading={dataLoading} />
@@ -222,10 +203,10 @@ export default function AccountsTable() {
   const authContext = useAuthContext();
   // Current list of all Accounts fetched from server so far in the correct pagination order.
   const [curAccounts, setCurAccounts] = useState<AccountRow[]>([]);
-  // Latest Page number fetched from server.
-  const [serverPage, setServerPage] = useState(1);
-  // Whether there are more accounts to fetch from server.
-  const [moreAccountsToFetch, setMoreAccountsToFetch] = useState(false);
+  // Current Page number (fetched from server). Valid page numbers start from 1.
+  const [curPageNum, setCurPageNum] = useState(0);
+  // Current page size.
+  const [curPageSize, setCurPageSize] = useState<number>(20);
   const [products, setProducts] = useState<Product[]>([]);
   // Total cccounts count found on the server.
   const [totalAccountsCount, setTotalAccountsCount] = useState(0);
@@ -235,22 +216,29 @@ export default function AccountsTable() {
   const [error, setError] = useState<Error | null>(null);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
 
+  const listAccountsHelper = async (pageNum: number) => {
+    const response = await listAccounts(authContext, {
+      page: pageNum,
+      page_size: curPageSize,
+    });
+    setTotalAccountsCount(response.count);
+    setCurAccounts(response.results);
+    setColumns(getAccountColumns(response.results));
+    setCurPageNum(pageNum);
+  };
+
   useEffect(() => {
-    listAccounts(authContext, { page: serverPage })
-      .then(async (response) => {
+    setLoading(true);
+    listAccountsHelper(1)
+      .then(async () => {
         const products = await listProducts(authContext);
-        const gotAccounts = response.results;
-        setTotalAccountsCount(response.count);
-        setMoreAccountsToFetch(response.next !== null);
-        setCurAccounts(gotAccounts);
-        setColumns(getAccountColumns(gotAccounts));
         setProducts(products);
       })
       .catch((error) =>
         setError(new Error(`Failed to fetch Accounts: ${error.message}`))
       )
       .finally(() => setLoading(false));
-  }, [authContext]);
+  }, [authContext, curPageSize]);
 
   if (loading) {
     return <ScreenLoader />;
@@ -285,22 +273,19 @@ export default function AccountsTable() {
     console.log("custom colum info ", customColumnInfo);
   };
 
-  // Handle user request to fetch the next page of Accounts.
-  const onFetchNextPage = async () => {
+  // Handle user request to go to page.
+  // If goToNextPage is true, fetch next page, otherwise fetch previous page.
+  // We assume this callback can be called only if next or prev page buttons
+  // are enabled in the UI. In other words, we assume those validations are already done.
+  const handlePageClick = async (goToNextPage: boolean) => {
     setDataLoading(true);
-    const nextPage = serverPage + 1;
+    const nextPageNum = goToNextPage ? curPageNum + 1 : curPageNum - 1;
     try {
-      const response = await listAccounts(authContext, { page: nextPage });
-      setTotalAccountsCount(totalAccountsCount);
-      setMoreAccountsToFetch(response.next !== null);
-      const allAccounts = [...curAccounts, ...response.results];
-      setCurAccounts(allAccounts);
-      setColumns(getAccountColumns(allAccounts));
-      setServerPage(nextPage);
+      await listAccountsHelper(nextPageNum);
     } catch (error: any) {
       setError(
         new Error(
-          `Failed to fetch Next Page: ${nextPage} for Accounts: ${error.message}`
+          `Failed to Accounts fetch nextPage: ${goToNextPage} with next page num: ${nextPageNum} with error: ${error.message}`
         )
       );
     } finally {
@@ -326,10 +311,12 @@ export default function AccountsTable() {
         columns={columns}
         accounts={curAccounts}
         totalAccountsCount={totalAccountsCount}
-        moreAccountsToFetch={moreAccountsToFetch}
+        curPageNum={curPageNum}
+        handlePageClick={handlePageClick}
         dataLoading={dataLoading}
-        onFetchNextPage={onFetchNextPage}
         onCustomColumnAdded={onCustomColumnAdded}
+        curPageSize={curPageSize}
+        onPageSizeChange={setCurPageSize}
       />
     </div>
   );

@@ -11,7 +11,7 @@ const CellListView: React.FC<{ values: string[] }> = ({ values }) => {
   return (
     <div className={cn("flex flex-col gap-1", wrapColumnContentClass)}>
       {values.map((value, index) => (
-        <p key={value}>
+        <p key={index}>
           {index + 1}. {value}
         </p>
       ))}

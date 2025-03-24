@@ -2,30 +2,27 @@ import { useEffect, useState } from "react";
 import {
   getCoreRowModel,
   useReactTable,
-  getPaginationRowModel,
   getSortedRowModel,
   getFilteredRowModel,
   ColumnDef,
   ColumnSort,
-  ColumnFilter,
-  ColumnFiltersState,
-  Updater,
 } from "@tanstack/react-table";
-import AddCustomColumn from "@/table/AddCustomColumn";
-import {
-  CustomColumnInput,
+import AddCustomColumn, {
   getCustomColumnDisplayName,
 } from "@/table/AddCustomColumn";
+import { CustomColumnInput } from "@/table/AddCustomColumn";
 import CommonTable from "@/table/CommonTable";
-import EnumFilter from "@/table/EnumFilter";
 import TextFilter from "@/table/TextFilter";
 import { getLeadColumns } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Lead as LeadRow, listSuggestedLeads } from "@/services/Leads";
+import { Lead as LeadRow, listLeadsWithQuota } from "@/services/Leads";
 import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
-import { USERPORT_TENANT_ID } from "@/services/Common";
 import LoadingOverlay from "@/common/LoadingOverlay";
+import EnumFilterV2 from "@/table/EnumFilterV2";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { exportToCSV } from "@/common/utils";
 
 const ZeroStateDisplay = () => {
   return (
@@ -42,54 +39,44 @@ interface TableProps {
   columns: ColumnDef<LeadRow>[];
   leads: LeadRow[];
   totalLeadsCount: number;
-  moreLeadsToFetch: boolean; // Whether server has more leads to fetch.
+  curPageNum: number;
+  curPageSize: number;
+  handlePageClick: (goToNextPage: boolean) => Promise<void>;
   dataLoading: boolean;
-  onFetchNextPage: () => Promise<void>;
   onCustomColumnAdded: (arg0: CustomColumnInput) => void;
+  onPageSizeChange: (pageSize: number) => void;
+  allPersonaFilterValues: string[];
+  personaFilterValues: string[];
+  onPersonaFilterValuesChange: (newPersonaFilterValues: string[]) => void;
 }
 
 export const Table: React.FC<TableProps> = ({
   columns,
   leads,
   totalLeadsCount,
-  moreLeadsToFetch,
+  curPageNum,
+  curPageSize,
+  handlePageClick,
   dataLoading,
-  onFetchNextPage,
   onCustomColumnAdded,
+  onPageSizeChange,
+  allPersonaFilterValues,
+  personaFilterValues,
+  onPersonaFilterValuesChange,
 }) => {
-  const authContext = useAuthContext();
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
+  // This is only a JSON object mapping selected Row ID to true.
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const pageCount = Math.ceil(totalLeadsCount / curPageSize);
 
-  var persona_filter_values: string[] = [];
-  if (authContext.userContext?.tenant.id !== USERPORT_TENANT_ID) {
-    persona_filter_values = [
-      getCustomColumnDisplayName("buyer"),
-      getCustomColumnDisplayName("influencer"),
-      getCustomColumnDisplayName("end_user"),
-      "null",
-    ];
-  } else {
-    // Test account, so we use only the two personas here.
-    // TODO: Change once this is no longer the test account.
-    persona_filter_values = [
-      getCustomColumnDisplayName("buyer"),
-      getCustomColumnDisplayName("influencer"),
-    ];
+  // Create list of selected leads.
+  var leadMap: Record<string, LeadRow> = {};
+  for (const l of leads) {
+    leadMap[l.id] = l;
   }
-
-  const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([
-    {
-      id: "persona_match",
-      value: persona_filter_values,
-    },
-  ]);
-  const [rowSelection, setRowSelection] = useState({});
-
-  const initialPaginationState = {
-    pageIndex: 0, //initial page index
-    pageSize: 20, //default page size
-  };
-  const [pagination, setPagination] = useState(initialPaginationState);
+  const selectedLeads: LeadRow[] = Object.keys(rowSelection).map(
+    (id) => leadMap[id]
+  );
 
   var initialColumnVisibility: Record<string, boolean> = {};
   columns.forEach((col) => {
@@ -108,38 +95,25 @@ export const Table: React.FC<TableProps> = ({
   const columnResizeMode = "onChange";
   const columnResizeDirection = "ltr";
 
-  // When column filters page, we should reset pagination to state otherwise
-  // table view gets messed up (page numbers are invalid).
-  const onColumnFiltersChange = (
-    newColumnFiltersState: Updater<ColumnFiltersState>
-  ) => {
-    // Reset page page index to initial page.
-    setPagination(initialPaginationState);
-    setColumnFilters(newColumnFiltersState);
-  };
-
   const table = useReactTable({
     data: leads,
     columns,
     columnResizeMode,
     columnResizeDirection,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    pageCount: pageCount,
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
-    onColumnFiltersChange: onColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    onPaginationChange: setPagination,
+    getRowId: (row) => row.id, //use the lead's ID
     // Needed to solve this error: https://github.com/TanStack/table/issues/5026.
     autoResetPageIndex: false,
     state: {
       sorting,
-      columnFilters,
       columnVisibility,
       rowSelection,
-      pagination,
     },
   });
 
@@ -147,25 +121,6 @@ export const Table: React.FC<TableProps> = ({
     // No accounts found.
     return <ZeroStateDisplay />;
   }
-
-  // User clicks on next page button in the table.
-  // We assume when this callback is called that next page on server is definitely
-  // available.
-  const handleNextPageClick = async () => {
-    if (table.getCanNextPage()) {
-      // Next page exists, just update table to next page.
-      table.nextPage();
-      return;
-    }
-    await onFetchNextPage();
-    // Fetch the row model count on the current page (before next page was fetched).
-    // If this is less than pageSize, then stay on the same page.
-    // If equal to pageSize, go to next page.
-    const currentPageRowCount = table.getRowModel().rows.length;
-    if (currentPageRowCount === initialPaginationState.pageSize) {
-      table.nextPage();
-    }
-  };
 
   const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
     // Fetch the rows that need to be enriched. By default,
@@ -175,13 +130,44 @@ export const Table: React.FC<TableProps> = ({
     onCustomColumnAdded(customColumnInfo);
   };
 
+  // Handler to export selected leads to CSV.
+  const exportSelectedLeadsToCSV = () => {
+    // Transform selected leads before export.
+    const transformedLeads = selectedLeads.map((lead: LeadRow) => {
+      return {
+        Name: lead.first_name + " " + lead.last_name,
+        "LinkedIn URL": lead.linkedin_url,
+        "Company Name": lead.account_details.name,
+        "Role Title": lead.role_title,
+        "Fit Score": lead.score,
+        "Persona Match":
+          lead.custom_fields &&
+          lead.custom_fields.evaluation &&
+          lead.custom_fields.evaluation.persona_match &&
+          lead.custom_fields.evaluation.persona_match !== "null"
+            ? lead.custom_fields.evaluation.persona_match
+            : "unknown",
+        Rationale: lead.custom_fields
+          ? lead.custom_fields.evaluation.rationale
+          : "unknown",
+        "Matching Signals":
+          lead.custom_fields && lead.custom_fields.evaluation.matching_signals
+            ? lead.custom_fields.evaluation.matching_signals.join("\n\n")
+            : "unknown",
+      };
+    });
+    exportToCSV(transformedLeads, "userport-leads");
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-gray-700 text-md mb-2">
         Total Number of Leads:{" "}
         <span className="font-semibold">{totalLeadsCount}</span>
       </p>
-      <div className="flex gap-6">
+
+      {/* Floating Toolbar */}
+      <div className="sticky top-0 z-50 border border-gray-200 shadow-md bg-white p-2 flex gap-6">
         {/* Filter Controls */}
         <div className="flex gap-4">
           <TextFilter
@@ -190,16 +176,32 @@ export const Table: React.FC<TableProps> = ({
             placeholder={"Filter Lead name..."}
           />
 
-          {/* Status Filter */}
-          <EnumFilter
-            table={table}
-            columnId={"persona_match"}
-            columnFilters={columnFilters}
+          <EnumFilterV2
+            displayName={getCustomColumnDisplayName("persona_match")}
+            allFilterValues={allPersonaFilterValues}
+            initialFilterValues={personaFilterValues}
+            onFilterValuesChanged={onPersonaFilterValuesChange}
           />
         </div>
 
         {/* Add custom column */}
         <AddCustomColumn onAdded={handleCustomColumnAdd} />
+
+        {/* Floating Action Bar */}
+        {selectedLeads.length > 0 && (
+          <div className="flex gap-4 px-2 items-center">
+            <p className="text-sm text-gray-700">
+              {selectedLeads.length} selected
+            </p>
+            <Button
+              className="border border-gray-300 bg-white"
+              onClick={exportSelectedLeadsToCSV}
+              variant="outline"
+            >
+              <Download /> Export
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Table Container */}
@@ -207,10 +209,12 @@ export const Table: React.FC<TableProps> = ({
         table={table}
         columns={columns}
         columnResizeMode={columnResizeMode}
-        pagination={pagination}
-        morePagesToFetch={moreLeadsToFetch}
-        handleNextPageClick={handleNextPageClick}
+        curPageNum={curPageNum}
+        totalPageCount={pageCount}
+        handlePageClick={handlePageClick}
         headerClassName="bg-[rgb(180,150,200)]"
+        curPageSize={curPageSize}
+        onPageSizeChange={onPageSizeChange}
       />
 
       <LoadingOverlay loading={dataLoading} />
@@ -229,32 +233,55 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const authContext = useAuthContext();
   // Current list of all leads fetched from server so far in the correct pagination order.
   const [curLeads, setCurLeads] = useState<LeadRow[]>([]);
-  // Latest Page number fetched from server.
-  const [serverPage, setServerPage] = useState(1);
-  // Whether there are more leads to fetch from server.
-  const [moreLeadsToFetch, setMoreLeadsToFetch] = useState(false);
+  // Current Page number (fetched from server). Valid page numbers start from 1.
+  const [curPageNum, setCurPageNum] = useState<number>(0);
+  // Current page size.
+  const [curPageSize, setCurPageSize] = useState<number>(20);
+  // Cursor values associated with the pages fetched from server.
+  // Initially null since page 1 always has null cursor value.
+  const [cursorValues, setCursorValues] = useState<(string | null)[]>([null]);
   // Total leads count found on the server.
   const [totalLeadsCount, setTotalLeadsCount] = useState(0);
   const [columns, setColumns] = useState<ColumnDef<LeadRow>[]>([]);
+  // Filters used for Persona Match.
+  const allPersonaFilterValues = ["buyer", "influencer", "end_user", "unknown"];
+  const [personaFilterValues, setPersonaFilterValues] = useState<string[]>(
+    allPersonaFilterValues
+  );
 
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
 
+  const listLeads = async (cursor: string | null) => {
+    const response = await listLeadsWithQuota(authContext, {
+      accountId: accountId ?? null,
+      cursor: cursor,
+      limit: curPageSize,
+      buyer_percent: 60,
+      influencer_percent: 35,
+      end_user_percent: 5,
+      persona_filter_values: personaFilterValues,
+    });
+    setTotalLeadsCount(response.count);
+    setCurLeads(response.results);
+    setColumns(getLeadColumns(response.results));
+    return response;
+  };
+
   // Initial fetch for leads.
   useEffect(() => {
-    listSuggestedLeads(authContext, serverPage, accountId)
+    setLoading(true);
+    listLeads(null)
       .then((response) => {
-        setTotalLeadsCount(response.count);
-        setMoreLeadsToFetch(response.next !== null);
-        setCurLeads(response.results);
-        setColumns(getLeadColumns(response.results));
+        setCurPageNum(1);
+        setCursorValues([null, response.next_cursor ?? null]);
       })
       .catch((error) =>
         setError(new Error(`Failed to fetch Leads: ${error.message}`))
       )
       .finally(() => setLoading(false));
-  }, [authContext]);
+  }, [authContext, curPageSize, personaFilterValues]);
 
   if (loading) {
     return <ScreenLoader />;
@@ -270,26 +297,30 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     console.log("custom colum info: ", customColumnInfo);
   };
 
-  // Handle user request to fetch the next page.
-  const onFetchNextPage = async () => {
+  // Handle user request to go to page.
+  // If goToNextPage is true, fetch next page, otherwise fetch previous page.
+  // We assume this callback can be called only if next or prev page buttons
+  // are enabled in the UI. In other words, we assume those validations are already done.
+  const handlePageClick = async (goToNextPage: boolean) => {
     setDataLoading(true);
-    const nextPage = serverPage + 1;
+    const nextPageNum = goToNextPage ? curPageNum + 1 : curPageNum - 1;
+    const cursor = cursorValues[nextPageNum - 1];
     try {
-      const response = await listSuggestedLeads(
-        authContext,
-        nextPage,
-        accountId
-      );
-      setTotalLeadsCount(totalLeadsCount);
-      setMoreLeadsToFetch(response.next !== null);
-      const allLeads = [...curLeads, ...response.results];
-      setCurLeads(allLeads);
-      setColumns(getLeadColumns(allLeads));
-      setServerPage(nextPage);
+      const response = await listLeads(cursor);
+      setCurPageNum(nextPageNum);
+      // We assume that user can only go forward or back one page at a time.
+      // TODO: If we allow user to go page X directly, then this logic has to be updated.
+      if (goToNextPage) {
+        // Append next cursor value.
+        setCursorValues([...cursorValues, response.next_cursor ?? null]);
+      } else {
+        // Remove cursor values whose index values are larger than next page num.
+        setCursorValues(cursorValues.filter((_, idx) => idx <= nextPageNum));
+      }
     } catch (error: any) {
       setError(
         new Error(
-          `Failed to fetch Next Page: ${nextPage} for Leads: ${error.message}`
+          `Failed to fetch Leads nextPage: ${goToNextPage} with next page num: ${nextPageNum} cursor: ${cursor} with error: ${error.message}`
         )
       );
     } finally {
@@ -297,15 +328,37 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     }
   };
 
+  // Handle change to persona filters.
+  const onPersonaFilterValuesChange = (newPersonaFilterValues: string[]) => {
+    const newPersonaFiltersSet = new Set(newPersonaFilterValues);
+    const curPersonaFiltersSet = new Set(personaFilterValues);
+    if (
+      newPersonaFiltersSet.size == curPersonaFiltersSet.size &&
+      [...newPersonaFiltersSet].every((filter) =>
+        curPersonaFiltersSet.has(filter)
+      )
+    ) {
+      // Filters have not changed.
+      return;
+    }
+    // Filters have changed.
+    setPersonaFilterValues(newPersonaFilterValues);
+  };
+
   return (
     <Table
       columns={columns}
       leads={curLeads}
       totalLeadsCount={totalLeadsCount}
-      moreLeadsToFetch={moreLeadsToFetch}
+      curPageNum={curPageNum}
+      curPageSize={curPageSize}
+      handlePageClick={handlePageClick}
       dataLoading={dataLoading}
-      onFetchNextPage={onFetchNextPage}
       onCustomColumnAdded={onCustomColumnAdded}
+      onPageSizeChange={setCurPageSize}
+      allPersonaFilterValues={allPersonaFilterValues}
+      personaFilterValues={personaFilterValues}
+      onPersonaFilterValuesChange={onPersonaFilterValuesChange}
     />
   );
 };

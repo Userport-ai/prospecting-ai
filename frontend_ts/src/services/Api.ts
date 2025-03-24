@@ -94,6 +94,10 @@ export interface ListObjectsResponse<T> {
   // Only present if pagination is enabled.
   next: string | null;
   previous: string | null;
+  // The cursor fields are only set for /leads/quota_distributon endpoints.
+  // They are not set for other endpoints.
+  next_cursor?: string;
+  prev_cursor?: string;
   // A list containing the serialized representations of the objects. The structure of each object within the results list depends on your model and serializer definitions.
   results: T[];
 }
