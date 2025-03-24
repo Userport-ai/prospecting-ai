@@ -267,7 +267,8 @@ def _update_account_from_enrichment(account: Account, enrichment_type: str, proc
             'company_type': processed_data.get('company_type'),
             'founded_year': processed_data.get('founded_year'),
             'customers': processed_data.get('customers', []),
-            'competitors': processed_data.get('competitors', [])
+            'competitors': processed_data.get('competitors', []),
+            'recent_events': processed_data.get('recent_events', [])
         }
         # Filter out None values
         update_fields = {k: v for k, v in update_fields.items() if v is not None}
