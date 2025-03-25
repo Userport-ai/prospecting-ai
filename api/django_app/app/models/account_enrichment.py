@@ -41,3 +41,4 @@ class AccountEnrichmentStatus(BaseMixin):
             models.Index(fields=['status']),
             models.Index(fields=['last_attempted_run']),
         ]
+        db_table = 'account_enrichment_status'
