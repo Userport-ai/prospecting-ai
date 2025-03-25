@@ -106,9 +106,6 @@ export function AppSidebar() {
       <SidebarContent className="mt-5 px-4 space-y-8">
         {/* App Group */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">
-            App
-          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-2">
               {appItems.map((item) => (

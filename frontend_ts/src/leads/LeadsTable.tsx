@@ -212,7 +212,7 @@ export const Table: React.FC<TableProps> = ({
         curPageNum={curPageNum}
         totalPageCount={pageCount}
         handlePageClick={handlePageClick}
-        headerClassName="bg-[rgb(180,150,200)]"
+        headerClassName="bg-[rgb(122,103,171)]"
         curPageSize={curPageSize}
         onPageSizeChange={onPageSizeChange}
       />
