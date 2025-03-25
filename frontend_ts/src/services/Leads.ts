@@ -1,6 +1,6 @@
 import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall, ListObjectsResponse } from "./Api";
-import { EnrichmentStatus } from "./Common";
+import { EnrichmentStatus, RecentCompanyEvent } from "./Common";
 import { ParsedHTML } from "./Extension";
 
 const LEADS_ENDPOINT = "/leads/";
@@ -12,7 +12,9 @@ export interface Lead {
   account_details: {
     id: string;
     name: string;
+    website: string;
     industry: string | null;
+    recent_events?: RecentCompanyEvent[];
   };
   first_name: string | null;
   last_name: string | null;

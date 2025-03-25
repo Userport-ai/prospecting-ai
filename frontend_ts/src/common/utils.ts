@@ -14,7 +14,7 @@ export function formatDate(isoDateString: string): string {
     console.error(`Invalid ISO date string: ${isoDateString}`);
     return isoDateString;
   }
-  return format(localDate, "yyyy-MM-dd HH:mm:ss a");
+  return format(localDate, "yyyy-MM-dd HH:mm a");
 }
 
 // Exports given JSON data to CSV.

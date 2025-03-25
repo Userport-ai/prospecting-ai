@@ -1,4 +1,4 @@
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown, Link } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
@@ -82,6 +82,7 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
     id: "linkedin_url",
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
+    size: 20,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -94,7 +95,7 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
           rel="noopener noreferrer"
           className="flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline"
         >
-          {url}
+          <Link size={18} />
         </a>
       );
     },
@@ -238,21 +239,9 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         } as CustomColumnMeta,
       },
       {
-        id: "rationale",
-        header: "Rationale",
-        minSize: 300,
-        accessorFn: (row) =>
-          row.custom_fields ? row.custom_fields.evaluation.rationale : null,
-        meta: {
-          displayName: "Rationale",
-          visibleInitially: true,
-          cellExpandable: true,
-        } as CustomColumnMeta,
-      },
-      {
         id: "matching_signals",
         header: "Matching Signals",
-        minSize: 300,
+        minSize: 600,
         accessorFn: (row) => getMatchingSignals(row),
         cell: (info) => {
           const matchingSignals = info.getValue() as string[] | null;
@@ -263,6 +252,18 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         },
         meta: {
           displayName: "Matching Signals",
+          visibleInitially: true,
+          cellExpandable: true,
+        } as CustomColumnMeta,
+      },
+      {
+        id: "rationale",
+        header: "Rationale",
+        minSize: 400,
+        accessorFn: (row) =>
+          row.custom_fields ? row.custom_fields.evaluation.rationale : null,
+        meta: {
+          displayName: "Rationale",
           visibleInitially: true,
           cellExpandable: true,
         } as CustomColumnMeta,

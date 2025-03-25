@@ -1,6 +1,6 @@
 import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall, ListObjectsResponse } from "./Api";
-import { EnrichmentStatus } from "./Common";
+import { EnrichmentStatus, RecentCompanyEvent } from "./Common";
 import { USERPORT_TENANT_ID } from "./Common";
 
 const ACCOUNTS_ENDPOINT = "/accounts/";
@@ -27,6 +27,7 @@ export interface Account {
   last_enriched_at: string | null;
   custom_fields: Record<string, any> | null;
   settings: Record<string, any> | null;
+  recent_events?: RecentCompanyEvent[];
   created_at: string;
   updated_at: string;
 }

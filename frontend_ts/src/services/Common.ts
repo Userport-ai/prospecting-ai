@@ -10,6 +10,14 @@ export enum EnrichmentStatusEnum {
   FAILED = "failed",
 }
 
+// Recent company event.
+export interface RecentCompanyEvent {
+  date: string;
+  title: string;
+  source: string;
+  description: string;
+}
+
 export interface EnrichmentStatusDetail {
   enrichment_type: EnrichmentType;
   status: EnrichmentStatusEnum;
