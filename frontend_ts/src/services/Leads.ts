@@ -12,6 +12,7 @@ export interface Lead {
   account_details: {
     id: string;
     name: string;
+    website: string;
     industry: string | null;
     recent_events?: RecentCompanyEvent[];
   };

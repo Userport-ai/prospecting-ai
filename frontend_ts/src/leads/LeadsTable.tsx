@@ -138,6 +138,7 @@ export const Table: React.FC<TableProps> = ({
         Name: lead.first_name + " " + lead.last_name,
         "LinkedIn URL": lead.linkedin_url,
         "Company Name": lead.account_details.name,
+        "Company Website": lead.account_details.website,
         "Role Title": lead.role_title,
         "Fit Score": lead.score,
         "Persona Match":
