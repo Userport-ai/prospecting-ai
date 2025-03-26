@@ -138,6 +138,7 @@ export const Table: React.FC<TableProps> = ({
         Name: lead.first_name + " " + lead.last_name,
         "LinkedIn URL": lead.linkedin_url,
         "Company Name": lead.account_details.name,
+        "Company Website": lead.account_details.website,
         "Role Title": lead.role_title,
         "Fit Score": lead.score,
         "Persona Match":
@@ -154,6 +155,11 @@ export const Table: React.FC<TableProps> = ({
           lead.custom_fields && lead.custom_fields.evaluation.matching_signals
             ? lead.custom_fields.evaluation.matching_signals.join("\n\n")
             : "unknown",
+        "Recent Company Highlights": lead.account_details.recent_events
+          ? lead.account_details.recent_events
+              .map((evt) => `${evt.description}\n${evt.date}`)
+              .join("\n\n")
+          : "none",
       };
     });
     exportToCSV(transformedLeads, "userport-leads");
@@ -167,7 +173,7 @@ export const Table: React.FC<TableProps> = ({
       </p>
 
       {/* Floating Toolbar */}
-      <div className="sticky top-0 z-50 border border-gray-200 shadow-md bg-white p-2 flex gap-6">
+      <div className="sticky top-0 z-10 border border-gray-200 shadow-md bg-white p-2 flex gap-6">
         {/* Filter Controls */}
         <div className="flex gap-4">
           <TextFilter
