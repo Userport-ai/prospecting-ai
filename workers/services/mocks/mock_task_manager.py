@@ -1,9 +1,13 @@
 import asyncio
 import uuid
 from typing import Dict, Any
+
+
+from services.task_registry import TaskRegistry
 from utils.loguru_setup import logger
 
 
+task_registry_instance = TaskRegistry()
 class MockTaskManager:
     """Mock implementation of TaskManager for local development"""
 
@@ -28,9 +32,13 @@ class MockTaskManager:
         }
 
     async def _execute_task(self, task_id: str):
-        # Simulate some processing time
-        await asyncio.sleep(2)
-
+        logger.info(f"Executing task {task_id} with payload: {self.tasks[task_id]['payload']}")
         task = self.tasks[task_id]
+
+        task_instance = task_registry_instance.get_task(task.get("task_name"))
+        if not task_instance or not task.get("task_name"):
+            raise ValueError(f"No task found with name: {task.get('task_name')}")
+        await task_instance.execute(task.get("payload"))
         task["status"] = "completed"
+
         print(f"Executed task {task_id}: {task}")

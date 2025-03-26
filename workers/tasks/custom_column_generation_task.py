@@ -51,6 +51,7 @@ class CustomColumnValue(UserportPydanticBaseModel):
     value_json: Optional[Dict[str, Any]] = None
     value_boolean: Optional[bool] = None
     value_number: Optional[float] = None
+    value_enum: Optional[str] = None
     confidence_score: Optional[float] = None
     generated_at: datetime
     error_details: Optional[Dict[str, Any]] = None
@@ -432,7 +433,7 @@ class CustomColumnTask(AccountEnrichmentTask):
             logger.debug(f"Value generation for entity {entity_id} completed in {generation_time:.2f}s")
 
             # Validate and format response
-            value = self._validate_response(response, column_config['response_type'])
+            value = self._validate_response(response, column_config)
 
             # Log the confidence score
             if 'confidence_score' in value:
@@ -511,7 +512,8 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
         }
         return formats.get(response_type, "unknown format")
 
-    def _validate_response(self, response: Dict[str, Any], response_type: str) -> Dict[str, Any]:
+    def _validate_response(self, response: Dict[str, Any], column_config: Any) -> Dict[str, Any]:
+        response_type = column_config['response_type']
         """Validate and format the AI response with enhanced error checking."""
         if not response:
             raise ValueError("Response is empty")
@@ -574,7 +576,15 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
 
                 value = float(value)  # Ensure it's a float
                 return {"value_number": value, "confidence_score": confidence}
-
+            elif response_type == "enum":
+                if isinstance(value, str):
+                    try:
+                        # Check if the string is a valid enum value
+                        if value not in column_config['response_config'].get("allowed_values", []):
+                            logger.error(f"Invalid enum value '{value}'")
+                    except Exception as e:
+                        raise ValueError(f"Error validating enum value '{value}': {str(e)}")
+                return {"value_enum": value, "confidence_score": confidence}
             else:
                 raise ValueError(f"Unsupported response type: {response_type}")
 

@@ -23,145 +23,98 @@ class CustomColumnCallbackHandler:
             account_id = data.get('account_id')
             status = data.get('status')
             processed_data = data.get('processed_data', {})
-            column_id = processed_data.get('column_id')
-            request_id = data.get('request_id')
+            values = processed_data.get('values', [])
+            completion_percentage = data.get('completion_percentage', 0)
+            column_id = processed_data.get('column_id')  # Some callbacks might include this directly
 
             # Log the callback
             logger.info(
                 f"Received custom column callback: job_id={job_id}, status={status}, "
-                f"column_id={column_id}, request_id={request_id}"
+                f"values_count={len(values)}, completion_percentage={completion_percentage}"
             )
 
             # Validate required fields
-            if not all([job_id, account_id, status, column_id]):
+            if not all([job_id, account_id, status]):
                 logger.error(f"Missing required fields in callback: {data}")
                 return False
 
-            with transaction.atomic():
-                # Get account with lock to prevent race conditions
-                account = Account.objects.select_for_update().get(id=account_id)
+            # Handle progress updates without values - these are just informational
+            if status == 'processing' and not values:
+                logger.info(f"Processing progress update: {completion_percentage}% complete")
 
-                # Get the custom column
-                try:
-                    column = CustomColumn.objects.select_for_update().get(id=column_id)
-                except CustomColumn.DoesNotExist:
-                    logger.error(f"Custom column {column_id} not found")
-                    return False
+                # If we have a column_id in the processed_data, update that column's timestamp
+                if column_id:
+                    try:
+                        column = CustomColumn.objects.get(id=column_id)
+                        column.last_refresh = timezone.now()
+                        column.save(update_fields=['last_refresh', 'updated_at'])
+                        logger.info(f"Updated last_refresh for column {column_id} for progress update")
+                    except CustomColumn.DoesNotExist:
+                        logger.warning(f"Column {column_id} not found for progress update")
+                        pass  # Continue anyway
 
-                # Check for duplicate request (idempotency)
-                if request_id:
-                    if cls._is_duplicate_request(column, request_id):
-                        logger.info(f"Duplicate request {request_id} - skipping processing")
-                        return True
+                return True  # Successfully processed the progress update
 
-                # Handle pagination
-                pagination = data.get('pagination')
-                if pagination:
-                    current_page = pagination.get('page', 1)
-                    total_pages = pagination.get('total_pages', 1)
-
-                    # Track processed pages to prevent duplicates
-                    if not cls._should_process_page(column, current_page):
-                        logger.info(f"Page {current_page} already processed for column {column_id}")
-                        return True
-
-                    # Process this page of values
-                    cls._process_values_batch(
-                        column=column,
-                        values=processed_data.get('values', []),
-                        entity_type=column.entity_type
-                    )
-
-                    # Update column metadata for pagination tracking
-                    if current_page < total_pages:
-                        cls._update_column_metadata(
-                            column=column,
-                            current_page=current_page,
-                            processed_count=processed_data.get('processed_count', 0),
-                            total_count=processed_data.get('total_count', 0)
-                        )
-                        return True
-
-                # Handle based on status
-                if status == 'processing':
-                    cls._handle_processing_update(
-                        column=column,
-                        values=processed_data.get('values', []),
-                        processed_count=processed_data.get('processed_count', 0),
-                        total_count=processed_data.get('total_count', 0),
-                        completion_percentage=data.get('completion_percentage', 0)
-                    )
-                elif status == 'completed':
-                    cls._handle_completion(
-                        column=column,
-                        values=processed_data.get('values', [])
-                    )
-                elif status == 'failed':
-                    cls._handle_failure(
-                        column=column,
-                        error_details=data.get('error_details', {})
-                    )
-
-                # Record processed request for idempotency
-                if request_id:
-                    cls._record_processed_request(column, request_id)
-
+            # If there are no values but status is not 'processing', only log a warning
+            if not values and status != 'completed':
+                logger.warning(f"No values provided in callback with status '{status}': {data}")
+                # Still return success to avoid retries for empty but valid callbacks
                 return True
+
+            # For callbacks with values, continue normal processing
+            # Group values by column_id
+            values_by_column = {}
+            for value in values:
+                column_id = value.get('column_id')
+                if not column_id:
+                    logger.warning(f"Missing column_id in value data: {value}")
+                    continue
+                if column_id not in values_by_column:
+                    values_by_column[column_id] = []
+                values_by_column[column_id].append(value)
+
+            # If we have grouped values, process them
+            if values_by_column:
+                with transaction.atomic():
+                    # Get account with lock to prevent race conditions
+                    account = Account.objects.select_for_update().get(id=account_id)
+
+                    # Get all referenced columns
+                    column_ids = list(values_by_column.keys())
+                    columns = {
+                        str(col.id): col for col in CustomColumn.objects.filter(id__in=column_ids)
+                    }
+
+                    # Check if all columns were found
+                    missing_columns = set(column_ids) - set(columns.keys())
+                    if missing_columns:
+                        logger.error(f"Custom columns not found: {missing_columns}")
+                        # Continue with available columns rather than failing completely
+
+                    # Process each column's values
+                    for column_id, column_values in values_by_column.items():
+                        if column_id not in columns:
+                            logger.warning(f"Skipping values for missing column {column_id}")
+                            continue
+
+                        column = columns[column_id]
+
+                        # Just process values immediately without any tracking
+                        cls._process_values_batch(
+                            column=column,
+                            values=column_values,
+                            entity_type=column.entity_type
+                        )
+
+                        # Update the column's last_refresh timestamp
+                        column.last_refresh = timezone.now()
+                        column.save(update_fields=['last_refresh', 'updated_at'])
+
+            return True
 
         except Exception as e:
             logger.error(f"Error handling custom column callback: {str(e)}", exc_info=True)
             return False
-
-    @classmethod
-    def _is_duplicate_request(cls, column, request_id):
-        """Check if this request has already been processed."""
-        # Store processed requests in the column's metadata
-        metadata = column.settings or {}
-        processed_requests = metadata.get('processed_requests', [])
-        return request_id in processed_requests
-
-    @classmethod
-    def _record_processed_request(cls, column, request_id):
-        """Record this request_id as processed for idempotency."""
-        # Update the column's metadata to include this request_id
-        metadata = column.settings or {}
-        processed_requests = metadata.get('processed_requests', [])
-        if request_id not in processed_requests:
-            processed_requests.append(request_id)
-            metadata['processed_requests'] = processed_requests
-            column.settings = metadata
-            column.save(update_fields=['settings', 'updated_at'])
-
-    @classmethod
-    def _should_process_page(cls, column, page):
-        """Check if this page should be processed."""
-        # Check the column's metadata for processed pages
-        metadata = column.settings or {}
-        processed_pages = metadata.get('processed_pages', [])
-        return page not in processed_pages
-
-    @classmethod
-    def _update_column_metadata(cls, column, current_page, processed_count, total_count):
-        """Update the column's metadata for pagination tracking."""
-        metadata = column.settings or {}
-
-        # Update processed pages
-        processed_pages = metadata.get('processed_pages', [])
-        if current_page not in processed_pages:
-            processed_pages.append(current_page)
-
-        # Update progress information
-        metadata.update({
-            'processed_pages': processed_pages,
-            'processed_count': processed_count,
-            'total_count': total_count,
-            'last_update': timezone.now().isoformat()
-        })
-
-        # Save the updated metadata
-        column.settings = metadata
-        column.last_refresh = timezone.now()
-        column.save(update_fields=['settings', 'last_refresh', 'updated_at'])
 
     @classmethod
     def _process_values_batch(cls, column, values, entity_type):
@@ -169,17 +122,27 @@ class CustomColumnCallbackHandler:
         if not values:
             return
 
+        logger.info(f"Processing {len(values)} values for column {column.id} (entity_type: {entity_type})")
+
         for value_data in values:
             entity_id = value_data.get('entity_id')
             if not entity_id:
                 logger.warning(f"Missing entity_id in value data: {value_data}")
                 continue
 
+            # Get the value status from the data
+            if entity_type == CustomColumn.EntityType.LEAD:
+                status_enum = LeadCustomColumnValue.Status
+            else:
+                status_enum = AccountCustomColumnValue.Status
+
+            status = value_data.get('status', status_enum.COMPLETED)
+
             try:
                 if entity_type == CustomColumn.EntityType.LEAD:
-                    cls._update_lead_value(column, entity_id, value_data)
+                    cls._update_lead_value(column, entity_id, value_data, status)
                 else:
-                    cls._update_account_value(column, entity_id, value_data)
+                    cls._update_account_value(column, entity_id, value_data, status)
             except Exception as e:
                 logger.error(
                     f"Error updating {entity_type} column value for {entity_id}: {str(e)}",
@@ -187,10 +150,8 @@ class CustomColumnCallbackHandler:
                 )
 
     @classmethod
-    def _update_lead_value(cls, column, lead_id, value_data):
+    def _update_lead_value(cls, column, lead_id, value_data, status):
         """Update a lead custom column value."""
-        status = value_data.get('status', LeadCustomColumnValue.Status.COMPLETED)
-
         # Get the appropriate value field based on response type
         value_fields = cls._get_value_fields(column.response_type, value_data)
 
@@ -210,10 +171,8 @@ class CustomColumnCallbackHandler:
         )
 
     @classmethod
-    def _update_account_value(cls, column, account_id, value_data):
+    def _update_account_value(cls, column, account_id, value_data, status):
         """Update an account custom column value."""
-        status = value_data.get('status', AccountCustomColumnValue.Status.COMPLETED)
-
         # Get the appropriate value field based on response type
         value_fields = cls._get_value_fields(column.response_type, value_data)
 
@@ -242,6 +201,11 @@ class CustomColumnCallbackHandler:
             'value_number': None
         }
 
+        # Check for value_enum and map it to value_string for ENUM type
+        value_enum = value_data.get('value_enum')
+        if value_enum is not None and response_type == CustomColumn.ResponseType.ENUM:
+            value_data['value_string'] = value_enum
+
         if response_type == CustomColumn.ResponseType.STRING:
             value_fields['value_string'] = value_data.get('value_string')
         elif response_type == CustomColumn.ResponseType.JSON_OBJECT:
@@ -254,96 +218,3 @@ class CustomColumnCallbackHandler:
             value_fields['value_string'] = value_data.get('value_string')
 
         return value_fields
-
-    @classmethod
-    def _handle_processing_update(cls, column, values, processed_count, total_count, completion_percentage):
-        """Handle a processing update callback."""
-        # Update column metadata for progress tracking
-        metadata = column.settings or {}
-        metadata.update({
-            'status': 'processing',
-            'processed_count': processed_count,
-            'total_count': total_count,
-            'completion_percentage': completion_percentage,
-            'last_update': timezone.now().isoformat()
-        })
-
-        # Save the updated metadata
-        column.settings = metadata
-        column.last_refresh = timezone.now()
-        column.save(update_fields=['settings', 'last_refresh', 'updated_at'])
-
-        # Process any values included in this update
-        if values:
-            cls._process_values_batch(
-                column=column,
-                values=values,
-                entity_type=column.entity_type
-            )
-
-    @classmethod
-    def _handle_completion(cls, column, values):
-        """Handle a completion callback."""
-        # Process all values
-        cls._process_values_batch(
-            column=column,
-            values=values,
-            entity_type=column.entity_type
-        )
-
-        # Update column metadata
-        metadata = column.settings or {}
-        metadata.update({
-            'status': 'completed',
-            'completion_percentage': 100,
-            'completed_at': timezone.now().isoformat(),
-            'total_values': len(values)
-        })
-
-        # Save the updated metadata
-        column.settings = metadata
-        column.last_refresh = timezone.now()
-        column.save(update_fields=['settings', 'last_refresh', 'updated_at'])
-
-        # Log the completion
-        logger.info(f"Custom column generation completed for column {column.id} with {len(values)} values")
-
-    @classmethod
-    def _handle_failure(cls, column, error_details):
-        """Handle a failure callback."""
-        # Update column metadata
-        metadata = column.settings or {}
-        metadata.update({
-            'status': 'failed',
-            'error_details': error_details,
-            'failed_at': timezone.now().isoformat()
-        })
-
-        # Save the updated metadata
-        column.settings = metadata
-        column.last_refresh = timezone.now()
-        column.save(update_fields=['settings', 'last_refresh', 'updated_at'])
-
-        # Update any values that are still processing to error status
-        if column.entity_type == CustomColumn.EntityType.LEAD:
-            LeadCustomColumnValue.objects.filter(
-                column=column,
-                status=LeadCustomColumnValue.Status.PROCESSING
-            ).update(
-                status=LeadCustomColumnValue.Status.ERROR,
-                error_details=error_details
-            )
-        else:
-            AccountCustomColumnValue.objects.filter(
-                column=column,
-                status=AccountCustomColumnValue.Status.PROCESSING
-            ).update(
-                status=AccountCustomColumnValue.Status.ERROR,
-                error_details=error_details
-            )
-
-        # Log the error
-        logger.error(
-            f"Custom column generation failed for column {column.id}: "
-            f"{error_details.get('message', 'Unknown error')}"
-        )

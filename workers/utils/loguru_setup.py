@@ -309,6 +309,21 @@ def setup_logging():
     # Get log level from environment
     log_level = os.getenv('LOG_LEVEL', 'DEBUG').upper()
 
+    # Create a custom JSON encoder that handles non-serializable types
+    class CustomJSONEncoder(json.JSONEncoder):
+        def default(self, obj):
+            # Handle datetime objects
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            # Handle type objects
+            elif isinstance(obj, type):
+                return obj.__name__
+            # Handle other non-serializable objects
+            elif hasattr(obj, '__str__'):
+                return str(obj)
+            # Fall back to default serialization
+            return super().default(obj)
+
     # Create a custom sink that formats logs as JSON with enhanced exception handling
     def sink(message):
         # Extract message record
@@ -337,7 +352,14 @@ def setup_logging():
             if k == "exc_info" and v is True:
                 has_exc_info = True
             elif k not in ['trace_id', 'account_id', 'task_name']:  # Skip already processed context fields
-                log_data[k] = v
+                # Only include serializable values
+                try:
+                    # Test if the value is JSON serializable
+                    json.dumps({k: v}, cls=CustomJSONEncoder)
+                    log_data[k] = v
+                except (TypeError, OverflowError):
+                    # If not serializable, convert to string
+                    log_data[k] = str(v)
 
         # Handle exception information
         if record["exception"] or has_exc_info:
@@ -349,7 +371,7 @@ def setup_logging():
                 tb_lines = traceback.format_exception(exc_type, exc_value, exc_tb)
 
                 log_data["error"] = {
-                    "type": exc_type.__name__,
+                    "type": exc_type.__name__ if hasattr(exc_type, "__name__") else str(exc_type),
                     "message": str(exc_value),
                     "traceback": tb_lines
                 }
@@ -363,8 +385,13 @@ def setup_logging():
                     "traceback": message.record["message"].split("\n")
                 }
 
-        # Output as JSON
-        print(json.dumps(log_data))
+        # Output as JSON using our custom encoder
+        try:
+            print(json.dumps(log_data, cls=CustomJSONEncoder))
+        except Exception as e:
+            # Fallback if JSON serialization fails
+            print(f"ERROR SERIALIZING LOG: {e}")
+            print(f"Original message: {record['message']}")
 
     # Add custom sink handler with enhanced settings
     logger.add(

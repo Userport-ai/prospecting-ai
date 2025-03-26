@@ -1,1123 +1,678 @@
-# Userport v2
+**Userport v2**
+
+**Introduction**
+
+Userport is a multi-tenant platform designed to manage sales accounts and leads, enriched with data from various external sources. It leverages a PostgreSQL database for core relational data, BigQuery for storing raw enrichment data and managing enrichment jobs, and a background processing system for handling data fetching and enrichment tasks asynchronously. This document outlines the system architecture, database schemas, and API design.
+
+*(Date: March 26, 2025)*
+
+**System Architecture**
 
 ```mermaid
-flowchart TB
-    ES[External Sources] --> BQ[(BigQuery)]
-    
-    API[API Service] --> Q[Job Queue]
-    Q --> P[Processor]
-    
-    P --> ES
-    P --> BQ
-    
-    BQ --> P
-    P --> PG[(PostgreSQL)]
-    
-    classDef source fill:#FF9800,stroke:#E65100,color:white
-    classDef service fill:#2196F3,stroke:#1565C0,color:white
-    classDef database fill:#4CAF50,stroke:#2E7D32,color:white
-    
-    class ES source
-    class API,Q,P service
-    class BQ,PG database
+flowchart TD
+  subgraph User_Interaction
+    UI[User Interface / Client]
+  end
+
+  subgraph Backend_Services
+    API[API Service]
+    AuthN[Authentication]
+    Q[Job Queue]
+    P[Processor]
+  end
+
+  subgraph Data_Processing_Storage
+    ES[External Sources]
+    BQ_Raw[BigQuery Raw Data]
+    PG[PostgreSQL Database]
+    BQ_Jobs[BigQuery Job Tracking]
+    BQ_Mappings[BigQuery Field Mappings]
+  end
+
+  UI --> API
+  API --> AuthN
+  AuthN --> API
+  API --> Q
+  Q --> P
+  P --> ES
+  P --> BQ_Raw
+  P --> PG
+  P --> BQ_Jobs
+  PG --> API
+  BQ_Jobs --> API
+  BQ_Mappings --> P
+
+  classDef source fill:#FF9800,stroke:#E65100,color:white
+  classDef service fill:#2196F3,stroke:#1565C0,color:white
+  classDef database fill:#4CAF50,stroke:#2E7D32,color:white
+  classDef queue fill:#FFEB3B,stroke:#FBC02D,color:black
+  classDef client fill:#9C27B0,stroke:#6A1B9A,color:white
+
+  class ES source
+  class UI client
+  class API,P,AuthN service
+  class Q queue
+  class PG,BQ_Raw,BQ_Jobs,BQ_Mappings database
 ```
 
-## Postgres Database Design
+* **API Service:** Handles incoming HTTP requests, authentication, validation, and interacts with the PostgreSQL database for synchronous operations. Enqueues background jobs for longer tasks like data enrichment.
+* **Job Queue:** Manages asynchronous tasks, ensuring requests like bulk imports or enrichment are processed reliably in the background.
+* **Processor:** Background workers that dequeue jobs, interact with External Sources, process data, store raw results in BigQuery, and update the primary PostgreSQL database with enriched/processed information.
+* **PostgreSQL:** The primary relational database storing core application data (tenants, users, products, accounts, leads, custom columns).
+* **BigQuery:** Used as a data warehouse/staging area for raw enrichment data, tracking enrichment job statuses, and potentially storing field mapping configurations.
+* **External Sources:** Third-party APIs or data providers used for enriching account and lead information.
 
-### Tenants
+**PostgreSQL Database Design**
 
-| Column     | Type         | Required | Description               |
-|------------|--------------|----------|---------------------------|
-| id         | UUID         | Yes      | Primary key               |
-| name       | VARCHAR(255) | Yes      | Tenant name               |
-| domain     | VARCHAR(255) | Yes      | Tenant domain             |
-| status     | VARCHAR(50)  | Yes      | active/inactive/suspended |
-| settings   | JSONB        | No       | Tenant-specific settings  |
-| created_at | TIMESTAMP    | Yes      | Creation timestamp        |
-| updated_at | TIMESTAMP    | Yes      | Last update timestamp     |
+*Conventions:*
+* Primary Keys are `UUID` type, auto-generated unless specified otherwise.
+* Timestamps (`created_at`, `updated_at`) use `TIMESTAMP WITH TIME ZONE` and default to `NOW()`. `updated_at` should auto-update on record changes.
+* Foreign key constraints default to `ON DELETE RESTRICT` unless otherwise specified.
+* Indexes should be added to foreign keys and frequently queried columns (e.g., `tenant_id`, `email`, `status`).
+
+*ENUM Types:*
+
+```sql
+CREATE TYPE user_role AS ENUM ('user', 'tenant_admin', 'internal_cs', 'internal_admin');
+CREATE TYPE user_status AS ENUM ('pending_verification', 'active', 'inactive', 'suspended');
+CREATE TYPE tenant_status AS ENUM ('active', 'inactive', 'suspended');
+CREATE TYPE enrichment_status AS ENUM ('pending', 'in_progress', 'completed', 'failed');
+CREATE TYPE entity_type AS ENUM ('account', 'lead');
+CREATE TYPE custom_column_data_type AS ENUM ('text', 'number', 'boolean', 'date', 'url', 'email', 'json');
+```
+
+### Tenants Table
+
+*Stores information about each client organization.*
+
+| Column     | Type                     | Modifiers                           | Description                                  |
+| :--------- | :----------------------- | :---------------------------------- | :------------------------------------------- |
+| id         | UUID                     | PRIMARY KEY DEFAULT gen_random_uuid() | Unique identifier for the tenant             |
+| name       | VARCHAR(255)             | NOT NULL                            | Tenant's legal or display name               |
+| domain     | VARCHAR(255)             | NOT NULL UNIQUE                     | Tenant's unique domain identifier (for login) |
+| status     | tenant\_status           | NOT NULL DEFAULT 'active'           | Current status of the tenant account         |
+| settings   | JSONB                    |                                     | Tenant-specific configuration (e.g., integrations) |
+| created_at | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of tenant creation                 |
+| updated_at | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of last tenant update              |
+
+*Indexes:* `domain`, `status`
 
 ### Users Table
 
-| Column        | Type        | Required | Description                                                             |
-|---------------|-------------|----------|-------------------------------------------------------------------------|
-| id            | UUID        | Yes      | Primary key                                                             |
-| tenant_id     | UUID        | Yes      | Foreign key to Tenants                                                  |
-| email         | String(255) | Yes      | User's email address<br/>Must be unique within tenant                   |
-| password_hash | String(255) | Yes      | Hashed password                                                         |
-| first_name    | String(100) | No       | User's first name                                                       |
-| last_name     | String(100) | No       | User's last name                                                        |
-| role          | Enum        | Yes      | User's role<br/>Values: user, tenant_admin, internal_cs, internal_admin |
-| status        | Enum        | Yes      | Account status<br/>Values: active, inactive, suspended                  |
-| last_login    | Timestamp   | No       | Last login timestamp                                                    |
-| created_at    | Timestamp   | Yes      | Creation timestamp                                                      |
-| updated_at    | Timestamp   | Yes      | Last update timestamp                                                   |
+*Stores user accounts associated with tenants.*
 
-### Products
+| Column        | Type                     | Modifiers                           | Description                                  |
+| :------------ | :----------------------- | :---------------------------------- | :------------------------------------------- |
+| id            | UUID                     | PRIMARY KEY DEFAULT gen_random_uuid() | Unique identifier for the user               |
+| tenant_id     | UUID                     | NOT NULL REFERENCES tenants(id)     | Foreign key linking user to their tenant     |
+| email         | VARCHAR(255)             | NOT NULL                            | User's email address (login identifier)    |
+| password_hash | VARCHAR(255)             | NOT NULL                            | Securely hashed user password                |
+| first_name    | VARCHAR(100)             |                                     | User's first name                            |
+| last_name     | VARCHAR(100)             |                                     | User's last name                             |
+| role          | user\_role               | NOT NULL DEFAULT 'user'             | User's role within the tenant/platform       |
+| status        | user\_status             | NOT NULL DEFAULT 'pending_verification' | User's account status                        |
+| last_login_at | TIMESTAMP WITH TIME ZONE |                                     | Timestamp of the user's last login         |
+| created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of user creation                   |
+| updated_at    | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of last user update                |
 
-| Column          | Type         | Required | Description               |
-|-----------------|--------------|----------|---------------------------|
-| id              | UUID         | Yes      | Primary key               |
-| tenant_id       | UUID         | Yes      | Foreign key to Tenants    |
-| name            | VARCHAR(255) | Yes      | Product name              |
-| description     | TEXT         | Yes      | Product description       |
-| icp_description | TEXT         | No       | Ideal Customer Profile    |
-| keywords        | TEXT[]       | No       | Related keywords          |
-| settings        | JSONB        | No       | Product-specific settings |
-| created_by      | UUID         | No       | Foreign key to Users      |
-| created_at      | TIMESTAMP    | Yes      | Creation timestamp        |
-| updated_at      | TIMESTAMP    | Yes      | Last update timestamp     |
+*Indexes:* `tenant_id`, `email`, `role`, `status`
+*Constraints:* `UNIQUE (tenant_id, email)`
 
-### Accounts
+### Products Table
 
-| Column             | Type         | Required | Description                          |
-|--------------------|--------------|----------|--------------------------------------|
-| id                 | UUID         | Yes      | Primary key                          |
-| tenant_id          | UUID         | Yes      | Foreign key to Tenants               |
-| product_id         | UUID         | Yes      | Foreign key to Products              |
-| name               | VARCHAR(255) | Yes      | Company name                         |
-| website            | VARCHAR(512) | No       | Company website                      |
-| linkedin_url       | VARCHAR(512) | No       | LinkedIn company URL                 |
-| industry           | VARCHAR(255) | No       | Industry                             |
-| location           | VARCHAR(255) | No       | Location                             |
-| employee_count     | INTEGER      | No       | Number of employees                  |
-| company_type       | VARCHAR(100) | No       | Type of company                      |
-| founded_year       | INTEGER      | No       | Year founded                         |
-| technologies       | JSONB        | No       | Technology stack                     |
-| funding_details    | JSONB        | No       | Funding information                  |
-| enrichment_status  | VARCHAR(50)  | Yes      | pending/in_progress/completed/failed |
-| enrichment_sources | JSONB        | No       | Status per source                    |
-| last_enriched_at   | TIMESTAMP    | No       | Last enrichment time                 |
-| custom_fields      | JSONB        | No       | Dynamic custom fields                |
-| created_by         | UUID         | No       | Foreign key to Users                 |
-| created_at         | TIMESTAMP    | Yes      | Creation timestamp                   |
-| updated_at         | TIMESTAMP    | Yes      | Last update timestamp                |
+*Stores products or services defined by tenants, around which accounts and leads are organized.*
+
+| Column          | Type                     | Modifiers                           | Description                             |
+| :-------------- | :----------------------- | :---------------------------------- | :-------------------------------------- |
+| id              | UUID                     | PRIMARY KEY DEFAULT gen_random_uuid() | Unique identifier for the product         |
+| tenant_id       | UUID                     | NOT NULL REFERENCES tenants(id)     | Foreign key linking product to its tenant |
+| name            | VARCHAR(255)             | NOT NULL                            | Name of the product/service             |
+| description     | TEXT                     |                                     | Detailed description of the product     |
+| icp_description | TEXT                     |                                     | Description of the Ideal Customer Profile |
+| keywords        | TEXT[]                   |                                     | Array of keywords related to the product  |
+| settings        | JSONB                    |                                     | Product-specific settings/configuration |
+| created_by      | UUID                     | REFERENCES users(id) ON DELETE SET NULL | User who created the product            |
+| created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of product creation           |
+| updated_at      | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of last product update        |
+
+*Indexes:* `tenant_id`, `name`, `created_by`
+*Constraints:* `UNIQUE (tenant_id, name)`
+
+### Accounts Table
+
+*Stores information about companies (accounts) relevant to a specific product.*
+
+| Column             | Type                     | Modifiers                           | Description                                  |
+| :----------------- | :----------------------- | :---------------------------------- | :------------------------------------------- |
+| id                 | UUID                     | PRIMARY KEY DEFAULT gen_random_uuid() | Unique identifier for the account            |
+| tenant_id          | UUID                     | NOT NULL REFERENCES tenants(id)     | Foreign key linking account to its tenant    |
+| product_id         | UUID                     | NOT NULL REFERENCES products(id) ON DELETE CASCADE | Foreign key linking account to its product |
+| name               | VARCHAR(255)             | NOT NULL                            | Company name                                 |
+| website            | VARCHAR(512)             |                                     | Company's primary website URL                |
+| linkedin_url       | VARCHAR(512)             |                                     | LinkedIn company page URL                    |
+| industry           | VARCHAR(255)             |                                     | Primary industry of the company              |
+| location           | VARCHAR(255)             |                                     | Company headquarters or primary location     |
+| employee_count     | INTEGER                  |                                     | Estimated number of employees                |
+| company_type       | VARCHAR(100)             |                                     | e.g., Public, Private, Non-profit          |
+| founded_year       | INTEGER                  |                                     | Year the company was founded                 |
+| technologies       | JSONB                    |                                     | Technology stack used by the company         |
+| funding_details    | JSONB                    |                                     | Information about funding rounds, amounts    |
+| enrichment_status  | enrichment\_status       | NOT NULL DEFAULT 'pending'          | Status of the latest enrichment process      |
+| enrichment_sources | JSONB                    |                                     | Status per enrichment source (e.g., `{"linkedin": "completed", "clearbit": "failed"}`) |
+| last_enriched_at   | TIMESTAMP WITH TIME ZONE |                                     | Timestamp of the last successful enrichment  |
+| custom_fields      | JSONB                    |                                     | Stores values for tenant-defined custom columns (key: custom_column_id or name, value: data) |
+| created_by         | UUID                     | REFERENCES users(id) ON DELETE SET NULL | User who created the account record        |
+| created_at         | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of account creation                |
+| updated_at         | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of last account update             |
+
+*Indexes:* `tenant_id`, `product_id`, `name`, `website`, `linkedin_url`, `enrichment_status`, `created_by`
 
 ### Leads Table
 
-| Column            | Type        | Required | Description                                                                       |
-|-------------------|-------------|----------|-----------------------------------------------------------------------------------|
-| id                | UUID        | Yes      | Primary key, Auto-generated                                                       |
-| tenant_id         | UUID        | Yes      | Foreign key to Tenants                                                            |
-| account_id        | UUID        | Yes      | Foreign key to Accounts                                                           |
-| first_name        | String(100) | No       | Lead's first name                                                                 |
-| last_name         | String(100) | No       | Lead's last name                                                                  |
-| title             | String(255) | No       | Job title                                                                         |
-| linkedin_url      | URL(512)    | No       | LinkedIn profile URL                                                              |
-| email             | String(255) | No       | Email address                                                                     |
-| phone             | String(50)  | No       | Phone number                                                                      |
-| enrichment_status | Enum        | Yes      | Status of enrichment<br/> Values: `pending`, `in_progress`, `completed`, `failed` |
-| enrichment_data   | JSON        | No       | Raw enrichment data                                                               |
-| linkedin_activity | JSON        | No       | Recent activities<br/>From Chrome extension                                       |
-| score             | Float       | No       | Lead score                                                                        |
-| last_enriched_at  | Timestamp   | No       | Last enrichment time                                                              |
-| created_by        | UUID        | No       | Foreign key to Users                                                              |
-| created_at        | Timestamp   | Yes      | Creation timestamp                                                                |
-| updated_at        | Timestamp   | Yes      | Last update timestamp                                                             |
+*Stores information about individuals (leads) associated with an account.*
+
+| Column            | Type                     | Modifiers                           | Description                                      |
+| :---------------- | :----------------------- | :---------------------------------- | :----------------------------------------------- |
+| id                | UUID                     | PRIMARY KEY DEFAULT gen_random_uuid() | Unique identifier for the lead                   |
+| tenant_id         | UUID                     | NOT NULL REFERENCES tenants(id)     | Foreign key linking lead to its tenant           |
+| account_id        | UUID                     | NOT NULL REFERENCES accounts(id) ON DELETE CASCADE | Foreign key linking lead to its account        |
+| first_name        | VARCHAR(100)             |                                     | Lead's first name                                |
+| last_name         | VARCHAR(100)             |                                     | Lead's last name                                 |
+| title             | VARCHAR(255)             |                                     | Lead's job title                                 |
+| linkedin_url      | VARCHAR(512)             | UNIQUE                              | Lead's LinkedIn profile URL                      |
+| email             | VARCHAR(255)             |                                     | Lead's professional email address              |
+| phone             | VARCHAR(50)              |                                     | Lead's phone number                              |
+| enrichment_status | enrichment\_status       | NOT NULL DEFAULT 'pending'          | Status of the latest enrichment process          |
+| enrichment_data   | JSONB                    |                                     | Cache of recent raw/processed enrichment data    |
+| linkedin_activity | JSONB                    |                                     | Recent LinkedIn activity (e.g., posts, comments) |
+| score             | FLOAT                    |                                     | Calculated score indicating lead potential       |
+| last_enriched_at  | TIMESTAMP WITH TIME ZONE |                                     | Timestamp of the last successful enrichment      |
+| custom_fields     | JSONB                    |                                     | Stores values for tenant-defined custom columns  |
+| created_by        | UUID                     | REFERENCES users(id) ON DELETE SET NULL | User who created the lead record               |
+| created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of lead creation                       |
+| updated_at        | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of last lead update                    |
+
+*Indexes:* `tenant_id`, `account_id`, `linkedin_url`, `email`, `enrichment_status`, `score`, `created_by`
 
 ### Custom Columns Table
 
-| Column             | Type        | Required | Description                                                                                        |
-|--------------------|-------------|----------|----------------------------------------------------------------------------------------------------|
-| id                 | UUID        | Yes      | Primary key                                                                                        |
-| tenant_id          | UUID        | Yes      | Foreign key to Tenants                                                                             |
-| product_id         | UUID        | Yes      | Foreign key to Products                                                                            |
-| entity_type        | Enum        | Yes      | Type of entity<br/>Values: account, lead                                                           |
-| name               | String(255) | Yes      | Column name                                                                                        |
-| description        | Text        | No       | Column description                                                                                 |
-| data_type          | VARCHAR(50) | Yes      | Type of data. e.g. text/number/boolean/date/json.. we can add more like email, URL etc. later on.. |
-| enrichment_mapping | JSONB       | No       | Mapping to enriched data                                                                           |
-| enrichment_query   | Text        | No       | AI enrichment query                                                                                |
-| created_by         | UUID        | No       | Foreign key to Users                                                                               |
-| created_at         | Timestamp   | Yes      | Creation timestamp                                                                                 |
-| updated_at         | Timestamp   | Yes      | Last update timestamp                                                                              |
+*Defines tenant-specific fields for Accounts or Leads.*
 
-### Enrichment Logs
+| Column             | Type                     | Modifiers                           | Description                                      |
+| :----------------- | :----------------------- | :---------------------------------- | :----------------------------------------------- |
+| id                 | UUID                     | PRIMARY KEY DEFAULT gen_random_uuid() | Unique identifier for the custom column          |
+| tenant_id          | UUID                     | NOT NULL REFERENCES tenants(id)     | Foreign key linking column to its tenant         |
+| product_id         | UUID                     | NOT NULL REFERENCES products(id) ON DELETE CASCADE | Foreign key linking column to its product    |
+| entity_type        | entity\_type             | NOT NULL                            | The entity this column applies to (account/lead) |
+| name               | VARCHAR(255)             | NOT NULL                            | Display name of the custom column                |
+| description        | TEXT                     |                                     | Optional description of the column's purpose   |
+| data_type          | custom\_column\_data\_type | NOT NULL                            | The data type of the column's value            |
+| enrichment_mapping | JSONB                    |                                     | Rules for mapping data from enrichment sources |
+| enrichment_query   | TEXT                     |                                     | Prompt or query for AI-based enrichment        |
+| created_by         | UUID                     | REFERENCES users(id) ON DELETE SET NULL | User who created the custom column             |
+| created_at         | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of column creation                   |
+| updated_at         | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp of last column update                |
 
-| Column         | Type        | Required | Description            |
-|----------------|-------------|----------|------------------------|
-| id             | UUID        | Yes      | Primary key            |
-| tenant_id      | UUID        | Yes      | Foreign key to Tenants |
-| entity_type    | VARCHAR(50) | Yes      | account/lead           |
-| entity_id      | UUID        | Yes      | ID of entity           |
-| job_id         | STRING      | Yes      | BigQuery job ID        |
-| source         | VARCHAR(50) | Yes      | Data source            |
-| status         | VARCHAR(50) | Yes      | success/failure        |
-| fields_updated | TEXT[]      | No       | List of updated fields |
-| error_details  | JSONB       | No       | Error information      |
-| processed_at   | TIMESTAMP   | Yes      | Processing timestamp   |
-| created_at     | TIMESTAMP   | Yes      | Creation timestamp     |
+*Indexes:* `tenant_id`, `product_id`, `entity_type`, `name`
+*Constraints:* `UNIQUE (product_id, entity_type, name)`
 
-## BigQuery Tables
+### Enrichment Logs Table
 
-### Account Enrichment Data
+*Logs the outcome of individual enrichment attempts.*
 
-| Column          | Type          | Description                            |
-|-----------------|---------------|----------------------------------------|
-| record_id       | STRING        | Unique identifier for raw record       |
-| account_id      | STRING        | References PostgreSQL account ID       |
-| tenant_id       | STRING        | For multi-tenancy                      |
-| source          | STRING        | Data source (linkedin, clearbit, etc.) |
-| company_name    | STRING        | Name from source                       |
-| employee_count  | INTEGER       | Employee count                         |
-| industry        | STRING        | Industry                               |
-| location        | STRING        | Location                               |
-| website         | STRING        | Website                                |
-| linkedin_url    | STRING        | LinkedIn URL                           |
-| technologies    | ARRAY<STRING> | Tech stack                             |
-| funding_details | JSON          | Funding information                    |
-| raw_data        | JSON          | Complete raw response for flexibility  |
-| fetched_at      | TIMESTAMP     | When data was fetched                  |
+| Column         | Type                     | Modifiers                           | Description                                         |
+| :------------- | :----------------------- | :---------------------------------- | :-------------------------------------------------- |
+| id             | UUID                     | PRIMARY KEY DEFAULT gen_random_uuid() | Unique identifier for the log entry                 |
+| tenant_id      | UUID                     | NOT NULL REFERENCES tenants(id)     | Tenant associated with the enrichment             |
+| job_id         | VARCHAR(255)             |                                     | Optional reference to a BigQuery job ID             |
+| entity_type    | entity\_type             | NOT NULL                            | Type of entity being enriched (account/lead)        |
+| entity_id      | UUID                     | NOT NULL                            | ID of the specific Account or Lead record           |
+| source         | VARCHAR(100)             | NOT NULL                            | The data source used (e.g., 'linkedin', 'clearbit', 'ai_custom_column') |
+| status         | enrichment\_status       | NOT NULL                            | Outcome of this specific enrichment attempt         |
+| fields_updated | TEXT[]                   |                                     | List of fields updated in Postgres by this attempt |
+| error_details  | JSONB                    |                                     | Details if the enrichment attempt failed            |
+| processed_at   | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp when the enrichment attempt was processed |
+| created_at     | TIMESTAMP WITH TIME ZONE | NOT NULL DEFAULT NOW()              | Timestamp when the log entry was created (job start) |
 
-### Lead Enrichment Data
+*Indexes:* `tenant_id`, `job_id`, `entity_type`, `entity_id`, `source`, `status`, `processed_at`
 
-| Column             | Type      | Description                            |
-|--------------------|-----------|----------------------------------------|
-| record_id          | STRING    | Unique identifier for raw record       |
-| lead_id            | STRING    | References PostgreSQL lead ID          |
-| account_id         | STRING    | References PostgreSQL account ID       |
-| tenant_id          | STRING    | For multi-tenancy                      |
-| source             | STRING    | Data source (linkedin, clearbit, etc.) |
-| first_name         | STRING    | First name                             |
-| last_name          | STRING    | Last name                              |
-| title              | STRING    | Job title                              |
-| email              | STRING    | Email                                  |
-| phone              | STRING    | Phone                                  |
-| linkedin_url       | STRING    | LinkedIn profile URL                   |
-| employment_history | JSON      | Work history                           |
-| education          | JSON      | Education details                      |
-| raw_data           | JSON      | Complete raw response for flexibility  |
-| fetched_at         | TIMESTAMP | When data was fetched                  |
+**BigQuery Tables**
+
+*Purpose:* Store raw data from external sources, track batch job statuses, and potentially manage complex mapping rules. This decouples raw data ingestion from the main application database.
+
+### Account Enrichment Data (Example)
+
+*Stores raw responses from external sources for accounts.*
+
+| Column          | Type          | Description                                       |
+| :-------------- | :------------ | :------------------------------------------------ |
+| record_id       | STRING        | Unique identifier for this raw data record        |
+| account_id      | STRING        | References PostgreSQL `accounts.id` (as STRING)   |
+| tenant_id       | STRING        | References PostgreSQL `tenants.id` (as STRING)    |
+| source          | STRING        | Data source (e.g., 'linkedin', 'clearbit', 'apollo') |
+| company_name    | STRING        | Company name as returned by the source            |
+| employee_count  | INTEGER       | Employee count from the source                    |
+| industry        | STRING        | Industry information from the source              |
+| location        | STRING        | Location information from the source              |
+| website         | STRING        | Website URL from the source                       |
+| linkedin_url    | STRING        | LinkedIn URL from the source                      |
+| technologies    | ARRAY<STRING> | Tech stack information from the source            |
+| funding_details | JSON          | Funding information (as JSON string or STRUCT)    |
+| raw_data        | JSON          | Complete raw JSON response from the source        |
+| fetched_at      | TIMESTAMP     | Timestamp when the data was fetched from the source |
+| bq_loaded_at    | TIMESTAMP     | Timestamp when the data was loaded into BigQuery  |
+
+### Lead Enrichment Data (Example)
+
+*Stores raw responses from external sources for leads.*
+
+| Column             | Type      | Description                                       |
+| :----------------- | :-------- | :------------------------------------------------ |
+| record_id          | STRING    | Unique identifier for this raw data record        |
+| lead_id            | STRING    | References PostgreSQL `leads.id` (as STRING)      |
+| account_id         | STRING    | References PostgreSQL `accounts.id` (as STRING)   |
+| tenant_id          | STRING    | References PostgreSQL `tenants.id` (as STRING)    |
+| source             | STRING    | Data source (e.g., 'linkedin', 'clearbit', 'apollo') |
+| first_name         | STRING    | First name from the source                        |
+| last_name          | STRING    | Last name from the source                         |
+| title              | STRING    | Job title from the source                         |
+| email              | STRING    | Email address from the source                     |
+| phone              | STRING    | Phone number from the source                      |
+| linkedin_url       | STRING    | LinkedIn profile URL from the source              |
+| employment_history | JSON      | Employment history (as JSON string or ARRAY<STRUCT>) |
+| education          | JSON      | Education details (as JSON string or ARRAY<STRUCT>)  |
+| raw_data           | JSON      | Complete raw JSON response from the source        |
+| fetched_at         | TIMESTAMP | Timestamp when the data was fetched from the source |
+| bq_loaded_at       | TIMESTAMP | Timestamp when the data was loaded into BigQuery  |
 
 ### Enrichment Jobs
 
-| Column        | Type          | Description                         |
-|---------------|---------------|-------------------------------------|
-| job_id        | STRING        | Unique job identifier               |
-| tenant_id     | STRING        | For multi-tenancy                   |
-| status        | STRING        | pending/processing/completed/failed |
-| entity_type   | STRING        | account/lead                        |
-| entity_ids    | ARRAY<STRING> | List of entities to enrich          |
-| sources       | ARRAY<STRING> | List of sources to use              |
-| created_at    | TIMESTAMP     | Job creation time                   |
-| updated_at    | TIMESTAMP     | Last status update                  |
-| error_details | JSON          | Any error information               |
-
-### Field Mappings
-
-| Column              | Type    | Description                   |
-|---------------------|---------|-------------------------------|
-| tenant_id           | STRING  | For multi-tenancy             |
-| source              | STRING  | Data source                   |
-| entity_type         | STRING  | account/lead                  |
-| source_field        | STRING  | Field in enrichment data      |
-| target_field        | STRING  | Field in PostgreSQL           |
-| transformation_rule | STRING  | Any data transformation rules |
-| enabled             | BOOLEAN | Whether mapping is active     |
-| priority            | INTEGER | Order of application          |
-
-## API Design
-
-### Authentication
-
-#### POST /api/v1/auth/login
-
-**Request Parameters:**
-
-| Parameter     | Type   | Required | Description                   | Example            |
-|---------------|--------|----------|-------------------------------|--------------------|
-| email         | String | Yes      | User's email address          | `"john@acme.com"`  |
-| password      | String | Yes      | User's password (min 8 chars) | `"securePass123!"` |
-| tenant_domain | String | Yes      | Tenant's domain               | `"acme.com"`       |
-
-**Example Request:**
-
-```json
-{
-  "email": "john@acme.com",
-  "password": "securePass123!",
-  "tenant_domain": "acme.com"
-}
-```
-
-**Success Response (200 OK):**
-
-```json
-{
-  "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-  "user": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "john@acme.com",
-    "first_name": "John",
-    "last_name": "Doe",
-    "role": "user"
-  }
-}
-```
-
-**Error Responses:**
-
-400 Bad Request:
-
-```json
-{
-  "error": "VALIDATION_ERROR",
-  "message": "Invalid input parameters",
-  "details": {
-    "email": [
-      "Invalid email format"
-    ],
-    "password": [
-      "Password must be at least 8 characters"
-    ]
-  }
-}
-```
-
-401 Unauthorized:
-
-```json
-{
-  "error": "AUTHENTICATION_FAILED",
-  "message": "Invalid credentials"
-}
-```
-
-404 Not Found:
-
-```json
-{
-  "error": "TENANT_NOT_FOUND",
-  "message": "Tenant not found for domain"
-}
-```
-
-#### POST /api/v1/auth/logout
-
-**Headers:**
-
-| Header        | Required | Description  | Example          |
-|---------------|----------|--------------|------------------|
-| Authorization | Yes      | Bearer token | `Bearer eyJ0...` |
-
-**Success Response (204 No Content)**
-
-**Error Responses:**
-
-401 Unauthorized:
-
-```json
-{
-  "error": "UNAUTHORIZED",
-  "message": "Invalid or expired token"
-}
-```
-
-#### POST /api/v1/auth/forgot-password
-
-**Request Parameters:**
-
-| Parameter     | Type   | Required | Description     | Example           |
-|---------------|--------|----------|-----------------|-------------------|
-| email         | String | Yes      | User's email    | `"john@acme.com"` |
-| tenant_domain | String | Yes      | Tenant's domain | `"acme.com"`      |
-
-**Example Request:**
-
-```json
-{
-  "email": "john@acme.com",
-  "tenant_domain": "acme.com"
-}
-```
-
-**Success Response (200 OK):**
-
-```json
-{
-  "message": "Password reset instructions sent to email"
-}
-```
-
-**Error Responses:**
-
-400 Bad Request:
-
-```json
-{
-  "error": "VALIDATION_ERROR",
-  "message": "Invalid input parameters",
-  "details": {
-    "email": [
-      "Invalid email format"
-    ]
-  }
-}
-```
-
-#### POST /api/v1/auth/reset-password
-
-**Request Parameters:**
-
-| Parameter    | Type   | Required | Description            | Example         |
-|--------------|--------|----------|------------------------|-----------------|
-| token        | String | Yes      | Reset token from email | `"xyz123..."`   |
-| new_password | String | Yes      | New password           | `"newPass123!"` |
-
-**Example Request:**
-
-```json
-{
-  "token": "xyz123...",
-  "new_password": "newPass123!"
-}
-```
-
-**Success Response (200 OK):**
-
-```json
-{
-  "message": "Password successfully reset"
-}
-```
-
-**Error Responses:**
-
-400 Bad Request:
-
-```json
-{
-  "error": "VALIDATION_ERROR",
-  "message": "Invalid input parameters",
-  "details": {
-    "new_password": [
-      "Password must be at least 8 characters"
-    ]
-  }
-}
-```
-
-401 Unauthorized:
-
-```json
-{
-  "error": "INVALID_TOKEN",
-  "message": "Invalid or expired reset token"
-}
-```
-
-### Tenants
-
-#### POST /api/v1/tenants
-
-**Restricted to: Internal Admin**
-
-**Request Parameters:**
-
-| Parameter   | Type   | Required | Description         | Example            |
-|-------------|--------|----------|---------------------|--------------------|
-| name        | String | Yes      | Tenant name         | `"Acme Corp"`      |
-| domain      | String | Yes      | Tenant domain       | `"acme.com"`       |
-| admin_email | String | Yes      | Initial admin email | `"admin@acme.com"` |
-| admin_name  | String | Yes      | Admin's name        | `"John Doe"`       |
-
-**Example Request:**
-
-```json
-{
-  "name": "Acme Corp",
-  "domain": "acme.com",
-  "admin_email": "admin@acme.com",
-  "admin_name": "John Doe"
-}
-```
-
-**Success Response (201 Created):**
-
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "Acme Corp",
-  "domain": "acme.com",
-  "status": "active",
-  "created_at": "2024-12-10T10:00:00Z"
-}
-```
-
-#### GET /api/v1/tenants/{tenant_id}
-
-**Restricted to: Internal Admin, Tenant Admin**
-
-**Success Response (200 OK):**
-
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "Acme Corp",
-  "domain": "acme.com",
-  "status": "active",
-  "created_at": "2024-12-10T10:00:00Z",
-  "updated_at": "2024-12-10T10:00:00Z"
-}
-```
-
-#### PATCH /api/v1/tenants/{tenant_id}
-
-**Restricted to: Internal Admin**
-
-**Request Parameters:**
-
-| Parameter | Type   | Required | Description     | Example              |
-|-----------|--------|----------|-----------------|----------------------|
-| name      | String | No       | New tenant name | `"Acme Corporation"` |
-| status    | String | No       | New status      | `"suspended"`        |
-
-**Example Request:**
-
-```json
-{
-  "name": "Acme Corporation",
-  "status": "suspended"
-}
-```
-
-**Success Response (200 OK):**
-
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "Acme Corporation",
-  "domain": "acme.com",
-  "status": "suspended",
-  "updated_at": "2024-12-10T11:00:00Z"
-}
-```
-
-### Accounts
-
-#### POST /api/v1/accounts
-
-Create a single account.
-
-**Request Parameters:**
-
-| Parameter    | Type   | Required | Description        | Example                               |
-|--------------|--------|----------|--------------------|---------------------------------------|
-| product_id   | UUID   | Yes      | Associated product | `"550e8400..."`                       |
-| name         | String | Yes      | Company name       | `"Acme Corp"`                         |
-| linkedin_url | URL    | No       | LinkedIn URL       | `"https://linkedin.com/company/acme"` |
-| website      | URL    | No       | Company website    | `"https://acme.com"`                  |
-
-**Example Request:**
-
-```json
-{
-  "product_id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "Acme Corp",
-  "linkedin_url": "https://linkedin.com/company/acme",
-  "website": "https://acme.com"
-}
-```
-
-**Success Response (201 Created):**
-
-```json
-{
-  "id": "660e8400-e29b-41d4-a716-446655440000",
-  "name": "Acme Corp",
-  "linkedin_url": "https://linkedin.com/company/acme",
-  "website": "https://acme.com",
-  "enrichment_status": "pending",
-  "created_at": "2024-12-10T10:00:00Z"
-}
-```
-
-#### GET /api/v1/accounts/{account_id}
-
-**Success Response (200 OK):**
-
-```json
-{
-  "id": "660e8400-e29b-41d4-a716-446655440000",
-  "name": "Acme Corp",
-  "linkedin_url": "https://linkedin.com/company/acme",
-  "website": "https://acme.com",
-  "employee_count": 1000,
-  "industry": "Software",
-  "location": "San Francisco, CA",
-  "enrichment_status": "completed",
-  "enrichment_data": {
-    "technologies": [
-      "Salesforce",
-      "HubSpot"
-    ],
-    "funding_rounds": 3,
-    "last_funding_amount": "$50M"
-  },
-  "custom_columns": {
-    "intent_score": "High",
-    "budget_range": "$100K-500K"
-  },
-  "created_at": "2024-12-10T10:00:00Z",
-  "updated_at": "2024-12-10T10:30:00Z"
-}
-```
-
-#### PATCH /api/v1/accounts/{account_id}
-
-**Request Parameters:**
-
-| Parameter    | Type   | Required | Description  | Example                      |
-|--------------|--------|----------|--------------|------------------------------|
-| name         | String | No       | Company name | `"Acme Corporation"`         |
-| linkedin_url | URL    | No       | LinkedIn URL | `"https://linkedin.com/..."` |
-| website      | URL    | No       | Website URL  | `"https://acme.com"`         |
-
-**Example Request:**
-
-```json
-{
-  "name": "Acme Corporation",
-  "website": "https://acmenew.com"
-}
-```
-
-**Success Response (200 OK):**
-
-```json
-{
-  "id": "660e8400-e29b-41d4-a716-446655440000",
-  "name": "Acme Corporation",
-  "website": "https://acmenew.com",
-  "updated_at": "2024-12-10T11:00:00Z"
-}
-```
-
-#### DELETE /api/v1/accounts/{account_id}
-
-**Success Response (204 No Content)**
-
-### Leads
-
-#### POST /api/v1/accounts/{account_id}/leads
-
-Create a single lead.
-
-**Request Parameters:**
-
-| Parameter    | Type   | Required | Description   | Example                            |
-|--------------|--------|----------|---------------|------------------------------------|
-| first_name   | String | No       | First name    | `"Jane"`                           |
-| last_name    | String | No       | Last name     | `"Smith"`                          |
-| title        | String | No       | Job title     | `"VP Sales"`                       |
-| linkedin_url | URL    | Yes      | LinkedIn URL  | `"https://linkedin.com/in/jsmith"` |
-| email        | String | No       | Email address | `"jane@acme.com"`                  |
-| phone        | String | No       | Phone number  | `"+1-555-0123"`                    |
-
-**Example Request:**
-
-```json
-{
-  "first_name": "Jane",
-  "last_name": "Smith",
-  "title": "VP Sales",
-  "linkedin_url": "https://linkedin.com/in/jsmith"
-}
-```
-
-**Success Response (201 Created):**
-
-```json
-{
-  "id": "770e8400-e29b-41d4-a716-446655440000",
-  "first_name": "Jane",
-  "last_name": "Smith",
-  "title": "VP Sales",
-  "linkedin_url": "https://linkedin.com/in/jsmith",
-  "enrichment_status": "pending",
-  "created_at": "2024-12-10T10:00:00Z"
-}
-```
-
-#### GET /api/v1/leads/{lead_id}
-
-**Success Response (200 OK):**
-
-```json
-{
-  "id": "770e8400-e29b-41d4-a716-446655440000",
-  "account_id": "660e8400-e29b-41d4-a716-446655440000",
-  "first_name": "Jane",
-  "last_name": "Smith",
-  "title": "VP Sales",
-  "linkedin_url": "https://linkedin.com/in/jsmith",
-  "email": "jane.smith@acme.com",
-  "phone": "+1-555-0123",
-  "enrichment_status": "completed",
-  "score": 0.85,
-  "custom_columns": {
-    "response_likelihood": "High",
-    "last_job_change": "8 months ago"
-  },
-  "created_at": "2024-12-10T10:00:00Z",
-  "updated_at": "2024-12-10T10:30:00Z"
-}
-```
-
-#### PATCH /api/v1/leads/{lead_id}
-
-**Request Parameters:**
-
-| Parameter  | Type   | Required | Description   | Example           |
-|------------|--------|----------|---------------|-------------------|
-| first_name | String | No       | First name    | `"Jane"`          |
-| last_name  | String | No       | Last name     | `"Smith"`         |
-| title      | String | No       | Job title     | `"SVP Sales"`     |
-| email      | String | No       | Email address | `"jane@acme.com"` |
-| phone      | String | No       | Phone number  | `"+1-555-0123"`   |
-
-**Example Request:**
-
-```json
-{
-  "title": "SVP Sales",
-  "email": "jane.smith@acme.com"
-}
-```
-
-**Success Response (200 OK):**
-
-```json
-{
-  "id": "770e8400-e29b-41d4-a716-446655440000",
-  "title": "SVP Sales",
-  "email": "jane.smith@acme.com",
-  "updated_at": "2024-12-10T11:00:00Z"
-}
-```
-
-#### DELETE /api/v1/leads/{lead_id}
-
-**Success Response (204 No Content)**
-
-### Products
-
-#### POST /api/v1/products
-
-**Request Parameters:**
-
-| Parameter       | Type          | Required | Description                  | Example                     |
-|-----------------|---------------|----------|------------------------------|-----------------------------|
-| name            | String        | Yes      | Product name (max 255 chars) | `"Sales CRM"`               |
-| description     | Text          | Yes      | Detailed product description | `"Enterprise sales CRM..."` |
-| icp_description | Text          | No       | Ideal Customer Profile       | `"B2B SaaS companies..."`   |
-| keywords        | Array[String] | No       | Related keywords             | `["sales", "crm"]`          |
-
-**Example Request:**
-
-```json
-{
-  "name": "Sales CRM",
-  "description": "Enterprise sales CRM solution with AI capabilities",
-  "icp_description": "B2B SaaS companies with 50+ employees",
-  "keywords": [
-    "sales",
-    "crm",
-    "enterprise",
-    "saas"
-  ]
-}
-```
-
-**Success Response (201 Created):**
-
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "Sales CRM",
-  "description": "Enterprise sales CRM solution with AI capabilities",
-  "icp_description": "B2B SaaS companies with 50+ employees",
-  "keywords": [
-    "sales",
-    "crm",
-    "enterprise",
-    "saas"
-  ],
-  "created_at": "2024-12-10T10:00:00Z"
-}
-```
-
-**Error Responses:**
-
-400 Bad Request:
-
-```json
-{
-  "error": "VALIDATION_ERROR",
-  "message": "Invalid input parameters",
-  "details": {
-    "name": [
-      "This field is required"
-    ],
-    "description": [
-      "This field is required"
-    ]
-  }
-}
-```
-
-### Accounts
-
-#### POST /api/v1/accounts/bulk
-
-**Request Parameters:**
-
-| Parameter               | Type          | Required | Description                 | Example                               |
-|-------------------------|---------------|----------|-----------------------------|---------------------------------------|
-| product_id              | UUID          | Yes      | ID of the product           | `"550e8400-..."`                      |
-| accounts                | Array[Object] | Yes      | List of accounts (max 1000) | See below                             |
-| accounts[].name         | String        | Yes      | Company name                | `"Acme Corp"`                         |
-| accounts[].linkedin_url | URL           | No       | LinkedIn company URL        | `"https://linkedin.com/company/acme"` |
-| accounts[].website      | URL           | No       | Company website             | `"https://acme.com"`                  |
-
-**Example Request:**
-
-```json
-{
-  "product_id": "550e8400-e29b-41d4-a716-446655440000",
-  "accounts": [
+*Tracks the status of batch enrichment or processing jobs.*
+
+| Column        | Type          | Description                                            |
+| :------------ | :------------ | :----------------------------------------------------- |
+| job_id        | STRING        | Unique identifier for the enrichment job (e.g., UUID) |
+| tenant_id     | STRING        | References PostgreSQL `tenants.id`                     |
+| status        | STRING        | 'pending', 'processing', 'completed', 'failed'         |
+| entity_type   | STRING        | 'account', 'lead', 'custom_column'                     |
+| entity_ids    | ARRAY<STRING> | List of PostgreSQL entity IDs involved in the job      |
+| sources       | ARRAY<STRING> | List of data sources requested for enrichment        |
+| custom_column_id | STRING   | Optional: ID of the custom column being enriched       |
+| created_at    | TIMESTAMP     | Timestamp when the job was requested/created         |
+| updated_at    | TIMESTAMP     | Timestamp of the last status update                    |
+| started_at    | TIMESTAMP     | Timestamp when processing actually began               |
+| completed_at  | TIMESTAMP     | Timestamp when the job finished (successfully or not)  |
+| error_details | JSON          | Details if the job failed                              |
+
+### Field Mappings (Optional - Can be managed in PG or config)
+
+*Defines how data from `Source Enrichment Data` tables maps to PostgreSQL fields.*
+
+| Column              | Type    | Description                                               |
+| :------------------ | :------ | :-------------------------------------------------------- |
+| mapping_id          | STRING  | Unique ID for the mapping rule                            |
+| tenant_id           | STRING  | Apply to a specific tenant, or NULL for global mapping    |
+| source              | STRING  | Data source this mapping applies to                       |
+| entity_type         | STRING  | 'account' or 'lead'                                       |
+| source_field_path   | STRING  | Path to the field in the BQ raw_data JSON (e.g., `company.name`) |
+| target_field        | STRING  | Name of the field in the PostgreSQL table (`accounts` or `leads`) |
+| transformation_rule | STRING  | Optional: Rule/function for data transformation (e.g., 'toUpperCase', 'extractYear') |
+| priority            | INTEGER | Order of application if multiple sources update the same field (lower number = higher priority) |
+| enabled             | BOOLEAN | Whether this mapping rule is active                       |
+| created_at          | TIMESTAMP | Timestamp mapping created                             |
+| updated_at          | TIMESTAMP | Timestamp mapping last updated                        |
+
+**API Design**
+
+*Conventions:*
+* Base URL: `/api/v1`
+* Authentication: Bearer Token in `Authorization` header for protected endpoints.
+* Request/Response Body: JSON.
+* Timestamps: ISO 8601 format in UTC (e.g., `2025-03-26T10:30:00Z`).
+* UUIDs: Represented as strings in JSON.
+* Asynchronous Operations: Endpoints triggering background jobs typically return `202 Accepted` with a `task_id` or `job_id`. A separate endpoint (`GET /api/v1/tasks/{task_id}` or `GET /api/v1/jobs/{job_id}`) should be used to check the status.
+
+### Common Components
+
+* **Authorization Header:**
+    * `Authorization: Bearer <JWT_TOKEN>` (Required for most endpoints after login)
+* **Pagination Parameters (for GET list endpoints):**
+    * `page` (Integer, default: 1)
+    * `page_size` (Integer, default: 20, max: 100)
+* **Sorting Parameters (for GET list endpoints):**
+    * `sort_by` (String, e.g., `created_at`, `name`, `score`)
+    * `sort_order` (String, `asc` or `desc`, default: `asc` or `desc` depending on context)
+* **Filtering Parameters:** Specific to each list endpoint (e.g., `status`, `name`).
+
+### Authentication (`/auth`)
+
+#### `POST /auth/login`
+* Authenticates a user based on email, password, and tenant domain.
+* **Request:** (See original)
+* **Success (200 OK):** (See original, include roles in user object)
+    ```json
     {
-      "name": "Acme Corp",
-      "linkedin_url": "https://linkedin.com/company/acme",
-      "website": "https://acme.com"
-    },
-    {
-      "name": "Tech Corp",
-      "linkedin_url": "https://linkedin.com/company/techcorp"
+      "token": "...",
+      "user": {
+        "id": "...", "email": "...", "first_name": "...", "last_name": "...", "role": "tenant_admin" // Example role
+      }
     }
-  ]
-}
-```
+    ```
+* **Errors:** 400 (Validation), 401 (Auth Failed), 404 (Tenant Not Found)
 
-**Success Response (202 Accepted):**
+#### `POST /auth/logout`
+* Invalidates the user's session/token (implementation dependent, often requires token blocklist).
+* **Headers:** `Authorization: Bearer <token>`
+* **Success (204 No Content)**
+* **Errors:** 401 (Unauthorized)
 
-```json
-{
-  "batch_id": "550e8400-e29b-41d4-a716-446655440000",
-  "message": "Account enrichment started",
-  "accounts": [
+#### `POST /auth/forgot-password`
+* Initiates the password reset process for a user.
+* **Request:** (See original)
+* **Success (200 OK):** (See original)
+* **Errors:** 400 (Validation), 404 (User/Tenant Not Found)
+
+#### `POST /auth/reset-password`
+* Allows a user to set a new password using a reset token.
+* **Request:** (See original)
+* **Success (200 OK):** (See original)
+* **Errors:** 400 (Validation - weak password), 401 (Invalid/Expired Token)
+
+### Tenants (`/tenants`) - *Restricted Access*
+
+*(Primarily for Internal Admins)*
+
+#### `POST /tenants`
+* Creates a new tenant and its initial admin user.
+* **Restriction:** `internal_admin`
+* **Request:** (See original)
+* **Success (201 Created):** (See original, return full tenant object)
+* **Errors:** 400 (Validation - domain exists, invalid email), 401, 403
+
+#### `GET /tenants`
+* Lists tenants (with pagination/filtering).
+* **Restriction:** `internal_admin`, `internal_cs`
+* **Query Params:** `page`, `page_size`, `sort_by`, `sort_order`, `status`, `name`
+* **Success (200 OK):** Paginated list of tenant objects.
+* **Errors:** 401, 403
+
+#### `GET /tenants/{tenant_id}`
+* Retrieves details for a specific tenant.
+* **Restriction:** `internal_admin`, `internal_cs`, `tenant_admin` (only their own tenant)
+* **Success (200 OK):** (See original)
+* **Errors:** 401, 403, 404
+
+#### `PATCH /tenants/{tenant_id}`
+* Updates a tenant's details (e.g., name, status, settings).
+* **Restriction:** `internal_admin` (for status/domain), `tenant_admin` (for name/settings)
+* **Request:** (See original, allow `settings` update)
+* **Success (200 OK):** (See original, return updated tenant object)
+* **Errors:** 400 (Validation), 401, 403, 404
+
+### Products (`/products`)
+
+#### `POST /products`
+* Creates a new product for the authenticated user's tenant.
+* **Restriction:** `tenant_admin` (or configurable role)
+* **Request:** (See original)
+* **Success (201 Created):** (See original, include `tenant_id`, `created_by`)
+* **Errors:** 400 (Validation - unique name), 401, 403
+
+#### `GET /products`
+* Lists products for the tenant.
+* **Restriction:** Any authenticated user within the tenant.
+* **Query Params:** `page`, `page_size`, `sort_by`, `sort_order`, `name`
+* **Success (200 OK):** Paginated list of product objects.
+    ```json
     {
-      "id": "660e8400-e29b-41d4-a716-446655440000",
-      "name": "Acme Corp",
-      "enrichment_status": "pending"
-    },
-    {
-      "id": "770e8400-e29b-41d4-a716-446655440000",
-      "name": "Tech Corp",
-      "enrichment_status": "pending"
+      "total": 5, "page": 1, "page_size": 20,
+      "products": [
+        { "id": "...", "name": "...", "description": "...", ... }
+      ]
     }
-  ]
-}
-```
+    ```
+* **Errors:** 401
 
-**Error Responses:**
+#### `GET /products/{product_id}`
+* Retrieves details for a specific product.
+* **Restriction:** Any authenticated user within the tenant.
+* **Success (200 OK):** Full product object.
+* **Errors:** 401, 404
 
-400 Bad Request:
+#### `PATCH /products/{product_id}`
+* Updates an existing product.
+* **Restriction:** `tenant_admin` (or creator/configurable role)
+* **Request:** Partial product object (name, description, icp, keywords, settings).
+* **Success (200 OK):** Updated product object.
+* **Errors:** 400 (Validation), 401, 403, 404
 
-```json
-{
-  "error": "VALIDATION_ERROR",
-  "message": "Invalid input parameters",
-  "details": {
-    "accounts": [
-      "Maximum of 1000 accounts allowed"
-    ],
-    "accounts.0.linkedin_url": [
-      "Invalid LinkedIn URL format"
-    ]
-  }
-}
-```
+#### `DELETE /products/{product_id}`
+* Deletes a product (and potentially associated accounts/leads via CASCADE). *Use with caution!*
+* **Restriction:** `tenant_admin`
+* **Success (204 No Content)**
+* **Errors:** 401, 403, 404
 
-429 Too Many Requests:
+### Accounts (`/accounts`)
 
-```json
-{
-  "error": "RATE_LIMIT_EXCEEDED",
-  "message": "Too many requests. Please try again in 60 seconds",
-  "retry_after": 60
-}
-```
-
-### Leads
-
-#### POST /api/v1/accounts/{account_id}/leads/recommend
-
-Triggers AI-based lead recommendation for an account.
-
-**URL Parameters:**
-
-| Parameter  | Type | Required | Description       | Example          |
-|------------|------|----------|-------------------|------------------|
-| account_id | UUID | Yes      | ID of the account | `"550e8400-..."` |
-
-**Example Request:**
-
-```json
-{
-  "account_id": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**Success Response (202 Accepted):**
-
-```json
-{
-  "message": "Lead recommendation started",
-  "task_id": "660e8400-e29b-41d4-a716-446655440000",
-  "account_id": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**Error Responses:**
-
-404 Not Found:
-
-```json
-{
-  "error": "NOT_FOUND",
-  "message": "Account not found"
-}
-```
-
-#### GET /api/v1/accounts/{account_id}/leads
-
-Retrieves leads for a specific account.
-
-**URL Parameters:**
-
-| Parameter  | Type | Required | Description       | Example          |
-|------------|------|----------|-------------------|------------------|
-| account_id | UUID | Yes      | ID of the account | `"550e8400-..."` |
-
-**Query Parameters:**
-
-| Parameter         | Type    | Required | Description                  | Example       |
-|-------------------|---------|----------|------------------------------|---------------|
-| page              | Integer | No       | Page number (default: 1)     | `1`           |
-| page_size         | Integer | No       | Items per page (default: 20) | `20`          |
-| sort_by           | String  | No       | Field to sort by             | `"score"`     |
-| sort_order        | String  | No       | Sort direction (asc/desc)    | `"desc"`      |
-| enrichment_status | String  | No       | Filter by status             | `"completed"` |
-
-**Success Response (200 OK):**
-
-```json
-{
-  "total": 45,
-  "page": 1,
-  "page_size": 20,
-  "leads": [
+#### `POST /accounts`
+* Creates a single account associated with a product. Enrichment is triggered automatically (`status: pending`).
+* **Restriction:** Authenticated users (`user`, `tenant_admin`).
+* **Request:** (See original) - Include optional `custom_fields`.
+    ```json
     {
-      "id": "770e8400-e29b-41d4-a716-446655440000",
-      "first_name": "Jane",
-      "last_name": "Smith",
-      "title": "VP of Sales",
-      "linkedin_url": "https://linkedin.com/in/janesmith",
-      "email": "jane.smith@acme.com",
-      "phone": "+1-555-0123",
-      "enrichment_status": "completed",
-      "score": 0.85,
-      "custom_columns": {
-        "intent_score": "High",
-        "last_promotion": "6 months ago"
+      "product_id": "...",
+      "name": "...",
+      "linkedin_url": "...", // optional
+      "website": "...",      // optional
+      "custom_fields": { "custom_col_id_1": "value1", "intent_score_col_name": "Low" } // Optional
+    }
+    ```
+* **Success (201 Created):** (See original)
+* **Errors:** 400 (Validation), 401, 403, 404 (Product not found)
+
+#### `POST /accounts/bulk`
+* Creates multiple accounts in batch. Triggers background enrichment job.
+* **Restriction:** Authenticated users.
+* **Request:** (See original) - Allow `custom_fields` per account. Max 1000 accounts.
+* **Success (202 Accepted):** Returns a `job_id` for tracking.
+    ```json
+    {
+      "job_id": "batch-uuid-...", // ID to track the bulk creation/enrichment job
+      "message": "Account creation and enrichment job accepted.",
+      "submitted_count": 2 // Number of accounts submitted
+    }
+    ```
+* **Errors:** 400 (Validation - size limit, format), 401, 403, 429 (Rate Limit)
+
+#### `GET /accounts`
+* Lists accounts for the tenant, potentially filtered by product.
+* **Restriction:** Authenticated users.
+* **Query Params:** `page`, `page_size`, `sort_by`, `sort_order`, `product_id`, `name`, `enrichment_status`, `industry`, etc. Allow filtering by `custom_fields`.
+* **Success (200 OK):** Paginated list of account objects (including `custom_fields`).
+    ```json
+    {
+      "total": 150, "page": 1, "page_size": 20,
+      "accounts": [
+        { "id": "...", "name": "...", "website": "...", "enrichment_status": "completed", "custom_fields": {...}, ... }
+      ]
+    }
+    ```
+* **Errors:** 400 (Invalid filter), 401
+
+#### `GET /accounts/{account_id}`
+* Retrieves details for a specific account, including enriched data and custom fields.
+* **Restriction:** Authenticated users.
+* **Success (200 OK):** (See original, ensure `custom_fields` is accurate)
+* **Errors:** 401, 404
+
+#### `PATCH /accounts/{account_id}`
+* Updates an existing account. Can update standard fields or `custom_fields`.
+* **Restriction:** Authenticated users.
+* **Request:** Partial account object.
+    ```json
+    {
+      "name": "New Name",
+      "employee_count": 1500, // Overwrite enriched data if needed
+      "custom_fields": {
+        "custom_col_id_1": "new_value", // Update specific custom field
+        "intent_score_col_name": null // Clear a custom field
+      }
+    }
+    ```
+* **Success (200 OK):** Updated account object.
+* **Errors:** 400 (Validation), 401, 403, 404
+
+#### `DELETE /accounts/{account_id}`
+* Deletes an account (and associated leads via CASCADE).
+* **Restriction:** `tenant_admin` or creator.
+* **Success (204 No Content)**
+* **Errors:** 401, 403, 404
+
+### Leads (`/leads` and nested under Accounts)
+
+#### `POST /accounts/{account_id}/leads`
+* Creates a single lead associated with an account. Enrichment triggered.
+* **Restriction:** Authenticated users.
+* **Request:** (See original) - Include optional `custom_fields`.
+* **Success (201 Created):** (See original)
+* **Errors:** 400 (Validation), 401, 403, 404 (Account not found)
+
+#### `GET /accounts/{account_id}/leads`
+* Retrieves leads for a specific account.
+* **Restriction:** Authenticated users.
+* **Query Params:** `page`, `page_size`, `sort_by` (`score`, `last_name`, etc.), `sort_order`, `enrichment_status`, `title`, etc. Allow filtering by `custom_fields`.
+* **Success (200 OK):** (See original, ensure `custom_fields` included)
+* **Errors:** 401, 404 (Account not found)
+
+#### `GET /leads/{lead_id}`
+* Retrieves details for a specific lead.
+* **Restriction:** Authenticated users.
+* **Success (200 OK):** (See original, ensure `custom_fields` included)
+* **Errors:** 401, 404
+
+#### `PATCH /leads/{lead_id}`
+* Updates an existing lead. Can update standard fields or `custom_fields`.
+* **Restriction:** Authenticated users.
+* **Request:** Partial lead object (similar to `PATCH /accounts/{account_id}`).
+* **Success (200 OK):** Updated lead object.
+* **Errors:** 400 (Validation), 401, 403, 404
+
+#### `DELETE /leads/{lead_id}`
+* Deletes a lead.
+* **Restriction:** `tenant_admin` or creator.
+* **Success (204 No Content)**
+* **Errors:** 401, 403, 404
+
+#### `POST /accounts/{account_id}/leads/recommend` (*AI Feature*)
+* Triggers AI-based lead recommendation for an account (background task).
+* **Restriction:** Authenticated users.
+* **Request:** (Optional) Body might include criteria like job titles, seniority.
+    ```json
+    {
+        "titles": ["VP Sales", "Head of Marketing"], // Optional criteria
+        "count": 10 // Optional: desired number of recommendations
+    }
+    ```
+* **Success (202 Accepted):**
+    ```json
+    {
+      "task_id": "recommend-uuid-...", // ID to track this recommendation task
+      "message": "Lead recommendation job accepted.",
+      "account_id": "..."
+    }
+    ```
+* **Errors:** 401, 404 (Account not found), 429 (Rate Limit)
+
+### Custom Columns (`/custom-columns`)
+
+#### `POST /custom-columns`
+* Creates a new custom column definition for a product.
+* **Restriction:** `tenant_admin`.
+* **Request:** (See original, use `data_type` instead of `column_type`)
+* **Success (201 Created):** (See original)
+* **Errors:** 400 (Validation - unique name per product/entity type), 401, 403, 404 (Product not found)
+
+#### `GET /custom-columns`
+* Lists custom columns defined for the tenant, filterable by product and entity type.
+* **Restriction:** Authenticated users.
+* **Query Params:** `page`, `page_size`, `product_id` (required), `entity_type` (`account` or `lead`).
+* **Success (200 OK):** Paginated list of custom column definitions.
+* **Errors:** 400 (Missing product_id), 401
+
+#### `GET /custom-columns/{column_id}`
+* Retrieves details for a specific custom column definition.
+* **Restriction:** Authenticated users.
+* **Success (200 OK):** Full custom column definition object.
+* **Errors:** 401, 404
+
+#### `PATCH /custom-columns/{column_id}`
+* Updates a custom column definition (e.g., description, enrichment query). *Name, entity_type, product_id, data_type usually should not be changed after creation.*
+* **Restriction:** `tenant_admin`.
+* **Request:** Partial definition object (description, enrichment_mapping, enrichment_query).
+* **Success (200 OK):** Updated custom column definition.
+* **Errors:** 400 (Validation), 401, 403, 404
+
+#### `DELETE /custom-columns/{column_id}`
+* Deletes a custom column definition. *Consider impact on existing data in `custom_fields` JSONB columns.* (Strategy needed: clear values, leave them, prevent deletion if used?).
+* **Restriction:** `tenant_admin`.
+* **Success (204 No Content)**
+* **Errors:** 401, 403, 404, 409 (Conflict - if deletion is blocked while data exists)
+
+#### `POST /custom-columns/{column_id}/enrich` (*AI Feature*)
+* Triggers AI-based enrichment for a specific custom column for given entities (background task).
+* **Restriction:** Authenticated users.
+* **Request:** (See original) - Max 1000 entity_ids.
+* **Success (202 Accepted):**
+    ```json
+    {
+      "task_id": "enrich-uuid-...", // ID to track this enrichment task
+      "message": "Custom column enrichment job accepted.",
+      "column_id": "...",
+      "entity_count": 2
+    }
+    ```
+* **Errors:** 400 (Validation - size limit), 401, 403, 404 (Column not found), 429 (Rate Limit)
+
+### Asynchronous Task/Job Status (`/tasks` or `/jobs`)
+
+#### `GET /tasks/{task_id}` (or `GET /jobs/{job_id}`)
+* Retrieves the status of a background task/job (bulk import, recommendation, enrichment).
+* **Restriction:** User who initiated the task or `tenant_admin`.
+* **Success (200 OK):**
+    ```json
+    {
+      "id": "enrich-uuid-...", // task_id or job_id
+      "status": "completed", // pending, processing, completed, failed
+      "type": "custom_column_enrichment", // or bulk_account_import, lead_recommendation
+      "progress": { // Optional, more detailed progress
+        "processed": 50,
+        "total": 100,
+        "percentage": 50.0
       },
-      "created_at": "2024-12-10T10:00:00Z",
-      "updated_at": "2024-12-10T10:30:00Z"
+      "result_summary": { // Optional summary upon completion
+        "succeeded": 98,
+        "failed": 2
+      },
+      "error_details": null, // Or details if status is 'failed'
+      "created_at": "...",
+      "updated_at": "..."
     }
-  ]
-}
-```
-
-### Custom Columns
-
-#### POST /api/v1/custom-columns
-
-Creates a new custom column for accounts or leads.
-
-**Request Parameters:**
-
-| Parameter        | Type   | Required | Description                          | Example                         |
-|------------------|--------|----------|--------------------------------------|---------------------------------|
-| product_id       | UUID   | Yes      | ID of the product                    | `"550e8400-..."`                |
-| entity_type      | String | Yes      | Type of entity (account/lead)        | `"account"`                     |
-| name             | String | Yes      | Column name                          | `"Intent Score"`                |
-| description      | String | No       | Column description                   | `"AI-calculated buying intent"` |
-| column_type      | String | Yes      | Data type (text/number/boolean/date) | `"text"`                        |
-| enrichment_query | String | No       | AI enrichment query                  | `"Calculate buying intent..."`  |
-
-**Example Request:**
-
-```json
-{
-  "product_id": "550e8400-e29b-41d4-a716-446655440000",
-  "entity_type": "account",
-  "name": "Intent Score",
-  "description": "AI-calculated buying intent based on recent activities",
-  "column_type": "text",
-  "enrichment_query": "Calculate buying intent based on recent company activities and growth"
-}
-```
-
-**Success Response (201 Created):**
-
-```json
-{
-  "id": "880e8400-e29b-41d4-a716-446655440000",
-  "product_id": "550e8400-e29b-41d4-a716-446655440000",
-  "entity_type": "account",
-  "name": "Intent Score",
-  "description": "AI-calculated buying intent based on recent activities",
-  "column_type": "text",
-  "enrichment_query": "Calculate buying intent based on recent company activities and growth",
-  "created_at": "2024-12-10T10:00:00Z"
-}
-```
-
-**Error Responses:**
-
-400 Bad Request:
-
-```json
-{
-  "error": "VALIDATION_ERROR",
-  "message": "Invalid input parameters",
-  "details": {
-    "name": [
-      "Column name must be unique for this product"
-    ],
-    "column_type": [
-      "Must be one of: text, number, boolean, date"
-    ]
-  }
-}
-```
-
-#### POST /api/v1/custom-columns/{column_id}/enrich
-
-Triggers enrichment for a custom column.
-
-**URL Parameters:**
-
-| Parameter | Type | Required | Description             | Example          |
-|-----------|------|----------|-------------------------|------------------|
-| column_id | UUID | Yes      | ID of the custom column | `"880e8400-..."` |
-
-**Request Parameters:**
-
-| Parameter  | Type        | Required | Description   | Example            |
-|------------|-------------|----------|---------------|--------------------|
-| entity_ids | Array[UUID] | Yes      | IDs to enrich | `["990e8400-..."]` |
-
-**Example Request:**
-
-```json
-{
-  "entity_ids": [
-    "990e8400-e29b-41d4-a716-446655440000",
-    "aa0e8400-e29b-41d4-a716-446655440000"
-  ]
-}
-```
-
-**Success Response (202 Accepted):**
-
-```json
-{
-  "message": "Column enrichment started",
-  "task_id": "bb0e8400-e29b-41d4-a716-446655440000",
-  "column_id": "880e8400-e29b-41d4-a716-446655440000",
-  "entity_count": 2
-}
-```
-
-**Error Responses:**
-
-400 Bad Request:
-
-```json
-{
-  "error": "VALIDATION_ERROR",
-  "message": "Invalid input parameters",
-  "details": {
-    "entity_ids": [
-      "Maximum of 1000 entities allowed per request"
-    ]
-  }
-}
-```
-
-404 Not Found:
-
-```json
-{
-  "error": "NOT_FOUND",
-  "message": "Custom column not found"
-}
-```
+    ```
+* **Errors:** 401, 403, 404 (Task/Job not found)
 
 ### Rate Limiting
 
-All API endpoints are subject to rate limiting:
-
-| Endpoint Category   | Rate Limit   | Window     |
-|---------------------|--------------|------------|
-| Authentication      | 10 requests  | Per minute |
-| Regular API calls   | 100 requests | Per minute |
-| Bulk operations     | 10 requests  | Per minute |
-| Enrichment triggers | 5 requests   | Per minute |
-
-When rate limit is exceeded:
-
-```json
-{
-  "error": "RATE_LIMIT_EXCEEDED",
-  "message": "Too many requests. Please try again later.",
-  "retry_after": 45
-}
-```
+*(See original - review limits based on expected usage and infrastructure)*
+Ensure `Retry-After` header is included in 429 responses.
 
 ### Common Error Responses
 
-#### 401 Unauthorized
+*(See original - ensure `request_id` is included in 500 errors for easier debugging)*
 
-Returned when authentication token is missing or invalid:
+* **400 Bad Request:** Include detailed validation errors.
+* **401 Unauthorized:** Missing, invalid, or expired token.
+* **403 Forbidden:** User authenticated but lacks permission for the specific action/resource.
+* **404 Not Found:** Resource identified by URL parameter (e.g., `tenant_id`, `account_id`) does not exist or is not accessible by the user.
+* **429 Too Many Requests:** Rate limit exceeded.
+* **500 Internal Server Error:** Unexpected server-side error.
 
-```json
-{
-  "error": "UNAUTHORIZED",
-  "message": "Authentication required"
-}
-```
-
-#### 403 Forbidden
-
-Returned when user doesn't have required permissions:
-
-```json
-{
-  "error": "FORBIDDEN",
-  "message": "Insufficient permissions to perform this action"
-}
-```
-
-#### 500 Internal Server Error
-
-Returned when an unexpected error occurs:
-
-```json
-{
-  "error": "INTERNAL_ERROR",
-  "message": "An unexpected error occurred",
-  "request_id": "cc0e8400-e29b-41d4-a716-446655440000"
-}
-```

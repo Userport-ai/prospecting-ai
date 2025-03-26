@@ -1,5 +1,4 @@
 from django.db import models
-from django.core.validators import MinValueValidator
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 
@@ -44,12 +43,13 @@ class CustomColumn(BaseMixin):
             models.Index(fields=['entity_type']),
             models.Index(fields=['is_active']),
         ]
+        db_table = 'custom_columns'  # Custom table name without app_ prefix
 
     def clean(self):
         super().clean()
         # Validate response_config based on response_type
         if self.response_type == self.ResponseType.STRING:
-            required_keys = set(['max_length'])
+            required_keys = {'max_length'}
             if not all(key in self.response_config for key in required_keys):
                 raise ValidationError({'response_config': f'Missing required keys: {required_keys}'})
 
@@ -62,7 +62,7 @@ class CustomColumn(BaseMixin):
                 raise ValidationError({'response_config': 'Missing or invalid allowed_values array'})
 
         # Validate AI config
-        required_ai_keys = set(['model'])
+        required_ai_keys = {'model'}
         if not all(key in self.ai_config for key in required_ai_keys):
             raise ValidationError({'ai_config': f'Missing required keys: {required_ai_keys}'})
 
@@ -118,6 +118,7 @@ class LeadCustomColumnValue(BaseCustomColumnValue):
         indexes = BaseCustomColumnValue.Meta.indexes + [
             models.Index(fields=['lead']),
         ]
+        db_table = 'lead_custom_column_values'  # Custom table name without app_ prefix
 
 
 class AccountCustomColumnValue(BaseCustomColumnValue):
@@ -129,3 +130,4 @@ class AccountCustomColumnValue(BaseCustomColumnValue):
         indexes = BaseCustomColumnValue.Meta.indexes + [
             models.Index(fields=['account']),
         ]
+        db_table = 'account_custom_column_values'  # Custom table name without app_ prefix
