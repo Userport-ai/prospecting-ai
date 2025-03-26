@@ -155,9 +155,9 @@ export const Table: React.FC<TableProps> = ({
           lead.custom_fields && lead.custom_fields.evaluation.matching_signals
             ? lead.custom_fields.evaluation.matching_signals.join("\n\n")
             : "unknown",
-        "Recent Company Events": lead.account_details.recent_events
+        "Recent Company Highlights": lead.account_details.recent_events
           ? lead.account_details.recent_events
-              .map((evt) => evt.description)
+              .map((evt) => `${evt.description}\n${evt.date}`)
               .join("\n\n")
           : "none",
       };
