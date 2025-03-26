@@ -26,7 +26,7 @@ class CustomColumnViewSet(TenantScopedViewSet):
 
     queryset = CustomColumn.objects.all()
     serializer_class = CustomColumnSerializer
-    filterset_fields = ['entity_type', 'product', 'is_active']
+    filterset_fields = ['entity_type', 'is_active']
     ordering_fields = ['name', 'created_at', 'last_refresh']
 
     def get_permissions(self):
@@ -127,14 +127,14 @@ class CustomColumnViewSet(TenantScopedViewSet):
         # Get entity IDs based on entity_type
         entity_ids = []
         if custom_column.entity_type == CustomColumn.EntityType.LEAD:
-            # Get all lead IDs for this tenant and product
+            # Get all lead IDs for this tenant
             entity_ids = list(
-                self.get_queryset().get(id=custom_column.id).product.leads.values_list('id', flat=True)
+                Lead.objects.filter(tenant=request.tenant).values_list('id', flat=True)
             )
         else:
-            # Get all account IDs for this tenant and product
+            # Get all account IDs for this tenant
             entity_ids = list(
-                self.get_queryset().get(id=custom_column.id).product.accounts.values_list('id', flat=True)
+                Account.objects.filter(tenant=request.tenant).values_list('id', flat=True)
             )
 
         if not entity_ids:
@@ -269,10 +269,6 @@ class CustomColumnViewSet(TenantScopedViewSet):
                     # Include all available detailed information
                     if account.technologies:
                         account_context['technologies'] = account.technologies
-
-                    # Do NOT send full technology profile as it's unnecessarily verbose
-                    # if account.full_technology_profile:
-                    #     account_context['full_technology_profile'] = account.full_technology_profile
 
                     if account.funding_details:
                         account_context['funding_details'] = account.funding_details

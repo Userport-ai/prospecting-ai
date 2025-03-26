@@ -460,7 +460,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         # Extract column description and expected values
         column_description = column_config.get('description', 'No description provided')
         response_type = column_config.get('response_type', 'string')
-        expected_format = self._get_format_for_response_type(response_type)
+        expected_format = self._get_format_for_response_type(column_config)
 
         # Get any examples from config
         examples = column_config.get('examples', [])
@@ -475,17 +475,17 @@ class CustomColumnTask(AccountEnrichmentTask):
             validation_text = "Validation Rules:\n" + "\n".join([f"- {rule}" for rule in validation_rules])
 
         # Create enhanced prompt
-        return f"""Generate a value for the following custom column:
+        return f"""Generate a value for the following custom column based on the context provided:
 
 Column Information:
 - ID: {column_config.get('id', 'Unknown')}
 - Name: {column_config.get('name', 'Custom Column')}
-- Description: {column_description}
+- Description/Question: {column_description}
 - Response Type: {response_type}
 
 Entity ID: {entity_id}
 
-Entity Context:
+Context:
 {json.dumps(entity_context, indent=2)}
 
 {examples_text}
@@ -506,13 +506,19 @@ Return as JSON:
 
 Be accurate, concise, and ensure the response strictly adheres to the specified response type."""
 
-    def _get_format_for_response_type(self, response_type: str) -> str:
+    def _get_format_for_response_type(self, column_config: Dict[str, Any]) -> str:
+
         """Get the expected format description for the response type."""
+        response_type = column_config.get('response_type', 'string')
+        if response_type == "enum":
+            allowed_values = column_config['response_config'].get('allowed_values', [])
+            return f"string (one of the following values: {allowed_values} or \"Unknown\")"
+
         formats = {
             "string": "string (text value)",
             "json_object": "object (valid JSON object)",
             "boolean": "boolean (true or false)",
-            "number": "number (integer or float)"
+            "number": "number (integer or float)",
         }
         return formats.get(response_type, "unknown format")
 

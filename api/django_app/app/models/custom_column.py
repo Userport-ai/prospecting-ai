@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 
-from app.models import Product, Account, Lead
+from app.models import Account, Lead
 from app.models.common import BaseMixin
 
 
@@ -21,7 +21,6 @@ class CustomColumn(BaseMixin):
         ENUM = 'enum', 'Enumeration'
 
     # Required fields
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='custom_columns')
     entity_type = models.CharField(max_length=50, choices=EntityType.choices)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -37,13 +36,13 @@ class CustomColumn(BaseMixin):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = [['tenant', 'product', 'name']]
+        unique_together = [['tenant', 'entity_type', 'name']]
         indexes = [
-            models.Index(fields=['tenant', 'product']),
+            models.Index(fields=['tenant']),
             models.Index(fields=['entity_type']),
             models.Index(fields=['is_active']),
         ]
-        db_table = 'custom_columns'  # Custom table name without app_ prefix
+        db_table = 'custom_columns'
 
     def clean(self):
         super().clean()
@@ -119,7 +118,7 @@ class LeadCustomColumnValue(BaseCustomColumnValue):
         indexes = BaseCustomColumnValue.Meta.indexes + [
             models.Index(fields=['lead']),
         ]
-        db_table = 'lead_custom_column_values'  # Custom table name without app_ prefix
+        db_table = 'lead_custom_column_values'
 
 
 class AccountCustomColumnValue(BaseCustomColumnValue):
@@ -131,4 +130,4 @@ class AccountCustomColumnValue(BaseCustomColumnValue):
         indexes = BaseCustomColumnValue.Meta.indexes + [
             models.Index(fields=['account']),
         ]
-        db_table = 'account_custom_column_values'  # Custom table name without app_ prefix
+        db_table = 'account_custom_column_values'
