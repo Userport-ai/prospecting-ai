@@ -288,7 +288,7 @@ class CustomColumnViewSet(TenantScopedViewSet):
                         enrichment_summary = account.get_enrichment_summary()
                         if enrichment_summary:
                             account_context['enrichment_summary'] = {k: v for k, v in enrichment_summary.items()
-                                                                     if k != 'statuses'}  # Exclude statuses objects
+                                                                     if (k != 'statuses' and k != 'last_update')}  # Exclude statuses objects
                     except:
                         pass  # Skip if error in getting enrichment summary
 

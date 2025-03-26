@@ -440,6 +440,9 @@ class CustomColumnTask(AccountEnrichmentTask):
             if 'confidence_score' in value:
                 logger.debug(f"Entity {entity_id} confidence score: {value['confidence_score']}")
 
+            if 'rationale' in value:
+                logger.debug(f"Entity {entity_id} rationale: {value['rationale']}")
+
             return value
 
         except Exception as e:
@@ -526,7 +529,7 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
 
         value = response['value']
         confidence = response.get('confidence_score', 0.0)
-        rationale = response.get('rationale', '')  # Extract rationale from response
+        rationale = response.get('rationale', '')
 
         # Validate confidence score range
         if not 0 <= confidence <= 1:
