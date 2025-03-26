@@ -173,7 +173,7 @@ export const Table: React.FC<TableProps> = ({
       </p>
 
       {/* Floating Toolbar */}
-      <div className="sticky top-0 z-50 border border-gray-200 shadow-md bg-white p-2 flex gap-6">
+      <div className="sticky top-0 z-10 border border-gray-200 shadow-md bg-white p-2 flex gap-6">
         {/* Filter Controls */}
         <div className="flex gap-4">
           <TextFilter
