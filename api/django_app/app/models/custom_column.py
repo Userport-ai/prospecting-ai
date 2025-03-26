@@ -82,6 +82,7 @@ class BaseCustomColumnValue(BaseMixin):
     value_boolean = models.BooleanField(null=True, blank=True)
     value_number = models.DecimalField(max_digits=19, decimal_places=6, null=True, blank=True)
     raw_response = models.TextField(null=True, blank=True)
+    rationale = models.TextField(null=True, blank=True) # store AI's reasoning
     confidence_score = models.FloatField(null=True, blank=True)
     generation_metadata = models.JSONField(null=True, blank=True)
     error_details = models.JSONField(null=True, blank=True)

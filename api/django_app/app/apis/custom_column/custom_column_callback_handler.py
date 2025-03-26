@@ -198,7 +198,8 @@ class CustomColumnCallbackHandler:
             'value_string': None,
             'value_json': None,
             'value_boolean': None,
-            'value_number': None
+            'value_number': None,
+            'rationale': value_data.get('rationale')
         }
 
         # Check for value_enum and map it to value_string for ENUM type

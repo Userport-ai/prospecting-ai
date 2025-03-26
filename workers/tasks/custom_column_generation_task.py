@@ -53,6 +53,7 @@ class CustomColumnValue(UserportPydanticBaseModel):
     value_number: Optional[float] = None
     value_enum: Optional[str] = None
     confidence_score: Optional[float] = None
+    rationale: Optional[str] = None
     generated_at: datetime
     error_details: Optional[Dict[str, Any]] = None
     status: str = "pending"
@@ -513,8 +514,9 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
         return formats.get(response_type, "unknown format")
 
     def _validate_response(self, response: Dict[str, Any], column_config: Any) -> Dict[str, Any]:
-        response_type = column_config['response_type']
         """Validate and format the AI response with enhanced error checking."""
+        response_type = column_config['response_type']
+
         if not response:
             raise ValueError("Response is empty")
 
@@ -524,6 +526,7 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
 
         value = response['value']
         confidence = response.get('confidence_score', 0.0)
+        rationale = response.get('rationale', '')  # Extract rationale from response
 
         # Validate confidence score range
         if not 0 <= confidence <= 1:
@@ -532,11 +535,13 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
 
         # Format based on response type with validation
         try:
+            result = {}
+
             if response_type == "string":
                 if not isinstance(value, str):
                     logger.warning(f"Expected string but got {type(value).__name__}, converting to string")
                     value = str(value)
-                return {"value_string": value, "confidence_score": confidence}
+                result = {"value_string": value}
 
             elif response_type == "json_object":
                 if isinstance(value, str):
@@ -551,7 +556,7 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
                 if not isinstance(value, dict) and not isinstance(value, list):
                     raise ValueError(f"Expected JSON object or array but got {type(value).__name__}")
 
-                return {"value_json": value, "confidence_score": confidence}
+                result = {"value_json": value}
 
             elif response_type == "boolean":
                 if isinstance(value, str):
@@ -564,7 +569,7 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
                         raise ValueError(f"Cannot convert string '{value}' to boolean")
 
                 value = bool(value)  # Ensure it's a boolean
-                return {"value_boolean": value, "confidence_score": confidence}
+                result = {"value_boolean": value}
 
             elif response_type == "number":
                 if isinstance(value, str):
@@ -575,7 +580,8 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
                         raise ValueError(f"Cannot convert string '{value}' to number")
 
                 value = float(value)  # Ensure it's a float
-                return {"value_number": value, "confidence_score": confidence}
+                result = {"value_number": value}
+
             elif response_type == "enum":
                 if isinstance(value, str):
                     try:
@@ -584,10 +590,16 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
                             logger.error(f"Invalid enum value '{value}'")
                     except Exception as e:
                         raise ValueError(f"Error validating enum value '{value}': {str(e)}")
-                return {"value_enum": value, "confidence_score": confidence}
+                result = {"value_enum": value}
+
             else:
                 raise ValueError(f"Unsupported response type: {response_type}")
 
+            # Add confidence and rationale to the result
+            result["confidence_score"] = confidence
+            result["rationale"] = rationale  # Include rationale in the result
+
+            return result
         except Exception as e:
             logger.error(f"Error validating response: {str(e)}")
             raise ValueError(f"Response validation failed: {str(e)}")
