@@ -459,6 +459,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         """Create the prompt for value generation with enhanced contextualization."""
         # Extract column description and expected values
         column_description = column_config.get('description', 'No description provided')
+        question = column_config.get('question', '')
         response_type = column_config.get('response_type', 'string')
         expected_format = self._get_format_for_response_type(column_config)
 
@@ -475,12 +476,13 @@ class CustomColumnTask(AccountEnrichmentTask):
             validation_text = "Validation Rules:\n" + "\n".join([f"- {rule}" for rule in validation_rules])
 
         # Create enhanced prompt
-        return f"""Generate a value for the following custom column based on the context provided:
+        return f"""You are an experienced BDR prospecting and qualifying accounts and leads. Answer the following question about an account/lead based on the context provided:
 
 Column Information:
 - ID: {column_config.get('id', 'Unknown')}
 - Name: {column_config.get('name', 'Custom Column')}
-- Description/Question: {column_description}
+- Description: {column_description}
+- Question: {question}
 - Response Type: {response_type}
 
 Entity ID: {entity_id}
@@ -510,17 +512,18 @@ Be accurate, concise, and ensure the response strictly adheres to the specified 
 
         """Get the expected format description for the response type."""
         response_type = column_config.get('response_type', 'string')
-        if response_type == "enum":
-            allowed_values = column_config['response_config'].get('allowed_values', [])
-            return f"string (one of the following values: {allowed_values} or \"Unknown\")"
-
+        allowed_values = column_config['response_config'].get('allowed_values', [])
         formats = {
             "string": "string (text value)",
             "json_object": "object (valid JSON object)",
             "boolean": "boolean (true or false)",
             "number": "number (integer or float)",
+            "enum": f"string"
         }
-        return formats.get(response_type, "unknown format")
+        format_for_response_type = formats.get(response_type, "unknown format")
+        if allowed_values:
+            format_for_response_type += f" from one of the following allowed values: {allowed_values}"
+        return format_for_response_type
 
     def _validate_response(self, response: Dict[str, Any], column_config: Any) -> Dict[str, Any]:
         """Validate and format the AI response with enhanced error checking."""
