@@ -1,16 +1,19 @@
 from rest_framework import serializers
+
 from app.models import Lead
+from app.utils.serialization_utils import get_custom_column_values
 
 
 class LeadDetailsSerializer(serializers.ModelSerializer):
     # Add a nested serializer for minimal account details
     account_details = serializers.SerializerMethodField()
+    custom_column_values = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
         fields = [
             'id',
-            'account_details',  # Read-only nested account information
+            'account_details',
             'first_name',
             'last_name',
             'role_title',
@@ -22,7 +25,8 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'score',
             'last_enriched_at',
             'suggestion_status',
-            'updated_at'
+            'updated_at',
+            'custom_column_values'  
         ]
         read_only_fields = [
             'id',
@@ -31,7 +35,8 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'score',
             'last_enriched_at',
             'created_at',
-            'updated_at'
+            'updated_at',
+            'custom_column_values'  
         ]
         depth = 1
 
@@ -47,25 +52,11 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'recent_events': obj.account.recent_events,
         }
 
-    def validate_custom_fields(self, value):
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Custom fields must be a JSON object")
-        return value
-
-    def validate(self, data):
+    def get_custom_column_values(self, obj):
         """
-        Ensure at least one identifier (linkedin_url or email) is provided
-        Only validate for POST/PUT requests, skip for PATCH/DELETE
+        Return all custom column values for this lead in an organized format.
         """
-        # Get the request method from the context
-        request = self.context.get('request')
-        if request and request.method in ['POST', 'PUT']:
-            # Only validate for POST/PUT requests
-            if not data.get('linkedin_url') and not data.get('email'):
-                raise serializers.ValidationError(
-                    "Either linkedin_url or email must be provided"
-                )
-        return data
+        return get_custom_column_values(obj)
 
 
 # For bulk operations, we might want a simplified serializer

@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 
 from django.db import models, transaction
-from django.db.models import F, Case, When, FloatField, Value, Q
+from django.db.models import F, Case, When, FloatField, Value, Q, Prefetch
 from django.db.models.expressions import RawSQL
 from django.db.models.functions import Cast, Least
 from django_filters import rest_framework as filters
@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from app.apis.common.base import TenantScopedViewSet
 from app.apis.leads.lead_generation_mixin import LeadGenerationMixin
 from app.models import UserRole, Lead, Account, EnrichmentStatus, Product
+from app.models.custom_column import LeadCustomColumnValue, CustomColumn
 from app.models.enrichment.lead_linkedin_research import LinkedInResearchInputData
 from app.models.serializers.lead_serializers import (
     LeadDetailsSerializer,
@@ -24,6 +25,7 @@ from app.models.serializers.lead_serializers import (
 )
 from app.permissions import HasRole
 from app.services.worker_service import WorkerService
+from app.utils.custom_column_utils import trigger_custom_column_generation
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +194,16 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         while maintaining the original scoring within each persona category.
         """
         queryset = super().get_queryset().select_related('account')
+
+        queryset = queryset.prefetch_related(
+            Prefetch(
+                'custom_column_values',
+                queryset=LeadCustomColumnValue.objects.filter(
+                    status=LeadCustomColumnValue.Status.COMPLETED
+                ).select_related('column'),
+                to_attr='prefetched_custom_column_values'
+            )
+        )
 
         # Get balance parameters from query params with defaults - false by default
         balance_personas = self.request.query_params.get('balance_personas', 'false').lower() == 'true'
@@ -698,12 +710,19 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
                 # Trigger enrichment for created leads
                 lead_ids = [lead.id for lead in created_leads]
-                # TODO: Trigger enrichment job
+
+                # Add custom column value generation using the utility function
+                custom_column_jobs = trigger_custom_column_generation(
+                    tenant_id=str(request.tenant.id),
+                    entity_type=CustomColumn.EntityType.LEAD,
+                    entity_ids=lead_ids
+                )
 
                 response_data = {
                     "message": "Leads created successfully",
                     "lead_count": len(created_leads),
-                    "leads": LeadDetailsSerializer(created_leads, many=True).data
+                    "leads": LeadDetailsSerializer(created_leads, many=True).data,
+                    "custom_column_jobs": custom_column_jobs
                 }
 
                 return Response(response_data, status=status.HTTP_201_CREATED)

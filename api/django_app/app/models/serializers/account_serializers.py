@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from app.models import Account, AccountEnrichmentStatus
+from app.utils.serialization_utils import get_custom_column_values
 
 
 class AccountEnrichmentStatusSerializer(serializers.ModelSerializer):
@@ -26,6 +27,7 @@ class EnrichmentStatusSerializer(serializers.Serializer):
 
 class AccountDetailsSerializer(serializers.ModelSerializer):
     enrichment_status = EnrichmentStatusSerializer(source='get_enrichment_summary', read_only=True)
+    custom_column_values = serializers.SerializerMethodField()
 
     class Meta:
         model = Account
@@ -51,31 +53,23 @@ class AccountDetailsSerializer(serializers.ModelSerializer):
             'settings',
             'recent_events',
             'created_at',
-            'updated_at'
+            'updated_at',
+            'custom_column_values'  # Added this field
         ]
         read_only_fields = [
             'id',
             'enrichment_sources',
             'last_enriched_at',
             'created_at',
-            'updated_at'
+            'updated_at',
+            'custom_column_values'  # Added this field
         ]
 
-    def validate_technologies(self, value):
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Technologies must be a JSON object")
-        return value
-
-    def validate_funding_details(self, value):
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Funding details must be a JSON object")
-        return value
-
-    def validate_custom_fields(self, value):
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Custom fields must be a JSON object")
-        return value
-
+    def get_custom_column_values(self, obj):
+        """
+        Return all custom column values for this account in an organized format.
+        """
+        return get_custom_column_values(obj)
 
 class AccountBulkCreateSerializer(serializers.ModelSerializer):
     class Meta:
