@@ -780,12 +780,12 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
             enriched_leads_dict_list: List[Dict[str, Any]] = [lead.model_dump() for lead in enriched_leads]
             evaluated_leads_dict_list: List[Dict[str, Any]] = [lead.model_dump() for lead in evaluated_leads]
-            await self._store_results(
-                job_id=job_id,
-                account_id=account_id,
-                structured_leads=enriched_leads_dict_list,
-                evaluated_leads=evaluated_leads_dict_list
-            )
+            # await self._store_results(
+            #     job_id=job_id,
+            #     account_id=account_id,
+            #     structured_leads=enriched_leads_dict_list,
+            #     evaluated_leads=evaluated_leads_dict_list
+            # )
 
             score_distribution = self._calculate_score_distribution(evaluated_leads_dict_list)
             qualified_leads_dict_list = [l for l in evaluated_leads_dict_list if l['fit_score'] >= self.config.fit_score_threshold]
