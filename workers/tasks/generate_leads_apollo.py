@@ -783,7 +783,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             await self._store_results(
                 job_id=job_id,
                 account_id=account_id,
-                structured_leads=enriched_leads_dict_list,  # Store enriched leads
+                structured_leads=enriched_leads_dict_list,
                 evaluated_leads=evaluated_leads_dict_list
             )
 
@@ -801,7 +801,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                     'score_distribution': score_distribution,
                     'structured_leads': enriched_leads_dict_list,
                     'all_leads': evaluated_leads_dict_list,
-                    'qualified_leads': qualified_leads_dict_list,
+                    'qualified_leads': [],
                     'metrics': asdict(self.metrics)
                 }
             }
@@ -1048,7 +1048,6 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                 source='apollo',
                 raw_data={
                     'structured_leads': structured_leads,
-                    'evaluated_leads': evaluated_leads,
                     'metadata': metadata
                 },
                 processed_data={
@@ -1062,7 +1061,6 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         except Exception as e:
             logger.error(f"Error storing results: {str(e)}")
             self.metrics.api_errors += 1
-            raise
 
     def _calculate_profile_completion_rate(self, leads: List[Dict[str, Any]]) -> float:
         """Calculate the rate of complete profiles."""
