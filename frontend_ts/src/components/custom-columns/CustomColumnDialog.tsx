@@ -37,6 +37,7 @@ const baseSchema = z.object({
     ai_config: z.object({
         model: z.string().min(1, "AI Model is required."),
         temperature: z.coerce.number().min(0).max(1), // Coerce to number, validate range
+        use_internet: z.boolean().optional()
     }),
     context_type: z.array(z.string()).min(1, "At least one Context Type is required."),
     refresh_interval: z.coerce.number().int().positive().optional().nullable(), // Optional integer > 0
@@ -179,64 +180,66 @@ const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
 
                         {/* Response Config (Conditional) */}
                         <ResponseConfigInput />
+                        <FormField control={form.control} name="ai_config.use_internet" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 "><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Internet Access</FormLabel><FormDescription>Enable internet access to the AI model.</FormDescription></div><FormMessage /></FormItem> )} />
 
-                        {/* AI Config */}
-                        <div className="space-y-4 p-4 border rounded-md bg-gray-50">
-                            <FormLabel className="text-base font-semibold">AI Configuration</FormLabel>
-                            <FormField control={form.control} name="ai_config.model" render={({ field }) => ( <FormItem> <FormLabel>AI Model *</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select model..." /></SelectTrigger></FormControl><SelectContent>{AVAILABLE_AI_MODELS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                            <FormField control={form.control} name="ai_config.temperature" render={({ field }) => ( <FormItem> <FormLabel>Temperature (0-1)</FormLabel><FormControl><Input type="number" step="0.1" min="0" max="1" placeholder="e.g., 0.2" {...field} /></FormControl><FormDescription>Lower values (e.g., 0.1) are more deterministic, higher values (e.g., 0.8) are more creative.</FormDescription><FormMessage /></FormItem>)} />
-                        </div>
 
-                        {/* Context Types */}
-                        <FormField
-                            control={form.control}
-                            name="context_type"
-                            render={() => (
-                                <FormItem>
-                                    <FormLabel>Required Context *</FormLabel>
-                                    <FormDescription>Select the data the AI needs to answer the question.</FormDescription>
-                                    <div className="grid grid-cols-2 gap-2 pt-2">
-                                        {AVAILABLE_CONTEXT_TYPES.map((item) => (
-                                            <FormField
-                                                key={item.id}
-                                                control={form.control}
-                                                name="context_type"
-                                                render={({ field }) => {
-                                                    return (
-                                                        <FormItem
-                                                            key={item.id}
-                                                            className="flex flex-row items-start space-x-3 space-y-0"
-                                                        >
-                                                            <FormControl>
-                                                                <Checkbox
-                                                                    checked={field.value?.includes(item.id)}
-                                                                    onCheckedChange={(checked) => {
-                                                                        return checked
-                                                                            ? field.onChange([...field.value, item.id])
-                                                                            : field.onChange(
-                                                                                field.value?.filter(
-                                                                                    (value) => value !== item.id
-                                                                                )
-                                                                            )
-                                                                    }}
-                                                                />
-                                                            </FormControl>
-                                                            <FormLabel className="text-sm font-normal">
-                                                                {item.label}
-                                                            </FormLabel>
-                                                        </FormItem>
-                                                    )
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                        {/*/!* AI Config *!/*/}
+                        {/*<div className="space-y-4 p-4 border rounded-md bg-gray-50">*/}
+                        {/*    <FormLabel className="text-base font-semibold">AI Configuration</FormLabel>*/}
+                        {/*    <FormField control={form.control} name="ai_config.model" render={({ field }) => ( <FormItem> <FormLabel>AI Model *</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select model..." /></SelectTrigger></FormControl><SelectContent>{AVAILABLE_AI_MODELS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />*/}
+                        {/*    <FormField control={form.control} name="ai_config.temperature" render={({ field }) => ( <FormItem> <FormLabel>Temperature (0-1)</FormLabel><FormControl><Input type="number" step="0.1" min="0" max="1" placeholder="e.g., 0.2" {...field} /></FormControl><FormDescription>Lower values (e.g., 0.1) are more deterministic, higher values (e.g., 0.8) are more creative.</FormDescription><FormMessage /></FormItem>)} />*/}
+                        {/*</div>*/}
+
+                        {/*/!* Context Types *!/*/}
+                        {/*<FormField*/}
+                        {/*    control={form.control}*/}
+                        {/*    name="context_type"*/}
+                        {/*    render={() => (*/}
+                        {/*        <FormItem>*/}
+                        {/*            <FormLabel>Required Context *</FormLabel>*/}
+                        {/*            <FormDescription>Select the data the AI needs to answer the question.</FormDescription>*/}
+                        {/*            <div className="grid grid-cols-2 gap-2 pt-2">*/}
+                        {/*                {AVAILABLE_CONTEXT_TYPES.map((item) => (*/}
+                        {/*                    <FormField*/}
+                        {/*                        key={item.id}*/}
+                        {/*                        control={form.control}*/}
+                        {/*                        name="context_type"*/}
+                        {/*                        render={({ field }) => {*/}
+                        {/*                            return (*/}
+                        {/*                                <FormItem*/}
+                        {/*                                    key={item.id}*/}
+                        {/*                                    className="flex flex-row items-start space-x-3 space-y-0"*/}
+                        {/*                                >*/}
+                        {/*                                    <FormControl>*/}
+                        {/*                                        <Checkbox*/}
+                        {/*                                            checked={field.value?.includes(item.id)}*/}
+                        {/*                                            onCheckedChange={(checked) => {*/}
+                        {/*                                                return checked*/}
+                        {/*                                                    ? field.onChange([...field.value, item.id])*/}
+                        {/*                                                    : field.onChange(*/}
+                        {/*                                                        field.value?.filter(*/}
+                        {/*                                                            (value) => value !== item.id*/}
+                        {/*                                                        )*/}
+                        {/*                                                    )*/}
+                        {/*                                            }}*/}
+                        {/*                                        />*/}
+                        {/*                                    </FormControl>*/}
+                        {/*                                    <FormLabel className="text-sm font-normal">*/}
+                        {/*                                        {item.label}*/}
+                        {/*                                    </FormLabel>*/}
+                        {/*                                </FormItem>*/}
+                        {/*                            )*/}
+                        {/*                        }}*/}
+                        {/*                    />*/}
+                        {/*                ))}*/}
+                        {/*            </div>*/}
+                        {/*            <FormMessage />*/}
+                        {/*        </FormItem>*/}
+                        {/*    )}*/}
+                        {/*/>*/}
 
                         {/* Refresh Interval */}
-                        <FormField control={form.control} name="refresh_interval" render={({ field }) => ( <FormItem> <FormLabel>Refresh Interval (Hours)</FormLabel><FormControl><Input type="number" placeholder="e.g., 168 (for weekly)" {...field} onChange={event => field.onChange(+event.target.value)} /></FormControl><FormDescription>How often the AI value should be refreshed automatically. Leave blank for no auto-refresh.</FormDescription><FormMessage /></FormItem>)} />
+                        {/*<FormField control={form.control} name="refresh_interval" render={({ field }) => ( <FormItem> <FormLabel>Refresh Interval (Hours)</FormLabel><FormControl><Input type="number" placeholder="e.g., 168 (for weekly)" {...field} onChange={event => field.onChange(+event.target.value)} /></FormControl><FormDescription>How often the AI value should be refreshed automatically. Leave blank for no auto-refresh.</FormDescription><FormMessage /></FormItem>)} />*/}
                         {/* Is Active */}
                         <FormField control={form.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-gray-50"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Active</FormLabel><FormDescription>Enable this column for generation.</FormDescription></div><FormMessage /></FormItem> )} />
 
