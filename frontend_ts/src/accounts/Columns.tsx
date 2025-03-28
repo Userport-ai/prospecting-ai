@@ -1,9 +1,10 @@
-import { ChevronsUpDown, Link, Info } from "lucide-react";
+// Import CustomColumnValueData directly from its source
+import { CustomColumnValueData } from "@/services/CustomColumn";import { ChevronsUpDown, Link, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
-import { ColumnDef, Table, Cell as CellContext } from "@tanstack/react-table";
+import { ColumnDef, Table } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Account as AccountRow, FundingDetails, CustomColumnValueData } from "@/services/Accounts";
+import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
 import {Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EnrichmentStatus, RecentCompanyEvent } from "@/services/Common";
@@ -397,9 +398,9 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   },
 ];
 
-const renderCustomCell = (cellContext: CellContext<AccountRow, unknown>) => {
-  const columnId = cellContext.column.id;
-  const customColumnMap = cellContext.row.original.custom_column_values;
+const renderCustomCell = (info: any) => {
+  const columnId = info.column.id;
+  const customColumnMap = info.row.original.custom_column_values;
   const customData = customColumnMap?.[columnId];
 
   if (!customData || customData.value === null || customData.value === undefined) {
@@ -498,7 +499,7 @@ export const getAccountColumns = (rows: AccountRow[]): ColumnDef<AccountRow>[] =
       id: columnId, // Use the UUID as the column ID
       header: colData.name, // Use the name from the custom column data
       accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
-      cell: renderCustomCell,
+      cell: (info) => renderCustomCell(info),
       minSize: 150,
       enableSorting: false,
       enableColumnFilter: false,
