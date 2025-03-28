@@ -54,7 +54,7 @@ class AccountDetailsSerializer(serializers.ModelSerializer):
             'recent_events',
             'created_at',
             'updated_at',
-            'custom_column_values'  # Added this field
+            'custom_column_values'  
         ]
         read_only_fields = [
             'id',
@@ -62,7 +62,7 @@ class AccountDetailsSerializer(serializers.ModelSerializer):
             'last_enriched_at',
             'created_at',
             'updated_at',
-            'custom_column_values'  # Added this field
+            'custom_column_values'  
         ]
 
     def get_custom_column_values(self, obj):

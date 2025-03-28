@@ -49,6 +49,8 @@ def get_custom_column_values(obj: Any, values_attr: str = 'prefetched_custom_col
 
         result[str(value.column_id)] = {
             'name': value.column.name,
+            'description': value.column.description,
+            'question': value.column.question,
             'value': val,
             'confidence': value.confidence_score,
             'rationale': value.rationale,
