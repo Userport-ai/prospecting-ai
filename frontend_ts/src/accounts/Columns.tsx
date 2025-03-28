@@ -1,11 +1,11 @@
-import { ChevronsUpDown, Link } from "lucide-react";
+import { ChevronsUpDown, Link, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
-import { ColumnDef, Table } from "@tanstack/react-table";
+import { ColumnDef, Table, Cell as CellContext } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
+import { Account as AccountRow, FundingDetails, CustomColumnValueData } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
-import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
+import {Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EnrichmentStatus, RecentCompanyEvent } from "@/services/Common";
 import FundingDetailsView from "./FundingDetailsView";
 import CellListView from "../table/CellListView";
@@ -21,23 +21,23 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "select",
     maxSize: 50,
     header: ({ table }: { table: Table<AccountRow> }) => (
-      <Checkbox
-        className="bg-white data-[state=checked]:bg-purple-400"
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
+        <Checkbox
+            className="bg-white data-[state=checked]:bg-purple-400"
+            checked={
+                table.getIsAllPageRowsSelected() ||
+                (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+        />
     ),
     cell: (info) => (
-      <Checkbox
-        className="data-[state=checked]:bg-purple-400"
-        checked={info.row.getIsSelected()}
-        onCheckedChange={(value) => info.row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
+        <Checkbox
+            className="data-[state=checked]:bg-purple-400"
+            checked={info.row.getIsSelected()}
+            onCheckedChange={(value) => info.row.toggleSelected(!!value)}
+            aria-label="Select row"
+        />
     ),
     size: 50,
     enableSorting: false,
@@ -68,22 +68,22 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     minSize: 80,
     header: ({ column }) => {
       return (
-        <div className="flex justify-between items-center gap-2 mr-2">
-          Name
-          <SortingDropdown
-            onSelect={(val) => {
-              if (val === "asc") {
-                column.toggleSorting(false);
-              } else if (val === "desc") {
-                column.toggleSorting(true);
-              } else if (val === "none") {
-                column.clearSorting();
-              }
-            }}
-          >
-            <ChevronsUpDown size={18} />
-          </SortingDropdown>
-        </div>
+          <div className="flex justify-between items-center gap-2 mr-2">
+            Name
+            <SortingDropdown
+                onSelect={(val) => {
+                  if (val === "asc") {
+                    column.toggleSorting(false);
+                  } else if (val === "desc") {
+                    column.toggleSorting(true);
+                  } else if (val === "none") {
+                    column.clearSorting();
+                  }
+                }}
+            >
+              <ChevronsUpDown size={18} />
+            </SortingDropdown>
+          </div>
       );
     },
     cell: (info) => {
@@ -110,10 +110,10 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
       }
 
       return (
-        <EnrichmentStatusView
-          accountId={info.row.original.id}
-          enrichmentStatus={enrichmentStatus}
-        />
+          <EnrichmentStatusView
+              accountId={info.row.original.id}
+              enrichmentStatus={enrichmentStatus}
+          />
       );
     },
     // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
@@ -277,17 +277,17 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
         return <div></div>;
       }
       return (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            "flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline",
-            wrapColumnContentClass
-          )}
-        >
-          <Link size={18} />
-        </a>
+          <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                  "flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline",
+                  wrapColumnContentClass
+              )}
+          >
+            <Link size={18} />
+          </a>
       );
     },
     meta: {
@@ -306,17 +306,17 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
         return null;
       }
       return (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            "flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline",
-            wrapColumnContentClass
-          )}
-        >
-          <Link size={18} />
-        </a>
+          <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                  "flex items-center gap-1 text-blue-600 hover:text-blue-900 hover:underline",
+                  wrapColumnContentClass
+              )}
+          >
+            <Link size={18} />
+          </a>
       );
     },
     meta: {
@@ -345,8 +345,8 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "funding_details",
     accessorFn: (row) => {
       if (
-        !row.funding_details ||
-        Object.keys(row.funding_details).length === 0
+          !row.funding_details ||
+          Object.keys(row.funding_details).length === 0
       ) {
         return null;
       }
@@ -388,7 +388,7 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   {
     id: "last_enriched_at",
     accessorFn: (row) =>
-      row.last_enriched_at ? formatDate(row.last_enriched_at) : "Unknown",
+        row.last_enriched_at ? formatDate(row.last_enriched_at) : "Unknown",
     header: "Last Enriched At",
     meta: {
       displayName: "Last Enriched At",
@@ -397,43 +397,118 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   },
 ];
 
+const renderCustomCell = (cellContext: CellContext<AccountRow, unknown>) => {
+  const columnId = cellContext.column.id;
+  const customColumnMap = cellContext.row.original.custom_column_values;
+  const customData = customColumnMap?.[columnId];
+
+  if (!customData || customData.value === null || customData.value === undefined) {
+    return <span className="text-gray-400 italic">N/A</span>; // Or indicate loading/pending if applicable
+  }
+
+  const RationaleTooltip = ({ rationale }: { rationale: string | null }) => {
+    if (!rationale) return null;
+    return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Info size={14} className="ml-1 text-gray-400 hover:text-gray-600 cursor-pointer" />
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs p-2 bg-gray-800 text-white rounded text-xs" side="top">
+            <p className="font-semibold mb-1">Rationale:</p>
+            <p>{rationale}</p>
+          </TooltipContent>
+        </Tooltip>
+    );
+  }
+
+  const renderValueWithTooltip = (valueElement: React.ReactNode, rationale: string | null) => {
+    return (
+        <div className="flex items-center">
+          {valueElement}
+          <RationaleTooltip rationale={rationale} />
+        </div>
+    );
+  }
+
+  switch (customData.response_type) {
+    case 'enum':
+      // Simple rendering for enum values - just display the string value
+      return renderValueWithTooltip(
+          <span className="whitespace-normal break-words">{String(customData.value)}</span>,
+          customData.rationale
+      );
+
+    case 'string':
+      return renderValueWithTooltip(
+          <span className="whitespace-normal break-words">{String(customData.value)}</span>,
+          customData.rationale
+      );
+
+    case 'number':
+      return renderValueWithTooltip(
+          <span>{Number(customData.value).toLocaleString()}</span>, // Format number if needed
+          customData.rationale
+      );
+
+    case 'boolean':
+      return renderValueWithTooltip(
+          <span>{customData.value ? "Yes" : "No"}</span>, // Or use configured labels if available
+          customData.rationale
+      );
+
+    case 'json_object':
+      // Render a simplified view or a button to show details
+      return renderValueWithTooltip(
+          <span className="text-blue-600 italic cursor-pointer">[JSON Data]</span>, // Placeholder
+          customData.rationale // You might want a different way to show JSON rationale
+      );
+
+    default:
+      return renderValueWithTooltip(
+          <span>{String(customData.value)}</span>,
+          customData.rationale
+      );
+  }
+};
+
+
 // Fetches the final Column definition for the given set of rows
 // by adding Custom Columns to base static column definition using
 // information from the given Account Rows.
-export const getAccountColumns = (
-  rows: AccountRow[]
-): ColumnDef<AccountRow>[] => {
-  // Get custom columns.
-  var customColumnKeys = new Set<string>();
+export const getAccountColumns = (rows: AccountRow[]): ColumnDef<AccountRow>[] => {
+  // Get unique custom column definitions from the rows provided
+  const customColumnDefinitions = new Map<string, CustomColumnValueData>();
+
   for (const row of rows) {
-    if (!row.custom_fields) {
-      continue;
+    if (row.custom_column_values) {
+      for (const columnId in row.custom_column_values) {
+        if (!customColumnDefinitions.has(columnId)) {
+          // Store the metadata (name, type etc.) from the first row we see it in
+          customColumnDefinitions.set(columnId, row.custom_column_values[columnId]);
+        }
+      }
     }
-    const customFields: string[] = Object.keys(row.custom_fields);
-    customFields.forEach((cf) => customColumnKeys.add(cf));
   }
 
-  var finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
-  customColumnKeys.forEach((columnKey) => {
+  const finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
+
+  // Add definitions for each unique custom column found
+  customColumnDefinitions.forEach((colData, columnId) => {
     finalColumns.push({
-      id: columnKey,
-      accessorFn: (row) => row.custom_fields,
-      header: getCustomColumnDisplayName(columnKey),
-      cell: (info) => {
-        const customFields = info.getValue() as Record<string, any> | null;
-        if (customFields && columnKey in customFields) {
-          // Return value of the custom fiel.
-          return customFields[columnKey];
-        }
-        return null;
-      },
-      size: 100,
-      filterFn: "arrIncludesSome",
+      id: columnId, // Use the UUID as the column ID
+      header: colData.name, // Use the name from the custom column data
+      accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
+      cell: renderCustomCell,
+      minSize: 150,
+      enableSorting: false,
+      enableColumnFilter: false,
       meta: {
-        displayName: getCustomColumnDisplayName(columnKey),
+        displayName: colData.name,
         visibleInitially: true,
-      },
+        cellExpandable: ['string', 'json_object', 'enum'].includes(colData.response_type) && colData.rationale !== null
+      } as CustomColumnMeta,
     });
   });
+
   return finalColumns;
 };
