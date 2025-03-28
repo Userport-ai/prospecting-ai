@@ -1,27 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, {useEffect, useState} from "react";
 import {
-  getCoreRowModel,
-  useReactTable,
-  getSortedRowModel,
-  getFilteredRowModel,
   ColumnDef,
-  ColumnSort,
   ColumnFilter,
+  ColumnSort,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
 } from "@tanstack/react-table";
-import AddCustomColumn from "@/table/AddCustomColumn";
-import { CustomColumnInput } from "@/table/AddCustomColumn";
+import AddCustomColumn, {CustomColumnInput} from "@/table/AddCustomColumn";
+import {Button} from "@/components/ui/Button";
 import AddAccounts from "./AddAccounts";
 import CommonTable from "@/table/CommonTable";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
-import { getAccountColumns } from "./Columns";
-import { CustomColumnMeta } from "@/table/CustomColumnMeta";
-import { Account as AccountRow, listAccounts } from "@/services/Accounts";
-import { useAuthContext } from "@/auth/AuthProvider";
+import {getAccountColumns} from "./Columns";
+import {CustomColumnMeta} from "@/table/CustomColumnMeta";
+import {Account as AccountRow, listAccounts} from "@/services/Accounts";
+import {useAuthContext} from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
-import { listProducts, Product } from "@/services/Products";
-import { Separator } from "@/components/ui/separator";
+import {listProducts, Product} from "@/services/Products";
+import {Separator} from "@/components/ui/separator";
+import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
 import LoadingOverlay from "@/common/LoadingOverlay";
+import { Cpu } from "lucide-react";
 
 const ZeroStateDisplay = () => {
   return (
@@ -155,6 +157,7 @@ const Table: React.FC<TableProps> = ({
       .rows.map((row) => (row.original as AccountRow).id ?? "");
     customColumnInfo.rowIds = rowIds;
     onCustomColumnAdded(customColumnInfo);
+    // setCreateColumnDialogOpen(false);
   };
 
   return (
@@ -215,6 +218,8 @@ export default function AccountsTable() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
+  const [isCreateColumnDialogOpen, setCreateColumnDialogOpen] = useState(false);
+
 
   const listAccountsHelper = async (pageNum: number) => {
     const response = await listAccounts(authContext, {
@@ -293,6 +298,19 @@ export default function AccountsTable() {
     }
   };
 
+  const handleColumnCreated = (newColumn: CustomColumn) => {
+    console.log("Custom column created:", newColumn);
+    // Optional: Show a success toast/notification
+    // Optional: You might want to refresh the accounts list *after a delay*
+    //           to allow the backend to start populating values, or add the
+    //           column definition immediately to the table state (though cells will be empty initially).
+    //           Simplest approach for now might be just closing the dialog.
+    setCreateColumnDialogOpen(false);
+
+    // Example: Trigger a refresh after a short delay
+    // setTimeout(() => listAccountsHelper(curPageNum || 1), 2000);
+  };
+
   return (
     <div className="px-4 mt-2">
       <PollPendingAccounts
@@ -303,9 +321,24 @@ export default function AccountsTable() {
         <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
         {/* Add Accounts to the table. */}
         <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
+
+        <Button
+            onClick={() => setCreateColumnDialogOpen(true)}
+            variant="outline"
+            className="flex gap-2 items-center"
+        >
+          <Cpu size={16}/> Ask AI
+        </Button>
       </div>
 
       <Separator className="my-4 bg-gray-300" />
+
+      <CreateCustomColumnDialog
+          products={products}
+          open={isCreateColumnDialogOpen}
+          onOpenChange={setCreateColumnDialogOpen}
+          onSuccess={handleColumnCreated}
+      />
 
       <Table
         columns={columns}

@@ -88,6 +88,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         """Configure the AI service with factory pattern."""
         factory = AIServiceFactory()
         self.model = factory.create_service("gemini")
+        self.search_model = factory.create_service("openai")
 
     @property
     def enrichment_type(self) -> str:
@@ -113,6 +114,8 @@ class CustomColumnTask(AccountEnrichmentTask):
             "column_config": kwargs["column_config"],
             "context_data": kwargs["context_data"],
             "tenant_id": kwargs.get("tenant_id"),
+            "ai_config": kwargs.get("ai_config"),
+            "entity_type": kwargs.get("entity_type"),
             "batch_size": kwargs.get("batch_size", 10),
             "job_id": kwargs.get("job_id"),
             "concurrent_requests": kwargs.get("concurrent_requests", 5),
@@ -129,6 +132,8 @@ class CustomColumnTask(AccountEnrichmentTask):
         context_data = payload.get('context_data', {})
         batch_size = payload.get('batch_size', 10)
         concurrent_requests = payload.get('concurrent_requests', 5)
+        ai_config = payload.get('ai_config')
+        entity_type = payload.get('entity_type')
         current_stage = 'initialization'
         start_time = time.time()
 
@@ -177,9 +182,11 @@ class CustomColumnTask(AccountEnrichmentTask):
                         # Generate values for batch
                         batch_result = await self._process_batch(
                             batch,
+                            entity_type,
                             column_id,
                             column_config,
-                            context_data
+                            context_data,
+                            ai_config
                         )
 
                         batch_values.extend(batch_result)
@@ -329,9 +336,11 @@ class CustomColumnTask(AccountEnrichmentTask):
     async def _process_batch(
             self,
             entity_ids: List[str],
+            entity_type: str,
             column_id: str,
             column_config: Dict[str, Any],
-            context_data: Dict[str, Any]
+            context_data: Dict[str, Any],
+            ai_config: Dict[str, Any],
     ) -> List[CustomColumnValue]:
         """Process a batch of entities with enhanced concurrency and error handling."""
         results = []
@@ -344,9 +353,11 @@ class CustomColumnTask(AccountEnrichmentTask):
 
             task = self._process_entity(
                 entity_id=entity_id,
+                entity_type=entity_type,
                 column_id=column_id,
                 column_config=column_config,
-                context_data=context_data
+                context_data=context_data,
+                ai_config=ai_config,
             )
             tasks.append(task)
 
@@ -370,20 +381,17 @@ class CustomColumnTask(AccountEnrichmentTask):
 
         return results
 
-    async def _process_entity(
-            self,
-            entity_id: str,
-            column_id: str,
-            column_config: Dict[str, Any],
-            context_data: Dict[str, Any]
-    ) -> CustomColumnValue:
+    async def _process_entity(self, entity_id: str, column_id: str, column_config: Dict[str, Any],
+                              context_data: Dict[str, Any], entity_type=None, ai_config=None) -> CustomColumnValue:
         """Process a single entity with retry logic."""
         try:
             # Generate value using AI with retry logic
             value = await self._generate_column_value(
                 entity_id=entity_id,
+                entity_type=entity_type,
                 column_config=column_config,
-                context_data=context_data
+                context_data=context_data,
+                ai_config=ai_config,
             )
 
             return CustomColumnValue(
@@ -408,8 +416,10 @@ class CustomColumnTask(AccountEnrichmentTask):
     async def _generate_column_value(
             self,
             entity_id: str,
+            entity_type: str,
             column_config: Dict[str, Any],
-            context_data: Dict[str, Any]
+            context_data: Dict[str, Any],
+            ai_config: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate a single column value using AI with enhanced error handling."""
         try:
@@ -422,14 +432,18 @@ class CustomColumnTask(AccountEnrichmentTask):
             # Prepare prompt with context
             prompt = self._create_generation_prompt(
                 entity_id=entity_id,
+                entity_type=entity_type,
                 column_config=column_config,
-                entity_context=entity_context
+                entity_context=entity_context,
             )
 
             # Generate value with AI service
             logger.debug(f"Generating column value for entity {entity_id}")
             start_time = time.time()
-            response = await self.model.generate_content(prompt, is_json=True)
+            if ai_config and ai_config.get('use_internet', False):
+                response = await self.search_model.generate_search_content(prompt)
+            else:
+                response = await self.model.generate_content(prompt, is_json=True)
             generation_time = time.time() - start_time
             logger.debug(f"Value generation for entity {entity_id} completed in {generation_time:.2f}s")
 
@@ -450,18 +464,16 @@ class CustomColumnTask(AccountEnrichmentTask):
             self.metrics["ai_errors"] += 1
             raise RetryableError(f"AI generation failed: {str(e)}")
 
-    def _create_generation_prompt(
-            self,
-            entity_id: str,
-            column_config: Dict[str, Any],
-            entity_context: Dict[str, Any]
-    ) -> str:
+    def _create_generation_prompt(self, entity_id: str, column_config: Dict[str, Any], entity_context: Dict[str, Any],
+                                  entity_type=None) -> str:
         """Create the prompt for value generation with enhanced contextualization."""
         # Extract column description and expected values
         column_description = column_config.get('description', 'No description provided')
         question = column_config.get('question', '')
         response_type = column_config.get('response_type', 'string')
         expected_format = self._get_format_for_response_type(column_config)
+        entity_type_str = entity_type if entity_type else "account/lead"
+
 
         # Get any examples from config
         examples = column_config.get('examples', [])
@@ -476,7 +488,7 @@ class CustomColumnTask(AccountEnrichmentTask):
             validation_text = "Validation Rules:\n" + "\n".join([f"- {rule}" for rule in validation_rules])
 
         # Create enhanced prompt
-        return f"""You are an experienced BDR prospecting and qualifying accounts and leads. Answer the following question about an account/lead based on the context provided:
+        return f"""You are an experienced BDR prospecting and qualifying {entity_type_str}. Answer the following question about an {entity_type_str} based on the context provided:
 
 Column Information:
 - ID: {column_config.get('id', 'Unknown')}
