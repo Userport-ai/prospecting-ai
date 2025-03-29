@@ -4,62 +4,76 @@ import { apiCall } from "./Api";
 
 // Interface matching the structure needed for the POST request
 export interface CreateCustomColumnRequest {
-    name: string;
-    description?: string | null;
-    question: string;
-    entity_type: "account" | "lead";
-    response_type: "string" | "json_object" | "boolean" | "number" | "enum";
-    response_config?: {
-        allowed_values?: string[];
-        // Add other potential config fields based on your backend documentation if needed
-        // e.g., max_length, format, tone for string
-        // e.g., min, max, decimal_places, unit for number
-        // e.g., true_label, false_label for boolean
-    } | null;
-    ai_config: {
-        model: string; // e.g., 'gemini-pro'
-        temperature: number; // e.g., 0.1
-    };
-    context_type: string[]; // e.g., ['company_profile']
-    refresh_interval?: number | null; // In hours
-    is_active?: boolean;
-    product: string; // Product UUID
+  name: string;
+  description?: string | null;
+  question: string;
+  entity_type: "account" | "lead";
+  response_type: "string" | "json_object" | "boolean" | "number" | "enum";
+  response_config?: {
+    allowed_values?: string[];
+    // Add other potential config fields based on your backend documentation if needed
+    // e.g., max_length, format, tone for string
+    // e.g., min, max, decimal_places, unit for number
+    // e.g., true_label, false_label for boolean
+  } | null;
+  ai_config: {
+    model: string; // e.g., 'gemini-pro'
+    temperature: number; // e.g., 0.1
+    use_internet: boolean;
+  };
+  context_type: string[]; // e.g., ['company_profile']
+  refresh_interval?: number | null; // In hours
+  is_active?: boolean;
+  product: string; // Product UUID
 }
 
 // Interface representing the created custom column (adjust based on actual API response)
 export interface CustomColumn extends CreateCustomColumnRequest {
-    id: string; // UUID assigned by backend
-    tenant_id: string;
-    created_by: string;
-    created_at: string; // ISO Date string
-    updated_at: string; // ISO Date string
-    // Potentially add last_refresh if returned
+  id: string; // UUID assigned by backend
+  tenant_id: string;
+  created_by: string;
+  created_at: string; // ISO Date string
+  updated_at: string; // ISO Date string
+  // Potentially add last_refresh if returned
 }
 
 // Function to create a new custom column
 export const createCustomColumn = async (
-    authContext: AuthContext,
-    columnData: CreateCustomColumnRequest
+  authContext: AuthContext,
+  columnData: CreateCustomColumnRequest
 ): Promise<CustomColumn> => {
-    return await apiCall<CustomColumn>(authContext, async (apiClient) => {
-        // Clean up potentially empty/null optional fields if needed by backend
-        const payload: Partial<CreateCustomColumnRequest> = { ...columnData };
-        if (!payload.description) delete payload.description;
-        if (!payload.response_config || Object.keys(payload.response_config).length === 0) {
-            delete payload.response_config;
-        } else if (payload.response_type !== 'enum' && payload.response_config?.allowed_values) {
-            // Clean up allowed_values if type is not enum
-            delete payload.response_config.allowed_values;
-            if (Object.keys(payload.response_config).length === 0) {
-                delete payload.response_config;
-            }
-        }
-        if (payload.refresh_interval === null || payload.refresh_interval === undefined) delete payload.refresh_interval;
-        if (payload.is_active === undefined) delete payload.is_active; // Keep default handling if undefined
+  return await apiCall<CustomColumn>(authContext, async (apiClient) => {
+    // Clean up potentially empty/null optional fields if needed by backend
+    const payload: Partial<CreateCustomColumnRequest> = { ...columnData };
+    if (!payload.description) delete payload.description;
+    if (
+      !payload.response_config ||
+      Object.keys(payload.response_config).length === 0
+    ) {
+      delete payload.response_config;
+    } else if (
+      payload.response_type !== "enum" &&
+      payload.response_config?.allowed_values
+    ) {
+      // Clean up allowed_values if type is not enum
+      delete payload.response_config.allowed_values;
+      if (Object.keys(payload.response_config).length === 0) {
+        delete payload.response_config;
+      }
+    }
+    if (
+      payload.refresh_interval === null ||
+      payload.refresh_interval === undefined
+    )
+      delete payload.refresh_interval;
+    if (payload.is_active === undefined) delete payload.is_active; // Keep default handling if undefined
 
-        const response = await apiClient.post<CustomColumn>("/custom_columns/", payload);
-        return response.data;
-    });
+    const response = await apiClient.post<CustomColumn>(
+      "/custom_columns/",
+      payload
+    );
+    return response.data;
+  });
 };
 
 // Add functions for list, get, update, delete custom columns here later if needed
@@ -69,12 +83,12 @@ export const createCustomColumn = async (
 // export const deleteCustomColumn = async (...) => {};
 
 export interface CustomColumnValueData {
-    name: string;
-    description: string | null;
-    question: string | null;
-    value: string | number | boolean | object | null; // The actual AI-generated value
-    confidence: number | null;
-    rationale: string | null;
-    generated_at: string; // ISO date string
-    response_type: 'string' | 'json_object' | 'boolean' | 'number' | 'enum';
+  name: string;
+  description: string | null;
+  question: string | null;
+  value: string | number | boolean | object | null; // The actual AI-generated value
+  confidence: number | null;
+  rationale: string | null;
+  generated_at: string; // ISO date string
+  response_type: "string" | "json_object" | "boolean" | "number" | "enum";
 }
