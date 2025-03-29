@@ -20,6 +20,85 @@ from app.services.worker_service import WorkerService
 logger = logging.getLogger(__name__)
 
 
+def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    """
+    Get custom column values for multiple entities in a batch.
+
+    Args:
+        entity_type: Either CustomColumn.EntityType.LEAD or CustomColumn.EntityType.ACCOUNT
+        entity_ids: List of entity IDs
+
+    Returns:
+        dict: Dictionary mapping entity_id -> {column_id -> value}
+    """
+    result = {entity_id: {} for entity_id in entity_ids}
+
+    try:
+        if entity_type == CustomColumn.EntityType.LEAD:
+            column_values = LeadCustomColumnValue.objects.filter(
+                lead_id__in=entity_ids,
+                status=LeadCustomColumnValue.Status.COMPLETED
+            ).select_related('column')
+
+            for cv in column_values:
+                # Extract value based on column type
+                if cv.value_string is not None:
+                    value = cv.value_string
+                elif cv.value_json is not None:
+                    value = cv.value_json
+                elif cv.value_boolean is not None:
+                    value = cv.value_boolean
+                elif cv.value_number is not None:
+                    value = cv.value_number
+                else:
+                    continue
+
+                # Add to result
+                entity_id = str(cv.lead_id)
+                if entity_id not in result:
+                    result[entity_id] = {}
+
+                result[entity_id][str(cv.column.id)] = {
+                    'name': cv.column.name,
+                    'value': value,
+                    'response_type': cv.column.response_type
+                }
+
+        else:  # Account entity type
+            column_values = AccountCustomColumnValue.objects.filter(
+                account_id__in=entity_ids,
+                status=AccountCustomColumnValue.Status.COMPLETED
+            ).select_related('column')
+
+            for cv in column_values:
+                # Extract value based on column type
+                if cv.value_string is not None:
+                    value = cv.value_string
+                elif cv.value_json is not None:
+                    value = cv.value_json
+                elif cv.value_boolean is not None:
+                    value = cv.value_boolean
+                elif cv.value_number is not None:
+                    value = cv.value_number
+                else:
+                    continue
+
+                # Add to result
+                entity_id = str(cv.account_id)
+                if entity_id not in result:
+                    result[entity_id] = {}
+
+                result[entity_id][str(cv.column.id)] = {
+                    'name': cv.column.name,
+                    'value': value,
+                    'response_type': cv.column.response_type
+                }
+    except Exception as e:
+        logger.error(f"Error getting batch custom column values: {str(e)}", exc_info=True)
+
+    return result
+
+
 def get_entity_context_data(
         tenant_id: str,
         custom_column: CustomColumn,
@@ -205,6 +284,16 @@ def get_entity_context_data(
                     logger.error(f"Error getting leads count: {str(e)}")
 
                 context_data[str(account.id)] = account_context
+
+        # Get custom column values in batch for all entities
+        custom_column_values_batch = get_batch_custom_column_values(entity_type, entity_ids)
+
+        # Add to each entity's context
+        for entity_id in entity_ids:
+            str_entity_id = str(entity_id)
+            if str_entity_id in custom_column_values_batch and custom_column_values_batch[str_entity_id]:
+                if str_entity_id in context_data:
+                    context_data[str_entity_id]['custom_column_values'] = custom_column_values_batch[str_entity_id]
 
         return context_data
 
