@@ -1,7 +1,8 @@
 import logging
 import uuid
 
-from django.db import transaction
+from rest_framework import serializers
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -40,7 +41,21 @@ class CustomColumnViewSet(TenantScopedViewSet):
 
     def perform_create(self, serializer):
         """Create a new custom column."""
-        super().perform_create(serializer)
+        try:
+            super().perform_create(serializer)
+        except IntegrityError as e:
+            # Check if it's a unique constraint violation
+            if 'unique constraint' in str(e).lower() or 'duplicate key' in str(e).lower():
+                # Log the error
+                logger.warning(f"Unique constraint violation when creating custom column: {str(e)}")
+
+                # Raise a custom exception that will be caught by exception handler
+                raise serializers.ValidationError({
+                    "error": "A custom column with this name already exists for this entity type.",
+                    "detail": "Please use a different name for your custom column."
+                })
+            # Re-raise other IntegrityErrors
+            raise
 
     @action(detail=True, methods=['post'])
     def generate_values(self, request, pk=None):
