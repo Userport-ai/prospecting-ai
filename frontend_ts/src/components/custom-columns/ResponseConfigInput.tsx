@@ -20,9 +20,9 @@ const ResponseConfigInput: React.FC = () => {
     const responseType = useWatch({ control, name: 'response_type' });
 
     // Field Array for Enum 'allowed_values'
-    const { fields, append, remove } = useFieldArray({
+    const { fields, append, remove } = useFieldArray<CreateCustomColumnRequest>({
         control,
-        name: "response_config.allowed_values",
+        name: "response_config.allowed_values" as any,
     });
 
     // --- Render logic based on responseType ---

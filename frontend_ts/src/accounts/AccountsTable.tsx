@@ -8,8 +8,9 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { CustomColumn } from '@/services/CustomColumn';
 import AddCustomColumn, {CustomColumnInput} from "@/table/AddCustomColumn";
-import {Button} from "@/components/ui/Button";
+import {Button} from "@/components/ui/button";
 import AddAccounts from "./AddAccounts";
 import CommonTable from "@/table/CommonTable";
 import VisibleColumns from "@/table/VisibleColumns";

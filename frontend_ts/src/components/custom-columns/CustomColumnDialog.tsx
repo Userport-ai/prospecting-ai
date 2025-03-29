@@ -170,7 +170,7 @@ const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
                         {/* Column Name */}
                         <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Column Name *</FormLabel><FormControl><Input placeholder="e.g., Fit Score" {...field} /></FormControl><FormDescription>The name displayed in the table header.</FormDescription><FormMessage /></FormItem>)} />
                         {/* Description */}
-                        <FormField control={form.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel><FormControl><Textarea placeholder="e.g., How well this account fits our target profile" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel><FormControl><Textarea placeholder="e.g., How well this account fits our target profile" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
                         {/* Question */}
                         <FormField control={form.control} name="question" render={({ field }) => ( <FormItem> <FormLabel>Question / Prompt *</FormLabel><FormControl><Textarea placeholder="e.g., Based on this company's profile, how well does it fit our ICP for [Product Name]?" rows={4} {...field} /></FormControl><FormDescription>The core instruction for the AI.</FormDescription><FormMessage /></FormItem>)} />
                         {/* Entity Type */}
@@ -180,7 +180,30 @@ const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
 
                         {/* Response Config (Conditional) */}
                         <ResponseConfigInput />
-                        <FormField control={form.control} name="ai_config.use_internet" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 "><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Internet Access</FormLabel><FormDescription>Enable internet access to the AI model.</FormDescription></div><FormMessage /></FormItem> )} />
+                        <FormField
+                            control={form.control}
+                            name="ai_config"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                                    <FormControl>
+                                        <Checkbox
+                                            checked={field.value?.use_internet === true}
+                                            onCheckedChange={(checked) => {
+                                                field.onChange({
+                                                    ...field.value,
+                                                    use_internet: checked
+                                                });
+                                            }}
+                                        />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel>Internet Access</FormLabel>
+                                        <FormDescription>Enable internet access to the AI model.</FormDescription>
+                                    </div>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
 
                         {/*/!* AI Config *!/*/}
