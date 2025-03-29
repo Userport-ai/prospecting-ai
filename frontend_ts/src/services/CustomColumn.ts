@@ -24,7 +24,6 @@ export interface CreateCustomColumnRequest {
   context_type: string[]; // e.g., ['company_profile']
   refresh_interval?: number | null; // In hours
   is_active?: boolean;
-  product: string; // Product UUID
 }
 
 // Interface representing the created custom column (adjust based on actual API response)

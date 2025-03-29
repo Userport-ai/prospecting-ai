@@ -45,7 +45,6 @@ import ScreenLoader from "@/common/ScreenLoader"; // Adjust path
 // --- Zod Schema ---
 // Making response_config optional initially and refining based on response_type
 const baseSchema = z.object({
-  product: z.string().uuid("Please select a valid product."),
   name: z.string().min(1, "Column Name is required."),
   description: z.string().optional(),
   question: z.string().min(1, "Question/Prompt is required."),
@@ -134,7 +133,6 @@ const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
       context_type: [AVAILABLE_CONTEXT_TYPES[0].id], // Default context
       refresh_interval: 24 * 7, // Default to weekly
       is_active: true,
-      product: products.length > 0 ? products[0].id : "", // Default to first product or empty
     },
   });
 
@@ -182,36 +180,6 @@ const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Product Selection */}
-            <FormField
-              control={form.control}
-              name="product"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Product..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {products.map((p) => (
-                        <SelectItem key={p.id} value={p.id!}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Associate this column with a specific product playbook.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             {/* Column Name */}
             <FormField
