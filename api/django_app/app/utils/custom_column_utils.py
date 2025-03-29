@@ -22,14 +22,14 @@ logger = logging.getLogger(__name__)
 
 def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> Dict[str, Dict[str, Any]]:
     """
-    Get custom column values for multiple entities in a batch.
+    Get custom column values for multiple entities in a batch with LLM-friendly formatting.
 
     Args:
         entity_type: Either CustomColumn.EntityType.LEAD or CustomColumn.EntityType.ACCOUNT
         entity_ids: List of entity IDs
 
     Returns:
-        dict: Dictionary mapping entity_id -> {column_id -> value}
+        dict: Dictionary mapping entity_id -> {column_name -> column_data}
     """
     result = {entity_id: {} for entity_id in entity_ids}
 
@@ -53,15 +53,18 @@ def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> D
                 else:
                     continue
 
-                # Add to result
+                # Format for better LLM understanding
                 entity_id = str(cv.lead_id)
                 if entity_id not in result:
                     result[entity_id] = {}
 
-                result[entity_id][str(cv.column.id)] = {
-                    'name': cv.column.name,
+                # Use column name as the key instead of ID
+                column_name = cv.column.name
+                result[entity_id][column_name] = {
                     'value': value,
-                    'response_type': cv.column.response_type
+                    'description': cv.column.description or f"Value for {column_name}",
+                    'question': cv.column.question,
+                    'type': cv.column.response_type
                 }
 
         else:  # Account entity type
@@ -83,18 +86,64 @@ def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> D
                 else:
                     continue
 
-                # Add to result
+                # Format for better LLM understanding
                 entity_id = str(cv.account_id)
                 if entity_id not in result:
                     result[entity_id] = {}
 
-                result[entity_id][str(cv.column.id)] = {
-                    'name': cv.column.name,
+                # Use column name as the key instead of ID
+                column_name = cv.column.name
+                result[entity_id][column_name] = {
                     'value': value,
-                    'response_type': cv.column.response_type
+                    'description': cv.column.description or f"Value for {column_name}",
+                    'question': cv.column.question,
+                    'type': cv.column.response_type
                 }
     except Exception as e:
         logger.error(f"Error getting batch custom column values: {str(e)}", exc_info=True)
+
+    return result
+
+
+def get_batch_account_custom_column_values_for_leads(lead_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    """
+    Get account custom column values for leads in a batch with LLM-friendly formatting.
+
+    Args:
+        lead_ids: List of lead IDs
+
+    Returns:
+        dict: Dictionary mapping lead_id -> account custom column values
+    """
+    result = {lead_id: {} for lead_id in lead_ids}
+
+    try:
+        # First, get all the account IDs for these leads
+        lead_to_account_map = {}
+        account_ids = set()
+
+        leads = Lead.objects.filter(id__in=lead_ids).values('id', 'account_id')
+        for lead in leads:
+            if lead['account_id']:
+                lead_to_account_map[str(lead['id'])] = str(lead['account_id'])
+                account_ids.add(str(lead['account_id']))
+
+        if not account_ids:
+            return result
+
+        # Get account custom column values
+        account_column_values = get_batch_custom_column_values(
+            CustomColumn.EntityType.ACCOUNT,
+            list(account_ids)
+        )
+
+        # Map account custom column values to leads
+        for lead_id, account_id in lead_to_account_map.items():
+            if account_id in account_column_values:
+                result[lead_id] = account_column_values[account_id]
+
+    except Exception as e:
+        logger.error(f"Error getting account custom column values for leads: {str(e)}", exc_info=True)
 
     return result
 
@@ -293,7 +342,18 @@ def get_entity_context_data(
             str_entity_id = str(entity_id)
             if str_entity_id in custom_column_values_batch and custom_column_values_batch[str_entity_id]:
                 if str_entity_id in context_data:
-                    context_data[str_entity_id]['custom_column_values'] = custom_column_values_batch[str_entity_id]
+                    context_data[str_entity_id]['insights'] = custom_column_values_batch[str_entity_id]
+
+        # For lead entities, also get the account custom column values
+        if entity_type == CustomColumn.EntityType.LEAD:
+            account_column_values_for_leads = get_batch_account_custom_column_values_for_leads(entity_ids)
+
+            # Add account column values to lead context
+            for lead_id in entity_ids:
+                str_lead_id = str(lead_id)
+                if str_lead_id in account_column_values_for_leads and account_column_values_for_leads[str_lead_id]:
+                    if str_lead_id in context_data:
+                        context_data[str_lead_id]['company_insights'] = account_column_values_for_leads[str_lead_id]
 
         return context_data
 
@@ -388,7 +448,7 @@ def trigger_custom_column_generation(
         entity_ids: List of entity IDs to process
         request_id: Optional request ID for idempotency
         job_id: Optional job ID for tracking
-        batch_size: Number of entities to process in each batch (default: 100)
+        batch_size: Number of entities to process in each batch (default: 10)
 
     Returns:
         List of dictionaries with job information
