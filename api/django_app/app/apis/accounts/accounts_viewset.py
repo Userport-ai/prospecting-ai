@@ -58,7 +58,8 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             Prefetch(
                 'custom_column_values',
                 queryset=AccountCustomColumnValue.objects.filter(
-                    status=AccountCustomColumnValue.Status.COMPLETED
+                    status=AccountCustomColumnValue.Status.COMPLETED,
+                    column__deleted_at__isnull=True,
                 ).select_related('column'),
                 to_attr='prefetched_custom_column_values'
             )
