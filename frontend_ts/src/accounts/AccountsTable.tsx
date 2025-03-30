@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import {
   ColumnDef,
   ColumnFilter,
@@ -8,20 +8,19 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CustomColumn } from '@/services/CustomColumn';
-import AddCustomColumn, {CustomColumnInput} from "@/table/AddCustomColumn";
-import {Button} from "@/components/ui/button";
+import { CustomColumn } from "@/services/CustomColumn";
+import { Button } from "@/components/ui/button";
 import AddAccounts from "./AddAccounts";
 import CommonTable from "@/table/CommonTable";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
-import {getAccountColumns} from "./Columns";
-import {CustomColumnMeta} from "@/table/CustomColumnMeta";
-import {Account as AccountRow, listAccounts} from "@/services/Accounts";
-import {useAuthContext} from "@/auth/AuthProvider";
+import { getAccountColumns } from "./Columns";
+import { CustomColumnMeta } from "@/table/CustomColumnMeta";
+import { Account as AccountRow, listAccounts } from "@/services/Accounts";
+import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
-import {listProducts, Product} from "@/services/Products";
-import {Separator} from "@/components/ui/separator";
+import { listProducts, Product } from "@/services/Products";
+import { Separator } from "@/components/ui/separator";
 import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
 import LoadingOverlay from "@/common/LoadingOverlay";
 import { Cpu } from "lucide-react";
@@ -82,9 +81,11 @@ interface TableProps {
   curPageNum: number;
   handlePageClick: (goToNextPage: boolean) => Promise<void>;
   dataLoading: boolean;
-  onCustomColumnAdded: (arg0: CustomColumnInput) => void;
   curPageSize: number;
   onPageSizeChange: (pageSize: number) => void;
+  isCreateColumnDialogOpen: boolean;
+  onCreateColumnOpenChange: (open: boolean) => void;
+  onColumnCreated: (newColumn: CustomColumn) => void;
 }
 
 // Component to display Accounts Table.
@@ -95,9 +96,11 @@ const Table: React.FC<TableProps> = ({
   curPageNum,
   handlePageClick,
   dataLoading,
-  onCustomColumnAdded,
   curPageSize,
   onPageSizeChange,
+  isCreateColumnDialogOpen,
+  onCreateColumnOpenChange,
+  onColumnCreated,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
@@ -150,17 +153,6 @@ const Table: React.FC<TableProps> = ({
     return <ZeroStateDisplay />;
   }
 
-  const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
-    // Fetch the rows that need to be enriched. By default,
-    // we fetch all the rows on the current page.
-    const rowIds = table
-      .getRowModel()
-      .rows.map((row) => (row.original as AccountRow).id ?? "");
-    customColumnInfo.rowIds = rowIds;
-    onCustomColumnAdded(customColumnInfo);
-    // setCreateColumnDialogOpen(false);
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <p className="text-gray-700 text-md mb-2">
@@ -181,7 +173,19 @@ const Table: React.FC<TableProps> = ({
         <VisibleColumns table={table} />
 
         {/* Add custom column */}
-        <AddCustomColumn onAdded={handleCustomColumnAdd} />
+        <Button
+          onClick={() => onCreateColumnOpenChange(true)}
+          variant="outline"
+          className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300 border-gray-200"
+        >
+          <Cpu size={16} /> Ask AI
+        </Button>
+
+        <CreateCustomColumnDialog
+          open={isCreateColumnDialogOpen}
+          onOpenChange={onCreateColumnOpenChange}
+          onSuccess={onColumnCreated}
+        />
       </div>
 
       {/* Table Container */}
@@ -220,7 +224,6 @@ export default function AccountsTable() {
   const [error, setError] = useState<Error | null>(null);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
   const [isCreateColumnDialogOpen, setCreateColumnDialogOpen] = useState(false);
-
 
   const listAccountsHelper = async (pageNum: number) => {
     const response = await listAccounts(authContext, {
@@ -273,12 +276,6 @@ export default function AccountsTable() {
     setCurAccounts([...addedAccounts, ...curAccounts]);
   };
 
-  // Handler for when custom column inputs are provided by the user.
-  const onCustomColumnAdded = (customColumnInfo: CustomColumnInput) => {
-    // TODO: call server to send custom column request instead
-    console.log("custom colum info ", customColumnInfo);
-  };
-
   // Handle user request to go to page.
   // If goToNextPage is true, fetch next page, otherwise fetch previous page.
   // We assume this callback can be called only if next or prev page buttons
@@ -322,24 +319,9 @@ export default function AccountsTable() {
         <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
         {/* Add Accounts to the table. */}
         <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
-
-        <Button
-            onClick={() => setCreateColumnDialogOpen(true)}
-            variant="outline"
-            className="flex gap-2 items-center"
-        >
-          <Cpu size={16}/> Ask AI
-        </Button>
       </div>
 
       <Separator className="my-4 bg-gray-300" />
-
-      <CreateCustomColumnDialog
-          products={products}
-          open={isCreateColumnDialogOpen}
-          onOpenChange={setCreateColumnDialogOpen}
-          onSuccess={handleColumnCreated}
-      />
 
       <Table
         columns={columns}
@@ -348,9 +330,11 @@ export default function AccountsTable() {
         curPageNum={curPageNum}
         handlePageClick={handlePageClick}
         dataLoading={dataLoading}
-        onCustomColumnAdded={onCustomColumnAdded}
         curPageSize={curPageSize}
         onPageSizeChange={setCurPageSize}
+        isCreateColumnDialogOpen={isCreateColumnDialogOpen}
+        onCreateColumnOpenChange={setCreateColumnDialogOpen}
+        onColumnCreated={handleColumnCreated}
       />
     </div>
   );

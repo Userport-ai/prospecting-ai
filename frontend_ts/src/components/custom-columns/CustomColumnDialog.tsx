@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox"; // For Is Active & Context Types
-import { Product } from "@/services/Products"; // Adjust path
 import {
   CreateCustomColumnRequest,
   createCustomColumn,
@@ -90,7 +89,6 @@ const refinedSchema = baseSchema.refine(
 
 // --- Component Props ---
 interface CreateCustomColumnDialogProps extends DialogProps {
-  products: Product[];
   onSuccess: (newColumn: CustomColumn) => void; // Callback on successful creation
 }
 
@@ -107,7 +105,6 @@ const AVAILABLE_AI_MODELS = ["gemini-pro", "gpt-4", "claude-3"];
 
 // --- The Component ---
 const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
-  products,
   open,
   onOpenChange,
   onSuccess,

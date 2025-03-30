@@ -9,7 +9,6 @@ import { Account as AccountRow } from "@/services/Accounts";
 import { Lead as LeadRow } from "@/services/Leads";
 import { CellContext, flexRender } from "@tanstack/react-table";
 import { X } from "lucide-react";
-import { getCustomColumnDisplayName } from "./AddCustomColumn";
 import { CustomColumnMeta } from "./CustomColumnMeta";
 
 // Need this interface to fix compilation error.
