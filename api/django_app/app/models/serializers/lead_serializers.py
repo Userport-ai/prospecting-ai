@@ -26,7 +26,7 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'last_enriched_at',
             'suggestion_status',
             'updated_at',
-            'custom_column_values'  
+            'custom_column_values'
         ]
         read_only_fields = [
             'id',
@@ -36,7 +36,7 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'last_enriched_at',
             'created_at',
             'updated_at',
-            'custom_column_values'  
+            'custom_column_values'
         ]
         depth = 1
 
@@ -50,6 +50,7 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
             'website': obj.account.website,
             'industry': obj.account.industry,
             'recent_events': obj.account.recent_events,
+            'custom_column_values': self.get_custom_column_values(obj.account),
         }
 
     def get_custom_column_values(self, obj):

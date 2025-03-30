@@ -37,7 +37,8 @@ def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> D
         if entity_type == CustomColumn.EntityType.LEAD:
             column_values = LeadCustomColumnValue.objects.filter(
                 lead_id__in=entity_ids,
-                status=LeadCustomColumnValue.Status.COMPLETED
+                status=LeadCustomColumnValue.Status.COMPLETED,
+                column__deleted_at__isnull=True,
             ).select_related('column')
 
             for cv in column_values:
@@ -70,7 +71,8 @@ def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> D
         else:  # Account entity type
             column_values = AccountCustomColumnValue.objects.filter(
                 account_id__in=entity_ids,
-                status=AccountCustomColumnValue.Status.COMPLETED
+                status=AccountCustomColumnValue.Status.COMPLETED,
+                column__deleted_at__isnull=True,
             ).select_related('column')
 
             for cv in column_values:
@@ -469,7 +471,8 @@ def trigger_custom_column_generation(
         columns = CustomColumn.objects.filter(
             tenant_id=tenant_id,
             entity_type=entity_type,
-            is_active=True
+            is_active=True,
+            deleted_at__isnull=True
         )
     else:
         logger.error("Either column_id or entity_type must be provided")

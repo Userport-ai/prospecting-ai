@@ -199,7 +199,8 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             Prefetch(
                 'custom_column_values',
                 queryset=LeadCustomColumnValue.objects.filter(
-                    status=LeadCustomColumnValue.Status.COMPLETED
+                    status=LeadCustomColumnValue.Status.COMPLETED,
+                    column__deleted_at__isnull=True,
                 ).select_related('column'),
                 to_attr='prefetched_custom_column_values'
             )
@@ -349,7 +350,7 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             persona_queryset = queryset.filter(persona_match=persona)
 
         # Order by score
-        persona_queryset = persona_queryset.order_by('-score', 'id') # Add 'id' as secondary sort to ensure stability across pages
+        persona_queryset = persona_queryset.order_by('-score', 'id')  # Add 'id' as secondary sort to ensure stability across pages
 
         # Exclude existing IDs
         if existing_ids:
@@ -557,7 +558,6 @@ class LeadsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
                         if additional_has_more:
                             has_more = True
-
 
             # Update running count in cursor for pagination consistency
             next_cursor["total_count"] = cursor["total_count"] + len(results)

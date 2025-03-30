@@ -28,7 +28,8 @@ def get_custom_column_values(obj: Any, values_attr: str = 'prefetched_custom_col
     if values is None and hasattr(obj, 'custom_column_values'):
         # Fall back to related manager if prefetched values not available
         values = obj.custom_column_values.filter(
-            status='completed'
+            status='completed',
+            column__deleted_at__isnull=True,
         ).select_related('column')
 
     result = {}
@@ -59,6 +60,8 @@ def get_custom_column_values(obj: Any, values_attr: str = 'prefetched_custom_col
         }
 
     return result
+
+
 def convert_datetimes_to_isoformat(obj):
     """
     Recursively traverses an object (dict, list) and converts
