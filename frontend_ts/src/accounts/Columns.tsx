@@ -1,17 +1,12 @@
 // Import CustomColumnValueData directly from its source
 import { CustomColumnValueData } from "@/services/CustomColumn";
-import { ChevronsUpDown, Link, Info } from "lucide-react";
+import { ChevronsUpDown, Link } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { ColumnDef, Table } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { EnrichmentStatus, RecentCompanyEvent } from "@/services/Common";
 import FundingDetailsView from "./FundingDetailsView";
 import CellListView from "../table/CellListView";
@@ -19,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { wrapColumnContentClass } from "@/common/utils";
 import EnrichmentStatusView from "./EnrichmentStatusView";
 import RecentCompanyEventsView from "./RecentCompanyEventsView";
+import CustomColumnValueRender from "@/table/CustomColumnValueRender";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -403,99 +399,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   },
 ];
 
-const renderCustomCell = (info: any) => {
-  const columnId = info.column.id;
-  const customColumnMap = info.row.original.custom_column_values;
-  const customData = customColumnMap?.[columnId];
-
-  if (
-    !customData ||
-    customData.value === null ||
-    customData.value === undefined
-  ) {
-    return <span className="text-gray-400 italic">N/A</span>; // Or indicate loading/pending if applicable
-  }
-
-  const RationaleTooltip = ({ rationale }: { rationale: string | null }) => {
-    if (!rationale) return null;
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Info
-            size={14}
-            className="ml-1 text-gray-400 hover:text-gray-600 cursor-pointer"
-          />
-        </TooltipTrigger>
-        <TooltipContent
-          className="max-w-xs p-2 bg-gray-800 text-white rounded text-xs"
-          side="top"
-        >
-          <p className="font-semibold mb-1">Rationale:</p>
-          <p>{rationale}</p>
-        </TooltipContent>
-      </Tooltip>
-    );
-  };
-
-  const renderValueWithTooltip = (
-    valueElement: React.ReactNode,
-    rationale: string | null
-  ) => {
-    return (
-      <div className="flex items-center">
-        {valueElement}
-        <RationaleTooltip rationale={rationale} />
-      </div>
-    );
-  };
-
-  switch (customData.response_type) {
-    case "enum":
-      // Simple rendering for enum values - just display the string value
-      return renderValueWithTooltip(
-        <span className="whitespace-normal break-words">
-          {String(customData.value)}
-        </span>,
-        customData.rationale
-      );
-
-    case "string":
-      return renderValueWithTooltip(
-        <span className="whitespace-normal break-words">
-          {String(customData.value)}
-        </span>,
-        customData.rationale
-      );
-
-    case "number":
-      return renderValueWithTooltip(
-        <span>{Number(customData.value).toLocaleString()}</span>, // Format number if needed
-        customData.rationale
-      );
-
-    case "boolean":
-      return renderValueWithTooltip(
-        <span>{customData.value ? "Yes" : "No"}</span>, // Or use configured labels if available
-        customData.rationale
-      );
-
-    case "json_object":
-      // Render a simplified view or a button to show details
-      return renderValueWithTooltip(
-        <span className="text-blue-600 italic cursor-pointer">
-          [JSON Data]
-        </span>, // Placeholder
-        customData.rationale // You might want a different way to show JSON rationale
-      );
-
-    default:
-      return renderValueWithTooltip(
-        <span>{String(customData.value)}</span>,
-        customData.rationale
-      );
-  }
-};
-
 // Fetches the final Column definition for the given set of rows
 // by adding Custom Columns to base static column definition using
 // information from the given Account Rows.
@@ -527,7 +430,18 @@ export const getAccountColumns = (
       id: columnId, // Use the UUID as the column ID
       header: colData.name, // Use the name from the custom column data
       accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
-      cell: (info) => renderCustomCell(info),
+      // cell: (info) => renderCustomCell(info),
+      cell: (info) => {
+        const columnId = info.column.id;
+        const customColumnMap = info.row.original.custom_column_values;
+        const customColumnValueData = customColumnMap?.[columnId];
+
+        return (
+          <CustomColumnValueRender
+            customColumnValueData={customColumnValueData}
+          />
+        );
+      },
       minSize: 150,
       enableSorting: false,
       enableColumnFilter: false,

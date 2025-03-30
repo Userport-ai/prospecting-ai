@@ -3,20 +3,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { ColumnDef, Table } from "@tanstack/react-table";
-import {
-  AreaOfInterest,
-  Lead as LeadRow,
-  PersonalityTrait,
-  PersonalizationSignal,
-  RecommendedApproach,
-} from "@/services/Leads";
+import { Lead as LeadRow } from "@/services/Leads";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 import CellListView from "@/table/CellListView";
-import RecommendedApproachView from "./RecommendedApproachView";
-import AreasOfInterestView from "./AreasOfInterestView";
-import PersonalityTraitsView from "./PersonalityTraitsView";
-import PersonalizationSignalsView from "./PersonalizationSignalsView";
+import { CustomColumnValueData } from "@/services/CustomColumn";
+import CustomColumnValueRender from "@/table/CustomColumnValueRender";
 
 // Base Lead Columns that we know will exist in the table and are statically defined.
 export const baseLeadColumns: ColumnDef<LeadRow>[] = [
@@ -171,29 +163,14 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
 // information from the given Lead Rows.
 export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
   // Get custom columns from all the rows in table.
-  var customColumnKeys = new Set<string>();
+  var customFieldKeys = new Set<string>();
   for (const row of rows) {
     if (!row.custom_fields) {
       continue;
     }
     const customFields: string[] = Object.keys(row.custom_fields);
-    customFields.forEach((cf) => customColumnKeys.add(cf));
+    customFields.forEach((cf) => customFieldKeys.add(cf));
   }
-
-  // Helper to fetch matching signals for each lead.
-  const getMatchingSignals = (lead: LeadRow): string[] | null => {
-    if (!lead.custom_fields || !lead.custom_fields.evaluation) {
-      return null;
-    }
-    const matchingCriteria = lead.custom_fields.evaluation.matching_criteria;
-    const matchingSignals = lead.custom_fields.evaluation.matching_signals;
-    if (matchingSignals) {
-      return matchingSignals;
-    } else if (matchingCriteria) {
-      return matchingCriteria;
-    }
-    return null;
-  };
 
   var finalColumns: ColumnDef<LeadRow>[] = [...baseLeadColumns];
   // Custom columns also has AI created fields like "evaluation" which are
@@ -201,7 +178,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
   // Since we know the structure of this object, we will derive columns
   // from its keys separately.
   const evaluationKey = "evaluation";
-  if (customColumnKeys.has(evaluationKey)) {
+  if (customFieldKeys.has(evaluationKey)) {
     const evaluationColumns: ColumnDef<LeadRow>[] = [
       {
         id: "fit_score",
@@ -242,7 +219,20 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         id: "matching_signals",
         header: "Matching Signals",
         minSize: 600,
-        accessorFn: (row) => getMatchingSignals(row),
+        accessorFn: (row: LeadRow) => {
+          if (!row.custom_fields || !row.custom_fields.evaluation) {
+            return null;
+          }
+          const matchingCriteria =
+            row.custom_fields.evaluation.matching_criteria;
+          const matchingSignals = row.custom_fields.evaluation.matching_signals;
+          if (matchingSignals) {
+            return matchingSignals;
+          } else if (matchingCriteria) {
+            return matchingCriteria;
+          }
+          return null;
+        },
         cell: (info) => {
           const matchingSignals = info.getValue() as string[] | null;
           if (!matchingSignals) {
@@ -268,178 +258,55 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
           cellExpandable: true,
         } as CustomColumnMeta,
       },
-      {
-        id: "analysis",
-        header: "Analysis",
-        minSize: 200,
-        accessorFn: (row) =>
-          row.custom_fields
-            ? row.custom_fields.evaluation.overall_analysis
-            : null,
-        meta: {
-          displayName: "Analysis",
-          visibleInitially: false,
-          cellExpandable: true,
-        } as CustomColumnMeta,
-      },
     ];
     finalColumns.push(...evaluationColumns);
-
-    // Delete the key so we don't create it again when creating the remaining
-    // custom column keys.
-    customColumnKeys.delete(evaluationKey);
   }
 
-  const personalityInsightsKey = "personality_insights";
-  if (customColumnKeys.has(personalityInsightsKey)) {
-    const personalityInsightsColumns: ColumnDef<LeadRow>[] = [
-      {
-        id: "traits",
-        header: "Personality Traits",
-        accessorFn: (row) =>
-          row.custom_fields?.personality_insights?.traits ?? null,
-        cell: (info) => {
-          const personalityTraits = info.getValue() as PersonalityTrait | null;
-          if (!personalityTraits) {
-            return null;
-          }
-          return <PersonalityTraitsView personalityTrait={personalityTraits} />;
-        },
-        meta: {
-          displayName: "Personality Traits",
-          visibleInitially: false,
-          cellExpandable: true,
-        } as CustomColumnMeta,
-      },
-      {
-        id: "engaged_products",
-        header: "Products Engaged",
-        accessorFn: (row) =>
-          row.custom_fields?.personality_insights?.engaged_products ?? null,
-        cell: (info) => {
-          const engagedProducts = info.getValue() as string[] | null;
-          if (!engagedProducts) {
-            return null;
-          }
-          return <CellListView values={engagedProducts} />;
-        },
-        meta: {
-          displayName: "Products Engaged",
-          visibleInitially: false,
-          cellExpandable: true,
-        } as CustomColumnMeta,
-      },
-      {
-        id: "areas_of_interest",
-        header: "Areas of Interest",
-        accessorFn: (row) =>
-          row.custom_fields?.personality_insights?.areas_of_interest ?? null,
-        cell: (info) => {
-          const areasOfInterest = info.getValue() as AreaOfInterest[] | null;
-          if (!areasOfInterest) {
-            return null;
-          }
-          return <AreasOfInterestView areasOfInterest={areasOfInterest} />;
-        },
-        meta: {
-          displayName: "Areas of Interest",
-          visibleInitially: false,
-          cellExpandable: true,
-        } as CustomColumnMeta,
-      },
-      {
-        id: "engaged_colleagues",
-        header: "Engagement with Colleagues",
-        accessorFn: (row) =>
-          row.custom_fields?.personality_insights?.engaged_colleagues ?? null,
-        cell: (info) => {
-          const engagedColleagues = info.getValue() as string[] | null;
-          if (!engagedColleagues) {
-            return null;
-          }
-          return <CellListView values={engagedColleagues} />;
-        },
-        meta: {
-          displayName: "Engagement with Colleagues",
-          visibleInitially: false,
-          cellExpandable: true,
-        } as CustomColumnMeta,
-      },
-      {
-        id: "recommended_approach",
-        header: "Recommeded Approach",
-        accessorFn: (row) =>
-          row.custom_fields?.personality_insights?.recommended_approach ?? null,
-        cell: (info) => {
-          const recommendedApproach =
-            info.getValue() as RecommendedApproach | null;
-          if (!recommendedApproach) {
-            return null;
-          }
-          return (
-            <RecommendedApproachView
-              recommendedApproach={recommendedApproach}
-            />
-          );
-        },
-        meta: {
-          displayName: "Recommended Approach",
-          visibleInitially: false,
-          cellExpandable: true,
-        } as CustomColumnMeta,
-      },
-      {
-        id: "personalization_signals",
-        header: "Personalization Signals",
-        accessorFn: (row) =>
-          row.custom_fields?.personality_insights?.personalization_signals ??
-          null,
-        cell: (info) => {
-          const personalizationSignals = info.getValue() as
-            | PersonalizationSignal[]
-            | null;
-          if (!personalizationSignals) {
-            return null;
-          }
-          return (
-            <PersonalizationSignalsView
-              personalizationSignals={personalizationSignals}
-            />
-          );
-        },
-        meta: {
-          displayName: "Recommended Approach",
-          visibleInitially: false,
-          cellExpandable: true,
-        } as CustomColumnMeta,
-      },
-    ];
-    finalColumns.push(...personalityInsightsColumns);
+  // Get unique custom column definitions from the rows provided.
+  // This is different from custom field values which are not user defined.
+  const customColumnDefinitions = new Map<string, CustomColumnValueData>();
 
-    // Delete the key so we don't create it again when creating the remaining
-    // custom column keys.
-    customColumnKeys.delete(personalityInsightsKey);
-  }
-
-  customColumnKeys.forEach((columnKey) => {
-    finalColumns.push({
-      id: columnKey,
-      accessorFn: (row) => row.custom_fields,
-      header: getCustomColumnDisplayName(columnKey),
-      cell: (info) => {
-        // Render values in each cell for the given Custom Column.
-        const customFields = info.getValue() as Record<string, any> | null;
-        if (customFields && columnKey in customFields) {
-          return customFields[columnKey];
+  for (const row of rows) {
+    if (row.custom_column_values) {
+      for (const columnId in row.custom_column_values) {
+        if (!customColumnDefinitions.has(columnId)) {
+          // Store the metadata (name, type etc.) from the first row we see it in
+          customColumnDefinitions.set(
+            columnId,
+            row.custom_column_values[columnId]
+          );
         }
-        return null;
+      }
+    }
+  }
+
+  // Add definitions for each unique custom column found
+  customColumnDefinitions.forEach((colData, columnId) => {
+    finalColumns.push({
+      id: columnId, // Use the UUID as the column ID
+      header: colData.name, // Use the name from the custom column data
+      accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
+      cell: (info) => {
+        const columnId = info.column.id;
+        const customColumnMap = info.row.original.custom_column_values;
+        const customColumnValueData = customColumnMap?.[columnId];
+
+        return (
+          <CustomColumnValueRender
+            customColumnValueData={customColumnValueData}
+          />
+        );
       },
-      minSize: 200,
-      filterFn: "arrIncludesSome",
+      minSize: 150,
+      enableSorting: false,
+      enableColumnFilter: false,
       meta: {
-        displayName: getCustomColumnDisplayName(columnKey),
+        displayName: colData.name,
         visibleInitially: true,
-      },
+        cellExpandable:
+          ["string", "json_object", "enum"].includes(colData.response_type) &&
+          colData.rationale !== null,
+      } as CustomColumnMeta,
     });
   });
   return finalColumns;

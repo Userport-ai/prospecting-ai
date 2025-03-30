@@ -77,7 +77,6 @@ class CustomColumnCallbackHandler:
             if values_by_column:
                 with transaction.atomic():
                     # Get account with lock to prevent race conditions
-                    account = Account.objects.select_for_update().get(id=account_id)
 
                     # Get all referenced columns
                     column_ids = list(values_by_column.keys())
