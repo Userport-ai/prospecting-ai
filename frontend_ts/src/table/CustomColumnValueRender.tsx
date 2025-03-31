@@ -1,3 +1,4 @@
+import MarkdownRenderer from "@/common/MarkdownRenderer";
 import {
   Tooltip,
   TooltipContent,
@@ -66,9 +67,9 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
 
     case "string":
       return renderValueWithTooltip(
-        <span className="whitespace-normal break-words">
-          {String(customColumnValueData.value)}
-        </span>,
+        <div className="whitespace-normal break-words">
+          <MarkdownRenderer content={String(customColumnValueData.value)} />
+        </div>,
         customColumnValueData.rationale
       );
 
