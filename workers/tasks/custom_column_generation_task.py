@@ -88,7 +88,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         """Configure the AI service with factory pattern."""
         factory = AIServiceFactory()
         self.model = factory.create_service("gemini", model_name="gemini-2.5-pro-exp-03-25")
-        self.search_model = factory.create_service("openai", model_name="gpt-4o-mini")
+        self.search_model = factory.create_service("openai", model_name="gpt-4o")
 
     @property
     def enrichment_type(self) -> str:

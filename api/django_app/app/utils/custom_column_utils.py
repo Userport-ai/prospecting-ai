@@ -307,8 +307,8 @@ def get_entity_context_data(
                 if account.technologies:
                     account_context['technologies'] = account.technologies
 
-                if account.full_technology_profile:
-                    account_context['full_technology_profile'] = account.full_technology_profile
+                # if account.full_technology_profile:
+                #     account_context['full_technology_profile'] = account.full_technology_profile
 
                 if account.funding_details:
                     account_context['funding_details'] = account.funding_details
