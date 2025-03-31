@@ -20,13 +20,14 @@ from app.services.worker_service import WorkerService
 logger = logging.getLogger(__name__)
 
 
-def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+def get_batch_custom_column_values(entity_type: str, entity_ids: List[str], exclude_column_id: str = None) -> Dict[str, Dict[str, Any]]:
     """
     Get custom column values for multiple entities in a batch with LLM-friendly formatting.
 
     Args:
         entity_type: Either CustomColumn.EntityType.LEAD or CustomColumn.EntityType.ACCOUNT
         entity_ids: List of entity IDs
+        exclude_column_id: Optional column ID to exclude from results
 
     Returns:
         dict: Dictionary mapping entity_id -> {column_name -> column_data}
@@ -35,11 +36,17 @@ def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> D
 
     try:
         if entity_type == CustomColumn.EntityType.LEAD:
-            column_values = LeadCustomColumnValue.objects.filter(
+            query = LeadCustomColumnValue.objects.filter(
                 lead_id__in=entity_ids,
                 status=LeadCustomColumnValue.Status.COMPLETED,
                 column__deleted_at__isnull=True,
-            ).select_related('column')
+            )
+
+            # Exclude the column being generated if specified
+            if exclude_column_id:
+                query = query.exclude(column_id=exclude_column_id)
+
+            column_values = query.select_related('column')
 
             for cv in column_values:
                 # Extract value based on column type
@@ -69,11 +76,17 @@ def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> D
                 }
 
         else:  # Account entity type
-            column_values = AccountCustomColumnValue.objects.filter(
+            query = AccountCustomColumnValue.objects.filter(
                 account_id__in=entity_ids,
                 status=AccountCustomColumnValue.Status.COMPLETED,
                 column__deleted_at__isnull=True,
-            ).select_related('column')
+            )
+
+            # Exclude the column being generated if specified
+            if exclude_column_id:
+                query = query.exclude(column_id=exclude_column_id)
+
+            column_values = query.select_related('column')
 
             for cv in column_values:
                 # Extract value based on column type
@@ -107,12 +120,13 @@ def get_batch_custom_column_values(entity_type: str, entity_ids: List[str]) -> D
     return result
 
 
-def get_batch_account_custom_column_values_for_leads(lead_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+def get_batch_account_custom_column_values_for_leads(lead_ids: List[str], exclude_column_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """
     Get account custom column values for leads in a batch with LLM-friendly formatting.
 
     Args:
         lead_ids: List of lead IDs
+        exclude_column_id: Optional column ID to exclude from results
 
     Returns:
         dict: Dictionary mapping lead_id -> account custom column values
@@ -136,7 +150,8 @@ def get_batch_account_custom_column_values_for_leads(lead_ids: List[str]) -> Dic
         # Get account custom column values
         account_column_values = get_batch_custom_column_values(
             CustomColumn.EntityType.ACCOUNT,
-            list(account_ids)
+            list(account_ids),
+            exclude_column_id=exclude_column_id
         )
 
         # Map account custom column values to leads
@@ -337,7 +352,8 @@ def get_entity_context_data(
                 context_data[str(account.id)] = account_context
 
         # Get custom column values in batch for all entities
-        custom_column_values_batch = get_batch_custom_column_values(entity_type, entity_ids)
+        custom_column_values_batch = get_batch_custom_column_values(entity_type, entity_ids,
+                                                                    exclude_column_id=str(custom_column.id))
 
         # Add to each entity's context
         for entity_id in entity_ids:
@@ -348,7 +364,8 @@ def get_entity_context_data(
 
         # For lead entities, also get the account custom column values
         if entity_type == CustomColumn.EntityType.LEAD:
-            account_column_values_for_leads = get_batch_account_custom_column_values_for_leads(entity_ids)
+            account_column_values_for_leads = get_batch_account_custom_column_values_for_leads(entity_ids,
+                                                                                               exclude_column_id=str(custom_column.id))
 
             # Add account column values to lead context
             for lead_id in entity_ids:
@@ -529,6 +546,11 @@ def trigger_custom_column_generation(
                         "original_request_id": request_id or str(uuid.uuid4())
                     }
                 }
+
+                ai_config = column.ai_config
+
+                if ai_config:
+                    payload['ai_config'] = column.ai_config
 
                 # Trigger worker task for this batch
                 response = worker_service.trigger_custom_column_generation(payload)

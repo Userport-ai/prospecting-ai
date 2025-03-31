@@ -87,8 +87,8 @@ class CustomColumnTask(AccountEnrichmentTask):
     def _configure_ai_service(self) -> None:
         """Configure the AI service with factory pattern."""
         factory = AIServiceFactory()
-        self.model = factory.create_service("gemini")
-        self.search_model = factory.create_service("openai")
+        self.model = factory.create_service("gemini", model_name="gemini-2.5-pro-exp-03-25")
+        self.search_model = factory.create_service("openai", model_name="gpt-4o-mini")
 
     @property
     def enrichment_type(self) -> str:
@@ -441,9 +441,10 @@ class CustomColumnTask(AccountEnrichmentTask):
             logger.debug(f"Generating column value for entity {entity_id}")
             start_time = time.time()
             if ai_config and ai_config.get('use_internet', False):
-                response = await self.search_model.generate_search_content(prompt)
+                response = await self.search_model.generate_search_content(prompt,
+                                                                           operation_tag='custom_column_with_internet')
             else:
-                response = await self.model.generate_content(prompt, is_json=True)
+                response = await self.model.generate_content(prompt, is_json=True, operation_tag='custom_column')
             generation_time = time.time() - start_time
             logger.debug(f"Value generation for entity {entity_id} completed in {generation_time:.2f}s")
 
@@ -507,9 +508,10 @@ Context:
 {validation_text}
 
 Response Requirements:
-1. Response must match the configured response_type: {response_type}
-2. Include a confidence score between 0 and 1
-3. Provide rationale for the generated value
+1. Overall response must be a JSON
+2. Value inside the response must match the configured response_type: {response_type}
+3. Include a confidence score between 0 and 1
+4. Provide rationale for the generated value
 
 Return as JSON:
 {{
