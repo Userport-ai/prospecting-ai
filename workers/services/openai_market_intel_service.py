@@ -229,7 +229,7 @@ The response must follow this exact JSON structure:
     {{
       "title": "Event Title",
       "description": "Event Description",
-      "date": "Event Date",
+      "date": "Event Date in yyyy-mm-dd format",
       "source": "URL or reference"
     }}
   ]

@@ -1,3 +1,5 @@
+// Import CustomColumnValueData directly from its source
+import { CustomColumnValueData } from "@/services/CustomColumn";
 import { ChevronsUpDown, Link } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
@@ -5,7 +7,6 @@ import { ColumnDef, Table } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
-import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 import { EnrichmentStatus, RecentCompanyEvent } from "@/services/Common";
 import FundingDetailsView from "./FundingDetailsView";
 import CellListView from "../table/CellListView";
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { wrapColumnContentClass } from "@/common/utils";
 import EnrichmentStatusView from "./EnrichmentStatusView";
 import RecentCompanyEventsView from "./RecentCompanyEventsView";
+import CustomColumnValueRender from "@/table/CustomColumnValueRender";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const baseAccountColumns: ColumnDef<AccountRow>[] = [
@@ -403,37 +405,55 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
 export const getAccountColumns = (
   rows: AccountRow[]
 ): ColumnDef<AccountRow>[] => {
-  // Get custom columns.
-  var customColumnKeys = new Set<string>();
+  // Get unique custom column definitions from the rows provided
+  const customColumnDefinitions = new Map<string, CustomColumnValueData>();
+
   for (const row of rows) {
-    if (!row.custom_fields) {
-      continue;
+    if (row.custom_column_values) {
+      for (const columnId in row.custom_column_values) {
+        if (!customColumnDefinitions.has(columnId)) {
+          // Store the metadata (name, type etc.) from the first row we see it in
+          customColumnDefinitions.set(
+            columnId,
+            row.custom_column_values[columnId]
+          );
+        }
+      }
     }
-    const customFields: string[] = Object.keys(row.custom_fields);
-    customFields.forEach((cf) => customColumnKeys.add(cf));
   }
 
-  var finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
-  customColumnKeys.forEach((columnKey) => {
+  const finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
+
+  // Add definitions for each unique custom column found
+  customColumnDefinitions.forEach((colData, columnId) => {
     finalColumns.push({
-      id: columnKey,
-      accessorFn: (row) => row.custom_fields,
-      header: getCustomColumnDisplayName(columnKey),
+      id: columnId, // Use the UUID as the column ID
+      header: colData.name, // Use the name from the custom column data
+      accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
+      // cell: (info) => renderCustomCell(info),
       cell: (info) => {
-        const customFields = info.getValue() as Record<string, any> | null;
-        if (customFields && columnKey in customFields) {
-          // Return value of the custom fiel.
-          return customFields[columnKey];
-        }
-        return null;
+        const columnId = info.column.id;
+        const customColumnMap = info.row.original.custom_column_values;
+        const customColumnValueData = customColumnMap?.[columnId];
+
+        return (
+          <CustomColumnValueRender
+            customColumnValueData={customColumnValueData}
+          />
+        );
       },
-      size: 100,
-      filterFn: "arrIncludesSome",
+      minSize: 150,
+      enableSorting: false,
+      enableColumnFilter: false,
       meta: {
-        displayName: getCustomColumnDisplayName(columnKey),
+        displayName: colData.name,
         visibleInitially: true,
-      },
+        cellExpandable:
+          ["string", "json_object", "enum"].includes(colData.response_type) &&
+          colData.rationale !== null,
+      } as CustomColumnMeta,
     });
   });
+
   return finalColumns;
 };

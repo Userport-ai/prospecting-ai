@@ -2,6 +2,7 @@ import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall, ListObjectsResponse } from "./Api";
 import { EnrichmentStatus, RecentCompanyEvent } from "./Common";
 import { USERPORT_TENANT_ID } from "./Common";
+import { CustomColumnValueData } from "./CustomColumn";
 
 const ACCOUNTS_ENDPOINT = "/accounts/";
 const BULK_CREATE_ACCOUNTS_ENDPOINT = "/accounts/bulk_create/";
@@ -30,6 +31,7 @@ export interface Account {
   recent_events?: RecentCompanyEvent[];
   created_at: string;
   updated_at: string;
+  custom_column_values: { [key: string]: CustomColumnValueData } | null;
 }
 
 export interface FundingDetails {

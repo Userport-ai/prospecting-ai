@@ -9,7 +9,7 @@ import { Account as AccountRow } from "@/services/Accounts";
 import { Lead as LeadRow } from "@/services/Leads";
 import { CellContext, flexRender } from "@tanstack/react-table";
 import { X } from "lucide-react";
-import { getCustomColumnDisplayName } from "./AddCustomColumn";
+import { CustomColumnMeta } from "./CustomColumnMeta";
 
 // Need this interface to fix compilation error.
 // Solution found here: https://github.com/shadcn-ui/ui/issues/5509
@@ -73,7 +73,7 @@ const CellSidebar: React.FC<{
 
       <SidebarContent className="px-6 py-4">
         <h2 className="text-lg font-medium text-gray-600">
-          {getCustomColumnDisplayName(cellContext.column.id)}
+          {(cellContext.column.columnDef.meta as CustomColumnMeta).displayName}
         </h2>
         <div className="p-4 border border-gray-300 rounded-xl shadow-sm bg-gray-50">
           {flexRender(cellContext.cell.column.columnDef.cell, cellContext)}

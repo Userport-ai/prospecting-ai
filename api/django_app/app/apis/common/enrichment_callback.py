@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from app.apis.auth.auth_verify_cloud_run_decorator import verify_cloud_run_token
+from app.apis.custom_column.custom_column_callback_handler import CustomColumnCallbackHandler
 from app.apis.leads.lead_enrichment_handler import LeadEnrichmentHandler
 from app.apis.leads.streaming_leads_callback_handler_v2 import StreamingCallbackHandlerV2
 from app.models import Lead
@@ -137,7 +138,7 @@ def update_enrichment_status(
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
-# @verify_cloud_run_token
+@verify_cloud_run_token
 def enrichment_callback(request):
     logger.info(f"Enrichment callback request for {request.data.get('enrichment_type', 'Unknown')} account_id: {request.data.get('account_id')}")
 
@@ -155,67 +156,75 @@ def enrichment_callback(request):
                 "error": "Missing required fields"
             }, status=400)
 
-        with transaction.atomic():
-            account = Account.objects.select_for_update().get(id=account_id)
+        if enrichment_type == EnrichmentType.CUSTOM_COLUMN:
+            # Custom column callback handling is simpler and doesn't use AccountEnrichmentStatus
+            result = CustomColumnCallbackHandler.handle_callback(data)
+            if result:
+                return Response({"status": "success"})
+            else:
+                return Response({"error": "Failed to process custom column callback"}, status=500)
+        else:
+            with transaction.atomic():
+                account = Account.objects.select_for_update().get(id=account_id)
 
-            # Check current enrichment status
-            current_status = get_current_enrichment_status(account_id, enrichment_type)
-            should_process, skip_reason = should_process_callback(
-                current_status,
-                status,
-                pagination_data if enrichment_type == EnrichmentType.GENERATE_LEADS else None
-            )
+                # Check current enrichment status
+                current_status = get_current_enrichment_status(account_id, enrichment_type)
+                should_process, skip_reason = should_process_callback(
+                    current_status,
+                    status,
+                    pagination_data if enrichment_type == EnrichmentType.GENERATE_LEADS else None
+                )
 
-            if not should_process:
-                logger.info(f"Skipping callback for account {account_id}, type {enrichment_type}: {skip_reason}")
-                return Response({
-                    "status": "skipped",
-                    "reason": skip_reason,
-                })
+                if not should_process:
+                    logger.info(f"Skipping callback for account {account_id}, type {enrichment_type}: {skip_reason}")
+                    return Response({
+                        "status": "skipped",
+                        "reason": skip_reason,
+                    })
 
-            # For paginated requests, status should be in_progress until final page
-            if pagination_data:
-                current_page = pagination_data.get('page', 1)
-                total_pages = pagination_data.get('total_pages', 1)
-                if current_page < total_pages:
-                    status = EnrichmentStatus.IN_PROGRESS
-
-            # Update enrichment status atomically
-            enrichment_status = update_enrichment_status(
-                account=account,
-                enrichment_type=enrichment_type,
-                status=status,
-                data=data,
-                pagination_data=pagination_data
-            )
-
-            # Process based on enrichment type
-            if enrichment_type == EnrichmentType.GENERATE_LEADS:
-                # Process through streaming handler
-                result = StreamingCallbackHandlerV2.handle_callback(data)
-                if result is None and pagination_data:
+                # For paginated requests, status should be in_progress until final page
+                if pagination_data:
                     current_page = pagination_data.get('page', 1)
                     total_pages = pagination_data.get('total_pages', 1)
                     if current_page < total_pages:
-                        # Intermediate page - acknowledge receipt
-                        return Response({
-                            "status": "processing",
-                            "page": pagination_data.get('page'),
-                            "total_pages": pagination_data.get('total_pages')
-                        })
-            else:
-                if status == EnrichmentStatus.COMPLETED and processed_data:
-                    if enrichment_type == EnrichmentType.LEAD_LINKEDIN_RESEARCH:
-                        if not lead_id:
-                            raise ValueError("Lead ID required for lead enrichment")
-                        LeadEnrichmentHandler.handle_lead_enrichment(
-                            lead_id=lead_id,
-                            account_id=account_id,
-                            processed_data=processed_data
-                        )
-                    else:
-                        # Use existing account enrichment function for other types
-                        _update_account_from_enrichment(account, enrichment_type, processed_data)
+                        status = EnrichmentStatus.IN_PROGRESS
+
+                # Update enrichment status atomically
+                enrichment_status = update_enrichment_status(
+                    account=account,
+                    enrichment_type=enrichment_type,
+                    status=status,
+                    data=data,
+                    pagination_data=pagination_data
+                )
+
+                # Process based on enrichment type
+                if enrichment_type == EnrichmentType.GENERATE_LEADS:
+                    # Process through streaming handler
+                    result = StreamingCallbackHandlerV2.handle_callback(data)
+                    if result is None and pagination_data:
+                        current_page = pagination_data.get('page', 1)
+                        total_pages = pagination_data.get('total_pages', 1)
+                        if current_page < total_pages:
+                            # Intermediate page - acknowledge receipt
+                            return Response({
+                                "status": "processing",
+                                "page": pagination_data.get('page'),
+                                "total_pages": pagination_data.get('total_pages')
+                            })
+                else:
+                    if status == EnrichmentStatus.COMPLETED and processed_data:
+                        if enrichment_type == EnrichmentType.LEAD_LINKEDIN_RESEARCH:
+                            if not lead_id:
+                                raise ValueError("Lead ID required for lead enrichment")
+                            LeadEnrichmentHandler.handle_lead_enrichment(
+                                lead_id=lead_id,
+                                account_id=account_id,
+                                processed_data=processed_data
+                            )
+                        else:
+                            # Use existing account enrichment function for other types
+                            _update_account_from_enrichment(account, enrichment_type, processed_data)
 
         return Response({
             "status": "success",

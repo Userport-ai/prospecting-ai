@@ -7,10 +7,7 @@ import {
   ColumnDef,
   ColumnSort,
 } from "@tanstack/react-table";
-import AddCustomColumn, {
-  getCustomColumnDisplayName,
-} from "@/table/AddCustomColumn";
-import { CustomColumnInput } from "@/table/AddCustomColumn";
+import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 import CommonTable from "@/table/CommonTable";
 import TextFilter from "@/table/TextFilter";
 import { getLeadColumns } from "./Columns";
@@ -21,8 +18,10 @@ import ScreenLoader from "@/common/ScreenLoader";
 import LoadingOverlay from "@/common/LoadingOverlay";
 import EnumFilterV2 from "@/table/EnumFilterV2";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Cpu, Download } from "lucide-react";
 import { exportToCSV } from "@/common/utils";
+import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
+import { CustomColumn } from "@/services/CustomColumn";
 
 const ZeroStateDisplay = () => {
   return (
@@ -43,11 +42,13 @@ interface TableProps {
   curPageSize: number;
   handlePageClick: (goToNextPage: boolean) => Promise<void>;
   dataLoading: boolean;
-  onCustomColumnAdded: (arg0: CustomColumnInput) => void;
   onPageSizeChange: (pageSize: number) => void;
   allPersonaFilterValues: string[];
   personaFilterValues: string[];
   onPersonaFilterValuesChange: (newPersonaFilterValues: string[]) => void;
+  isCreateColumnDialogOpen: boolean;
+  onCreateColumnOpenChange: (open: boolean) => void;
+  onColumnCreated: (newColumn: CustomColumn) => void;
 }
 
 export const Table: React.FC<TableProps> = ({
@@ -58,11 +59,13 @@ export const Table: React.FC<TableProps> = ({
   curPageSize,
   handlePageClick,
   dataLoading,
-  onCustomColumnAdded,
   onPageSizeChange,
   allPersonaFilterValues,
   personaFilterValues,
   onPersonaFilterValuesChange,
+  isCreateColumnDialogOpen,
+  onCreateColumnOpenChange,
+  onColumnCreated,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   // This is only a JSON object mapping selected Row ID to true.
@@ -121,14 +124,6 @@ export const Table: React.FC<TableProps> = ({
     // No accounts found.
     return <ZeroStateDisplay />;
   }
-
-  const handleCustomColumnAdd = (customColumnInfo: CustomColumnInput) => {
-    // Fetch the rows that need to be enriched. By default,
-    // we fetch all the rows on the current page.
-    const rowIds = table.getRowModel().rows.map((row) => row.original.id);
-    customColumnInfo.rowIds = rowIds;
-    onCustomColumnAdded(customColumnInfo);
-  };
 
   // Handler to export selected leads to CSV.
   const exportSelectedLeadsToCSV = () => {
@@ -191,7 +186,19 @@ export const Table: React.FC<TableProps> = ({
         </div>
 
         {/* Add custom column */}
-        <AddCustomColumn onAdded={handleCustomColumnAdd} />
+        <Button
+          onClick={() => onCreateColumnOpenChange(true)}
+          variant="outline"
+          className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300 border-gray-200"
+        >
+          <Cpu size={16} /> Ask AI
+        </Button>
+
+        <CreateCustomColumnDialog
+          open={isCreateColumnDialogOpen}
+          onOpenChange={onCreateColumnOpenChange}
+          onSuccess={onColumnCreated}
+        />
 
         {/* Floating Action Bar */}
         {selectedLeads.length > 0 && (
@@ -258,6 +265,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
+  const [isCreateColumnDialogOpen, setCreateColumnDialogOpen] = useState(false);
 
   const listLeads = async (cursor: string | null) => {
     const response = await listLeadsWithQuota(authContext, {
@@ -296,12 +304,6 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   if (error) {
     throw error;
   }
-
-  // Handler for when custom column inputs are provided by the user.
-  const onCustomColumnAdded = (customColumnInfo: CustomColumnInput) => {
-    // TODO: call server to send custom column request instead.
-    console.log("custom colum info: ", customColumnInfo);
-  };
 
   // Handle user request to go to page.
   // If goToNextPage is true, fetch next page, otherwise fetch previous page.
@@ -351,6 +353,19 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     setPersonaFilterValues(newPersonaFilterValues);
   };
 
+  const handleColumnCreated = (newColumn: CustomColumn) => {
+    console.log("Custom column created:", newColumn);
+    // Optional: Show a success toast/notification
+    // Optional: You might want to refresh the accounts list *after a delay*
+    //           to allow the backend to start populating values, or add the
+    //           column definition immediately to the table state (though cells will be empty initially).
+    //           Simplest approach for now might be just closing the dialog.
+    setCreateColumnDialogOpen(false);
+
+    // Example: Trigger a refresh after a short delay
+    // setTimeout(() => listAccountsHelper(curPageNum || 1), 2000);
+  };
+
   return (
     <Table
       columns={columns}
@@ -360,11 +375,13 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       curPageSize={curPageSize}
       handlePageClick={handlePageClick}
       dataLoading={dataLoading}
-      onCustomColumnAdded={onCustomColumnAdded}
       onPageSizeChange={setCurPageSize}
       allPersonaFilterValues={allPersonaFilterValues}
       personaFilterValues={personaFilterValues}
       onPersonaFilterValuesChange={onPersonaFilterValuesChange}
+      isCreateColumnDialogOpen={isCreateColumnDialogOpen}
+      onCreateColumnOpenChange={setCreateColumnDialogOpen}
+      onColumnCreated={handleColumnCreated}
     />
   );
 };

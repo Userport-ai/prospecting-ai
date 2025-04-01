@@ -1,6 +1,8 @@
 import logging
 import warnings
 from typing import List, Dict, Any
+
+from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
@@ -11,12 +13,14 @@ from django.db import transaction
 from app.apis.common.base import TenantScopedViewSet
 from app.apis.leads.lead_generation_mixin import LeadGenerationMixin
 from app.models import UserRole, Account, EnrichmentType
+from app.models.custom_column import AccountCustomColumnValue, CustomColumn
 from app.models.serializers.account_serializers import (
     AccountDetailsSerializer,
     AccountBulkCreateSerializer
 )
 from app.permissions import HasRole
 from app.services.worker_service import WorkerService
+from app.utils.custom_column_utils import trigger_custom_column_generation
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +52,18 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         return base_queryset.select_related(
             'product',
             'created_by'
-        ).prefetch_related('enrichment_statuses')
+        ).prefetch_related(
+            'enrichment_statuses',
+            # Add prefetch for custom column values
+            Prefetch(
+                'custom_column_values',
+                queryset=AccountCustomColumnValue.objects.filter(
+                    status=AccountCustomColumnValue.Status.COMPLETED,
+                    column__deleted_at__isnull=True,
+                ).select_related('column'),
+                to_attr='prefetched_custom_column_values'
+            )
+        )
 
     def get_permissions(self):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
@@ -189,11 +204,19 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 enrichment_responses = self._trigger_enrichments(created_accounts)
 
                 logger.info(f"Triggerd Bulk Account Enrichments successfully for Accounts: {accounts_data}.")
+
+                custom_column_jobs = trigger_custom_column_generation(
+                    tenant_id=str(request.tenant.id),
+                    entity_type=CustomColumn.EntityType.ACCOUNT,
+                    entity_ids=[str(account.id) for account in created_accounts]
+                )
+
                 response_data = {
                     "message": "Accounts created successfully",
                     "account_count": len(created_accounts),
                     "accounts": AccountDetailsSerializer(created_accounts, many=True).data,
                     "enrichment_responses": enrichment_responses,
+                    "custom_column_jobs": custom_column_jobs
                 }
 
                 return Response(response_data, status=status.HTTP_201_CREATED)

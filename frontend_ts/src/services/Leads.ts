@@ -2,6 +2,7 @@ import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall, ListObjectsResponse } from "./Api";
 import { EnrichmentStatus, RecentCompanyEvent } from "./Common";
 import { ParsedHTML } from "./Extension";
+import { CustomColumnValueData } from "./CustomColumn";
 
 const LEADS_ENDPOINT = "/leads/";
 const LEADS_QUOTA_DISTRIBUTION_ENDPOINT = "/leads/quota_distribution/";
@@ -15,6 +16,7 @@ export interface Lead {
     website: string;
     industry: string | null;
     recent_events?: RecentCompanyEvent[];
+    custom_column_values?: CustomColumnValueData[];
   };
   first_name: string | null;
   last_name: string | null;
@@ -30,6 +32,7 @@ export interface Lead {
   score: number | null;
   last_enriched_at: string | null;
   created_at: string;
+  custom_column_values: { [key: string]: CustomColumnValueData } | null;
 }
 
 // Lead Enrichment data as defined in

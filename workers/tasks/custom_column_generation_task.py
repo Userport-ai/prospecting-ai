@@ -1,6 +1,8 @@
 import asyncio
-from datetime import datetime
-from typing import Dict, Any, List, Optional
+import json
+import time
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, List, Optional, Tuple
 
 from google.api_core.exceptions import ResourceExhausted
 
@@ -10,11 +12,10 @@ from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from tasks.enrichment_task import AccountEnrichmentTask
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
-from utils.loguru_setup import logger
+from utils.loguru_setup import logger, set_trace_context
 
 
-
-# Retry configuration for AI operations
+# Enhanced retry configuration for AI operations
 AI_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
     base_delay=2.0,
@@ -29,6 +30,19 @@ AI_RETRY_CONFIG = RetryConfig(
     ]
 )
 
+# API retry configuration
+API_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    base_delay=1.0,
+    max_delay=5.0,
+    retryable_exceptions=[
+        RetryableError,
+        asyncio.TimeoutError,
+        ConnectionError,
+        Exception  # Allow retrying on general exceptions for API calls
+    ]
+)
+
 class CustomColumnValue(UserportPydanticBaseModel):
     """Model for custom column value."""
     column_id: str
@@ -37,28 +51,48 @@ class CustomColumnValue(UserportPydanticBaseModel):
     value_json: Optional[Dict[str, Any]] = None
     value_boolean: Optional[bool] = None
     value_number: Optional[float] = None
+    value_enum: Optional[str] = None
     confidence_score: Optional[float] = None
+    rationale: Optional[str] = None
     generated_at: datetime
     error_details: Optional[Dict[str, Any]] = None
     status: str = "pending"
 
+
 class CustomColumnTask(AccountEnrichmentTask):
-    """Task for generating and updating custom column values."""
+    """Task for generating and updating custom column values with enhanced async patterns."""
 
     ENRICHMENT_TYPE = 'custom_column'
 
     def __init__(self, callback_service):
         """Initialize the task with required services."""
-        super(callback_service)
+        super().__init__(callback_service)
         self.bq_service = BigQueryService()
         self._configure_ai_service()
+        self._init_metrics()
+
+    def _init_metrics(self):
+        """Initialize metrics for tracking task performance."""
+        self.metrics = {
+            "total_entities": 0,
+            "successful_entities": 0,
+            "failed_entities": 0,
+            "processing_time": 0.0,
+            "ai_errors": 0,
+            "api_errors": 0,
+            "avg_confidence_score": 0.0,
+            "start_time": datetime.now(timezone.utc)
+        }
 
     def _configure_ai_service(self) -> None:
-        """Configure the AI service."""
-        self.model = AIServiceFactory().create_service("gemini")
+        """Configure the AI service with factory pattern."""
+        factory = AIServiceFactory()
+        self.model = factory.create_service("gemini", model_name="gemini-2.5-pro-exp-03-25")
+        self.search_model = factory.create_service("openai", model_name="gpt-4o")
 
     @property
     def enrichment_type(self) -> str:
+        """Get the enrichment type."""
         return self.ENRICHMENT_TYPE
 
     @property
@@ -80,8 +114,11 @@ class CustomColumnTask(AccountEnrichmentTask):
             "column_config": kwargs["column_config"],
             "context_data": kwargs["context_data"],
             "tenant_id": kwargs.get("tenant_id"),
+            "ai_config": kwargs.get("ai_config"),
+            "entity_type": kwargs.get("entity_type"),
             "batch_size": kwargs.get("batch_size", 10),
             "job_id": kwargs.get("job_id"),
+            "concurrent_requests": kwargs.get("concurrent_requests", 5),
             "attempt_number": kwargs.get("attempt_number", 1),
             "max_retries": kwargs.get("max_retries", 3)
         }
@@ -94,10 +131,19 @@ class CustomColumnTask(AccountEnrichmentTask):
         column_config = payload.get('column_config', {})
         context_data = payload.get('context_data', {})
         batch_size = payload.get('batch_size', 10)
+        concurrent_requests = payload.get('concurrent_requests', 5)
+        ai_config = payload.get('ai_config')
+        entity_type = payload.get('entity_type')
         current_stage = 'initialization'
+        start_time = time.time()
+
+        # Update metrics
+        self.metrics["total_entities"] = len(entity_ids)
+
         callback_service = await CallbackService.get_instance()
 
         logger.info(f"Starting custom column generation for job_id: {job_id}, column_id: {column_id}")
+        logger.info(f"Processing {len(entity_ids)} entities with batch_size={batch_size}, concurrent_requests={concurrent_requests}")
 
         try:
             # Initial processing callback
@@ -111,45 +157,108 @@ class CustomColumnTask(AccountEnrichmentTask):
                 processed_data={'stage': current_stage}
             )
 
-            # Process entities in batches
+            # Process entities in batches with concurrency control
             current_stage = 'processing'
             total_entities = len(entity_ids)
             processed_values = []
             failed_entities = []
+            confidence_scores = []
 
-            for i in range(0, total_entities, batch_size):
-                batch = entity_ids[i:i + batch_size]
+            # Create semaphore for concurrency control
+            semaphore = asyncio.Semaphore(concurrent_requests)
 
-                # Generate values for batch
-                batch_values = await self._process_batch(
-                    batch,
-                    column_id,
-                    column_config,
-                    context_data
-                )
+            # Create batches for processing
+            batches = [entity_ids[i:i + batch_size] for i in range(0, total_entities, batch_size)]
+            logger.info(f"Created {len(batches)} batches for processing")
 
+            async def process_batch(batch_index: int, batch: List[str]) -> Tuple[List[CustomColumnValue], List[str]]:
+                """Process a single batch of entities with semaphore control."""
+                batch_values = []
+                batch_failed = []
+
+                async with semaphore:
+                    logger.debug(f"Processing batch {batch_index+1}/{len(batches)} with {len(batch)} entities")
+                    try:
+                        # Generate values for batch
+                        batch_result = await self._process_batch(
+                            batch,
+                            entity_type,
+                            column_id,
+                            column_config,
+                            context_data,
+                            ai_config
+                        )
+
+                        batch_values.extend(batch_result)
+
+                        # Track failed entities in this batch
+                        batch_failed = [v.entity_id for v in batch_result if v.status == "error"]
+
+                        # Track confidence scores
+                        for value in batch_result:
+                            if value.status == "completed" and value.confidence_score is not None:
+                                confidence_scores.append(value.confidence_score)
+
+                        # Calculate progress for this batch
+                        batch_completion = (batch_index + 1) / len(batches) * 80 + 10  # Scale to 10-90%
+
+                        # Send progress callback for each batch
+                        logger.debug(f"Batch {batch_index+1} completed: {len(batch_result)} processed, {len(batch_failed)} failed")
+
+                        # Send batch completion callback
+                        if batch_index % max(1, len(batches) // 10) == 0 or batch_index == len(batches) - 1:
+                            await callback_service.send_callback(
+                                job_id=job_id,
+                                account_id=entity_ids[0],
+                                status='processing',
+                                enrichment_type=self.ENRICHMENT_TYPE,
+                                source="custom_column",
+                                completion_percentage=int(batch_completion),
+                                processed_data={
+                                    'stage': current_stage,
+                                    'processed_count': (batch_index + 1) * batch_size,
+                                    'total_count': total_entities,
+                                    'batch_completed': batch_index + 1,
+                                    'total_batches': len(batches)
+                                }
+                            )
+
+                        return batch_values, batch_failed
+
+                    except Exception as e:
+                        logger.error(f"Error processing batch {batch_index}: {str(e)}", exc_info=True)
+                        self.metrics["api_errors"] += 1
+                        # Return failure for all entities in batch
+                        error_values = []
+                        for entity_id in batch:
+                            error_values.append(CustomColumnValue(
+                                column_id=column_id,
+                                entity_id=entity_id,
+                                error_details={"error": str(e), "batch_index": batch_index},
+                                generated_at=datetime.utcnow(),
+                                status="error"
+                            ))
+
+                        return error_values, batch
+
+            # Execute all batches concurrently and gather results
+            batch_tasks = [process_batch(i, batch) for i, batch in enumerate(batches)]
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
+            # Process results from all batches
+            for result in batch_results:
+                if isinstance(result, Exception):
+                    logger.error(f"Batch processing exception: {str(result)}")
+                    self.metrics["api_errors"] += 1
+                    continue
+
+                batch_values, batch_failed = result
                 processed_values.extend(batch_values)
-
-                # Calculate progress
-                completion = int((i + len(batch)) / total_entities * 100)
-
-                # Send progress callback
-                await callback_service.send_callback(
-                    job_id=job_id,
-                    account_id=entity_ids[0],
-                    status='processing',
-                    enrichment_type=self.ENRICHMENT_TYPE,
-                    source="custom_column",
-                    completion_percentage=completion,
-                    processed_data={
-                        'stage': current_stage,
-                        'processed_count': i + len(batch),
-                        'total_count': total_entities
-                    }
-                )
+                failed_entities.extend(batch_failed)
 
             # Store results
             current_stage = 'storing_results'
+            logger.info(f"Storing results for {len(processed_values)} processed values")
             await self._store_results(
                 job_id=job_id,
                 column_id=column_id,
@@ -159,6 +268,12 @@ class CustomColumnTask(AccountEnrichmentTask):
             # Calculate success metrics
             successful_count = len([v for v in processed_values if v.status == "completed"])
             failed_count = len([v for v in processed_values if v.status == "error"])
+
+            # Update metrics
+            self.metrics["successful_entities"] = successful_count
+            self.metrics["failed_entities"] = failed_count
+            self.metrics["processing_time"] = time.time() - start_time
+            self.metrics["avg_confidence_score"] = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
 
             # Send completion callback
             await callback_service.send_callback(
@@ -171,6 +286,8 @@ class CustomColumnTask(AccountEnrichmentTask):
                 processed_data={
                     'successful_count': successful_count,
                     'failed_count': failed_count,
+                    'avg_confidence': self.metrics["avg_confidence_score"],
+                    'processing_time_seconds': self.metrics["processing_time"],
                     'values': [v.dict() for v in processed_values]
                 }
             )
@@ -181,7 +298,8 @@ class CustomColumnTask(AccountEnrichmentTask):
                 "column_id": column_id,
                 "total_processed": len(processed_values),
                 "successful_count": successful_count,
-                "failed_count": failed_count
+                "failed_count": failed_count,
+                "metrics": self.metrics
             }
 
         except Exception as e:
@@ -189,7 +307,8 @@ class CustomColumnTask(AccountEnrichmentTask):
             error_details = {
                 'error_type': type(e).__name__,
                 'message': str(e),
-                'stage': current_stage
+                'stage': current_stage,
+                'processing_time': time.time() - start_time
             }
 
             # Store error state
@@ -217,124 +336,308 @@ class CustomColumnTask(AccountEnrichmentTask):
     async def _process_batch(
             self,
             entity_ids: List[str],
+            entity_type: str,
             column_id: str,
             column_config: Dict[str, Any],
-            context_data: Dict[str, Any]
+            context_data: Dict[str, Any],
+            ai_config: Dict[str, Any],
     ) -> List[CustomColumnValue]:
-        """Process a batch of entities."""
+        """Process a batch of entities with enhanced concurrency and error handling."""
         results = []
+        tasks = []
 
+        # Process each entity in the batch concurrently
         for entity_id in entity_ids:
-            try:
-                # Generate value using AI
-                value = await self._generate_column_value(
-                    entity_id=entity_id,
-                    column_config=column_config,
-                    context_data=context_data
-                )
+            # Set trace context for better debugging
+            set_trace_context(account_id=entity_id)
 
+            task = self._process_entity(
+                entity_id=entity_id,
+                entity_type=entity_type,
+                column_id=column_id,
+                column_config=column_config,
+                context_data=context_data,
+                ai_config=ai_config,
+            )
+            tasks.append(task)
+
+        # Execute tasks concurrently and handle results/exceptions
+        entity_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for i, result in enumerate(entity_results):
+            entity_id = entity_ids[i]
+            if isinstance(result, Exception):
+                logger.error(f"Error processing entity {entity_id}: {str(result)}")
                 results.append(CustomColumnValue(
                     column_id=column_id,
                     entity_id=entity_id,
-                    **value,
-                    generated_at=datetime.utcnow(),
-                    status="completed"
-                ))
-
-            except Exception as e:
-                logger.error(f"Error processing entity {entity_id}: {str(e)}")
-                results.append(CustomColumnValue(
-                    column_id=column_id,
-                    entity_id=entity_id,
-                    error_details={"error": str(e)},
+                    error_details={"error": str(result)},
                     generated_at=datetime.utcnow(),
                     status="error"
                 ))
+                self.metrics["ai_errors"] += 1
+            else:
+                results.append(result)
 
         return results
+
+    async def _process_entity(self, entity_id: str, column_id: str, column_config: Dict[str, Any],
+                              context_data: Dict[str, Any], entity_type=None, ai_config=None) -> CustomColumnValue:
+        """Process a single entity with retry logic."""
+        try:
+            # Generate value using AI with retry logic
+            value = await self._generate_column_value(
+                entity_id=entity_id,
+                entity_type=entity_type,
+                column_config=column_config,
+                context_data=context_data,
+                ai_config=ai_config,
+            )
+
+            return CustomColumnValue(
+                column_id=column_id,
+                entity_id=entity_id,
+                **value,
+                generated_at=datetime.utcnow(),
+                status="completed"
+            )
+
+        except Exception as e:
+            logger.error(f"Error processing entity {entity_id}: {str(e)}")
+            return CustomColumnValue(
+                column_id=column_id,
+                entity_id=entity_id,
+                error_details={"error": str(e)},
+                generated_at=datetime.utcnow(),
+                status="error"
+            )
 
     @with_retry(retry_config=AI_RETRY_CONFIG, operation_name="generate_column_value")
     async def _generate_column_value(
             self,
             entity_id: str,
+            entity_type: str,
             column_config: Dict[str, Any],
-            context_data: Dict[str, Any]
+            context_data: Dict[str, Any],
+            ai_config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Generate a single column value using AI."""
+        """Generate a single column value using AI with enhanced error handling."""
         try:
+            # Get entity context
+            entity_context = context_data.get(entity_id, {})
+
+            if not entity_context:
+                logger.warning(f"No context data found for entity {entity_id}")
+
             # Prepare prompt with context
             prompt = self._create_generation_prompt(
                 entity_id=entity_id,
+                entity_type=entity_type,
                 column_config=column_config,
-                context_data=context_data
+                entity_context=entity_context,
             )
 
-            # Generate value
-            response = await self.model.generate_content(prompt, is_json=True)
+            # Generate value with AI service
+            logger.debug(f"Generating column value for entity {entity_id}")
+            start_time = time.time()
+            if ai_config and ai_config.get('use_internet', False):
+                response = await self.search_model.generate_search_content(prompt,
+                                                                           operation_tag='custom_column_with_internet')
+            else:
+                response = await self.model.generate_content(prompt, is_json=True, operation_tag='custom_column')
+            generation_time = time.time() - start_time
+            logger.debug(f"Value generation for entity {entity_id} completed in {generation_time:.2f}s")
 
             # Validate and format response
-            value = self._validate_response(response, column_config['response_type'])
+            value = self._validate_response(response, column_config)
+
+            # Log the confidence score
+            if 'confidence_score' in value:
+                logger.debug(f"Entity {entity_id} confidence score: {value['confidence_score']}")
+
+            if 'rationale' in value:
+                logger.debug(f"Entity {entity_id} rationale: {value['rationale']}")
 
             return value
 
         except Exception as e:
-            logger.error(f"Error generating column value: {str(e)}")
-            raise
+            logger.error(f"Error generating column value for entity {entity_id}: {str(e)}")
+            self.metrics["ai_errors"] += 1
+            raise RetryableError(f"AI generation failed: {str(e)}")
 
-    def _create_generation_prompt(
-            self,
-            entity_id: str,
-            column_config: Dict[str, Any],
-            context_data: Dict[str, Any]
-    ) -> str:
-        """Create the prompt for value generation."""
-        return f"""Generate a value for the following custom column:
+    def _create_generation_prompt(self, entity_id: str, column_config: Dict[str, Any], entity_context: Dict[str, Any],
+                                  entity_type=None) -> str:
+        """Create the prompt for value generation with enhanced contextualization."""
+        # Extract column description and expected values
+        column_description = column_config.get('description', 'No description provided')
+        question = column_config.get('question', '')
+        response_type = column_config.get('response_type', 'string')
+        expected_format = self._get_format_for_response_type(column_config)
+        entity_type_str = entity_type if entity_type else "account/lead"
 
-Column Configuration:
-{column_config}
 
-Entity Context:
-{context_data.get(entity_id, {})}
+        # Get any examples from config
+        examples = column_config.get('examples', [])
+        examples_text = ""
+        if examples:
+            examples_text = "Examples:\n" + "\n".join([f"- {example}" for example in examples])
+
+        # Get any validation rules
+        validation_rules = column_config.get('validation_rules', [])
+        validation_text = ""
+        if validation_rules:
+            validation_text = "Validation Rules:\n" + "\n".join([f"- {rule}" for rule in validation_rules])
+
+        # Create enhanced prompt
+        return f"""You are an experienced BDR prospecting and qualifying {entity_type_str}. Answer the following question about an {entity_type_str} based on the context provided:
+
+Column Information:
+- ID: {column_config.get('id', 'Unknown')}
+- Name: {column_config.get('name', 'Custom Column')}
+- Description: {column_description}
+- Question: {question}
+- Response Type: {response_type}
+
+Entity ID: {entity_id}
+
+Context:
+{json.dumps(entity_context, indent=2)}
+
+{examples_text}
+
+{validation_text}
 
 Response Requirements:
-1. Response must match the configured response_type: {column_config['response_type']}
-2. Include a confidence score between 0 and 1
-3. Provide rationale for the generated value
+1. Overall response must be a JSON
+2. Value inside the response must match the configured response_type: {response_type}
+3. Include a confidence score between 0 and 1
+4. Provide rationale for the generated value
 
 Return as JSON:
 {{
-    "value": <typed_value>,
+    "value": {expected_format},
     "confidence_score": float,
     "rationale": string
-}}"""
+}}
 
-    def _validate_response(self, response: Dict[str, Any], response_type: str) -> Dict[str, Any]:
-        """Validate and format the AI response."""
-        if not response or 'value' not in response:
-            raise ValueError("Invalid response format")
+Be accurate, concise, and ensure the response strictly adheres to the specified response type."""
+
+    def _get_format_for_response_type(self, column_config: Dict[str, Any]) -> str:
+
+        """Get the expected format description for the response type."""
+        response_type = column_config.get('response_type', 'string')
+        allowed_values = column_config['response_config'].get('allowed_values', [])
+        formats = {
+            "string": "string (text value)",
+            "json_object": "object (valid JSON object)",
+            "boolean": "boolean (true or false)",
+            "number": "number (integer or float)",
+            "enum": f"string"
+        }
+        format_for_response_type = formats.get(response_type, "unknown format")
+        if allowed_values:
+            format_for_response_type += f" from one of the following allowed values: {allowed_values}"
+        return format_for_response_type
+
+    def _validate_response(self, response: Dict[str, Any], column_config: Any) -> Dict[str, Any]:
+        """Validate and format the AI response with enhanced error checking."""
+        response_type = column_config['response_type']
+
+        if not response:
+            raise ValueError("Response is empty")
+
+        if 'value' not in response:
+            logger.error(f"Invalid response format: {response}")
+            raise ValueError("Response missing 'value' field")
 
         value = response['value']
         confidence = response.get('confidence_score', 0.0)
+        rationale = response.get('rationale', '')
 
-        # Format based on response type
-        if response_type == "string":
-            return {"value_string": str(value), "confidence_score": confidence}
-        elif response_type == "json_object":
-            return {"value_json": value, "confidence_score": confidence}
-        elif response_type == "boolean":
-            return {"value_boolean": bool(value), "confidence_score": confidence}
-        elif response_type == "number":
-            return {"value_number": float(value), "confidence_score": confidence}
-        else:
-            raise ValueError(f"Unsupported response type: {response_type}")
+        # Validate confidence score range
+        if not 0 <= confidence <= 1:
+            logger.warning(f"Confidence score out of range: {confidence}, clamping to valid range")
+            confidence = max(0.0, min(1.0, confidence))
 
+        # Format based on response type with validation
+        try:
+            result = {}
+
+            if response_type == "string":
+                if not isinstance(value, str):
+                    logger.warning(f"Expected string but got {type(value).__name__}, converting to string")
+                    value = str(value)
+                result = {"value_string": value}
+
+            elif response_type == "json_object":
+                if isinstance(value, str):
+                    # Try to parse string as JSON
+                    import json
+                    try:
+                        value = json.loads(value)
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse string as JSON: {value}")
+                        raise ValueError(f"Invalid JSON object: {value}")
+
+                if not isinstance(value, dict) and not isinstance(value, list):
+                    raise ValueError(f"Expected JSON object or array but got {type(value).__name__}")
+
+                result = {"value_json": value}
+
+            elif response_type == "boolean":
+                if isinstance(value, str):
+                    value_lower = value.lower()
+                    if value_lower in ["true", "yes", "1"]:
+                        value = True
+                    elif value_lower in ["false", "no", "0"]:
+                        value = False
+                    else:
+                        raise ValueError(f"Cannot convert string '{value}' to boolean")
+
+                value = bool(value)  # Ensure it's a boolean
+                result = {"value_boolean": value}
+
+            elif response_type == "number":
+                if isinstance(value, str):
+                    try:
+                        # Try to convert string to float
+                        value = float(value)
+                    except ValueError:
+                        raise ValueError(f"Cannot convert string '{value}' to number")
+
+                value = float(value)  # Ensure it's a float
+                result = {"value_number": value}
+
+            elif response_type == "enum":
+                if isinstance(value, str):
+                    try:
+                        # Check if the string is a valid enum value
+                        if value not in column_config['response_config'].get("allowed_values", []):
+                            logger.error(f"Invalid enum value '{value}'")
+                    except Exception as e:
+                        raise ValueError(f"Error validating enum value '{value}': {str(e)}")
+                result = {"value_enum": value}
+
+            else:
+                raise ValueError(f"Unsupported response type: {response_type}")
+
+            # Add confidence and rationale to the result
+            result["confidence_score"] = confidence
+            result["rationale"] = rationale  # Include rationale in the result
+
+            return result
+        except Exception as e:
+            logger.error(f"Error validating response: {str(e)}")
+            raise ValueError(f"Response validation failed: {str(e)}")
+
+    @with_retry(retry_config=API_RETRY_CONFIG, operation_name="store_results")
     async def _store_results(
             self,
             job_id: str,
             column_id: str,
             values: List[CustomColumnValue]
     ) -> None:
-        """Store generated values in BigQuery."""
+        """Store generated values in BigQuery with retry logic."""
         try:
             for value in values:
                 await self.bq_service.insert_enrichment_raw_data(
@@ -347,24 +650,30 @@ Return as JSON:
                     },
                     processed_data=value.dict(exclude={'error_details'})
                 )
-        except Exception as e:
-            logger.error(f"Error storing results: {str(e)}")
-            raise
 
+        except Exception as e:
+            logger.error(f"Error storing results: {str(e)}", exc_info=True)
+            self.metrics["api_errors"] += 1
+            raise RetryableError(f"Failed to store results: {str(e)}")
+
+    @with_retry(retry_config=API_RETRY_CONFIG, operation_name="store_error_state")
     async def _store_error_state(
             self,
             job_id: str,
             column_id: str,
             error_details: Dict[str, Any]
     ) -> None:
-        """Store error information in BigQuery."""
+        """Store error information in BigQuery with retry logic."""
         try:
+            # Format error details with timestamps and context
             formatted_error = {
                 'error_type': error_details.get('error_type', 'unknown_error'),
                 'message': error_details.get('message', 'Unknown error occurred'),
                 'stage': error_details.get('stage', 'unknown'),
                 'timestamp': datetime.utcnow().isoformat(),
-                'column_id': column_id
+                'column_id': column_id,
+                'metrics': self.metrics,
+                'retryable': error_details.get('retryable', True)
             }
 
             await self.bq_service.insert_enrichment_raw_data(
@@ -377,5 +686,8 @@ Return as JSON:
                 error_details=formatted_error
             )
 
+            logger.info(f"Error state stored for job {job_id}, column {column_id}")
+
         except Exception as e:
-            logger.error(f"Failed to store error state: {str(e)}")
+            logger.error(f"Failed to store error state: {str(e)}", exc_info=True)
+            # Don't raise here to avoid nested exception in error handler
