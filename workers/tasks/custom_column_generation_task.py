@@ -123,7 +123,7 @@ class CustomColumnTask(AccountEnrichmentTask):
             "max_retries": kwargs.get("max_retries", 3)
         }
 
-    async def execute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any], Dict[str, Any]):
         """Execute the custom column generation task."""
         job_id = payload.get('job_id')
         column_id = payload.get('column_id')
@@ -292,7 +292,7 @@ class CustomColumnTask(AccountEnrichmentTask):
                 }
             )
 
-            return {
+            return None, {
                 "status": "completed",
                 "job_id": job_id,
                 "column_id": column_id,
@@ -325,7 +325,8 @@ class CustomColumnTask(AccountEnrichmentTask):
                 processed_data={'stage': current_stage}
             )
 
-            return {
+            # Do not store the result in callback requests as we want to re-run everytime for custom column
+            return None, {
                 "status": "failed",
                 "job_id": job_id,
                 "column_id": column_id,

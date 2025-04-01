@@ -126,6 +126,9 @@ class BaseTask(ABC):
             # 2. If no existing result, we do the normal flow
             result, summary = await self.execute(payload)
 
+            if not result:
+                return summary
+
             # Store final result if successful
             await self.result_manager.store_result(enrichment_type=self.enrichment_type, callback_payload=result)
 
