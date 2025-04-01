@@ -54,7 +54,7 @@ class AccountDetailsSerializer(serializers.ModelSerializer):
             'recent_events',
             'created_at',
             'updated_at',
-            'custom_column_values'  
+            'custom_column_values'
         ]
         read_only_fields = [
             'id',
@@ -62,14 +62,16 @@ class AccountDetailsSerializer(serializers.ModelSerializer):
             'last_enriched_at',
             'created_at',
             'updated_at',
-            'custom_column_values'  
+            'custom_column_values'
         ]
 
     def get_custom_column_values(self, obj):
         """
         Return all custom column values for this account in an organized format.
+        Always returns a dict, even if there are no values.
         """
         return get_custom_column_values(obj)
+
 
 class AccountBulkCreateSerializer(serializers.ModelSerializer):
     class Meta:

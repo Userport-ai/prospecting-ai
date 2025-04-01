@@ -44,18 +44,22 @@ class LeadDetailsSerializer(serializers.ModelSerializer):
         """
         Return minimal account details for nested display
         """
+        if not obj.account:
+            return {}
+
         return {
             'id': obj.account.id,
             'name': obj.account.name,
             'website': obj.account.website,
             'industry': obj.account.industry,
-            'recent_events': obj.account.recent_events,
+            'recent_events': obj.account.recent_events or [],
             'custom_column_values': self.get_custom_column_values(obj.account),
         }
 
     def get_custom_column_values(self, obj):
         """
         Return all custom column values for this lead in an organized format.
+        Always returns a dict, even if there are no values.
         """
         return get_custom_column_values(obj)
 
