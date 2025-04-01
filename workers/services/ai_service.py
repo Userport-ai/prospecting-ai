@@ -894,7 +894,7 @@ class OpenAIService(AIService):
                                         "end_index": annotation.end_index
                                     })
         except Exception as e:
-            logger.error(f"Error extracting citations: {str(e)}")
+            logger.warning(f"Error extracting citations: {str(e)}")
 
         return citations
 
