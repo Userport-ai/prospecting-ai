@@ -22,7 +22,7 @@ import ScreenLoader from "@/common/ScreenLoader";
 import { listProducts, Product } from "@/services/Products";
 import { Separator } from "@/components/ui/separator";
 import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
-import {Cpu, Loader2} from "lucide-react";
+import { Cpu, Loader2 } from "lucide-react";
 
 const ZeroStateDisplay = () => {
   return (
@@ -37,28 +37,44 @@ const ZeroStateDisplay = () => {
 
 interface PollPendingAccountsProps {
   accounts: AccountRow[];
-  onPollingComplete: (accounts: AccountRow[]) => void
+  onPollingComplete: (accounts: AccountRow[]) => void;
 }
 
 // Component to Poll Accounts that are in pending state.
 const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
-                                                                   accounts,
-                                                                   onPollingComplete
-                                                                 }) => {
+  accounts,
+  onPollingComplete,
+}) => {
   const authContext = useAuthContext();
+
+  // Helper to check if any custom column values are being generated.
+  const anyCustomColumnValuesGenerating = (account: AccountRow): boolean => {
+    if (account.custom_column_values === null) {
+      return false;
+    }
+
+    const customColumnValuesMap = account.custom_column_values;
+    return Object.keys(customColumnValuesMap).some(
+      (columnId) =>
+        customColumnValuesMap[columnId].status &&
+        (customColumnValuesMap[columnId].status === "pending" ||
+          customColumnValuesMap[columnId].status === "processing")
+    );
+  };
 
   // Setup polling in the background in case any of the accounts have enrichment
   // status as pending or in progress.
-  const pollAccountIds: string[] = accounts
-      .filter(
-          (account) =>
-              account.enrichment_status.total_enrichments === 0 ||
-              account.enrichment_status.in_progress > 0 ||
-              account.enrichment_status.pending > 0
-      )
-      .map((account) => account.id);
+  var pollAccountIds: string[] = accounts
+    .filter(
+      (account) =>
+        account.enrichment_status.total_enrichments === 0 ||
+        account.enrichment_status.in_progress > 0 ||
+        account.enrichment_status.pending > 0 ||
+        anyCustomColumnValuesGenerating(account)
+    )
+    .map((account) => account.id);
 
-  const POLLING_INTERVAL = 30 * 1000; // Poll every 30s.
+  const pollingInterval = 30 * 1000; // Poll every 30s.
 
   useEffect(() => {
     if (pollAccountIds.length === 0) {
@@ -72,10 +88,14 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
       console.log(`Polling ${pollAccountIds.length} accounts...`);
 
       try {
-        const response = await listAccounts(authContext, { ids: pollAccountIds });
+        const response = await listAccounts(authContext, {
+          ids: pollAccountIds,
+        });
         const newPolledAccounts = response.results;
 
-        console.log(`Received ${newPolledAccounts.length} accounts from polling`);
+        console.log(
+          `Received ${newPolledAccounts.length} accounts from polling`
+        );
 
         // Only trigger refresh if there are accounts to update
         if (newPolledAccounts.length > 0) {
@@ -84,7 +104,7 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
       } catch (error) {
         console.error("Error during account polling:", error);
       }
-    }, POLLING_INTERVAL);
+    }, pollingInterval);
 
     // Clean up the interval when the component unmounts
     return () => {
@@ -112,18 +132,18 @@ interface TableProps {
 
 // Component to display Accounts Table.
 const Table: React.FC<TableProps> = ({
-                                       columns,
-                                       accounts,
-                                       totalAccountsCount,
-                                       curPageNum,
-                                       handlePageClick,
-                                       dataLoading,
-                                       curPageSize,
-                                       onPageSizeChange,
-                                       isCreateColumnDialogOpen,
-                                       onCreateColumnOpenChange,
-                                       onColumnCreated,
-                                     }) => {
+  columns,
+  accounts,
+  totalAccountsCount,
+  curPageNum,
+  handlePageClick,
+  dataLoading,
+  curPageSize,
+  onPageSizeChange,
+  isCreateColumnDialogOpen,
+  onCreateColumnOpenChange,
+  onColumnCreated,
+}) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
@@ -142,7 +162,7 @@ const Table: React.FC<TableProps> = ({
   });
 
   const [columnVisibility, setColumnVisibility] = useState(
-      initialColumnVisibility
+    initialColumnVisibility
   );
 
   // Following https://tanstack.com/table/v8/docs/framework/react/examples/column-sizing for column resizing
@@ -179,61 +199,61 @@ const Table: React.FC<TableProps> = ({
   }
 
   return (
-      <div className="flex flex-col gap-6">
-        <p className="text-gray-700 text-md mb-2">
-          Total Number of Accounts:{" "}
-          <span className="font-semibold">{totalAccountsCount}</span>
-        </p>
-        <div className="flex items-center gap-6">
-          {/* Filter Controls */}
-          <div className="flex gap-4">
-            <TextFilter
-                table={table}
-                columnId={"name"}
-                placeholder={"Filter Account name..."}
-            />
-          </div>
-
-          {/* View visible Columns. */}
-          <VisibleColumns table={table} />
-
-          {/* Add custom column */}
-          <Button
-              onClick={() => onCreateColumnOpenChange(true)}
-              variant="outline"
-              className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300 border-gray-200"
-          >
-            <Cpu size={16} /> Ask AI
-          </Button>
-
-          <CreateCustomColumnDialog
-              open={isCreateColumnDialogOpen}
-              onOpenChange={onCreateColumnOpenChange}
-              onSuccess={onColumnCreated}
+    <div className="flex flex-col gap-6">
+      <p className="text-gray-700 text-md mb-2">
+        Total Number of Accounts:{" "}
+        <span className="font-semibold">{totalAccountsCount}</span>
+      </p>
+      <div className="flex items-center gap-6">
+        {/* Filter Controls */}
+        <div className="flex gap-4">
+          <TextFilter
+            table={table}
+            columnId={"name"}
+            placeholder={"Filter Account name..."}
           />
         </div>
 
-        {/* Table Container */}
-        <CommonTable
-            table={table}
-            columns={columns}
-            columnResizeMode={columnResizeMode}
-            curPageNum={curPageNum}
-            totalPageCount={pageCount}
-            handlePageClick={handlePageClick}
-            headerClassName="bg-[rgb(122,103,171)]"
-            curPageSize={curPageSize}
-            onPageSizeChange={onPageSizeChange}
-        />
+        {/* View visible Columns. */}
+        <VisibleColumns table={table} />
 
-        {/* Replace full-screen loading with a more subtle indicator */}
-        {dataLoading && (
-            <div className="fixed bottom-4 right-4 bg-white shadow-md rounded-lg p-2 border border-gray-200 flex items-center text-sm text-gray-600 z-50">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Loading data...
-            </div>
-        )}
+        {/* Add custom column */}
+        <Button
+          onClick={() => onCreateColumnOpenChange(true)}
+          variant="outline"
+          className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300 border-gray-200"
+        >
+          <Cpu size={16} /> Ask AI
+        </Button>
+
+        <CreateCustomColumnDialog
+          open={isCreateColumnDialogOpen}
+          onOpenChange={onCreateColumnOpenChange}
+          onSuccess={onColumnCreated}
+        />
       </div>
+
+      {/* Table Container */}
+      <CommonTable
+        table={table}
+        columns={columns}
+        columnResizeMode={columnResizeMode}
+        curPageNum={curPageNum}
+        totalPageCount={pageCount}
+        handlePageClick={handlePageClick}
+        headerClassName="bg-[rgb(122,103,171)]"
+        curPageSize={curPageSize}
+        onPageSizeChange={onPageSizeChange}
+      />
+
+      {/* Replace full-screen loading with a more subtle indicator */}
+      {dataLoading && (
+        <div className="fixed bottom-4 right-4 bg-white shadow-md rounded-lg p-2 border border-gray-200 flex items-center text-sm text-gray-600 z-50">
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          Loading data...
+        </div>
+      )}
+    </div>
   );
 };
 // Displays list of accounts in a table format.
@@ -254,38 +274,31 @@ export default function AccountsTable() {
   const [totalAccountsCount, setTotalAccountsCount] = useState(0);
   const [columns, setColumns] = useState<ColumnDef<AccountRow>[]>([]);
   const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
+  const [tableNeedRefresh, setTableNeedsRefresh] = useState(false);
 
   // Function to refresh table data (accounts) in the background without full loading overlay
-  const refreshTableData = async () => {
-    // Only show loading indicator if not a background refresh
-    setBackgroundRefreshing(true);
-
-    try {
-      // Get the current page number to maintain pagination state
-      const currentPageNum = curPageNum;
-
-      const response = await listAccounts(authContext, {
-        page: currentPageNum,
-        page_size: curPageSize,
-      });
-
-      // Update data without changing page
-      setTotalAccountsCount(response.count);
-      setCurAccounts(response.results);
-
-      // Update columns while preserving the current page
-      setColumns(getAccountColumns(response.results, refreshTableData));
-    } catch (error: any) {
-      console.error("Failed to refresh account table:", error);
-      // Optionally show a toast notification instead of setting error state
-      // toast.error(`Failed to refresh: ${error.message}`);
-    } finally {
-      setBackgroundRefreshing(false);
-    }
+  const refreshTableData = () => {
+    setTableNeedsRefresh(true);
   };
 
+  useEffect(() => {
+    if (!tableNeedRefresh) {
+      return;
+    }
+    listAccountsHelper(curPageNum)
+      .catch((error) => {
+        console.error("Failed to refresh account table:", error);
+        // Optionally show a toast notification instead of setting error state
+        // toast.error(`Failed to refresh: ${error.message}`);
+      })
+      .finally(() => setTableNeedsRefresh(false));
+  }, [tableNeedRefresh]);
+
   // Original function for initial page load and explicit page navigation
-  const listAccountsHelper = async (pageNum: number, showLoadingOverlay = true) => {
+  const listAccountsHelper = async (
+    pageNum: number,
+    showLoadingOverlay = true
+  ) => {
     // Always use full loading overlay for initial data fetch (when curPageNum is 0)
     const useFullLoading = showLoadingOverlay || curPageNum === 0;
 
@@ -323,14 +336,14 @@ export default function AccountsTable() {
   useEffect(() => {
     setLoading(true);
     listAccountsHelper(1)
-        .then(async () => {
-          const products = await listProducts(authContext);
-          setProducts(products);
-        })
-        .catch((error) =>
-            setError(new Error(`Failed to fetch Accounts: ${error.message}`))
-        )
-        .finally(() => setLoading(false));
+      .then(async () => {
+        const products = await listProducts(authContext);
+        setProducts(products);
+      })
+      .catch((error) =>
+        setError(new Error(`Failed to fetch Accounts: ${error.message}`))
+      )
+      .finally(() => setLoading(false));
   }, [authContext, curPageSize]);
 
   // Handle user request to go to page with improved loading
@@ -342,9 +355,9 @@ export default function AccountsTable() {
       await listAccountsHelper(nextPageNum);
     } catch (error: any) {
       setError(
-          new Error(
-              `Failed to fetch Accounts for page ${nextPageNum}: ${error.message}`
-          )
+        new Error(
+          `Failed to fetch Accounts for page ${nextPageNum}: ${error.message}`
+        )
       );
     } finally {
       setDataLoading(false);
@@ -361,14 +374,17 @@ export default function AccountsTable() {
 
     try {
       // Stored the polled accounts in a map.
-      const polledAccountsMap: Record<string, AccountRow> = polledAccounts.reduce(
+      const polledAccountsMap: Record<string, AccountRow> =
+        polledAccounts.reduce(
           (curAccMap, account) => ({ ...curAccMap, [account.id]: account }),
           {} as Record<string, AccountRow>
-      );
+        );
 
       // Update only the accounts that were polled.
       const updatedAccounts = curAccounts.map((account) =>
-          account.id in polledAccountsMap ? polledAccountsMap[account.id] : account
+        account.id in polledAccountsMap
+          ? polledAccountsMap[account.id]
+          : account
       );
 
       // Update the accounts without changing the page
@@ -411,40 +427,40 @@ export default function AccountsTable() {
   }
 
   return (
-      <div className="px-4 mt-2">
-        <PollPendingAccounts
-            accounts={curAccounts}
-            onPollingComplete={onPollingComplete}
-        />
-        <div className="flex items-center gap-4">
-          <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
-          {/* Add Accounts to the table. */}
-          <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
+    <div className="px-4 mt-2">
+      <PollPendingAccounts
+        accounts={curAccounts}
+        onPollingComplete={onPollingComplete}
+      />
+      <div className="flex items-center gap-4">
+        <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
+        {/* Add Accounts to the table. */}
+        <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
 
-          {/* Subtle background refresh indicator */}
-          {backgroundRefreshing && (
-              <div className="text-xs text-gray-500 flex items-center">
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                Refreshing...
-              </div>
-          )}
-        </div>
-
-        <Separator className="my-4 bg-gray-300" />
-
-        <Table
-            columns={columns}
-            accounts={curAccounts}
-            totalAccountsCount={totalAccountsCount}
-            curPageNum={curPageNum}
-            handlePageClick={handlePageClick}
-            dataLoading={dataLoading}
-            curPageSize={curPageSize}
-            onPageSizeChange={setCurPageSize}
-            isCreateColumnDialogOpen={isCreateColumnDialogOpen}
-            onCreateColumnOpenChange={setCreateColumnDialogOpen}
-            onColumnCreated={handleColumnCreated}
-        />
+        {/* Subtle background refresh indicator */}
+        {backgroundRefreshing && (
+          <div className="text-xs text-gray-500 flex items-center">
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            Refreshing...
+          </div>
+        )}
       </div>
+
+      <Separator className="my-4 bg-gray-300" />
+
+      <Table
+        columns={columns}
+        accounts={curAccounts}
+        totalAccountsCount={totalAccountsCount}
+        curPageNum={curPageNum}
+        handlePageClick={handlePageClick}
+        dataLoading={dataLoading}
+        curPageSize={curPageSize}
+        onPageSizeChange={setCurPageSize}
+        isCreateColumnDialogOpen={isCreateColumnDialogOpen}
+        onCreateColumnOpenChange={setCreateColumnDialogOpen}
+        onColumnCreated={handleColumnCreated}
+      />
+    </div>
   );
 }
