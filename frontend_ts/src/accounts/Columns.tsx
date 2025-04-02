@@ -399,11 +399,9 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
   },
 ];
 
-// Fetches the final Column definition for the given set of rows
-// by adding Custom Columns to base static column definition using
-// information from the given Account Rows.
 export const getAccountColumns = (
-  rows: AccountRow[]
+    rows: AccountRow[],
+    onRefreshTable?: () => void
 ): ColumnDef<AccountRow>[] => {
   // Get unique custom column definitions from the rows provided
   const customColumnDefinitions = new Map<string, CustomColumnValueData>();
@@ -413,10 +411,12 @@ export const getAccountColumns = (
       for (const columnId in row.custom_column_values) {
         if (!customColumnDefinitions.has(columnId)) {
           // Store the metadata (name, type etc.) from the first row we see it in
-          customColumnDefinitions.set(
-            columnId,
-            row.custom_column_values[columnId]
-          );
+          // Make sure to include the columnId in the data
+          const columnData = {
+            ...row.custom_column_values[columnId],
+            columnId: columnId // Explicitly add the columnId
+          };
+          customColumnDefinitions.set(columnId, columnData);
         }
       }
     }
@@ -430,16 +430,24 @@ export const getAccountColumns = (
       id: columnId, // Use the UUID as the column ID
       header: colData.name, // Use the name from the custom column data
       accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
-      // cell: (info) => renderCustomCell(info),
       cell: (info) => {
         const columnId = info.column.id;
+        const accountId = info.row.original.id; // Get the account ID
         const customColumnMap = info.row.original.custom_column_values;
         const customColumnValueData = customColumnMap?.[columnId];
 
+        // Ensure columnId is included in the data passed to the component
+        const enrichedColumnData = customColumnValueData ? {
+          ...customColumnValueData,
+          columnId: columnId
+        } : null;
+
         return (
-          <CustomColumnValueRender
-            customColumnValueData={customColumnValueData}
-          />
+            <CustomColumnValueRender
+                customColumnValueData={enrichedColumnData}
+                entityId={accountId}
+                onValueGenerated={onRefreshTable}
+            />
         );
       },
       minSize: 150,
@@ -449,8 +457,8 @@ export const getAccountColumns = (
         displayName: colData.name,
         visibleInitially: true,
         cellExpandable:
-          ["string", "json_object", "enum"].includes(colData.response_type) &&
-          colData.rationale !== null,
+            ["string", "json_object", "enum"].includes(colData.response_type) &&
+            colData.rationale !== null,
       } as CustomColumnMeta,
     });
   });

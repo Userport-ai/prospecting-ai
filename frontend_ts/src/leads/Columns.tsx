@@ -161,7 +161,10 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
 // Fetches the final Column definition for the given set of rows
 // by adding Custom Columns to base static column definition using
 // information from the given Lead Rows.
-export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
+export const getLeadColumns = (
+    rows: LeadRow[],
+    onRefreshTable?: () => void
+): ColumnDef<LeadRow>[] => {
   // Get custom columns from all the rows in table.
   var customFieldKeys = new Set<string>();
   for (const row of rows) {
@@ -172,7 +175,27 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
     customFields.forEach((cf) => customFieldKeys.add(cf));
   }
 
+  // Get unique custom column definitions from the rows provided
+  const customColumnDefinitions = new Map<string, CustomColumnValueData>();
+
+  for (const row of rows) {
+    if (row.custom_column_values) {
+      for (const columnId in row.custom_column_values) {
+        if (!customColumnDefinitions.has(columnId)) {
+          // Store the metadata (name, type etc.) from the first row we see it in
+          // Make sure to include the columnId in the data
+          const columnData = {
+            ...row.custom_column_values[columnId],
+            columnId: columnId // Explicitly add the columnId
+          };
+          customColumnDefinitions.set(columnId, columnData);
+        }
+      }
+    }
+  }
+
   var finalColumns: ColumnDef<LeadRow>[] = [...baseLeadColumns];
+
   // Custom columns also has AI created fields like "evaluation" which are
   // populated whenever the lead is suggested or approved by the user.
   // Since we know the structure of this object, we will derive columns
@@ -197,10 +220,10 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         filterFn: "arrIncludesSome",
         accessorFn: (row) => {
           if (
-            row.custom_fields &&
-            row.custom_fields.evaluation &&
-            row.custom_fields.evaluation.persona_match &&
-            row.custom_fields.evaluation.persona_match !== "null" // LLM can mark a persona as "null" sometimes, sigh.
+              row.custom_fields &&
+              row.custom_fields.evaluation &&
+              row.custom_fields.evaluation.persona_match &&
+              row.custom_fields.evaluation.persona_match !== "null" // LLM can mark a persona as "null" sometimes, sigh.
           ) {
             return row.custom_fields.evaluation.persona_match;
           }
@@ -224,7 +247,7 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
             return null;
           }
           const matchingCriteria =
-            row.custom_fields.evaluation.matching_criteria;
+              row.custom_fields.evaluation.matching_criteria;
           const matchingSignals = row.custom_fields.evaluation.matching_signals;
           if (matchingSignals) {
             return matchingSignals;
@@ -251,7 +274,14 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         header: "Rationale",
         minSize: 400,
         accessorFn: (row) =>
-          row.custom_fields ? row.custom_fields.evaluation.rationale : null,
+            row.custom_fields ? row.custom_fields.evaluation.rationale : null,
+        cell: (info) => {
+          const rationale = info.getValue() as string | null;
+          if (!rationale) {
+            return null;
+          }
+          return <div className="whitespace-normal break-words">{rationale}</div>;
+        },
         meta: {
           displayName: "Rationale",
           visibleInitially: true,
@@ -262,24 +292,6 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
     finalColumns.push(...evaluationColumns);
   }
 
-  // Get unique custom column definitions from the rows provided.
-  // This is different from custom field values which are not user defined.
-  const customColumnDefinitions = new Map<string, CustomColumnValueData>();
-
-  for (const row of rows) {
-    if (row.custom_column_values) {
-      for (const columnId in row.custom_column_values) {
-        if (!customColumnDefinitions.has(columnId)) {
-          // Store the metadata (name, type etc.) from the first row we see it in
-          customColumnDefinitions.set(
-            columnId,
-            row.custom_column_values[columnId]
-          );
-        }
-      }
-    }
-  }
-
   // Add definitions for each unique custom column found
   customColumnDefinitions.forEach((colData, columnId) => {
     finalColumns.push({
@@ -288,13 +300,22 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
       accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
       cell: (info) => {
         const columnId = info.column.id;
+        const leadId = info.row.original.id; // Get the lead ID
         const customColumnMap = info.row.original.custom_column_values;
         const customColumnValueData = customColumnMap?.[columnId];
 
+        // Ensure columnId is included in the data passed to the component
+        const enrichedColumnData = customColumnValueData ? {
+          ...customColumnValueData,
+          columnId: columnId // Add columnId explicitly
+        } : null;
+
         return (
-          <CustomColumnValueRender
-            customColumnValueData={customColumnValueData}
-          />
+            <CustomColumnValueRender
+                customColumnValueData={enrichedColumnData}
+                entityId={leadId} // Pass the lead ID
+                onValueGenerated={onRefreshTable} // Callback to refresh table data after generation
+            />
         );
       },
       minSize: 150,
@@ -304,10 +325,11 @@ export const getLeadColumns = (rows: LeadRow[]): ColumnDef<LeadRow>[] => {
         displayName: colData.name,
         visibleInitially: true,
         cellExpandable:
-          ["string", "json_object", "enum"].includes(colData.response_type) &&
-          colData.rationale !== null,
+            ["string", "json_object", "enum"].includes(colData.response_type) &&
+            colData.rationale !== null,
       } as CustomColumnMeta,
     });
   });
+
   return finalColumns;
 };
