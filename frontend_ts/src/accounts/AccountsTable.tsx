@@ -22,7 +22,6 @@ import ScreenLoader from "@/common/ScreenLoader";
 import { listProducts, Product } from "@/services/Products";
 import { Separator } from "@/components/ui/separator";
 import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
-import LoadingOverlay from "@/common/LoadingOverlay";
 import {Cpu, Loader2} from "lucide-react";
 
 const ZeroStateDisplay = () => {
