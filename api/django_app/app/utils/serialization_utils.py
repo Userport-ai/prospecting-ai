@@ -50,7 +50,7 @@ def get_custom_column_values(obj):
             'name': column.name,
             'description': column.description or '',
             'response_type': column.response_type,
-            'status': column.status,
+            'status': None,
             'value': None  # Default to None
         }
 
@@ -67,7 +67,6 @@ def get_custom_column_values(obj):
     else:
         # Fall back to related manager if prefetched values not available
         values = obj.custom_column_values.filter(
-            status='completed',
             column__deleted_at__isnull=True,
         ).select_related('column')
 
@@ -88,6 +87,8 @@ def get_custom_column_values(obj):
             result[column_id]['value'] = value.value_boolean
         elif value.value_json is not None:
             result[column_id]['value'] = value.value_json
+
+        result[column_id]['status'] = value.status
 
     return result
 
