@@ -43,6 +43,7 @@ API_RETRY_CONFIG = RetryConfig(
     ]
 )
 
+
 class CustomColumnValue(UserportPydanticBaseModel):
     """Model for custom column value."""
     column_id: str
@@ -443,6 +444,7 @@ class CustomColumnTask(AccountEnrichmentTask):
             start_time = time.time()
             if ai_config and ai_config.get('use_internet', False):
                 response = await self.search_model.generate_search_content(prompt,
+                                                                           search_context_size="high",
                                                                            operation_tag='custom_column_with_internet')
             else:
                 response = await self.model.generate_content(prompt, is_json=True, operation_tag='custom_column')
@@ -475,7 +477,6 @@ class CustomColumnTask(AccountEnrichmentTask):
         response_type = column_config.get('response_type', 'string')
         expected_format = self._get_format_for_response_type(column_config)
         entity_type_str = entity_type if entity_type else "account/lead"
-
 
         # Get any examples from config
         examples = column_config.get('examples', [])
@@ -524,7 +525,6 @@ Return as JSON:
 Be accurate, concise, and ensure the response strictly adheres to the specified response type."""
 
     def _get_format_for_response_type(self, column_config: Dict[str, Any]) -> str:
-
         """Get the expected format description for the response type."""
         response_type = column_config.get('response_type', 'string')
         allowed_values = column_config['response_config'].get('allowed_values', [])
