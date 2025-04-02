@@ -50,6 +50,7 @@ def get_custom_column_values(obj):
             'name': column.name,
             'description': column.description or '',
             'response_type': column.response_type,
+            'status': column.status,
             'value': None  # Default to None
         }
 
