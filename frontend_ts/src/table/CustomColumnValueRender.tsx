@@ -91,11 +91,7 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
 
       // If onValueGenerated callback is provided, call it
       if (onValueGenerated) {
-        // Small delay to allow the backend to process the request
-        // This makes the UI feel more responsive
-        setTimeout(() => {
-          onValueGenerated();
-        }, 500);
+        onValueGenerated();
       }
     } catch (error) {
       console.error("Error generating custom column value:", error);

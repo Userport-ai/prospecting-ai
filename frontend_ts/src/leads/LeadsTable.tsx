@@ -18,7 +18,7 @@ import ScreenLoader from "@/common/ScreenLoader";
 import LoadingOverlay from "@/common/LoadingOverlay";
 import EnumFilterV2 from "@/table/EnumFilterV2";
 import { Button } from "@/components/ui/button";
-import {Cpu, Download, Loader2} from "lucide-react";
+import { Cpu, Download, Loader2 } from "lucide-react";
 import { exportToCSV } from "@/common/utils";
 import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
 import { CustomColumn } from "@/services/CustomColumn";
@@ -267,44 +267,65 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const [dataLoading, setDataLoading] = useState<boolean>(false);
   const [isCreateColumnDialogOpen, setCreateColumnDialogOpen] = useState(false);
   const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
+  const [tableNeedRefresh, setTableNeedsRefresh] = useState(false);
 
   // Function to refresh table data (leads) in the background without full loading overlay
-  const refreshTableData = async () => {
-    setBackgroundRefreshing(true);
-
-    try {
-      // Use current page's cursor to maintain pagination state
-      const currentCursor = cursorValues[curPageNum - 1];
-
-      const response = await listLeadsWithQuota(authContext, {
-        accountId: accountId ?? null,
-        cursor: currentCursor,
-        limit: curPageSize,
-        buyer_percent: 60,
-        influencer_percent: 35,
-        end_user_percent: 5,
-        persona_filter_values: personaFilterValues,
-      });
-
-      // Update data without changing page
-      setTotalLeadsCount(response.count);
-      setCurLeads(response.results);
-      setColumns(getLeadColumns(response.results, refreshTableData));
-
-      // No need to update page number or cursor values since we're staying on the same page
-    } catch (error: any) {
-      console.error("Failed to refresh lead table:", error);
-      // Optionally show a toast notification instead of setting error state
-      // toast.error(`Failed to refresh: ${error.message}`);
-    } finally {
-      setBackgroundRefreshing(false);
-    }
+  const refreshTableData = () => {
+    setTableNeedsRefresh(true);
   };
 
+  // List leads
+  useEffect(() => {
+    if (!tableNeedRefresh) {
+      return;
+    }
+
+    const pollingInterval = 30 * 1000; // Poll every 30s.
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await listLeads(cursorValues[curPageNum - 1], false);
+        const pollingRequired = response.results.some((lead) => {
+          const customColumnValuesMap = lead.custom_column_values;
+          if (!customColumnValuesMap) {
+            return false;
+          }
+          return Object.keys(customColumnValuesMap).some(
+            (columnId) =>
+              customColumnValuesMap[columnId].status &&
+              (customColumnValuesMap[columnId].status === "pending" ||
+                customColumnValuesMap[columnId].status === "processing")
+          );
+        });
+
+        if (!pollingRequired) {
+          // No need to poll.
+          console.log("nothing to poll for leads");
+          setTableNeedsRefresh(false);
+          return;
+        }
+
+        console.log("polling leads.");
+      } catch (error) {
+        console.error("Failed to refresh Leads table:", error);
+        // Optionally show a toast notification instead of setting error state
+        // toast.error(`Failed to refresh: ${error.message}`);
+      }
+    }, pollingInterval);
+
+    // Clean up the interval when the component unmounts
+    return () => {
+      console.log("Cleaning up lead polling interval: ", intervalId);
+      clearInterval(intervalId);
+    };
+  }, [tableNeedRefresh]);
+
   // Improved listLeads function with better loading state handling
-  const listLeads = async (cursor: string | null, showLoadingOverlay = true) => {
+  const listLeads = async (
+    cursor: string | null,
+    showLoadingOverlay = true
+  ) => {
     // Always use full loading overlay for initial data fetch (when curPageNum is 0)
-    const useFullLoading = showLoadingOverlay || curPageNum === 0;
+    const useFullLoading = showLoadingOverlay;
 
     if (useFullLoading) {
       setDataLoading(true);
@@ -343,15 +364,15 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   // Initial fetch for leads with improved loading
   useEffect(() => {
     setLoading(true);
-    listLeads(null)
-        .then((response) => {
-          setCurPageNum(1);
-          setCursorValues([null, response.next_cursor ?? null]);
-        })
-        .catch((error) =>
-            setError(new Error(`Failed to fetch Leads: ${error.message}`))
-        )
-        .finally(() => setLoading(false));
+    listLeads(null, false)
+      .then((response) => {
+        setCurPageNum(1);
+        setCursorValues([null, response.next_cursor ?? null]);
+      })
+      .catch((error) =>
+        setError(new Error(`Failed to fetch Leads: ${error.message}`))
+      )
+      .finally(() => setLoading(false));
   }, [authContext, curPageSize, personaFilterValues]);
 
   // Handle user request to go to page with improved loading
@@ -361,7 +382,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     const cursor = cursorValues[nextPageNum - 1];
 
     try {
-      const response = await listLeads(cursor);
+      const response = await listLeads(cursor, true);
       setCurPageNum(nextPageNum);
 
       // Update cursor values appropriately
@@ -372,9 +393,9 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       }
     } catch (error: any) {
       setError(
-          new Error(
-              `Failed to fetch Leads for page ${nextPageNum}: ${error.message}`
-          )
+        new Error(
+          `Failed to fetch Leads for page ${nextPageNum}: ${error.message}`
+        )
       );
     } finally {
       setDataLoading(false);
@@ -419,34 +440,33 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     throw error;
   }
 
-
   return (
-      <div>
-        {/* Subtle background refresh indicator */}
-        {backgroundRefreshing && (
-            <div className="text-xs text-gray-500 flex items-center mb-2">
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              Refreshing data...
-            </div>
-        )}
+    <div>
+      {/* Subtle background refresh indicator */}
+      {backgroundRefreshing && (
+        <div className="text-xs text-gray-500 flex items-center mb-2">
+          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+          Refreshing data...
+        </div>
+      )}
 
-        <Table
-            columns={columns}
-            leads={curLeads}
-            totalLeadsCount={totalLeadsCount}
-            curPageNum={curPageNum}
-            curPageSize={curPageSize}
-            handlePageClick={handlePageClick}
-            dataLoading={dataLoading}
-            onPageSizeChange={setCurPageSize}
-            allPersonaFilterValues={allPersonaFilterValues}
-            personaFilterValues={personaFilterValues}
-            onPersonaFilterValuesChange={onPersonaFilterValuesChange}
-            isCreateColumnDialogOpen={isCreateColumnDialogOpen}
-            onCreateColumnOpenChange={setCreateColumnDialogOpen}
-            onColumnCreated={handleColumnCreated}
-        />
-      </div>
+      <Table
+        columns={columns}
+        leads={curLeads}
+        totalLeadsCount={totalLeadsCount}
+        curPageNum={curPageNum}
+        curPageSize={curPageSize}
+        handlePageClick={handlePageClick}
+        dataLoading={dataLoading}
+        onPageSizeChange={setCurPageSize}
+        allPersonaFilterValues={allPersonaFilterValues}
+        personaFilterValues={personaFilterValues}
+        onPersonaFilterValuesChange={onPersonaFilterValuesChange}
+        isCreateColumnDialogOpen={isCreateColumnDialogOpen}
+        onCreateColumnOpenChange={setCreateColumnDialogOpen}
+        onColumnCreated={handleColumnCreated}
+      />
+    </div>
   );
 };
 
