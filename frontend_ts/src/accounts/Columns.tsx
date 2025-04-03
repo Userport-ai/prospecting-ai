@@ -454,6 +454,9 @@ export const getAccountColumns = (
             customColumnValueData={enrichedColumnData}
             entityId={accountId}
             onValueGenerated={onRefreshTable}
+            disableGeneration={
+              info.row.original.enrichment_status.avg_completion_percent !== 100
+            }
           />
         );
       },
