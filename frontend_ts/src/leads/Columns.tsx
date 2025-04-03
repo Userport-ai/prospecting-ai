@@ -241,7 +241,7 @@ export const getLeadColumns = (
       {
         id: "matching_signals",
         header: "Matching Signals",
-        minSize: 600,
+        minSize: 500,
         accessorFn: (row: LeadRow) => {
           if (!row.custom_fields || !row.custom_fields.evaluation) {
             return null;
@@ -286,7 +286,7 @@ export const getLeadColumns = (
         },
         meta: {
           displayName: "Rationale",
-          visibleInitially: true,
+          visibleInitially: false,
           cellExpandable: true,
         } as CustomColumnMeta,
       },
