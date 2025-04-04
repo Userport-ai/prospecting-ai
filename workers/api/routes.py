@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
@@ -15,6 +16,11 @@ from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
 from utils.loguru_setup import logger, set_trace_context
 
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 router = APIRouter()
 
@@ -118,7 +124,9 @@ async def execute_task(
 
         task = task_registry.get_task(task_name)
         result = await task.run_task(payload)
-        return JSONResponse(content=result)
+        return JSONResponse(
+            content=json.loads(json.dumps(result, cls=DateTimeEncoder))
+        )
 
     except KeyError:
         raise TaskError(status_code=404, detail="Task not found")
