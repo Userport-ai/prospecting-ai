@@ -159,6 +159,11 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
       visibleInitially: true,
     } as CustomColumnMeta,
   },
+];
+
+// Secondary Account columns we know will exist in the table but we want them to be at the end
+// relative to custom columns.
+const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
   {
     id: "customers",
     accessorFn: (row) => {
@@ -400,9 +405,11 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
 ];
 
 export const getAccountColumns = (
-    rows: AccountRow[],
-    onRefreshTable?: () => void
+  rows: AccountRow[],
+  onRefreshTable?: () => void
 ): ColumnDef<AccountRow>[] => {
+  const finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
+
   // Get unique custom column definitions from the rows provided
   const customColumnDefinitions = new Map<string, CustomColumnValueData>();
 
@@ -414,15 +421,13 @@ export const getAccountColumns = (
           // Make sure to include the columnId in the data
           const columnData = {
             ...row.custom_column_values[columnId],
-            columnId: columnId // Explicitly add the columnId
+            columnId: columnId, // Explicitly add the columnId
           };
           customColumnDefinitions.set(columnId, columnData);
         }
       }
     }
   }
-
-  const finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
 
   // Add definitions for each unique custom column found
   customColumnDefinitions.forEach((colData, columnId) => {
@@ -437,17 +442,22 @@ export const getAccountColumns = (
         const customColumnValueData = customColumnMap?.[columnId];
 
         // Ensure columnId is included in the data passed to the component
-        const enrichedColumnData = customColumnValueData ? {
-          ...customColumnValueData,
-          columnId: columnId
-        } : null;
+        const enrichedColumnData = customColumnValueData
+          ? {
+              ...customColumnValueData,
+              columnId: columnId,
+            }
+          : null;
 
         return (
-            <CustomColumnValueRender
-                customColumnValueData={enrichedColumnData}
-                entityId={accountId}
-                onValueGenerated={onRefreshTable}
-            />
+          <CustomColumnValueRender
+            customColumnValueData={enrichedColumnData}
+            entityId={accountId}
+            onValueGenerated={onRefreshTable}
+            disableGeneration={
+              info.row.original.enrichment_status.avg_completion_percent !== 100
+            }
+          />
         );
       },
       minSize: 150,
@@ -457,11 +467,11 @@ export const getAccountColumns = (
         displayName: colData.name,
         visibleInitially: true,
         cellExpandable:
-            ["string", "json_object", "enum"].includes(colData.response_type) &&
-            colData.rationale !== null,
+          ["string", "json_object", "enum"].includes(colData.response_type) &&
+          colData.rationale !== null,
       } as CustomColumnMeta,
     });
   });
 
-  return finalColumns;
+  return [...finalColumns, ...secondaryAccountColumns];
 };

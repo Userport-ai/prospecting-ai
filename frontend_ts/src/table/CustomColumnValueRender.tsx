@@ -51,12 +51,14 @@ interface CustomColumnValueRenderProps {
   customColumnValueData?: CustomColumnValueData | null;
   entityId?: string; // ID of the account/lead this column value is for
   onValueGenerated?: () => void; // Callback after successful generation
+  disableGeneration: boolean; // Whether to disable generation. For example, when enrichment is in progress.
 }
 
 const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
   customColumnValueData,
   entityId,
   onValueGenerated,
+  disableGeneration,
 }) => {
   const [isGenerating, setIsGenerating] = useState(
     customColumnValueData &&
@@ -91,11 +93,7 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
 
       // If onValueGenerated callback is provided, call it
       if (onValueGenerated) {
-        // Small delay to allow the backend to process the request
-        // This makes the UI feel more responsive
-        setTimeout(() => {
-          onValueGenerated();
-        }, 500);
+        onValueGenerated();
       }
     } catch (error) {
       console.error("Error generating custom column value:", error);
@@ -132,6 +130,7 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
           <Button
             variant="ghost"
             size="sm"
+            disabled={disableGeneration}
             onClick={handleGenerateValue}
             className="flex items-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1"
           >
