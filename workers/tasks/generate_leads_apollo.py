@@ -39,7 +39,7 @@ class ApolloConfig:
     retry_delay: float = 1.0
     max_retry_delay: float = 5.0
     enrich_leads: bool = True
-    max_leads_to_enrich: int = 100
+    max_leads_to_enrich: int = 20
     confidence_threshold: int = 50
     min_fit_threshold: int = 50
     default_temperature: float = 0.15
