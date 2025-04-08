@@ -11,14 +11,12 @@ import requests
 
 from models.accounts import AccountInfo, Financials
 from models.builtwith import EnrichmentResult
-# Import the factory and base service
 from services.ai_service import AIServiceFactory, AIService
 from services.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.builtwith_service import BuiltWithService
 from services.django_callback_service import CallbackService
-# Assuming this service still exists and works with the factory-created AI service
-from services.openai_market_intel_service import OpenAISearchService
+from services.ai_market_intel_service import AICompanyIntelService
 from utils.account_info_fetcher import AccountInfoFetcher
 from utils.connection_pool import ConnectionPool
 from utils.loguru_setup import logger, set_trace_context
@@ -380,7 +378,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         total_accounts = len(accounts)
 
 
-        self.gemini_service = self.ai_factory.create_service(provider="gemini", model_name="gemini-2.0-flash",
+        self.gemini_service = self.ai_factory.create_service(provider="gemini", model_name="gemini-2.5-pro-exp-03-25",
                                                         default_temperature=0.1)
         self.openai_service = self.ai_factory.create_service(provider="openai", model_name="gpt-4o",
                                                         default_temperature=0.1)
@@ -480,7 +478,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 # --- Fetch Market Intelligence (OpenAI Search) ---
                 logger.debug(f"Job {job_id}, Account {account_id}: Fetching market intelligence using OpenAI")
                 # Pass the service instance created outside the loop
-                intelligence_data = await self._fetch_market_intelligence(website, self.openai_service)
+                intelligence_data = await self._fetch_market_intelligence(website, self.gemini_service)
                 account_info.competitors = self._merge_lists(intelligence_data.get("competitors", []),
                                                              account_info.competitors)
                 account_info.customers = self._merge_lists(intelligence_data.get("customers", []),
@@ -785,7 +783,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         """
         try:
             # Assume OpenAISearchService wraps the factory-created openai_service
-            intelligence_service = OpenAISearchService(openai_service)
+            intelligence_service = AICompanyIntelService(openai_service)
 
             logger.debug(f"Fetching market intelligence for website: {website}")
 

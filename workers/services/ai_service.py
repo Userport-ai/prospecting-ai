@@ -424,7 +424,7 @@ class AIService(ABC):
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "search",
-            force_refresh: bool = False
+            force_refresh: bool = True
     ) -> Dict[str, Any]:
         """Generate content with web search capability.
 
@@ -817,7 +817,7 @@ class GeminiService(AIService):
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "search",
-            force_refresh: bool = False
+            force_refresh: bool = True
     ) -> Dict[str, Any]:
         """Generate content with web search capability."""
         # Generate cache key
@@ -1117,8 +1117,7 @@ class OpenAIService(AIService):
                 ]
             )
 
-            # Disable search cache for now
-            results = None # await self.cache_service._execute_query(query, job_config)
+            results = await self.cache_service._execute_query(query, job_config)
 
             if results:
                 row = results[0]
@@ -1352,7 +1351,7 @@ class OpenAIService(AIService):
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "search",
-            force_refresh: bool = False
+            force_refresh: bool = True
     ) -> Dict[str, Any]:
         """Generate content with web search capability."""
         search_tool = self._create_search_tool(search_context_size, user_location)

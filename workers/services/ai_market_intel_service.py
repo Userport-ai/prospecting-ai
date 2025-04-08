@@ -35,20 +35,20 @@ class CustomerEventIntelligence(BaseModel):
     customers: List[Customer]
     recent_events: List[RecentEvent]
 
-class OpenAISearchService:
-    """Service for using OpenAI's web search capability with structured output to gather market intelligence."""
+class AICompanyIntelService:
+    """Service for using OpenAI/Gemini web search capability with structured output to gather market intelligence."""
 
-    def __init__(self, openai_service: AIService):
-        """Initialize the OpenAI search service.
+    def __init__(self, ai_service: AIService):
+        """Initialize the Gemini search service.
 
         Args:
-            openai_service: Configured OpenAIService instance
+            ai_service: Configured AIService instance
         """
-        self.openai_service = openai_service
+        self.ai_service = ai_service
 
     async def fetch_company_intelligence(self, website: str) -> Dict[str, Any]:
         """
-        Fetch competitor and customer intelligence for a company website using OpenAI with web search.
+        Fetch competitor and customer intelligence for a company website using Gemini/Open AI with web search.
 
         Args:
             website: The company website URL
@@ -95,8 +95,8 @@ class OpenAISearchService:
             # Set up the competitors prompt
             prompt = self._create_competitors_prompt(website)
 
-            # Use the Responses API with web search and structured output
-            result = await self.openai_service.generate_structured_search_content(
+            # Use the AI service with web search and structured output
+            result = await self.ai_service.generate_structured_search_content(
                 prompt=prompt,
                 response_schema=CompetitorIntelligence,
                 search_context_size="medium",
@@ -126,8 +126,8 @@ class OpenAISearchService:
             # Set up the customers and events prompt
             prompt = self._create_customers_events_prompt(website)
 
-            # Use the Responses API with web search and structured output
-            result = await self.openai_service.generate_structured_search_content(
+            # Use web search and structured output
+            result = await self.ai_service.generate_structured_search_content(
                 prompt=prompt,
                 response_schema=CustomerEventIntelligence,
                 search_context_size="medium",
@@ -171,6 +171,7 @@ class OpenAISearchService:
         return events
 
     def extract_citations(self, intelligence_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract citations from intelligence data if present."""
         return intelligence_data.get("citations", [])
 
     def _create_competitors_prompt(self, website: str) -> str:
