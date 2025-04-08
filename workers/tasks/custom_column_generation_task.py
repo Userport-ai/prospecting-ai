@@ -518,7 +518,7 @@ class CustomColumnTask(AccountEnrichmentTask):
     Instructions:
     1. Analyze the provided entity context thoroughly.
     2. If the context doesn't contain sufficient or up-to-date information to answer the question, perform targeted web research using reliable sources (e.g., official company websites, reputable news outlets, professional directories).
-    3. Synthesize the information from the context and/or web research to directly answer the question.
+    3. Synthesize the information from the context and/or web research to directly answer the question. Give verifiable links to factual and relevant sources in the `value` field.
     4. Format your answer according to the specified response type: {response_type}.
     5. Determine a confidence score (0.0 to 1.0) based on the clarity, directness, and reliability of your sources.
     6. Provide a brief rationale explaining how you determined the answer and what sources you used (context, specific websites, etc.).
