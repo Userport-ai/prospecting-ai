@@ -129,6 +129,9 @@ class AccountInfoFetcher:
             brightdata_accounts: List[BrightDataAccount] = await self.brightdata_service.collect_account_data(snapshot_id=snapshot_id)
             logger.debug(f"Collected Bright Data Accounts for Snapshot ID: {snapshot_id} for website: {self.website}")
 
+            # Filter out dead page accounts.
+            brightdata_accounts = list(filter(lambda account: account.warning_code == None, brightdata_accounts))
+
             if len(brightdata_accounts) == 0:
                 raise ValueError(f"Got empty list of BrightData Accounts for snapshot ID: {snapshot_id} and URLs: {account_linkedin_urls} for website: {self.website}")
 
