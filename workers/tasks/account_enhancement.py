@@ -378,7 +378,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         total_accounts = len(accounts)
 
 
-        self.gemini_service = self.ai_factory.create_service(provider="gemini", model_name="gemini-2.5-pro-exp-03-25",
+        self.gemini_service = self.ai_factory.create_service(provider="gemini", model_name="gemini-2.5-pro-preview-03-25",
                                                         default_temperature=0.1)
         self.openai_service = self.ai_factory.create_service(provider="openai", model_name="gpt-4o",
                                                         default_temperature=0.1)
