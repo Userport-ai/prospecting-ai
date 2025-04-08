@@ -4,20 +4,21 @@ import json
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 import httpx
 import requests
-# Updated import
-from google import genai
 
 from models.accounts import AccountInfo, Financials
 from models.builtwith import EnrichmentResult
-from services.ai_service import AIServiceFactory
+# Import the factory and base service
+from services.ai_service import AIServiceFactory, AIService
 from services.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.builtwith_service import BuiltWithService
 from services.django_callback_service import CallbackService
+# Assuming this service still exists and works with the factory-created AI service
+from services.openai_market_intel_service import OpenAISearchService
 from utils.account_info_fetcher import AccountInfoFetcher
 from utils.connection_pool import ConnectionPool
 from utils.loguru_setup import logger, set_trace_context
@@ -27,9 +28,13 @@ from utils.website_parser import WebsiteParser
 from .enrichment_task import AccountEnrichmentTask
 
 
+# Removed direct google.genai import as factory handles it
+
+
 @dataclass
 class PromptTemplates:
     """Store prompt templates for AI interactions."""
+    # Keep prompts as they are used by the methods calling the AI service
     LINKEDIN_EXTRACTION_PROMPT = """
     Extract the LinkedIn company URL from the search results below.
     Follow these rules strictly:
@@ -270,63 +275,41 @@ class AccountEnhancementTask(AccountEnrichmentTask):
     def __init__(self, callback_service):
         """Initialize the task with required services and configurations."""
         super().__init__(callback_service)
-        self._initialize_credentials()
+        self.openai_service = None
+        self.gemini_service = None
+        self._initialize_credentials()  # Keep credential checks for env vars needed by factory/services
         self.bq_service = BigQueryService()
-        self._configure_ai_service()
+        # Initialize the AI Service Factory
+        self.ai_factory = AIServiceFactory()
         self.prompts = PromptTemplates()
         project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
         dataset = os.getenv('BIGQUERY_DATASET', 'userport_enrichment')
         self.pool = ConnectionPool(
             limits=httpx.Limits(
                 max_keepalive_connections=15,
-                max_connections=20,            # Maximum concurrent connections
-                keepalive_expiry=150.0         # Connection TTL in seconds
+                max_connections=20,
+                keepalive_expiry=150.0
             ),
             timeout=300.0
         )
         self.cache_service = APICacheService(self.bq_service.client, project_id=project_id, dataset=dataset, connection_pool=self.pool)
 
     def _initialize_credentials(self) -> None:
-        """Initialize and validate required API credentials."""
+        """Initialize and validate required API credentials from environment variables."""
         self.jina_api_token = os.getenv('JINA_API_TOKEN')
-        self.google_api_key = os.getenv('GEMINI_API_TOKEN')
+        # Check for tokens needed by the services within the factory
+        gemini_token = os.getenv('GEMINI_API_TOKEN')
+        openai_token = os.getenv('OPENAI_API_KEY')
 
-        if not self.google_api_key:
-            raise ValueError("GEMINI_API_TOKEN environment variable is required")
+        if not gemini_token:
+            logger.warning("GEMINI_API_TOKEN environment variable not set. Gemini functionality might fail.")
+        if not openai_token:
+            logger.warning("OPENAI_API_KEY environment variable not set. OpenAI functionality might fail.")
         if not self.jina_api_token:
             raise ValueError("JINA_API_TOKEN environment variable is required")
-
-    def _configure_ai_service(self) -> None:
-        """Configure the Gemini AI service."""
-        # Create client instead of configuring globally
-        self.client = genai.Client(api_key=self.google_api_key)
-        self.model_name = 'gemini-2.0-flash'
-
-    async def _generate_gemini_content(self, prompt: str):
-        """Generate content using the Gemini model with the new SDK."""
-        try:
-            # Configure response as JSON if JSON markers are in the prompt
-            config = {}
-            if "JSON" in prompt or "json" in prompt:
-                config['response_mime_type'] = 'application/json'
-
-            # Run in a separate thread since the client's method is synchronous
-            return await self._run_gemini_in_thread(prompt, config)
-        except Exception as e:
-            logger.error(f"Error in Gemini content generation: {str(e)}", exc_info=True)
-            raise
-
-    async def _run_gemini_in_thread(self, prompt: str, config=None):
-        """Run Gemini model in a separate thread to avoid blocking."""
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            None,  # Default executor
-            lambda: self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=config
-            )
-        )
+        # Add checks for GOOGLE_CLOUD_PROJECT and BIGQUERY_DATASET if not handled by factory init
+        if not os.getenv('GOOGLE_CLOUD_PROJECT'):
+            raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is required for AI Service Factory caching.")
 
     @property
     def enrichment_type(self) -> str:
@@ -347,7 +330,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
             for account in accounts:
                 if not all(k in account for k in ['account_id', 'website']):
-                    raise ValueError("Each account must have 'account_id' and and 'website'")
+                    raise ValueError("Each account must have 'account_id' and 'website'")  # Corrected typo
 
             return {
                 "accounts": accounts,
@@ -371,7 +354,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             "is_bulk": False
         }
 
-    async def execute(self, payload: Dict[str, Any]) -> (Dict[str, Any], Dict[str, Any]):
+    async def execute(self, payload: Dict[str, Any]) -> (Optional[Dict[str, Any]], Dict[str, Any]):
         """Execute the account enhancement task."""
         job_id = payload.get('job_id')
         accounts = payload.get('accounts') or []
@@ -382,24 +365,33 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
         if not accounts:
             logger.error(f"Job {job_id}: No accounts provided in payload")
-            return {
+            # Return structure: (callback_payload, final_status_payload)
+            return None, {
                 "status": "failed",
                 "error": "No accounts provided",
-                "job_id": job_id
+                "job_id": job_id,
+                "results": []
             }
 
         results = []
+        final_callback_payload = None  # Store the last successful callback payload
         has_failures = False
         processed_count = 0
         total_accounts = len(accounts)
 
-        callback_payload = None  # result payload to be sent back to django
+
+        self.gemini_service = self.ai_factory.create_service(provider="gemini", model_name="gemini-2.0-flash",
+                                                        default_temperature=0.1)
+        self.openai_service = self.ai_factory.create_service(provider="openai", model_name="gpt-4o",
+                                                        default_temperature=0.1)
+
         for account in accounts:
             processed_count += 1
             account_id = account.get('account_id')
             website = account.get('website')
+            current_account_callback_payload = None  # Payload for this specific account
 
-            # Update account_id
+            # Update account_id for logging context
             set_trace_context(account_id=account_id)
 
             logger.info(f"Processing account {processed_count}/{total_accounts}: ID {account_id}, website: {website}")
@@ -408,149 +400,96 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 if not all([account_id, website]):
                     logger.error(f"Job {job_id}, Account {account_id}: Missing required fields")
                     error_details = {'error_type': 'validation_error', 'message': "Missing required fields"}
-
-                    # Store error state
-                    await self._store_error_state(job_id, account_id, error_details)
-
-                    # Send validation failure callback
-                    await callback_service.send_callback(
-                        job_id=job_id,
-                        account_id=account_id,
-                        status='failed',
-                        enrichment_type='company_info',
-                        error_details=error_details,
-                        completion_percentage=int((processed_count / total_accounts) * 100)
-                    )
-
-                    results.append({
-                        "status": "failed",
-                        "account_id": account_id,
-                        "error": "Missing required fields"
-                    })
+                    await self._handle_failure(job_id, account_id, error_details, results, callback_service,
+                                               processed_count, total_accounts)
                     has_failures = True
                     continue
 
-                # Initial processing callback
+                # --- Start Processing ---
                 logger.info(f"Job {job_id}, Account {account_id}: Starting processing")
                 await callback_service.send_callback(
-                    job_id=job_id,
-                    account_id=account_id,
-                    status='processing',
-                    enrichment_type='company_info',
-                    completion_percentage=int((processed_count - 0.5) / total_accounts * 100)
+                    job_id=job_id, account_id=account_id, status='processing', enrichment_type='company_info',
+                    completion_percentage=int((processed_count - 0.9) / total_accounts * 100)  # Start progress early
                 )
 
-                # Fetch Basic Account information first.
+                # --- Fetch Basic Account Info ---
                 logger.debug(f"Job {job_id}, Account {account_id}: Fetching Basic Account information")
                 account_info_fetcher = AccountInfoFetcher(website=website)
                 account_info: AccountInfo = await account_info_fetcher.get()
-
-                # Send intermediate callback after Basic Account information has been fetched.
                 await callback_service.send_callback(
-                    job_id=job_id,
-                    account_id=account_id,
-                    status='processing',
-                    enrichment_type='company_info',
-                    is_partial=True,
-                    completion_percentage=int((processed_count - 0.75) / total_accounts * 100),
+                    job_id=job_id, account_id=account_id, status='processing', enrichment_type='company_info',
+                    is_partial=True, completion_percentage=int((processed_count - 0.8) / total_accounts * 100),
                     processed_data={'linkedin_url': account_info.linkedin_url} if account_info.linkedin_url else {}
                 )
 
-                # Fetch company profile
-                logger.debug(f"Job {job_id}, Account {account_id}: Fetching company profile from Jina AI")
-                try:
-                    company_profile = await self._fetch_company_profile(account_info.name)
-                except requests.exceptions.RequestException as e:
-                    logger.error(f"Jina API error for company profile: {str(e)}", exc_info=True)
-                    raise
-                except Exception as e:
-                    logger.error(f"Unexpected error fetching company profile: {str(e)}", exc_info=True)
-                    raise
-
-                # Send intermediate callback after profile fetch
+                # --- Fetch Jina AI Profile ---
+                logger.debug(
+                    f"Job {job_id}, Account {account_id}: Fetching company profile from Jina AI for: {account_info.name}")
+                company_profile = await self._fetch_company_profile(account_info.name)
                 await callback_service.send_callback(
-                    job_id=job_id,
-                    account_id=account_id,
-                    status='processing',
-                    enrichment_type='company_info',
-                    completion_percentage=int((processed_count - 0.25) / total_accounts * 100)
+                    job_id=job_id, account_id=account_id, status='processing', enrichment_type='company_info',
+                    completion_percentage=int((processed_count - 0.7) / total_accounts * 100)
                 )
 
-                # Extract structured data
+                # --- Extract Structured Data (Gemini) ---
                 logger.debug(f"Job {job_id}, Account {account_id}: Extracting structured data using Gemini")
-                structured_data = await self._extract_structured_data(company_profile)
+                # Pass the service instance created outside the loop
+                structured_data = await self._extract_structured_data(company_profile, self.gemini_service)
+                await callback_service.send_callback(
+                    job_id=job_id, account_id=account_id, status='processing', enrichment_type='company_info',
+                    completion_percentage=int((processed_count - 0.5) / total_accounts * 100)
+                )
 
-                # Populate some fields from structured data to account info.
+                # --- Populate Account Info from Structured Data ---
                 account_info.financials = Financials(**structured_data.get('financials')) if structured_data.get('financials') else None
                 account_info.technologies = self._extract_technologies(structured_data.get('technology_stack') or {})
                 account_info.customers = (structured_data.get('market_position') or {}).get('customers') or []
                 account_info.competitors = (structured_data.get('market_position') or {}).get('competitors') or []
-
-                # Ensure LinkedIn URL is properly set in structured data
-                if account_info.linkedin_url:
-                    if 'digital_presence' not in structured_data:
-                        structured_data['digital_presence'] = {}
-                    if 'social_media' not in structured_data['digital_presence']:
-                        structured_data['digital_presence']['social_media'] = {}
-
-                    # Only update if not already present or if existing URL is invalid
+                if account_info.linkedin_url:  # Ensure LinkedIn URL from fetcher is added
+                    if 'digital_presence' not in structured_data: structured_data['digital_presence'] = {}
+                    if 'social_media' not in structured_data['digital_presence']: structured_data['digital_presence'][
+                        'social_media'] = {}
                     structured_data['digital_presence']['social_media']['linkedin'] = account_info.linkedin_url
                     if not self._is_valid_linkedin_url(account_info.linkedin_url):
                         logger.warning(f"LinkedIn URL - {account_info.linkedin_url} is invalid!")
 
-                # Generate analysis
-                logger.debug(f"Job {job_id}, Account {account_id}: Generating analysis")
-                analysis_text = await self._generate_analysis(company_profile)
+                # --- Generate Analysis (Gemini) ---
+                logger.debug(f"Job {job_id}, Account {account_id}: Generating analysis using Gemini")
+                # Pass the service instance created outside the loop
+                analysis_text = await self._generate_analysis(company_profile, self.gemini_service)
+                await callback_service.send_callback(
+                    job_id=job_id, account_id=account_id, status='processing', enrichment_type='company_info',
+                    completion_percentage=int((processed_count - 0.4) / total_accounts * 100)
+                )
 
-                # Fetch customers.
+                # --- Fetch Website Customers ---
                 wb_parser = WebsiteParser(website=website)
                 wb_customers: List[str] = await wb_parser.fetch_company_customers()
                 logger.debug(f"Customers from Website for account ID {account_id} are {wb_customers}")
-                # Merge customers from website parser.
                 account_info.customers = list(set(account_info.customers) | set(wb_customers))
 
-                # Fetch technologies and update account info
+                # --- Fetch Technology Stack (BuiltWith/Website) ---
                 technologies, tech_profile = await self._fetch_technology_stack(website=website, account_id=account_id, existing_technologies=account_info.technologies)
                 account_info.technologies = technologies
                 account_info.tech_profile = tech_profile
+                await callback_service.send_callback(
+                    job_id=job_id, account_id=account_id, status='processing', enrichment_type='company_info',
+                    completion_percentage=int((processed_count - 0.2) / total_accounts * 100)
+                )
 
-                # Fetch market intelligence using OpenAI
-                logger.debug(f"Job {job_id}, Account {account_id}: Fetching market intelligence")
-                intelligence_data = await self._fetch_market_intelligence(website)
-
-                # Enhance the account info with intelligence data
-                openai_competitors = intelligence_data.get("competitors", [])
-                if openai_competitors:
-                    # Prioritize OpenAI competitors but keep any unique competitors from previous enrichment
-                    original_competitors = account_info.competitors
-                    # Replace with OpenAI data first
-                    account_info.competitors = openai_competitors
-
-                    # Add any unique competitors from original data
-                    for competitor in original_competitors:
-                        if competitor.lower() not in [c.lower() for c in account_info.competitors]:
-                            account_info.competitors.append(competitor)
-
-                    logger.debug(f"Job {job_id}, Account {account_id}: Updated competitors list with {len(account_info.competitors)} items")
-
-                # Merge customers similarly
-                openai_customers = intelligence_data.get("customers", [])
-                if openai_customers:
-                    original_customers = account_info.customers
-                    # Replace with OpenAI data first
-                    account_info.customers = openai_customers
-
-                    # Add any unique customers from original data
-                    for customer in original_customers:
-                        if customer.lower() not in [c.lower() for c in account_info.customers]:
-                            account_info.customers.append(customer)
-
-                    logger.debug(f"Job {job_id}, Account {account_id}: Updated customers list with {len(account_info.customers)} items")
-
-                # Get recent events
+                # --- Fetch Market Intelligence (OpenAI Search) ---
+                logger.debug(f"Job {job_id}, Account {account_id}: Fetching market intelligence using OpenAI")
+                # Pass the service instance created outside the loop
+                intelligence_data = await self._fetch_market_intelligence(website, self.openai_service)
+                account_info.competitors = self._merge_lists(intelligence_data.get("competitors", []),
+                                                             account_info.competitors)
+                account_info.customers = self._merge_lists(intelligence_data.get("customers", []),
+                                                           account_info.customers)
                 recent_events = intelligence_data.get("recent_events", [])
+                logger.debug(
+                    f"Job {job_id}, Account {account_id}: Updated competitors ({len(account_info.competitors)}), customers ({len(account_info.customers)})")
 
-                # Then continue with your existing code for processed_data, but update it to include recent events:
+                # --- Prepare Final Processed Data ---
                 processed_data = {
                     'company_name': account_info.name,
                     'employee_count': account_info.employee_count,
@@ -559,103 +498,92 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     'website': website,
                     'linkedin_url': account_info.linkedin_url,
                     'technologies': account_info.technologies,
-                    'funding_details': account_info.financials.private_data.model_dump(),
+                    'funding_details': account_info.financials.private_data.model_dump(
+                        mode='json') if account_info.financials and account_info.financials.private_data else {},
                     'company_type': account_info.organization_type,
                     'founded_year': account_info.founded_year,
                     'customers': account_info.customers,
                     'competitors': account_info.competitors,
-                    'tech_profile': account_info.tech_profile.model_dump(),
-                    'recent_events': recent_events,
+                    'tech_profile': account_info.tech_profile.model_dump() if hasattr(account_info.tech_profile, 'model_dump') else (account_info.tech_profile.processed_data if account_info.tech_profile else {}),
+                    # Use processed data from EnrichmentResult
+                    'recent_events': recent_events,  # Add recent events
+                    'analysis_summary': analysis_text  # Add analysis summary
                 }
 
-                # Update the raw data to include OpenAI intelligence when storing in BigQuery
+                # --- Store Raw Data (Consolidated) ---
+                raw_bq_data = {
+                    'jina_response': company_profile,
+                    'gemini_structured': structured_data,
+                    'gemini_analysis': analysis_text,
+                    # Store the raw intelligence data which might contain citations etc.
+                    'openai_intelligence': intelligence_data.get("raw_intelligence", {})
+                }
+                logger.debug(f"Job {job_id}, Account {account_id}: Storing final enrichment data")
                 await self.bq_service.insert_enrichment_raw_data(
                     job_id=job_id,
                     entity_id=account_id,
-                    source='jina_ai',
-                    raw_data={
-                        'jina_response': company_profile,
-                        'gemini_structured': structured_data,
-                        'gemini_analysis': analysis_text,
-                        'openai_intelligence': intelligence_data.get("raw_intelligence", {})  # Store the raw intelligence data
-                    },
-                    processed_data=processed_data
+                    source='jina_ai_gemini_openai',  # Combined source
+                    raw_data=raw_bq_data,
+                    processed_data=processed_data,
+                    status='completed'  # Mark as completed here
                 )
 
-                # Store enrichment raw data
-                logger.debug(f"Job {job_id}, Account {account_id}: Storing enrichment raw data")
-                await self.bq_service.insert_enrichment_raw_data(
-                    job_id=job_id,
-                    entity_id=account_id,
-                    source='jina_ai',
-                    raw_data={
-                        'jina_response': company_profile,
-                        'gemini_structured': structured_data,
-                        'gemini_analysis': analysis_text
-                    },
-                    processed_data=processed_data
-                )
-
-                # Send success callback
+                # --- Send Final Success Callback for this Account ---
                 logger.info(f"Job {job_id}, Account {account_id}: Processing completed successfully")
-                callback_payload = {
+                current_account_callback_payload = {
                     'job_id': job_id,
                     'account_id': account_id,
                     'status': 'completed',
                     'enrichment_type': 'company_info',
-                    'raw_data': structured_data,
+                    'raw_data': raw_bq_data,  # Send combined raw data
                     'processed_data': processed_data,
                     'completion_percentage': int((processed_count / total_accounts) * 100)
                 }
+                await callback_service.send_callback(**current_account_callback_payload)
 
                 results.append({
                     "status": "completed",
                     "account_id": account_id,
                     "company_name": account_info.name
                 })
+                final_callback_payload = current_account_callback_payload  # Store last success
 
             except Exception as e:
                 has_failures = True
-                logger.error(f"Job {job_id}, Account {account_id}: Processing failed - {str(e)}", exc_info=True)
-
+                logger.error(f"Job {job_id}, Account {account_id}: Processing failed - {type(e).__name__}: {str(e)}",
+                             exc_info=True)
                 error_details = {
                     'error_type': type(e).__name__,
                     'message': str(e),
-                    'retryable': True
+                    # Check if the exception is marked as retryable by the service's retry config
+                    'retryable': isinstance(e, RetryableError)  # Or check against known retryable exceptions if needed
                 }
+                # Use helper to handle failure logging, BQ storing, and callback
+                await self._handle_failure(job_id, account_id, error_details, results, callback_service,
+                                           processed_count, total_accounts)
 
-                try:
-                    # Store error state
-                    logger.debug(f"Job {job_id}, Account {account_id}: Storing error state")
-                    await self._store_error_state(job_id, account_id, error_details)
+        # --- Final Job Status Determination ---
+        successful_accounts = sum(1 for r in results if r["status"] == "completed")
+        failed_accounts = total_accounts - successful_accounts
 
-                    # Send failure callback
-                    await callback_service.send_callback(
-                        job_id=job_id,
-                        account_id=account_id,
-                        status='failed',
-                        enrichment_type='company_info',
-                        error_details=error_details,
-                        completion_percentage=int((processed_count / total_accounts) * 100)
-                    )
-                except Exception as callback_error:
-                    logger.error(f"Job {job_id}, Account {account_id}: Failed to send error callback - {str(callback_error)}", exc_info=True)
+        if total_accounts == 0:
+            final_status = "failed"  # Handle empty account list case
+        elif has_failures:
+            # If there are any failures but some accounts succeeded, use partially_completed
+            if successful_accounts > 0:
+                final_status = "partially_completed"
+            else:
+                # All accounts failed, mark as failed
+                final_status = "failed"
+        else:
+            # No failures, mark as completed (same as original code)
+            final_status = "completed"
 
-                results.append({
-                    "status": "failed",
-                    "account_id": account_id,
-                    "error": str(e)
-                })
-
-        # Final status determination
-        successful_accounts = len([r for r in results if r["status"] == "completed"])
-        failed_accounts = len([r for r in results if r["status"] == "failed"])
-
-        final_status = "completed" if not has_failures else "partially_completed"
         logger.info(f"Job {job_id} finished. Status: {final_status}, "
-                    f"Success: {successful_accounts}, Failed: {failed_accounts}")
+                    f"Total: {total_accounts}, Success: {successful_accounts}, Failed: {failed_accounts}")
 
-        return callback_payload, {
+        # Prepare final status payload
+        final_status_payload = {
             "status": final_status,
             "job_id": job_id,
             "is_bulk": is_bulk,
@@ -665,50 +593,97 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             "results": results
         }
 
+        return final_callback_payload, final_status_payload
+
+    async def _handle_failure(self, job_id: str, account_id: str, error_details: Dict, results: List,
+                              callback_service: CallbackService, processed_count: int, total_accounts: int):
+        """Helper function to handle account processing failures."""
+        try:
+            # Store error state in BigQuery
+            logger.debug(f"Job {job_id}, Account {account_id}: Storing error state")
+            await self._store_error_state(job_id, account_id, error_details)
+
+            # Send failure callback
+            await callback_service.send_callback(
+                job_id=job_id,
+                account_id=account_id,
+                status='failed',
+                enrichment_type='company_info',
+                error_details=error_details,
+                completion_percentage=int((processed_count / total_accounts) * 100)
+                # Mark completion % at failure point
+            )
+        except Exception as callback_error:
+            logger.error(
+                f"Job {job_id}, Account {account_id}: Failed to send error callback/store state - {str(callback_error)}",
+                exc_info=True)
+
+        results.append({
+            "status": "failed",
+            "account_id": account_id,
+            "error": error_details.get('message', 'Unknown error')
+        })
+
+
     async def _fetch_technology_stack(self, website: str, account_id: str,
-                                      existing_technologies) -> tuple[List[str], EnrichmentResult]:
+                                      existing_technologies: List[str]) -> tuple[List[str], Optional[EnrichmentResult]]:
         """
         Fetches technology stack from BuiltWith API and website parser if needed.
-        Returns tuple of (technologies list, raw tech profile).
+        Returns tuple of (technologies list, raw tech profile EnrichmentResult or None).
         """
         logger.debug(f"Fetching technology stack for account ID {account_id}")
+        tech_profile_result: Optional[EnrichmentResult] = None
+        technologies: List[str] = list(set(existing_technologies))  # Start with technologies from structured data
 
-        # Try BuiltWith first
-        domain = UrlUtils.get_domain(url=website)
-        builtwith_service = BuiltWithService(cache_service=self.cache_service)
-        tech_profile = await builtwith_service.get_technology_profile(domain=domain)
+        try:
+            # Try BuiltWith first
+            domain = UrlUtils.get_domain(url=website)
+            if domain:
+                builtwith_service = BuiltWithService(cache_service=self.cache_service)
+                tech_profile_result = await builtwith_service.get_technology_profile(domain=domain)
 
-        # Get BuiltWith technologies
-        bw_technologies: List[str] = []
-        if (tech_profile
-                and (tech_profile.processed_data.get("profile") or {}).get("technologies")):
-            bw_technologies = [
-                str(tech["name"])
-                for tech in tech_profile.processed_data["profile"]["technologies"]
-                if tech.get("name")
-            ]
-            logger.debug(f"Technologies from Built With for account ID {account_id} are {bw_technologies}")
+                # Get BuiltWith technologies if available
+                bw_technologies: List[str] = []
+                if (tech_profile_result
+                        and tech_profile_result.processed_data  # Check if processed_data is not None
+                        and (tech_profile_result.processed_data.get("profile") or {}).get("technologies")):
+                    bw_technologies = [
+                        str(tech["name"])
+                        for tech in tech_profile_result.processed_data["profile"]["technologies"]
+                        if tech.get("name")
+                    ]
+                    logger.debug(f"Technologies from Built With for account ID {account_id} are {bw_technologies}")
+                    # Merge BuiltWith technologies
+                    technologies = list(set(technologies) | set(bw_technologies))
+            else:
+                logger.warning(f"Could not extract domain from website: {website} for BuiltWith lookup.")
 
-        # Start with BuiltWith technologies
-        technologies = list(set(bw_technologies))
+        except Exception as e:
+            logger.warning(f"BuiltWith lookup failed for {website}: {str(e)}", exc_info=True)
+            tech_profile_result = None  # Ensure result is None on failure
 
-        # Fallback to website parser if no BuiltWith technologies found
-        if not bw_technologies:
-            logger.debug("No BuiltWith technologies found, attempting website parse")
-            wb_parser = WebsiteParser(website=website)
-            website_technologies = await wb_parser.fetch_technologies()
-            website_technologies = [str(tech) for tech in website_technologies if tech]
-            logger.debug(f"Technologies from Website for account ID {account_id} are {website_technologies}")
-            # Merge website technologies with any existing ones
-            technologies = list(set(existing_technologies) | set(website_technologies))
+        # Fallback to website parser if BuiltWith failed or found nothing substantial
+        # (Define 'substantial' - e.g., less than 3 techs found by BuiltWith?)
+        should_parse_website = not technologies or len(technologies) < 3
 
-        return technologies, tech_profile
+        if should_parse_website:
+            logger.debug("Attempting website parse for technologies (BuiltWith insufficient or failed)")
+            try:
+                wb_parser = WebsiteParser(website=website)
+                website_technologies = await wb_parser.fetch_technologies()
+                website_technologies = [str(tech) for tech in website_technologies if tech]
+                logger.debug(f"Technologies from Website for account ID {account_id} are {website_technologies}")
+                # Merge website technologies
+                technologies = list(set(technologies) | set(website_technologies))
+            except Exception as e:
+                logger.warning(f"Website technology parsing failed for {website}: {str(e)}", exc_info=True)
 
-    def _is_valid_linkedin_url(self, url: str) -> bool:
+        return list(set(technologies)), tech_profile_result  # Return unique list and the BW result
+
+    def _is_valid_linkedin_url(self, url: Optional[str]) -> bool:
         """Validate LinkedIn company URL format."""
         if not url:
             return False
-
         try:
             # Basic validation of LinkedIn company URL format
             return (
@@ -718,195 +693,177 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                     '\n' not in url
             )
         except Exception as e:
-            logger.error(f"Error validating LinkedIn URL: {str(e)}")
+            logger.error(f"Error validating LinkedIn URL '{url}': {str(e)}")
             return False
 
+    # Keep retry for external non-AI API
     @with_retry(retry_config=API_RETRY_CONFIG, operation_name="fetch_company_profile")
     async def _fetch_company_profile(self, company_name: str) -> str:
         """Fetch company profile from Jina AI."""
-        search_query = f"{company_name}+company+profile"
+        if not company_name:
+            raise ValueError("Company name cannot be empty for Jina AI search.")
+        search_query = f"{company_name} company overview business profile"  # Slightly adjusted query
         logger.debug(f"Searching Jina AI for company profile with query: {search_query}")
 
-        jina_url = f"https://s.jina.ai/{search_query}"
+        jina_url = f"https://s.jina.ai/{requests.utils.quote(search_query)}"  # URL encode query
         response = requests.get(
             jina_url,
-            headers={"Authorization": f"Bearer {self.jina_api_token}"},
-            timeout=30
+            headers={
+                "Authorization": f"Bearer {self.jina_api_token}",
+                "Accept": "text/plain"  # Prefer plain text
+            },
+            timeout=45  # Increased timeout
         )
-        response.raise_for_status()
+        response.raise_for_status()  # Raises HTTPError for bad responses (4xx or 5xx)
 
-        if not response.text.strip():
+        profile_text = response.text.strip()
+        if not profile_text:
             raise ValueError(f"Empty response from Jina AI for company: {company_name}")
+        if len(profile_text) < 100:  # Check for very short, potentially useless responses
+            logger.warning(f"Jina AI response for {company_name} seems short: {profile_text[:100]}...")
 
-        return response.text
+        return profile_text
 
     @with_retry(retry_config=AI_RETRY_CONFIG, operation_name="extract_structured_data")
-    async def _extract_structured_data(self, company_profile: str) -> Dict[str, Any]:
-        """Extract structured data from company profile using Gemini AI."""
+    async def _extract_structured_data(self, company_profile: str, gemini_service: AIService) -> Dict[str, Any]:
+        """Extract structured data from company profile using the Gemini AI service."""
         try:
             logger.debug("Creating extraction prompt for structured data...")
             extraction_prompt = self.prompts.EXTRACTION_PROMPT.format(
                 company_profile=company_profile
             )
 
-            try:
-                logger.debug("Sending structured data extraction prompt to Gemini...")
-                # Using the new SDK's generate_content method
-                response = await self._generate_gemini_content(extraction_prompt)
+            logger.debug("Sending structured data extraction prompt to Gemini Service...")
+            # Use the factory-created service instance
+            # is_json=True tells the service to expect/parse JSON
+            structured_data_response = await gemini_service.generate_content(
+                extraction_prompt,
+                is_json=True,
+                operation_tag="structured_data_extraction"
+                # temperature can be specified here to override default if needed
+            )
 
-                if not response or not hasattr(response, 'text'):
-                    raise ValueError("Empty response from Gemini AI for structured data extraction")
+            # --- MODIFICATION START ---
+            # Handle case where Gemini returns a list containing the dictionary
+            structured_data: Optional[Dict[str, Any]] = None
 
-                structured_data = self._parse_gemini_response(response.text)
+            if isinstance(structured_data_response, list):
+                if len(structured_data_response) > 0 and isinstance(structured_data_response[0], dict):
+                    # If it's a non-empty list and the first item is a dict, extract it
+                    structured_data = structured_data_response[0]
+                    logger.debug("Received list from Gemini service, extracted first dictionary element.")
+                else:
+                    logger.warning(f"Gemini service returned a list, but it's empty or doesn't contain a dictionary: {structured_data_response}")
+            elif isinstance(structured_data_response, dict):
+                # If it's already a dictionary, use it directly
+                structured_data = structured_data_response
+            else:
+                logger.error(f"Gemini service returned unexpected type for structured data extraction. Got: {type(structured_data_response)}")
 
-                # Validate essential fields
-                if not (structured_data.get('company_name') or {}).get('legal_name'):
-                    logger.warning("Structured data missing company legal name")
+            # Check if we successfully obtained a dictionary
+            if structured_data is None:
+                raise ValueError("Failed to extract a valid dictionary from AI service response.")
+            # --- MODIFICATION END ---
 
-                return structured_data
+            # Validate essential fields (optional but recommended)
+            if not (structured_data.get('company_name') or {}).get('legal_name'):
+                logger.warning("Structured data extraction missing company legal name")
+            if not structured_data.get('location'):
+                logger.warning("Structured data extraction missing location info")
 
-            except Exception as e:
-                logger.error(f"Gemini API error: {str(e)}", exc_info=True)
-                raise
-
-        except Exception as e:
-            logger.error(f"Error extracting structured data: {str(e)}", exc_info=True)
-            raise
-
-    def _parse_gemini_response(self, response_text: str) -> Dict[str, Any]:
-        """Parse and validate Gemini AI response."""
-        try:
-            cleaned_text = response_text.strip()
-
-            # Remove code block markers if present
-            if cleaned_text.startswith("```json"):
-                cleaned_text = cleaned_text[7:]
-            elif cleaned_text.startswith("```"):
-                cleaned_text = cleaned_text[3:]
-
-            if cleaned_text.endswith("```"):
-                cleaned_text = cleaned_text[:-3]
-
-            cleaned_text = cleaned_text.strip()
-
-            try:
-                parsed_data = json.loads(cleaned_text)
-
-                # Validate basic structure
-                if not isinstance(parsed_data, dict):
-                    raise ValueError("Parsed response is not a dictionary")
-
-                return parsed_data
-
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON parsing error. Text: '{cleaned_text[:500]}...'")
-                logger.error(f"JSON error details: {str(e)}")
-                raise ValueError(f"Failed to parse Gemini response as JSON: {str(e)}")
+            # Add post-processing or validation if necessary
+            return structured_data
 
         except Exception as e:
-            logger.error(f"Error parsing Gemini response: {str(e)}", exc_info=True)
+            logger.error(f"Error extracting structured data via AI Service: {str(e)}", exc_info=True)
+            # Re-raise to be caught by the main execute loop handler
             raise
 
-    async def _fetch_market_intelligence(self, website: str) -> Dict[str, Any]:
+    async def _fetch_market_intelligence(self, website: str, openai_service: AIService) -> Dict[str, Any]:
         """
-        Fetch market intelligence including competitors and customers using OpenAI with web search.
-
-        Args:
-            website: Company website URL
-
-        Returns:
-            Dict containing intelligence data
+        Fetch market intelligence including competitors and customers using OpenAI Search service.
         """
         try:
-            from services.openai_market_intel_service import OpenAISearchService
-            from services.ai_service import AIServiceFactory
+            # Assume OpenAISearchService wraps the factory-created openai_service
+            intelligence_service = OpenAISearchService(openai_service)
 
             logger.debug(f"Fetching market intelligence for website: {website}")
 
-            # Use AIServiceFactory to create an OpenAI service
-            factory = AIServiceFactory()
-            openai_service = factory.create_service(
-                provider="openai",
-                model_name="gpt-4o",  # The model that supports web search
-                cache_ttl_hours=24  # Cache for 24 hours since competitor data can change
-            )
-
-            # Create intelligence service
-            intelligence_service = OpenAISearchService(openai_service)
-
-            # Fetch intelligence data with web search
+            # Call the wrapper service method (assuming it uses generate_structured_search_content internally)
             intelligence_data = await intelligence_service.fetch_company_intelligence(website)
 
-            # Extract structured data
+            # Extract structured data using the wrapper service's methods
             competitors = intelligence_service.extract_competitor_names(intelligence_data)
             customers = intelligence_service.extract_customer_names(intelligence_data)
             recent_events = intelligence_service.extract_recent_events(intelligence_data)
-            citations = intelligence_service.extract_citations(intelligence_data)
+            # citations = intelligence_service.extract_citations(intelligence_data) # Citations might be inside raw_intelligence
 
-            logger.debug(f"Found {len(competitors)} competitors and {len(customers)} customers with {len(citations)} citations")
+            logger.debug(f"Found {len(competitors)} competitors and {len(customers)} customers via OpenAI Search")
 
             return {
                 "competitors": competitors,
                 "customers": customers,
                 "recent_events": recent_events,
-                "citations": citations,
+                # Pass the raw response which might contain citations etc.
                 "raw_intelligence": intelligence_data
             }
         except Exception as e:
-            logger.error(f"Error fetching market intelligence: {str(e)}", exc_info=True)
+            logger.error(f"Error fetching market intelligence via OpenAI Service: {str(e)}", exc_info=True)
             # Return empty data rather than failing the entire enrichment
             return {
                 "competitors": [],
                 "customers": [],
                 "recent_events": [],
-                "citations": [],
-                "raw_intelligence": {}
+                "raw_intelligence": {"error": f"Failed to fetch market intelligence: {str(e)}"}
             }
 
-    async def _generate_analysis(self, company_profile: str) -> str:
-        """Generate business analysis using Gemini AI."""
+    @with_retry(retry_config=AI_RETRY_CONFIG, operation_name="generate_analysis")
+    async def _generate_analysis(self, company_profile: str, gemini_service: AIService) -> str:
+        """Generate business analysis using the Gemini AI service."""
         try:
             logger.debug("Creating analysis prompt...")
             analysis_prompt = self.prompts.ANALYSIS_PROMPT.format(
                 company_profile=company_profile
             )
 
-            try:
-                factory = AIServiceFactory()
-                model = factory.create_service("gemini", model_name="gemini-2.0-flash")
-                logger.debug("Sending analysis prompt to Gemini...")
-                response = model.generate_content(analysis_prompt)
+            logger.debug("Sending analysis prompt to Gemini Service...")
+            # Use the factory-created service instance
+            # is_json=False tells the service to return raw text
+            analysis_text = await gemini_service.generate_content(
+                analysis_prompt,
+                is_json=False,
+                operation_tag="business_analysis"
+                # temperature can be specified here to override default if needed
+            )
 
-                if not response or not response.parts:
-                    raise ValueError("Empty response from Gemini AI for analysis generation")
+            if not isinstance(analysis_text, str) or not analysis_text.strip():
+                logger.warning("Generated analysis is empty or not a string.")
+                # Return a placeholder or raise an error? For now, return placeholder.
+                return "Analysis could not be generated."
 
-                analysis_text = response.parts[0].text
-
-                if not analysis_text.strip():
-                    raise ValueError("Generated analysis is empty")
-
-                return analysis_text
-
-            except Exception as e:
-                logger.error(f"Error generating analysis with Gemini: {str(e)}", exc_info=True)
-                raise
+            return analysis_text.strip()
 
         except Exception as e:
-            logger.error(f"Error generating analysis: {str(e)}", exc_info=True)
+            logger.error(f"Error generating analysis via AI Service: {str(e)}", exc_info=True)
+            # Re-raise to be caught by the main execute loop handler
             raise
 
-    def _format_location(self, location_data: Dict) -> str:
+    def _format_location(self, location_data: Optional[Dict]) -> Optional[str]:
         """Format location from structured data"""
+        if not location_data: return None
         hq = location_data.get('headquarters') or {}
         parts = [
             hq.get('city'),
             hq.get('state'),
             hq.get('country')
         ]
-        return ', '.join(filter(None, parts)) or None
+        # Filter out None or empty strings and join
+        formatted = ', '.join(filter(bool, parts))
+        return formatted or None
 
-    def _extract_technologies(self, tech_data: Dict) -> List[str]:
+    def _extract_technologies(self, tech_data: Optional[Dict]) -> List[str]:
         """Extract and flatten technology information"""
+        if not tech_data: return []
         tech_lists = [
             tech_data.get('programming_languages') or [],
             tech_data.get('frameworks') or [],
@@ -914,22 +871,35 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             tech_data.get('cloud_services') or [],
             tech_data.get('other_tools') or []
         ]
+        # Flatten list, remove duplicates, and filter out empty/None items
         return list(set(item for sublist in tech_lists for item in sublist if item))
+
+    def _merge_lists(self, primary_list: List[str], secondary_list: List[str]) -> List[str]:
+        """Merges two lists, prioritizing items from the primary list, ensuring uniqueness (case-insensitive)."""
+        merged_set = set(p.lower() for p in primary_list if p)
+        result_list = list(p for p in primary_list if p)  # Keep original casing from primary
+
+        for item in secondary_list:
+            if item and item.lower() not in merged_set:
+                merged_set.add(item.lower())
+                result_list.append(item)
+        return result_list
 
     async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
         """Store error information in BigQuery."""
         try:
             if not job_id or not entity_id:
-                logger.error("Missing required fields for error state storage")
+                logger.error("Missing required fields for error state storage (job_id or entity_id)")
                 return
 
-            # Ensure error details are properly formatted
+            # Ensure error details are properly formatted and JSON serializable
             formatted_error = {
-                'error_type': error_details.get('error_type') or 'unknown_error',
-                'message': error_details.get('message') or 'Unknown error occurred',
-                'timestamp': datetime.datetime.utcnow().isoformat(),
-                'retryable': error_details.get('retryable', True),
-                'additional_info': error_details.get('additional_info') or {}
+                'error_type': error_details.get('error_type', 'unknown_error'),
+                'message': str(error_details.get('message', 'Unknown error occurred')),  # Ensure string
+                'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),  # Use UTC timestamp
+                'retryable': error_details.get('retryable', False),  # Default to False unless specified
+                # Ensure additional info is serializable or removed
+                'additional_info': json.loads(json.dumps(error_details.get('additional_info', {}), default=str))
             }
 
             logger.debug(f"Storing error state for job {job_id}, entity {entity_id}")
@@ -937,11 +907,11 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             await self.bq_service.insert_enrichment_raw_data(
                 job_id=job_id,
                 entity_id=entity_id,
-                source='jina_ai',
-                raw_data={},
+                source='system_error',  # Indicate the source is an error during processing
+                raw_data={'error_details': formatted_error},  # Store error in raw_data
                 processed_data={},
                 status='failed',
-                error_details=formatted_error
+                error_details=formatted_error  # Also store in the dedicated error field if schema supports it
             )
 
             logger.info(f"Successfully stored error state for job {job_id}, entity {entity_id}")

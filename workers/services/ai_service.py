@@ -1117,6 +1117,7 @@ class OpenAIService(AIService):
                 ]
             )
 
+            # Disable search cache for now
             results = None # await self.cache_service._execute_query(query, job_config)
 
             if results:
