@@ -1,28 +1,28 @@
 import asyncio
-import datetime
 import json
 import os
 import uuid
 from dataclasses import dataclass
 from typing import Dict, Any, List
 
-import google.generativeai as genai
 import httpx
 import requests
+# Updated import
+from google import genai
 
+from models.accounts import AccountInfo, Financials
 from models.builtwith import EnrichmentResult
 from services.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.builtwith_service import BuiltWithService
 from services.django_callback_service import CallbackService
-from utils.connection_pool import ConnectionPool
-from utils.website_parser import WebsiteParser
-from utils.retry_utils import RetryableError, RetryConfig, with_retry
-from .enrichment_task import AccountEnrichmentTask
 from utils.account_info_fetcher import AccountInfoFetcher
-from utils.url_utils import UrlUtils
-from models.accounts import AccountInfo, Financials
+from utils.connection_pool import ConnectionPool
 from utils.loguru_setup import logger, set_trace_context
+from utils.retry_utils import RetryableError, RetryConfig, with_retry
+from utils.url_utils import UrlUtils
+from utils.website_parser import WebsiteParser
+from .enrichment_task import AccountEnrichmentTask
 
 
 @dataclass
@@ -296,8 +296,35 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the Gemini AI service."""
-        genai.configure(api_key=self.google_api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        # Create client instead of configuring globally
+        self.client = genai.Client(api_key=self.google_api_key)
+        self.model_name = 'gemini-2.0-flash-exp'
+
+    async def _generate_gemini_content(self, prompt: str):
+        """Generate content using the Gemini model with the new SDK."""
+        try:
+            # Configure response as JSON if JSON markers are in the prompt
+            config = {}
+            if "JSON" in prompt or "json" in prompt:
+                config['response_mime_type'] = 'application/json'
+
+            # Run in a separate thread since the client's method is synchronous
+            return await self._run_gemini_in_thread(prompt, config)
+        except Exception as e:
+            logger.error(f"Error in Gemini content generation: {str(e)}", exc_info=True)
+            raise
+
+    async def _run_gemini_in_thread(self, prompt: str, config=None):
+        """Run Gemini model in a separate thread to avoid blocking."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,  # Default executor
+            lambda: self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=config
+            )
+        )
 
     @property
     def enrichment_type(self) -> str:
@@ -683,10 +710,10 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         try:
             # Basic validation of LinkedIn company URL format
             return (
-                url.startswith('https://www.linkedin.com/company/') and
-                len(url) > len('https://www.linkedin.com/company/') and
-                ' ' not in url and
-                '\n' not in url
+                    url.startswith('https://www.linkedin.com/company/') and
+                    len(url) > len('https://www.linkedin.com/company/') and
+                    ' ' not in url and
+                    '\n' not in url
             )
         except Exception as e:
             logger.error(f"Error validating LinkedIn URL: {str(e)}")
@@ -722,12 +749,13 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
             try:
                 logger.debug("Sending structured data extraction prompt to Gemini...")
-                response = self.model.generate_content(extraction_prompt)
+                # Using the new SDK's generate_content method
+                response = await self._generate_gemini_content(extraction_prompt)
 
-                if not response or not response.parts:
+                if not response or not hasattr(response, 'text'):
                     raise ValueError("Empty response from Gemini AI for structured data extraction")
 
-                structured_data = self._parse_gemini_response(response.parts[0].text)
+                structured_data = self._parse_gemini_response(response.text)
 
                 # Validate essential fields
                 if not (structured_data.get('company_name') or {}).get('legal_name'):
@@ -832,90 +860,3 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 "citations": [],
                 "raw_intelligence": {}
             }
-
-    async def _generate_analysis(self, company_profile: str) -> str:
-        """Generate business analysis using Gemini AI."""
-        try:
-            logger.debug("Creating analysis prompt...")
-            analysis_prompt = self.prompts.ANALYSIS_PROMPT.format(
-                company_profile=company_profile
-            )
-
-            try:
-                logger.debug("Sending analysis prompt to Gemini...")
-                response = self.model.generate_content(analysis_prompt)
-
-                if not response or not response.parts:
-                    raise ValueError("Empty response from Gemini AI for analysis generation")
-
-                analysis_text = response.parts[0].text
-
-                if not analysis_text.strip():
-                    raise ValueError("Generated analysis is empty")
-
-                return analysis_text
-
-            except Exception as e:
-                logger.error(f"Error generating analysis with Gemini: {str(e)}", exc_info=True)
-                raise
-
-        except Exception as e:
-            logger.error(f"Error generating analysis: {str(e)}", exc_info=True)
-            raise
-
-    def _format_location(self, location_data: Dict) -> str:
-        """Format location from structured data"""
-        hq = location_data.get('headquarters') or {}
-        parts = [
-            hq.get('city'),
-            hq.get('state'),
-            hq.get('country')
-        ]
-        return ', '.join(filter(None, parts)) or None
-
-    def _extract_technologies(self, tech_data: Dict) -> List[str]:
-        """Extract and flatten technology information"""
-        tech_lists = [
-            tech_data.get('programming_languages') or [],
-            tech_data.get('frameworks') or [],
-            tech_data.get('databases') or [],
-            tech_data.get('cloud_services') or [],
-            tech_data.get('other_tools') or []
-        ]
-        return list(set(item for sublist in tech_lists for item in sublist if item))
-
-    async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
-        """Store error information in BigQuery."""
-        try:
-            if not job_id or not entity_id:
-                logger.error("Missing required fields for error state storage")
-                return
-
-            # Ensure error details are properly formatted
-            formatted_error = {
-                'error_type': error_details.get('error_type') or 'unknown_error',
-                'message': error_details.get('message') or 'Unknown error occurred',
-                'timestamp': datetime.datetime.utcnow().isoformat(),
-                'retryable': error_details.get('retryable', True),
-                'additional_info': error_details.get('additional_info') or {}
-            }
-
-            logger.debug(f"Storing error state for job {job_id}, entity {entity_id}")
-
-            await self.bq_service.insert_enrichment_raw_data(
-                job_id=job_id,
-                entity_id=entity_id,
-                source='jina_ai',
-                raw_data={},
-                processed_data={},
-                status='failed',
-                error_details=formatted_error
-            )
-
-            logger.info(f"Successfully stored error state for job {job_id}, entity {entity_id}")
-
-        except Exception as e:
-            logger.error(
-                f"Failed to store error state in BigQuery for job {job_id}, entity {entity_id}: {str(e)}",
-                exc_info=True
-            )

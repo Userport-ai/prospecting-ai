@@ -1,7 +1,7 @@
 import asyncio
 import json
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 
 from google.api_core.exceptions import ResourceExhausted
@@ -11,9 +11,8 @@ from services.ai_service import AIServiceFactory
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from tasks.enrichment_task import AccountEnrichmentTask
-from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.loguru_setup import logger, set_trace_context
-
+from utils.retry_utils import RetryableError, RetryConfig, with_retry
 
 # Enhanced retry configuration for AI operations
 AI_RETRY_CONFIG = RetryConfig(
@@ -89,7 +88,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         """Configure the AI service with factory pattern."""
         factory = AIServiceFactory()
         self.model = factory.create_service("gemini", model_name="gemini-2.5-pro-exp-03-25")
-        self.search_model = factory.create_service("openai", model_name="gpt-4o")
+        self.search_model = factory.create_service("gemini", model_name="gemini-2.5-pro-exp-03-25")
 
     @property
     def enrichment_type(self) -> str:
@@ -445,6 +444,7 @@ class CustomColumnTask(AccountEnrichmentTask):
             if ai_config and ai_config.get('use_internet', False):
                 response = await self.search_model.generate_search_content(prompt,
                                                                            search_context_size="high",
+                                                                           force_refresh=True,
                                                                            operation_tag='custom_column_with_internet')
             else:
                 response = await self.model.generate_content(prompt, is_json=True, operation_tag='custom_column')
@@ -480,56 +480,80 @@ class CustomColumnTask(AccountEnrichmentTask):
 
         # Get any examples from config
         examples = column_config.get('examples', [])
-        examples_text = ""
-        if examples:
-            examples_text = "Examples:\n" + "\n".join([f"- {example}" for example in examples])
+        examples_text = "\n".join([f"- {example}" for example in examples]) if examples else ""
 
         # Get any validation rules
         validation_rules = column_config.get('validation_rules', [])
-        validation_text = ""
-        if validation_rules:
-            validation_text = "Validation Rules:\n" + "\n".join([f"- {rule}" for rule in validation_rules])
+        validation_text = "\n".join([f"- {rule}" for rule in validation_rules]) if validation_rules else ""
+
+        # Define conditional sections
+        examples_section = f"""
+    If available, here are some examples to guide your response:
+    <examples>
+    {examples_text}
+    </examples>
+    """ if examples_text else ""
+
+        validation_section = f"""
+    If provided, here are some validation rules or notes to consider:
+    <validation_rules>
+    {validation_text}
+    </validation_rules>
+    """ if validation_text else ""
 
         # Create enhanced prompt
-        return f"""You are an experienced BDR prospecting and qualifying {entity_type_str}. Answer the following question about an {entity_type_str} based on the context provided:
+        return f"""You are an AI assistant functioning as an experienced Business Development Representative (BDR). Your task is to analyze information about a specific entity and answer a targeted question, potentially performing web research if necessary. Your goal is to provide accurate, up-to-date, and relevant information in a consistent format.
+    
+    Here's the context for the entity you'll be analyzing:
+    <entity_context>
+    {json.dumps(entity_context, indent=2)}
+    </entity_context>
+    <entity_type>{entity_type_str}</entity_type>
+    
+    Now, here's the specific question you need to answer:
+    <column_description>{column_description}</column_description>
+    <question>{question}</question>
+    <response_type>{response_type}</response_type>
+    {examples_section}{validation_section}
+    Instructions:
+    1. Analyze the provided entity context thoroughly.
+    2. If the context doesn't contain sufficient or up-to-date information to answer the question, perform targeted web research using reliable sources (e.g., official company websites, reputable news outlets, professional directories).
+    3. Synthesize the information from the context and/or web research to directly answer the question.
+    4. Format your answer according to the specified response type: {response_type}.
+    5. Determine a confidence score (0.0 to 1.0) based on the clarity, directness, and reliability of your sources.
+    6. Provide a brief rationale explaining how you determined the answer and what sources you used (context, specific websites, etc.).
+    7. If you cannot find reliable information to answer the question, clearly state this in your rationale, assign a low confidence score (e.g., < 0.2), and provide an appropriate "empty" or "null" value that matches the response type: {response_type}.
+    
+    Before providing your final answer, show your reasoning process inside <analysis> tags in your thinking block:
+    <analysis>
+    1. Extract relevant information from entity context:
+    2. Identify information gaps
+    3. Plan web research strategy (if needed):
+       [List potential sources and search queries for web research based on entity and question]
+    4. Conduct web research (if needed). 
+    5. Summarize the research and synthesize the information. Give verifiable links to actual relevant sources.
+    6. Draft answer
+    7. Verify answer against response type {response_type} and validation rules: {validation_text if validation_text else "None provided"}
+    8. Determine confidence score along with how you came up with it.
+    9. Craft rationale summarizing how you determined the answer and what sources you used.
+    10.In case of conflict between the information/instructions in the question and outside the question tag, outside info overrides any conflicting information in question tag.
+    </analysis>
+    
+    After completing your thought process, provide your answer in the following JSON format:
+    {{
+      "value": <Value conforming to {response_type}>,
+      "confidence_score": <float between 0.0 and 1.0>,
+      "rationale": "<string explaining derivation and sources, or stating info not found>"
+    }}
 
-Column Information:
-- ID: {column_config.get('id', 'Unknown')}
-- Name: {column_config.get('name', 'Custom Column')}
-- Description: {column_description}
-- Question: {question}
-- Response Type: {response_type}
-
-Entity ID: {entity_id}
-
-Context:
-{json.dumps(entity_context, indent=2)}
-
-{examples_text}
-
-{validation_text}
-
-Response Requirements:
-1. Overall response must be a JSON
-2. Value inside the response must match the configured response_type: {response_type}
-3. Include a confidence score between 0 and 1
-4. Provide rationale for the generated value
-
-Return as JSON:
-{{
-    "value": {expected_format},
-    "confidence_score": float,
-    "rationale": string
-}}
-
-Be accurate, concise, and ensure the response strictly adheres to the specified response type."""
+    Remember to adhere strictly to the specified response type for the "value" field, and ensure your response is accurate, up-to-date, and of appropriate length and detail."""
 
     def _get_format_for_response_type(self, column_config: Dict[str, Any]) -> str:
         """Get the expected format description for the response type."""
         response_type = column_config.get('response_type', 'string')
         allowed_values = column_config['response_config'].get('allowed_values', [])
         formats = {
-            "string": "string (text value)",
+            "string": "string (markdown text value)",
             "json_object": "object (valid JSON object)",
             "boolean": "boolean (true or false)",
             "number": "number (integer or float)",

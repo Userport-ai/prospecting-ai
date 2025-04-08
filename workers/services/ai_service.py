@@ -6,9 +6,10 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Union, Tuple, List
 
-import google.generativeai as genai
+import google.genai as genai
 from google.api_core.exceptions import ResourceExhausted as GoogleAPIResourceExhausted
 from google.cloud import bigquery
+from google.genai import types
 from openai import AsyncOpenAI
 
 from utils.async_utils import to_thread, to_cpu_thread, run_in_thread
@@ -487,9 +488,9 @@ class GeminiService(AIService):
         if not api_key:
             raise ValueError("GEMINI_API_TOKEN environment variable required")
 
-        genai.configure(api_key=api_key)
+        # Create client instead of configuring globally
+        self.client = genai.Client(api_key=api_key)
         self.model = model_name or 'gemini-2.0-flash'
-        self.model_instance = genai.GenerativeModel(self.model)
 
         # Approximate token count for cost estimation
         self.avg_chars_per_token = 4
@@ -505,21 +506,27 @@ class GeminiService(AIService):
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content using Gemini without using cache."""
         try:
-            if is_json:
-                prompt = f"{prompt}\n\nRespond in JSON format only."
+            # Create config for the API call
+            config_params = {}
 
             # Use provided temperature or default
             used_temperature = temperature if temperature is not None else self.default_temperature
+            if used_temperature is not None:
+                config_params['temperature'] = used_temperature
 
-            # Gemini's generate_content is synchronous, so we run it in a thread
-            response = await self._generate_content_in_thread(prompt, used_temperature)
+            if is_json:
+                prompt = f"{prompt}\n\nRespond in JSON format only."
+                config_params['response_mime_type'] = 'application/json'
 
-            if not response or not response.parts:
+            # Run in thread since we're using the synchronous API
+            response = await self._generate_content_in_thread(prompt, config_params)
+
+            if not response or not hasattr(response, 'text'):
                 logger.warning("Empty response from Gemini")
                 token_usage = self._create_token_usage(0, 0, operation_tag)
                 return {} if is_json else "", token_usage
 
-            response_text = response.parts[0].text
+            response_text = response.text
             logger.debug(f"Gemini response: {response_text}")
 
             # Estimate token usage based on character count
@@ -546,15 +553,15 @@ class GeminiService(AIService):
             return {} if is_json else "", token_usage
 
     @to_thread
-    def _generate_content_in_thread(self, prompt: str, temperature: Optional[float] = None):
+    def _generate_content_in_thread(self, prompt: str, config_params: Dict[str, Any]):
         """Run Gemini's synchronous generate_content in a separate thread"""
-        generation_config = {}
-        if temperature is not None:
-            generation_config['temperature'] = temperature
+        # Create a GenerateContentConfig object from the config dictionary
+        config = types.GenerateContentConfig(**config_params) if config_params else None
 
-        return self.model_instance.generate_content(
-            prompt,
-            generation_config=generation_config
+        return self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=config
         )
 
     @to_cpu_thread
@@ -583,8 +590,228 @@ class GeminiService(AIService):
             logger.error(f"Error parsing JSON response: {str(e)}")
             return {}
 
+    def _generate_search_cache_key(
+            self,
+            prompt: str,
+            search_context_size: str,
+            operation_tag: str,
+            user_location: Optional[Dict[str, Any]] = None,
+            schema_info: Optional[str] = None
+    ) -> str:
+        """Generate a cache key for search operations."""
+        cache_data = {
+            'prompt': prompt,
+            'provider': self.provider_name,
+            'model': self.model,
+            'search_context_size': search_context_size,
+            'operation_tag': operation_tag,
+            'schema_info': schema_info
+        }
 
-    def generate_search_content(
+        # Add user location to cache key if provided
+        if user_location:
+            cache_data['user_location'] = json.dumps(user_location, sort_keys=True)
+
+        # Generate cache key
+        return hashlib.sha256(json.dumps(cache_data, sort_keys=True).encode()).hexdigest()
+
+    async def _check_search_cache(
+            self,
+            cache_key: str,
+            operation_tag: str
+    ) -> Optional[Dict[str, Any]]:
+        """Check if there's a cached response for the given cache key."""
+        if not self.cache_service:
+            return None
+
+        try:
+            query = f"""
+            SELECT 
+                response_data,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
+                total_cost_in_usd
+            FROM `{self.cache_service.project_id}.{self.cache_service.dataset}.{self.cache_service.table_name}`
+            WHERE cache_key = @cache_key
+            AND provider = @provider
+            AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP())
+            AND (tenant_id IS NULL OR tenant_id = @tenant_id)
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("cache_key", "STRING", cache_key),
+                    bigquery.ScalarQueryParameter("provider", "STRING", self.provider_name),
+                    bigquery.ScalarQueryParameter("tenant_id", "STRING", self.tenant_id)
+                ]
+            )
+
+            # Execute query in a separate thread
+            results = await self.cache_service._execute_query(query, job_config)
+
+            if results:
+                row = results[0]
+                logger.info(f"Cache hit for search query with key: {cache_key[:8]}...")
+
+                # Return the cached response
+                return row.response_data
+
+        except Exception as e:
+            logger.error(f"Cache read failed: {e}")
+
+        return None
+
+    async def _store_search_result(
+            self,
+            cache_key: str,
+            result: Dict[str, Any],
+            token_usage: TokenUsage,
+            prompt: str
+    ) -> None:
+        """Store a search result in cache."""
+        if not self.cache_service:
+            return
+
+        try:
+            # Prepare expiration time
+            expires_at = None
+            if self.cache_ttl_hours is not None:
+                expires_at = datetime.now(timezone.utc) + timedelta(hours=self.cache_ttl_hours)
+
+            # Prepare row for insertion
+            row = {
+                "cache_key": cache_key,
+                "provider": self.provider_name,
+                "model": self.model,
+                "prompt": prompt,
+                "is_json_response": True,
+                "operation_tag": token_usage.operation_tag,
+                "response_data": json.dumps(result),
+                "response_text": None,
+                "prompt_tokens": token_usage.prompt_tokens,
+                "completion_tokens": token_usage.completion_tokens,
+                "total_tokens": token_usage.total_tokens,
+                "total_cost_in_usd": token_usage.total_cost_in_usd,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "expires_at": expires_at.isoformat() if expires_at else None,
+                "tenant_id": self.tenant_id
+            }
+
+            # Insert row
+            errors = await self.cache_service._insert_row(row)
+
+            if errors:
+                logger.error(f"Error caching search response: {errors}")
+
+        except Exception as e:
+            logger.error(f"Failed to cache search response: {e}")
+
+    @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_search_content")
+    async def _execute_search_request(
+            self,
+            prompt: str,
+            search_context_size: str = "medium",
+            user_location: Optional[Dict[str, Any]] = None,
+            response_schema: Optional[Any] = None,
+            operation_tag: str = "search"
+    ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
+        """Execute search request using Gemini API."""
+        try:
+            # Prepare enhanced prompt based on schema if provided
+            enhanced_prompt = prompt
+            if response_schema and hasattr(response_schema, "model_fields"):
+                schema_description = []
+                for field_name, field_info in response_schema.model_fields.items():
+                    field_type = str(field_info.annotation)
+                    description = getattr(field_info, "description", "")
+                    schema_description.append(f"- {field_name}: {field_type}{' - ' + description if description else ''}")
+
+                enhanced_prompt = f"{prompt}\n\nRespond with JSON data in this structure:\n{chr(10).join(schema_description)}\n\nEnsure your response is valid JSON."
+            else:
+                enhanced_prompt = f"{prompt}\n\nRespond with valid JSON data."
+
+            # Configure search parameters
+            search_params = {}
+            if user_location:
+                search_params["user_location"] = user_location
+
+            # Run in thread since we're using the synchronous API
+            response = await self._generate_search_content_in_thread(
+                prompt=enhanced_prompt,
+                search_params=search_params,
+                temperature=self.default_temperature
+            )
+
+            if not response or not hasattr(response, 'text'):
+                logger.warning("Empty search response from Gemini")
+                token_usage = self._create_token_usage(0, 0, operation_tag)
+                return {} if response_schema else "", token_usage
+
+            response_text = response.text
+            logger.debug(f"Gemini search response: {response_text}...")
+
+            # Estimate token usage with search multiplier
+            multiplier = 1.0
+
+            prompt_tokens = len(enhanced_prompt) // self.avg_chars_per_token
+            prompt_tokens = int(prompt_tokens * multiplier)  # Account for search context
+            completion_tokens = len(response_text) // self.avg_chars_per_token
+            total_tokens = prompt_tokens + completion_tokens
+
+            # Apply higher cost for search operations
+            search_cost_multiplier = 1.2  # 20% premium for search operations
+            total_cost = (total_tokens / 1000) * self.cost_per_1k_tokens * search_cost_multiplier
+
+            token_usage = self._create_token_usage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                operation_tag=operation_tag,
+                total_cost=total_cost
+            )
+
+            # Parse JSON response if needed
+            if response_schema or "json" in enhanced_prompt.lower():
+                result = await self._parse_json_response_async(response_text)
+                # Add metadata about the search
+                result["_search_metadata"] = {
+                    "provider": self.provider_name,
+                    "model": self.model,
+                    "search_context_size": search_context_size
+                }
+                return result, token_usage
+
+            return response_text, token_usage
+
+        except Exception as e:
+            logger.error(f"Error in Gemini search request: {str(e)}", exc_info=True)
+            error_result = {"error": str(e)}
+            token_usage = self._create_token_usage(len(prompt) // 4, 10, operation_tag, 0.001)
+            return error_result, token_usage
+
+    @to_thread
+    def _generate_search_content_in_thread(self, prompt: str, search_params: Dict[str, Any], temperature: Optional[float] = None):
+        """Execute Gemini's search-enabled content generation in a separate thread."""
+        # Create the Google Search tool
+        search_tool = types.Tool(google_search=types.GoogleSearch(**search_params))
+
+        # Prepare generation config
+        config_params = {}
+        if temperature is not None:
+            config_params['temperature'] = temperature
+
+        return self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[search_tool],
+                **config_params
+            )
+        )
+
+    async def generate_search_content(
             self,
             prompt: str,
             search_context_size: str = "medium",
@@ -592,9 +819,41 @@ class GeminiService(AIService):
             operation_tag: str = "search",
             force_refresh: bool = False
     ) -> Dict[str, Any]:
-        raise NotImplementedError("Generate search content is not implemented yet for Gemini AI Service")
+        """Generate content with web search capability."""
+        # Generate cache key
+        cache_key = self._generate_search_cache_key(
+            prompt=prompt,
+            search_context_size=search_context_size,
+            operation_tag=operation_tag,
+            user_location=user_location
+        )
 
-    def generate_structured_search_content(
+        # Check cache if not forcing refresh
+        if not force_refresh and self.cache_service:
+            cached_result = await self._check_search_cache(cache_key, operation_tag)
+            if cached_result:
+                return cached_result
+
+        # Execute search request
+        result, token_usage = await self._execute_search_request(
+            prompt=prompt,
+            search_context_size=search_context_size,
+            user_location=user_location,
+            operation_tag=operation_tag
+        )
+
+        # Store result in cache
+        if self.cache_service:
+            await self._store_search_result(
+                cache_key=cache_key,
+                result=result,
+                token_usage=token_usage,
+                prompt=prompt
+            )
+
+        return result
+
+    async def generate_structured_search_content(
             self,
             prompt: str,
             response_schema: Any,  # Pydantic model class
@@ -603,8 +862,71 @@ class GeminiService(AIService):
             operation_tag: str = "structured_search",
             force_refresh: bool = False
     ) -> Dict[str, Any]:
-        raise NotImplementedError("Generate structured search content is not implemented yet for Gemini AI Service")
+        """Generate content with web search capability and structured output format."""
+        # Create schema_info for cache key
+        schema_info = str(response_schema) if response_schema else None
 
+        # Generate cache key
+        cache_key = self._generate_search_cache_key(
+            prompt=prompt,
+            search_context_size=search_context_size,
+            operation_tag=operation_tag,
+            user_location=user_location,
+            schema_info=schema_info
+        )
+
+        # Check cache if not forcing refresh
+        if not force_refresh and self.cache_service:
+            cached_result = await self._check_search_cache(cache_key, operation_tag)
+            if cached_result:
+                return cached_result
+
+        # Execute search request with schema
+        result, token_usage = await self._execute_search_request(
+            prompt=prompt,
+            search_context_size=search_context_size,
+            user_location=user_location,
+            response_schema=response_schema,
+            operation_tag=operation_tag
+        )
+
+        # Handle refusals if present
+        if "refusal" in result or "error" in result:
+            empty_response = {}
+            if hasattr(response_schema, "model_fields"):
+                empty_response = {field: [] if "List" in str(field_info.annotation) else None
+                                  for field, field_info in response_schema.model_fields.items()}
+
+            if "refusal" in result:
+                logger.warning(f"Model refused to respond: {result['refusal']}")
+                empty_response["_refusal_message"] = result["refusal"]
+            elif "error" in result:
+                logger.warning(f"Error in response: {result['error']}")
+                empty_response["_error_message"] = result["error"]
+
+            result = empty_response
+
+        # Store result in cache
+        if self.cache_service:
+            await self._store_search_result(
+                cache_key=cache_key,
+                result=result,
+                token_usage=token_usage,
+                prompt=prompt
+            )
+
+        # Try to validate and convert the result using the schema
+        if hasattr(response_schema, "model_validate"):
+            try:
+                # This will raise an exception if the result doesn't match the schema
+                validated_model = response_schema.model_validate(result)
+                # Convert back to dict for consistency
+                if hasattr(validated_model, "model_dump"):
+                    result = validated_model.model_dump()
+            except Exception as e:
+                logger.warning(f"Schema validation failed: {str(e)}. Using unvalidated result.")
+
+        return result
 
 class OpenAIService(AIService):
     """OpenAI implementation of AI service."""
@@ -1218,4 +1540,4 @@ class AIServiceFactory:
 
     async def close(self):
         """Close any resources used by the factory."""
-        pass  # Add any cleanup code here if needed in the future
+        pass

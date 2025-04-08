@@ -12,7 +12,6 @@ from services.task_registry import TaskRegistry
 from tasks.account_enhancement import AccountEnhancementTask
 from tasks.custom_column_generation_task import CustomColumnTask
 from tasks.generate_leads_apollo import ApolloLeadsTask
-from tasks.generate_leads_task import GenerateLeadsTask
 from tasks.lead_linkedin_research_task import LeadLinkedInResearchTask
 from utils.loguru_setup import logger, set_trace_context
 
@@ -30,7 +29,6 @@ task_registry = TaskRegistry()
 async def register_tasks():
     """Asynchronously registers tasks during FastAPI startup."""
     await task_registry.register(AccountEnhancementTask)
-    await task_registry.register(GenerateLeadsTask)
     await task_registry.register(LeadLinkedInResearchTask)
     await task_registry.register(ApolloLeadsTask)
     await task_registry.register(CustomColumnTask)

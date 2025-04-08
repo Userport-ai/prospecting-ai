@@ -1,10 +1,10 @@
 fastapi==0.109.0
-httpx==0.27.0
+httpx==0.28.1
 uvicorn==0.27.0
 google-cloud-tasks==2.14.2
 python-dotenv==1.0.1
 google-cloud-bigquery==3.27.0
-google-generativeai==0.3.2  # For Gemini AI
+google-genai==1.9.0  # For Gemini AI
 urllib3==2.2.1
 requests==2.31.0
 openai~=1.68.0
