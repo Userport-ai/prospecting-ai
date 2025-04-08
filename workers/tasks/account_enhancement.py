@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import os
 import uuid
@@ -860,3 +861,90 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 "citations": [],
                 "raw_intelligence": {}
             }
+
+    async def _generate_analysis(self, company_profile: str) -> str:
+        """Generate business analysis using Gemini AI."""
+        try:
+            logger.debug("Creating analysis prompt...")
+            analysis_prompt = self.prompts.ANALYSIS_PROMPT.format(
+                company_profile=company_profile
+            )
+
+            try:
+                logger.debug("Sending analysis prompt to Gemini...")
+                response = self.model.generate_content(analysis_prompt)
+
+                if not response or not response.parts:
+                    raise ValueError("Empty response from Gemini AI for analysis generation")
+
+                analysis_text = response.parts[0].text
+
+                if not analysis_text.strip():
+                    raise ValueError("Generated analysis is empty")
+
+                return analysis_text
+
+            except Exception as e:
+                logger.error(f"Error generating analysis with Gemini: {str(e)}", exc_info=True)
+                raise
+
+        except Exception as e:
+            logger.error(f"Error generating analysis: {str(e)}", exc_info=True)
+            raise
+
+    def _format_location(self, location_data: Dict) -> str:
+        """Format location from structured data"""
+        hq = location_data.get('headquarters') or {}
+        parts = [
+            hq.get('city'),
+            hq.get('state'),
+            hq.get('country')
+        ]
+        return ', '.join(filter(None, parts)) or None
+
+    def _extract_technologies(self, tech_data: Dict) -> List[str]:
+        """Extract and flatten technology information"""
+        tech_lists = [
+            tech_data.get('programming_languages') or [],
+            tech_data.get('frameworks') or [],
+            tech_data.get('databases') or [],
+            tech_data.get('cloud_services') or [],
+            tech_data.get('other_tools') or []
+        ]
+        return list(set(item for sublist in tech_lists for item in sublist if item))
+
+    async def _store_error_state(self, job_id: str, entity_id: str, error_details: Dict[str, Any]) -> None:
+        """Store error information in BigQuery."""
+        try:
+            if not job_id or not entity_id:
+                logger.error("Missing required fields for error state storage")
+                return
+
+            # Ensure error details are properly formatted
+            formatted_error = {
+                'error_type': error_details.get('error_type') or 'unknown_error',
+                'message': error_details.get('message') or 'Unknown error occurred',
+                'timestamp': datetime.datetime.utcnow().isoformat(),
+                'retryable': error_details.get('retryable', True),
+                'additional_info': error_details.get('additional_info') or {}
+            }
+
+            logger.debug(f"Storing error state for job {job_id}, entity {entity_id}")
+
+            await self.bq_service.insert_enrichment_raw_data(
+                job_id=job_id,
+                entity_id=entity_id,
+                source='jina_ai',
+                raw_data={},
+                processed_data={},
+                status='failed',
+                error_details=formatted_error
+            )
+
+            logger.info(f"Successfully stored error state for job {job_id}, entity {entity_id}")
+
+        except Exception as e:
+            logger.error(
+                f"Failed to store error state in BigQuery for job {job_id}, entity {entity_id}: {str(e)}",
+                exc_info=True
+            )
