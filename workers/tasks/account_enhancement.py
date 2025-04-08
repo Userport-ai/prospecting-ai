@@ -13,6 +13,7 @@ from google import genai
 
 from models.accounts import AccountInfo, Financials
 from models.builtwith import EnrichmentResult
+from services.ai_service import AIServiceFactory
 from services.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.builtwith_service import BuiltWithService
@@ -299,7 +300,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         """Configure the Gemini AI service."""
         # Create client instead of configuring globally
         self.client = genai.Client(api_key=self.google_api_key)
-        self.model_name = 'gemini-2.0-flash-exp'
+        self.model_name = 'gemini-2.0-flash'
 
     async def _generate_gemini_content(self, prompt: str):
         """Generate content using the Gemini model with the new SDK."""
@@ -871,8 +872,10 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             )
 
             try:
+                factory = AIServiceFactory()
+                model = factory.create_service("gemini", model_name="gemini-2.0-flash")
                 logger.debug("Sending analysis prompt to Gemini...")
-                response = self.model.generate_content(analysis_prompt)
+                response = model.generate_content(analysis_prompt)
 
                 if not response or not response.parts:
                     raise ValueError("Empty response from Gemini AI for analysis generation")
