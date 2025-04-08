@@ -233,6 +233,21 @@ class AICacheService:
             ttl_hours: Optional[int] = None,
             temperature: Optional[float] = None
     ) -> None:
+
+        # Skip caching for empty responses
+        if is_json and (not response or response == {}):
+            logger.warning(f"Skipping cache for empty JSON response for prompt: {prompt[:100]}...")
+            return
+
+        if not is_json and (not response or response == ""):
+            logger.warning(f"Skipping cache for empty text response for prompt: {prompt[:100]}...")
+            return
+
+        # Skip caching responses with error indicators
+        if is_json and isinstance(response, dict) and ("error" in response or "refusal" in response):
+            logger.warning(f"Skipping cache for response with error/refusal: {str(response)[:100]}...")
+            return
+
         """Cache an AI response."""
         cache_key = self._generate_cache_key(prompt, provider, model, is_json, operation_tag, temperature)
         expires_at = None
