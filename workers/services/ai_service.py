@@ -172,14 +172,22 @@ class AICacheService:
             if is_json:
                 # BigQuery client already deserializes JSON fields
                 content = row.response_data
+                if content is not None:
+                    if (isinstance(content, dict) and not content) or \
+                            (isinstance(content, list) and not content) or \
+                            content == '':
+                        logger.debug(f"Skipping cached response with empty JSON content for key: {cache_key}")
+                        return None
             else:
                 content = row.response_text
+                if not content or content.strip() == '':
+                    logger.debug(f"Skipping cached response with empty text content for key: {cache_key}")
+                return None
 
             return {
                 "content": content,
                 "token_usage": token_usage
             }
-
         return None
 
     @to_thread
