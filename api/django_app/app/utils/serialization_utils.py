@@ -51,7 +51,8 @@ def get_custom_column_values(obj):
             'description': column.description or '',
             'response_type': column.response_type,
             'status': None,
-            'value': None  # Default to None
+            'value': None,  # Default to None
+            'rationale': None
         }
 
         # Add to result dict immediately
@@ -89,6 +90,7 @@ def get_custom_column_values(obj):
             result[column_id]['value'] = value.value_json
 
         result[column_id]['status'] = value.status
+        result[column_id]['rationale'] = value.rationale
 
     return result
 
