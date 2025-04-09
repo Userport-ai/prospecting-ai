@@ -40,7 +40,7 @@ const renderValueWithTooltip = (
   rationale: string | null
 ) => {
   return (
-    <div className="flex items-center">
+    <div className="flex-col justify-center">
       {valueElement}
       <RationaleTooltip rationale={rationale} />
     </div>
