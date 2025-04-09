@@ -418,7 +418,7 @@ export const getAccountColumns = (
   const finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
 
   // Get unique custom column definitions from the rows provided
-  const customColumnDefinitions = new Map<string, CustomColumnValueData>();
+  var customColumnDefinitions = new Map<string, CustomColumnValueData>();
 
   for (const row of rows) {
     if (row.custom_column_values) {
@@ -434,6 +434,37 @@ export const getAccountColumns = (
         }
       }
     }
+  }
+
+  // Helper method that returns true if the custom column name contains "Score" and false otherwise.
+  const columnNameIncludesScore = (colData: CustomColumnValueData): boolean => {
+    return colData.name.includes("Score");
+  };
+
+  // Sort custom columns if Fit Score is present so it is always the first custom column.
+  var fitScoreColumEntry: [string, CustomColumnValueData] | null = null;
+  customColumnDefinitions.forEach((colData, columnId) => {
+    if (columnNameIncludesScore(colData)) {
+      // Fit Score column found.
+      fitScoreColumEntry = [columnId, colData];
+    }
+  });
+  if (fitScoreColumEntry) {
+    // This should be the first column.
+    var sortedCustomColumnDefinitions = new Map<
+      string,
+      CustomColumnValueData
+    >();
+    sortedCustomColumnDefinitions.set(
+      fitScoreColumEntry[0],
+      fitScoreColumEntry[1]
+    );
+    customColumnDefinitions.forEach((colData, columnId) => {
+      if (columnId !== fitScoreColumEntry![0]) {
+        sortedCustomColumnDefinitions.set(columnId, colData);
+      }
+    });
+    customColumnDefinitions = sortedCustomColumnDefinitions;
   }
 
   // Add definitions for each unique custom column found
@@ -467,8 +498,8 @@ export const getAccountColumns = (
           />
         );
       },
-      minSize: 300,
-      maxSize: 300,
+      minSize: !columnNameIncludesScore(colData) ? 300 : 100, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
+      maxSize: !columnNameIncludesScore(colData) ? 300 : 100, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
       enableSorting: false,
       enableColumnFilter: false,
       meta: {
