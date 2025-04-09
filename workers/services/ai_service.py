@@ -371,6 +371,42 @@ class AIService(ABC):
             total_cost_in_usd=total_cost,
             provider=self.provider_name
         )
+        
+    def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
+        """Extract JSON content from text response.
+        Handles various formats including JSON with prefixes, markdown code blocks, etc.
+        """
+        try:
+            # Clean response text of common formatting
+            text = text.strip()
+            
+            # Remove markdown code block markers
+            if text.startswith("```json"):
+                text = text[7:]
+            if text.startswith("```"):
+                text = text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
+            
+            # Strategy 1: Try direct JSON parsing
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                # Strategy 2: Find JSON between curly braces
+                json_start = text.find('{')
+                json_end = text.rfind('}') + 1
+                
+                if 0 <= json_start < json_end:
+                    extracted_json = text[json_start:json_end]
+                    logger.debug(f"Extracted JSON from character {json_start} to {json_end}")
+                    return json.loads(extracted_json)
+                    
+                # If all attempts fail, raise the original error
+                raise
+        except Exception as e:
+            logger.error(f"Error parsing JSON response from {text[:100]!r}. Error: {str(e)}")
+            return {}
 
     @abstractmethod
     async def _generate_content_without_cache(
@@ -595,23 +631,8 @@ class GeminiService(AIService):
         return self._parse_json_response(response)
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
-        """Parse JSON from Gemini response."""
-        try:
-            # Clean response text
-            text = response.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-
-            return json.loads(text)
-
-        except Exception as e:
-            logger.error(f"Error parsing JSON response: {str(e)}")
-            return {}
+        """Parse JSON from Gemini response, finding the innermost JSON block."""
+        return self._extract_json_from_text(response)
 
     def _generate_search_cache_key(
             self,
@@ -1197,30 +1218,7 @@ class OpenAIService(AIService):
         except Exception as e:
             logger.error(f"Failed to cache search response: {e}")
 
-    def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
-        """Extract JSON content from text response."""
-        try:
-            # Strategy 1: Find JSON between braces
-            json_start = text.find('{')
-            json_end = text.rfind('}') + 1
-            if json_start >= 0 and json_end > json_start:
-                return json.loads(text[json_start:json_end])
-
-            # Strategy 2: Parse the whole text
-            return json.loads(text)
-        except json.JSONDecodeError:
-            try:
-                # Strategy 3: Use regex to find JSON pattern
-                import re
-                match = re.search(r'(\{[\s\S]*\})', text)
-                if match:
-                    return json.loads(match.group(1))
-            except (json.JSONDecodeError, AttributeError):
-                pass
-
-            # Fallback: Return the text in a structured format
-            logger.warning(f"Failed to parse JSON from response: {text[:100]}...")
-            return {"text": text, "error": "Failed to parse as JSON"}
+    # Using the common _extract_json_from_text method from parent class
 
     def _extract_citations(self, response) -> List[Dict[str, Any]]:
         """Extract citation information from response."""
