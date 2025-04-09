@@ -15,4 +15,3 @@ python-dotenv==1.0.1
 python-json-logger==2.0.7
 requests==2.31.0
 six==1.16.0
-uwsgi==2.0.27 # Needed to work with Python 13.3
