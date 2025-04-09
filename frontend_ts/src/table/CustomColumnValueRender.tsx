@@ -178,7 +178,7 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
 
     case "string":
       return renderValueWithTooltip(
-        <div className="whitespace-normal break-words">
+        <div className="max-w-full whitespace-normal break-words">
           <MarkdownRenderer
             content={removeMarkdownBackticks(
               String(customColumnValueData.value)
