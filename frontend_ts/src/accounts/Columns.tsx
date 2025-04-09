@@ -129,7 +129,8 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "location",
     accessorFn: (row) => row.location,
     header: "HQ",
-    minSize: 200,
+    minSize: 100,
+    maxSize: 100,
     cell: (info) => {
       const hq = info.getValue() as string | null;
       if (!hq) {
@@ -146,7 +147,8 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "employee_count",
     accessorFn: (row) => row.employee_count,
     header: "Employee Count",
-    size: 20,
+    minSize: 100,
+    maxSize: 100,
     cell: (info) => {
       const count = info.getValue() as number | null;
       if (!count) {
@@ -242,7 +244,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
       }
       return row.recent_events;
     },
-    minSize: 600,
+    minSize: 200,
+    maxSize: 200,
     cell: (info) => {
       const recentEvents = info.getValue() as RecentCompanyEvent[] | null;
       if (!recentEvents) {
@@ -277,7 +280,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     id: "website",
     accessorFn: (row) => row.website,
     header: "Website",
-    minSize: 20,
+    minSize: 80,
+    maxSize: 80,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -306,7 +310,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     id: "linkedin_url",
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
-    minSize: 20,
+    minSize: 80,
+    maxSize: 80,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -335,7 +340,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     id: "company_type",
     accessorFn: (row) => row.company_type,
     header: "Company Type",
-    size: 20,
+    minSize: 120,
+    maxSize: 120,
     cell: (info) => {
       const type = info.getValue() as string | null;
       if (!type) {
@@ -360,7 +366,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
       return row.funding_details;
     },
     header: "Funding Details",
-    minSize: 250,
+    minSize: 200,
+    maxSize: 200,
     cell: (info) => {
       const fundingDetails = info.getValue() as FundingDetails | null;
       if (!fundingDetails) {
@@ -368,7 +375,6 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
       }
       return <FundingDetailsView fundingDetails={fundingDetails} />;
     },
-    size: 100,
     meta: {
       displayName: "Funding Details",
       visibleInitially: true,
@@ -379,7 +385,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     id: "founded_year",
     accessorFn: (row) => row.founded_year,
     header: "Founded Year",
-    size: 20,
+    minSize: 80,
+    maxSize: 80,
     cell: (info) => {
       const founded_year = info.getValue() as string | null;
       if (!founded_year) {
@@ -460,7 +467,8 @@ export const getAccountColumns = (
           />
         );
       },
-      minSize: 150,
+      minSize: 300,
+      maxSize: 300,
       enableSorting: false,
       enableColumnFilter: false,
       meta: {
