@@ -471,7 +471,29 @@ export const getAccountColumns = (
   customColumnDefinitions.forEach((colData, columnId) => {
     finalColumns.push({
       id: columnId, // Use the UUID as the column ID
-      header: colData.name, // Use the name from the custom column data
+      header: ({ column }) => {
+        return (
+          <div className="flex justify-between items-center gap-2 mr-2">
+            {colData.name}
+            {/* Only make Score custom column sortable */}
+            {columnNameIncludesScore(colData) && (
+              <SortingDropdown
+                onSelect={(val) => {
+                  if (val === "asc") {
+                    column.toggleSorting(false);
+                  } else if (val === "desc") {
+                    column.toggleSorting(true);
+                  } else if (val === "none") {
+                    column.clearSorting();
+                  }
+                }}
+              >
+                <ChevronsUpDown size={18} />
+              </SortingDropdown>
+            )}
+          </div>
+        );
+      },
       accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
       cell: (info) => {
         const columnId = info.column.id;
@@ -500,7 +522,7 @@ export const getAccountColumns = (
       },
       minSize: !columnNameIncludesScore(colData) ? 300 : 100, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
       maxSize: !columnNameIncludesScore(colData) ? 300 : 100, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
-      enableSorting: false,
+      enableSorting: !columnNameIncludesScore(colData) ? false : true,
       enableColumnFilter: false,
       meta: {
         displayName: colData.name,
