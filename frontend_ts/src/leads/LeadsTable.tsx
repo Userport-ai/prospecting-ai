@@ -258,8 +258,9 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const [columns, setColumns] = useState<ColumnDef<LeadRow>[]>([]);
   // Filters used for Persona Match.
   const allPersonaFilterValues = ["buyer", "influencer", "end_user", "unknown"];
+  const initialPersonaFilterValues = ["buyer", "influencer"];
   const [personaFilterValues, setPersonaFilterValues] = useState<string[]>(
-    allPersonaFilterValues
+    initialPersonaFilterValues
   );
 
   const [error, setError] = useState<Error | null>(null);
