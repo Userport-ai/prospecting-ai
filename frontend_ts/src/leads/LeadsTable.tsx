@@ -23,6 +23,20 @@ import { exportToCSV } from "@/common/utils";
 import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
 import { CustomColumn } from "@/services/CustomColumn";
 
+interface BaseLeadInfoForCSVExport {
+  Name: string;
+  "LinkedIn URL"?: string;
+  "Company Name"?: string;
+  "Company Website"?: string;
+  "Role Title": string | null;
+  "Fit Score": number | null;
+  "Persona Match": string;
+  Rationale: string[];
+  "Matching Signals": string;
+  "Recent Company Highlights": string;
+  [key: string]: any; // Allows dynamic addition of string keys with any value type
+}
+
 const ZeroStateDisplay = () => {
   return (
     <div className="flex flex-col gap-2 items-center justify-center h-64 text-center bg-gray-50 border border-dashed border-gray-300 rounded-md p-6">
@@ -129,7 +143,7 @@ export const Table: React.FC<TableProps> = ({
   const exportSelectedLeadsToCSV = () => {
     // Transform selected leads before export.
     const transformedLeads = selectedLeads.map((lead: LeadRow) => {
-      return {
+      var baseLeadInfo: BaseLeadInfoForCSVExport = {
         Name: lead.first_name + " " + lead.last_name,
         "LinkedIn URL": lead.linkedin_url,
         "Company Name": lead.account_details.name,
@@ -145,7 +159,7 @@ export const Table: React.FC<TableProps> = ({
             : "unknown",
         Rationale: lead.custom_fields
           ? lead.custom_fields.evaluation.rationale
-          : "unknown",
+          : [],
         "Matching Signals":
           lead.custom_fields && lead.custom_fields.evaluation.matching_signals
             ? lead.custom_fields.evaluation.matching_signals.join("\n\n")
@@ -156,6 +170,15 @@ export const Table: React.FC<TableProps> = ({
               .join("\n\n")
           : "none",
       };
+
+      // Add custom columns if any.
+      if (lead.custom_column_values) {
+        for (const columnId in lead.custom_column_values) {
+          const colData = lead.custom_column_values[columnId];
+          baseLeadInfo[colData.name] = colData.value;
+        }
+      }
+      return baseLeadInfo;
     });
     exportToCSV(transformedLeads, "userport-leads");
   };
