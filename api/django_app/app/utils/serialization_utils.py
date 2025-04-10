@@ -52,7 +52,8 @@ def get_custom_column_values(obj):
             'response_type': column.response_type,
             'status': None,
             'value': None,  # Default to None
-            'rationale': None
+            'rationale': None,
+            'created_at': column.created_at
         }
 
         # Add to result dict immediately
