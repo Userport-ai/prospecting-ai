@@ -41,7 +41,7 @@ def get_custom_column_values(obj):
         entity_type=entity_type,
         is_active=True,
         deleted_at__isnull=True
-    )
+    ).order_by('created_at')
 
     # Process all columns (with or without values)
     for column in columns:
