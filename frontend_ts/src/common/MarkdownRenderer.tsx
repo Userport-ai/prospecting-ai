@@ -12,6 +12,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkBreaks]}
       components={{
+        p: ({ children }) => (
+          <p style={{ marginBottom: "1rem", whiteSpace: "pre-wrap" }}>
+            {children}
+          </p>
+        ),
         ol: ({ children }) => (
           <ol
             style={{
