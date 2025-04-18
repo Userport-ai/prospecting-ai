@@ -694,13 +694,12 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             logger.error(f"Error validating LinkedIn URL '{url}': {str(e)}")
             return False
 
-    # Keep retry for external non-AI API
     @with_retry(retry_config=API_RETRY_CONFIG, operation_name="fetch_company_profile")
     async def _fetch_company_profile(self, company_name: str) -> str:
         """Fetch company profile from Jina AI."""
         if not company_name:
             raise ValueError("Company name cannot be empty for Jina AI search.")
-        search_query = f"{company_name} company overview business profile"  # Slightly adjusted query
+        search_query = f"{company_name} company overview business profile"
         logger.debug(f"Searching Jina AI for company profile with query: {search_query}")
 
         jina_url = f"https://s.jina.ai/{requests.utils.quote(search_query)}"  # URL encode query
@@ -712,7 +711,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             },
             timeout=45  # Increased timeout
         )
-        response.raise_for_status()  # Raises HTTPError for bad responses (4xx or 5xx)
+        response.raise_for_status()
 
         profile_text = response.text.strip()
         if not profile_text:
@@ -777,13 +776,13 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             # Re-raise to be caught by the main execute loop handler
             raise
 
-    async def _fetch_market_intelligence(self, website: str, openai_service: AIService) -> Dict[str, Any]:
+    async def _fetch_market_intelligence(self, website: str, ai_service: AIService) -> Dict[str, Any]:
         """
         Fetch market intelligence including competitors and customers using OpenAI Search service.
         """
         try:
             # Assume OpenAISearchService wraps the factory-created openai_service
-            intelligence_service = AICompanyIntelService(openai_service)
+            intelligence_service = AICompanyIntelService(ai_service)
 
             logger.debug(f"Fetching market intelligence for website: {website}")
 

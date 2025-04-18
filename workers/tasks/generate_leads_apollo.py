@@ -33,8 +33,8 @@ class ApolloConfig:
     ai_batch_size: int = 5
     fit_score_threshold: float = 0.0
     cache_ttl_hours: int = 24 * 30
-    concurrent_requests: int = 4
-    ai_concurrent_requests: int = 4
+    concurrent_requests: int = 5
+    ai_concurrent_requests: int = 10
     max_retries: int = 3
     retry_delay: float = 1.0
     max_retry_delay: float = 5.0
@@ -88,8 +88,8 @@ class ProcessingMetrics:
     processing_time: float = 0.0
     api_errors: int = 0
     ai_errors: int = 0
-    enriched_leads: int = 0  # New: Track enriched leads
-    enrichment_errors: int = 0  # New: Track enrichment errors
+    enriched_leads: int = 0
+    enrichment_errors: int = 0
 
 
 @dataclass
@@ -524,12 +524,12 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             Evaluation Guidelines:
             1. Role Relevance:
                - How closely does their title match our target personas?
+               - Which persona type do the match the best? Write the rationale in the 'reason' field before deciding on which persona
                - Is their seniority level appropriate for decision-making/influence?
                - Do their departments/functions align with our product's use case?
 
             2. Company Context:
                - Does their company profile suggest they might need our solution?
-               - Is the company in our target market/industry?
                - Consider company size and maturity
 
             3. Confidence Level:
@@ -542,6 +542,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                     {{
                         "lead_id": string,
                         "initial_score": number (0-100),
+                        "initial_persona_estimate": string (one of 'buyer', 'influencer', 'end_user' or 'null'),
                         "reason": string (specific reasons for the score),
                         "enrichment_recommended": boolean,
                         "confidence": number (0-100),
@@ -923,6 +924,17 @@ class ApolloLeadsTask(AccountEnrichmentTask):
                         search_params['organization_ids[]'] = apollo_org_id
                     else:
                         search_params['q_organization_domains'] = domain
+                    search_params['person_seniorities[]'] = [
+                        'founder',
+                        'vp',
+                        'head',
+                        'director',
+                        'c_suite',
+                        'owner',
+                        'manager',
+                        'partner',
+                        'senior'
+                    ] # Everyone except entry level... Entry level folks are less likely to be influencers/buyers
 
                     headers = {
                         'Content-Type': 'application/json',
