@@ -501,7 +501,7 @@ class CustomColumnTask(AccountEnrichmentTask):
     </validation_rules>
     """ if validation_text else ""
 
-        # Create enhanced prompt
+        todays_date = datetime.now().strftime("%Y-%m-%d")
         return f"""**Persona:** You are an AI assistant acting as an experienced Business Development Representative (BDR).
 
 **Goal:** Analyze the provided entity information and answer a specific question accurately and concisely, performing web research if necessary.
@@ -542,6 +542,7 @@ class CustomColumnTask(AccountEnrichmentTask):
     * Verify the draft against `{response_type}` and validation rules.
     * Determine the confidence score and justify it.
     * Formulate the rationale.
+11. **Today's date:** `{todays_date}`. Use this date for any date-related calculations or time-sensitive information retrieval.
 
 **Output Format (Strict JSON):**
 

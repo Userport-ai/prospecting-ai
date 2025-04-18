@@ -50,20 +50,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     } as CustomColumnMeta,
   },
   {
-    id: "created_at",
-    accessorFn: (row) => formatDate(row.created_at),
-    header: "Created On",
-    size: 50,
-    cell: (info) => {
-      const dateStr = info.getValue() as string;
-      return <p className="text-xs">{dateStr}</p>;
-    },
-    meta: {
-      displayName: "Created On",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
     id: "name",
     accessorFn: (row) => row.name,
     accessorKey: "name",
@@ -407,6 +393,20 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     meta: {
       displayName: "Last Enriched At",
       visibleInitially: false,
+    } as CustomColumnMeta,
+  },
+  {
+    id: "created_at",
+    accessorFn: (row) => formatDate(row.created_at),
+    header: "Created On",
+    size: 50,
+    cell: (info) => {
+      const dateStr = info.getValue() as string;
+      return <p className="text-xs">{dateStr}</p>;
+    },
+    meta: {
+      displayName: "Created On",
+      visibleInitially: true,
     } as CustomColumnMeta,
   },
 ];
