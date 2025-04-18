@@ -82,6 +82,8 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                           // When this is not working,
                           // got to https://github.com/TanStack/table/issues/5115.
                           width: header.getSize(),
+                          minWidth: header.column.columnDef.minSize,
+                          maxWidth: header.column.columnDef.maxSize,
                         }}
                         className={cn(
                           "text-white font-semibold px-2 py-1 border-b border-purple-300",
@@ -147,7 +149,11 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                       {row.getVisibleCells().map((cell) => (
                         <TableCell
                           key={cell.id}
-                          style={{ width: cell.column.getSize() }}
+                          style={{
+                            width: cell.column.getSize(),
+                            maxWidth: cell.column.columnDef.maxSize,
+                            minWidth: cell.column.columnDef.minSize,
+                          }}
                           className="text-gray-700 px-2 py-2"
                         >
                           <div className="flex justify-between gap-2">

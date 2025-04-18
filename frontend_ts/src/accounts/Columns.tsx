@@ -129,7 +129,8 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "location",
     accessorFn: (row) => row.location,
     header: "HQ",
-    minSize: 200,
+    minSize: 100,
+    maxSize: 100,
     cell: (info) => {
       const hq = info.getValue() as string | null;
       if (!hq) {
@@ -146,7 +147,8 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     id: "employee_count",
     accessorFn: (row) => row.employee_count,
     header: "Employee Count",
-    size: 20,
+    minSize: 100,
+    maxSize: 100,
     cell: (info) => {
       const count = info.getValue() as number | null;
       if (!count) {
@@ -242,7 +244,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
       }
       return row.recent_events;
     },
-    minSize: 600,
+    minSize: 200,
+    maxSize: 200,
     cell: (info) => {
       const recentEvents = info.getValue() as RecentCompanyEvent[] | null;
       if (!recentEvents) {
@@ -277,7 +280,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     id: "website",
     accessorFn: (row) => row.website,
     header: "Website",
-    minSize: 20,
+    minSize: 80,
+    maxSize: 80,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -306,7 +310,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     id: "linkedin_url",
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
-    minSize: 20,
+    minSize: 80,
+    maxSize: 80,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -335,7 +340,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     id: "company_type",
     accessorFn: (row) => row.company_type,
     header: "Company Type",
-    size: 20,
+    minSize: 120,
+    maxSize: 120,
     cell: (info) => {
       const type = info.getValue() as string | null;
       if (!type) {
@@ -360,7 +366,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
       return row.funding_details;
     },
     header: "Funding Details",
-    minSize: 250,
+    minSize: 200,
+    maxSize: 200,
     cell: (info) => {
       const fundingDetails = info.getValue() as FundingDetails | null;
       if (!fundingDetails) {
@@ -368,7 +375,6 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
       }
       return <FundingDetailsView fundingDetails={fundingDetails} />;
     },
-    size: 100,
     meta: {
       displayName: "Funding Details",
       visibleInitially: true,
@@ -379,7 +385,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
     id: "founded_year",
     accessorFn: (row) => row.founded_year,
     header: "Founded Year",
-    size: 20,
+    minSize: 80,
+    maxSize: 80,
     cell: (info) => {
       const founded_year = info.getValue() as string | null;
       if (!founded_year) {
@@ -411,7 +418,7 @@ export const getAccountColumns = (
   const finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
 
   // Get unique custom column definitions from the rows provided
-  const customColumnDefinitions = new Map<string, CustomColumnValueData>();
+  var customColumnDefinitions = new Map<string, CustomColumnValueData>();
 
   for (const row of rows) {
     if (row.custom_column_values) {
@@ -429,11 +436,64 @@ export const getAccountColumns = (
     }
   }
 
+  // Helper method that returns true if the custom column name contains "Score" and false otherwise.
+  const columnNameIncludesScore = (colData: CustomColumnValueData): boolean => {
+    return colData.name.includes("Score");
+  };
+
+  // Sort custom columns if Fit Score is present so it is always the first custom column.
+  var fitScoreColumEntry: [string, CustomColumnValueData] | null = null;
+  customColumnDefinitions.forEach((colData, columnId) => {
+    if (columnNameIncludesScore(colData)) {
+      // Fit Score column found.
+      fitScoreColumEntry = [columnId, colData];
+    }
+  });
+  if (fitScoreColumEntry) {
+    // This should be the first column.
+    var sortedCustomColumnDefinitions = new Map<
+      string,
+      CustomColumnValueData
+    >();
+    sortedCustomColumnDefinitions.set(
+      fitScoreColumEntry[0],
+      fitScoreColumEntry[1]
+    );
+    customColumnDefinitions.forEach((colData, columnId) => {
+      if (columnId !== fitScoreColumEntry![0]) {
+        sortedCustomColumnDefinitions.set(columnId, colData);
+      }
+    });
+    customColumnDefinitions = sortedCustomColumnDefinitions;
+  }
+
   // Add definitions for each unique custom column found
   customColumnDefinitions.forEach((colData, columnId) => {
     finalColumns.push({
       id: columnId, // Use the UUID as the column ID
-      header: colData.name, // Use the name from the custom column data
+      header: ({ column }) => {
+        return (
+          <div className="flex justify-between items-center gap-2 mr-2">
+            {colData.name}
+            {/* Only make Score custom column sortable */}
+            {columnNameIncludesScore(colData) && (
+              <SortingDropdown
+                onSelect={(val) => {
+                  if (val === "asc") {
+                    column.toggleSorting(false);
+                  } else if (val === "desc") {
+                    column.toggleSorting(true);
+                  } else if (val === "none") {
+                    column.clearSorting();
+                  }
+                }}
+              >
+                <ChevronsUpDown size={18} />
+              </SortingDropdown>
+            )}
+          </div>
+        );
+      },
       accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
       cell: (info) => {
         const columnId = info.column.id;
@@ -460,15 +520,16 @@ export const getAccountColumns = (
           />
         );
       },
-      minSize: 150,
-      enableSorting: false,
+      minSize: !columnNameIncludesScore(colData) ? 300 : 100, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
+      maxSize: !columnNameIncludesScore(colData) ? 300 : 100, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
+      enableSorting: !columnNameIncludesScore(colData) ? false : true,
       enableColumnFilter: false,
       meta: {
         displayName: colData.name,
         visibleInitially: true,
-        cellExpandable:
-          ["string", "json_object", "enum"].includes(colData.response_type) &&
-          colData.rationale !== null,
+        cellExpandable: ["string", "json_object", "enum"].includes(
+          colData.response_type
+        ),
       } as CustomColumnMeta,
     });
   });

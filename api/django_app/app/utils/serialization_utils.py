@@ -41,7 +41,7 @@ def get_custom_column_values(obj):
         entity_type=entity_type,
         is_active=True,
         deleted_at__isnull=True
-    )
+    ).order_by('created_at')
 
     # Process all columns (with or without values)
     for column in columns:
@@ -51,7 +51,9 @@ def get_custom_column_values(obj):
             'description': column.description or '',
             'response_type': column.response_type,
             'status': None,
-            'value': None  # Default to None
+            'value': None,  # Default to None
+            'rationale': None,
+            'created_at': column.created_at
         }
 
         # Add to result dict immediately
@@ -89,6 +91,7 @@ def get_custom_column_values(obj):
             result[column_id]['value'] = value.value_json
 
         result[column_id]['status'] = value.status
+        result[column_id]['rationale'] = value.rationale
 
     return result
 

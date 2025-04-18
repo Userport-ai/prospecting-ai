@@ -40,7 +40,7 @@ const renderValueWithTooltip = (
   rationale: string | null
 ) => {
   return (
-    <div className="flex items-center">
+    <div className="flex-col justify-center">
       {valueElement}
       <RationaleTooltip rationale={rationale} />
     </div>
@@ -154,6 +154,17 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
     );
   }
 
+  // Helper to remove markdown backticks so that the Markdown renderer
+  // does not render it as a Code block. This is needed because LLM
+  // hallucinates these backticks.
+  const removeMarkdownBackticks = (text: string) => {
+    if (text.startsWith("```markdown")) {
+      text = text.split("markdown").join("");
+    }
+    // Replace all backticks.
+    return text.split("```").join("");
+  };
+
   // Render based on response type
   switch (customColumnValueData.response_type) {
     case "enum":
@@ -167,8 +178,12 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
 
     case "string":
       return renderValueWithTooltip(
-        <div className="whitespace-normal break-words">
-          <MarkdownRenderer content={String(customColumnValueData.value)} />
+        <div className="max-w-full whitespace-normal break-words">
+          <MarkdownRenderer
+            content={removeMarkdownBackticks(
+              String(customColumnValueData.value)
+            )}
+          />
         </div>,
         customColumnValueData.rationale
       );

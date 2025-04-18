@@ -43,7 +43,8 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "name",
-    minSize: 200,
+    minSize: 150,
+    maxSize: 150,
     accessorFn: (row) => `${row.first_name} ${row.last_name}`,
     header: ({ column }) => {
       return (
@@ -74,7 +75,8 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
     id: "linkedin_url",
     accessorFn: (row) => row.linkedin_url,
     header: "LinkedIn URL",
-    size: 20,
+    minSize: 100,
+    maxSize: 100,
     cell: (info) => {
       const url = info.getValue() as string | null;
       if (!url) {
@@ -111,7 +113,8 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   {
     id: "company_name",
     accessorFn: (row) => row.account_details.name,
-    minSize: 200,
+    minSize: 100,
+    maxSize: 100,
     header: "Company Name",
     meta: {
       displayName: "Company Name",
@@ -120,7 +123,8 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
   },
   {
     id: "role_title",
-    minSize: 200,
+    minSize: 150,
+    maxSize: 150,
     accessorFn: (row) => row.role_title,
     header: "Role Title",
     meta: {
@@ -206,7 +210,9 @@ export const getLeadColumns = (
       {
         id: "fit_score",
         header: "Fit Score",
-        size: 20,
+        size: 50,
+        minSize: 50,
+        maxSize: 50,
         accessorFn: (row) => row.score,
         meta: {
           displayName: "Fit Score",
@@ -217,6 +223,8 @@ export const getLeadColumns = (
         id: "persona_match",
         header: "Persona Match",
         size: 50,
+        minSize: 100,
+        maxSize: 100,
         filterFn: "arrIncludesSome",
         accessorFn: (row) => {
           if (
@@ -241,7 +249,8 @@ export const getLeadColumns = (
       {
         id: "matching_signals",
         header: "Matching Signals",
-        minSize: 500,
+        minSize: 200,
+        maxSize: 300,
         accessorFn: (row: LeadRow) => {
           if (!row.custom_fields || !row.custom_fields.evaluation) {
             return null;
@@ -323,15 +332,16 @@ export const getLeadColumns = (
           />
         );
       },
-      minSize: 150,
+      minSize: 50,
+      maxSize: 300,
       enableSorting: false,
       enableColumnFilter: false,
       meta: {
         displayName: colData.name,
         visibleInitially: true,
-        cellExpandable:
-          ["string", "json_object", "enum"].includes(colData.response_type) &&
-          colData.rationale !== null,
+        cellExpandable: ["string", "json_object", "enum"].includes(
+          colData.response_type
+        ),
       } as CustomColumnMeta,
     });
   });
