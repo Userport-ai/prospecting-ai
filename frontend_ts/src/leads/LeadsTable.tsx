@@ -272,7 +272,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   // Current Page number (fetched from server). Valid page numbers start from 1.
   const [curPageNum, setCurPageNum] = useState<number>(0);
   // Current page size.
-  const [curPageSize, setCurPageSize] = useState<number>(20);
+  const [curPageSize, setCurPageSize] = useState<number>(100);
   // Cursor values associated with the pages fetched from server.
   // Initially null since page 1 always has null cursor value.
   const [cursorValues, setCursorValues] = useState<(string | null)[]>([null]);

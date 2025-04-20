@@ -264,7 +264,7 @@ export default function AccountsTable() {
   // Current Page number (fetched from server). Valid page numbers start from 1.
   const [curPageNum, setCurPageNum] = useState(0);
   // Current page size.
-  const [curPageSize, setCurPageSize] = useState<number>(20);
+  const [curPageSize, setCurPageSize] = useState<number>(100);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
