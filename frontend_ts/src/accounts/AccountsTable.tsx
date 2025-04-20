@@ -265,7 +265,7 @@ export default function AccountsTable() {
   const [curPageNum, setCurPageNum] = useState(0);
   // Current page size.
   const [curPageSize, setCurPageSize] = useState<number>(100);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
@@ -441,7 +441,9 @@ export default function AccountsTable() {
       <div className="flex items-center gap-4">
         <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
         {/* Add Accounts to the table. */}
-        <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
+        {products && (
+          <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
+        )}
 
         {/* Subtle background refresh indicator */}
         {backgroundRefreshing && (
