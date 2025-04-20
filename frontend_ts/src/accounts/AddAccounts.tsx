@@ -51,12 +51,15 @@ import { USERPORT_TENANT_ID } from "@/services/Common";
 // Component that lets the user select a product.
 const ProductSelection: React.FC<{
   // field: ControllerRenderProps<any>;
-  defaultValue: string | undefined;
+  defaultValue: string | null;
   onValueChange: (arg0: string) => void;
   products: Product[];
 }> = ({ defaultValue, onValueChange, products }) => {
   return (
-    <Select onValueChange={onValueChange} defaultValue={defaultValue}>
+    <Select
+      onValueChange={onValueChange}
+      defaultValue={defaultValue ?? undefined}
+    >
       <SelectTrigger className="border-gray-300">
         <SelectValue placeholder="Select a Product" />
       </SelectTrigger>
@@ -204,7 +207,9 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
 }) => {
   const authContext = useAuthContext();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(
+    products.length === 1 ? products[0].id! : null
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const AccountNameColumnHeader = "Name";
@@ -356,7 +361,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
               Select the product to use for prospecting
             </p>
             <ProductSelection
-              defaultValue=""
+              defaultValue={selectedProduct}
               onValueChange={setSelectedProduct}
               products={products}
             />
@@ -413,7 +418,7 @@ const AddAccountManually: React.FC<AddAccountManuallyProps> = ({
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      productId: "",
+      productId: products.length === 1 ? products[0].id! : "", // If only 1 product, set as default value.
       name: "",
       website: "",
     },

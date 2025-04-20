@@ -336,14 +336,20 @@ export default function AccountsTable() {
   useEffect(() => {
     setLoading(true);
     listAccountsHelper(1)
-      .then(async () => {
-        const products = await listProducts(authContext);
-        setProducts(products);
-      })
       .catch((error) =>
         setError(new Error(`Failed to fetch Accounts: ${error.message}`))
       )
-      .finally(() => setLoading(false));
+      .finally(async () => {
+        setLoading(false);
+
+        // Load products in the background so it doesn't delay loading UI.
+        try {
+          const products = await listProducts(authContext);
+          setProducts(products);
+        } catch (err) {
+          console.error("Error fetching Products:", err);
+        }
+      });
   }, [authContext, curPageSize]);
 
   // Handle user request to go to page with improved loading
