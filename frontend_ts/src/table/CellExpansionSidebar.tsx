@@ -48,12 +48,12 @@ const CellSidebar: React.FC<{
     <Sidebar
       side="right"
       variant="floating"
-      className="bg-gray-50 shadow-xl rounded-l-lg border-l border-gray-200 p-0"
+      className="rounded-l-lg border-none p-0"
     >
-      <SidebarHeader className="px-4 py-4 border-b border-gray-300 bg-gray-100 mb-4">
+      <SidebarHeader className="px-4 py-4 border-b border-gray-400 bg-gray-100 mb-4">
         <div className="flex justify-between">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-xl text-gray-800 font-medium">
+          <div className="flex flex-col gap-3">
+            <h1 className="text-2xl text-gray-800 font-medium">
               {getName(row)}
             </h1>
             <a
@@ -72,10 +72,10 @@ const CellSidebar: React.FC<{
       </SidebarHeader>
 
       <SidebarContent className="px-6 py-4">
-        <h2 className="text-lg font-medium text-gray-600">
+        <h2 className="text-xl font-medium text-gray-900 mb-4">
           {(cellContext.column.columnDef.meta as CustomColumnMeta).displayName}
         </h2>
-        <div className="p-4 border border-gray-300 rounded-xl shadow-sm bg-gray-50">
+        <div className="p-4 border border-gray-400 rounded-xl shadow-sm bg-gray-50">
           {flexRender(cellContext.cell.column.columnDef.cell, cellContext)}
         </div>
       </SidebarContent>

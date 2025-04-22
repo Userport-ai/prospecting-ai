@@ -19,6 +19,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
               whiteSpace: "pre-wrap",
               fontSize: "0.9rem",
               lineHeight: "1.5rem",
+              color: "#424242",
             }}
           >
             {children}
