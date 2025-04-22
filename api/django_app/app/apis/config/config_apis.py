@@ -65,41 +65,41 @@ class SettingsViewSet(TenantScopedViewSet):
 
         super().perform_create(serializer)
 
-def perform_update(self, serializer):
-    user = self.request.user
-    instance = serializer.instance
-    target_user = serializer.validated_data.get('user', instance.user)
+    def perform_update(self, serializer):
+        user = self.request.user
+        instance = serializer.instance
+        target_user = serializer.validated_data.get('user', instance.user)
 
-    if user.role == UserRole.INTERNAL_ADMIN:
-        # Internal admin can do anything
-        pass
-    elif user.role == UserRole.TENANT_ADMIN:
-        # Tenant admin can ONLY modify tenant-level settings
-        if instance.user is not None or target_user is not None:
-            raise PermissionDenied("Tenant admins can only modify tenant-level settings")
-    else:
-        # Regular users can only modify their own settings
-        if instance.user != user:
-            raise PermissionDenied("Users can only modify their own settings")
+        if user.role == UserRole.INTERNAL_ADMIN:
+            # Internal admin can do anything
+            pass
+        elif user.role == UserRole.TENANT_ADMIN:
+            # Tenant admin can ONLY modify tenant-level settings
+            if instance.user is not None or target_user is not None:
+                raise PermissionDenied("Tenant admins can only modify tenant-level settings")
+        else:
+            # Regular users can only modify their own settings
+            if instance.user != user:
+                raise PermissionDenied("Users can only modify their own settings")
 
-    serializer.save()
+        serializer.save()
 
-def perform_destroy(self, instance):
-    user = self.request.user
+    def perform_destroy(self, instance):
+        user = self.request.user
 
-    if user.role == UserRole.INTERNAL_ADMIN:
-        # Internal admin can do anything
-        pass
-    elif user.role == UserRole.TENANT_ADMIN:
-        # Tenant admin can ONLY delete tenant-level settings
-        if instance.user is not None:
-            raise PermissionDenied("Tenant admins can only delete tenant-level settings")
-    else:
-        # Regular users can only delete their own settings
-        if instance.user != user:
-            raise PermissionDenied("Users can only delete their own settings")
+        if user.role == UserRole.INTERNAL_ADMIN:
+            # Internal admin can do anything
+            pass
+        elif user.role == UserRole.TENANT_ADMIN:
+            # Tenant admin can ONLY delete tenant-level settings
+            if instance.user is not None:
+                raise PermissionDenied("Tenant admins can only delete tenant-level settings")
+        else:
+            # Regular users can only delete their own settings
+            if instance.user != user:
+                raise PermissionDenied("Users can only delete their own settings")
 
-    super().perform_destroy(instance)
+        super().perform_destroy(instance)
 
     @action(detail=False, methods=['post'])
     def bulk_update(self, request):

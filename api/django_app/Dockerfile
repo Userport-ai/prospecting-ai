@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Base Python ----
-FROM python:3.10-slim as python-base
+FROM python:3.10-slim AS python-base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=0 \
@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
     STATIC_ROOT=/app/staticfiles
 
 # ---- Dependencies ----
-FROM python-base as builder
+FROM python-base AS builder
 
 WORKDIR /wheels
 

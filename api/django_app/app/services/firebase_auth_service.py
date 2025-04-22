@@ -1,5 +1,8 @@
+import hashlib
 import os
 import logging
+
+from django.core.cache import cache
 from firebase_admin import initialize_app, auth, credentials, get_app
 from django.core.exceptions import ValidationError
 from app.models import User
@@ -45,8 +48,13 @@ class FirebaseAuthService:
                 logger.error("Received empty token")
                 raise ValidationError("No token provided")
 
-            logger.debug(f"Token length: {len(id_token)}")
-            logger.debug(f"Attempting to verify token: {id_token[:10]}...")
+            token_hash = hashlib.md5(id_token.encode()).hexdigest()
+            cache_key = f"firebase_token_{token_hash}"
+
+            cached_user = cache.get(cache_key)
+            if cached_user:
+                logger.debug(f"Auth cache hit: {cached_user.email}")
+                return cached_user
             decoded_token = auth.verify_id_token(id_token)
             logger.debug(f"Token decoded successfully: {decoded_token.keys()}")
 
@@ -65,6 +73,7 @@ class FirebaseAuthService:
             )
             logger.debug(f"User {'created' if created else 'found'}: {user.email}")
 
+            cache.set(cache_key, user, 600)  # Cache for 5 minutes
             return user
 
         except auth.InvalidIdTokenError as e:

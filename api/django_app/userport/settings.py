@@ -156,8 +156,24 @@ DATABASES = {
         'PASSWORD': dbpassword,
         'HOST': "127.0.0.1",
         'PORT': "5432",
-        'ATOMIC_REQUESTS': True,
-        'DEFAULT_SCHEMA': 'public'
+        'CONN_MAX_AGE': 60,  # For connection pooling
+        'ATOMIC_REQUESTS': False,
+        'DEFAULT_SCHEMA': 'public',
+        'OPTIONS': {
+            'connect_timeout': 10,
+        }
+    }
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'userport-cache',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+            'CULL_FREQUENCY': 3,  # 1/3 of entries to be purged
+        }
     }
 }
 
