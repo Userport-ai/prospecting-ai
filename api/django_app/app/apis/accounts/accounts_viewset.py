@@ -202,7 +202,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
                 enrichment_responses = self._trigger_enrichments(created_accounts)
 
-                logger.info(f"Triggerd Bulk Account Enrichments successfully for Accounts: {accounts_data}.")
+                logger.info(f"Triggered Bulk Account Enrichments successfully for Accounts: {accounts_data}.")
 
                 custom_column_jobs = trigger_custom_column_generation(
                     tenant_id=str(request.tenant.id),

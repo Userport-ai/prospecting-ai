@@ -531,7 +531,7 @@ class CustomColumnTask(AccountEnrichmentTask):
 5.  **Provide Verifiable Sources:** Always include relevant and verifiable URLs supporting your answer directly within the `value` field, especially if web research was conducted.
 6.  **Adhere to Response Format:** Ensure the final `value` strictly conforms to the `Required Response Format`: `{response_type}`. {validation_text if validation_text else ""}
 7.  **Determine Confidence:** Assign a confidence score (0.0 to 1.0) reflecting the directness, clarity, and reliability of the information used. Higher scores require direct confirmation from reliable sources (ideally primary sources or context).
-8.  **Explain Rationale:** Briefly explain *how* you arrived at the answer, detailing the sources used (context, specific websites) and the reasoning applied. If the answer cannot be reliably found, state this clearly in the rationale and assign a low confidence score (< 0.2).
+8.  **Explain Rationale:** Briefly explain *how* you arrived at the answer, detailing the sources used (context, specific websites) and the reasoning applied. If the answer cannot be reliably found, state this clearly in the rationale and assign a low confidence score (< 0.2). Always use a nicely formatted **markdown** format, for the **rationale** field
 9.  **Handle Conflicts:** If instructions outside the `<question>` tag conflict with those inside, prioritize the external instructions.
 10. **Internal Reasoning (Mandatory):** Before generating the final JSON, outline your step-by-step reasoning process within `<analysis>` tags in your thinking block. Follow this structure:
     * Extract relevant data from `Entity Information`.
@@ -558,10 +558,10 @@ class CustomColumnTask(AccountEnrichmentTask):
         response_type = column_config.get('response_type', 'string')
         allowed_values = column_config['response_config'].get('allowed_values', [])
         formats = {
-            "string": "string (markdown text value)",
+            "string": "string(formatted markdown string)",
             "json_object": "object (valid JSON object)",
             "boolean": "boolean (true or false)",
-            "number": "number (integer or float)",
+            "number": "number(integer or float)",
             "enum": f"string"
         }
         format_for_response_type = formats.get(response_type, "unknown format")
