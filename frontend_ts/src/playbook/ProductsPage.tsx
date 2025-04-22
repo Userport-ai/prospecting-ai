@@ -211,7 +211,7 @@ const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
           <h3 className="text-sm font-semibold text-gray-600 mb-1">
             Description
           </h3>
-          <p className="text-gray-700 text-base leading-relaxed">
+          <p className="text-gray-700 text-base leading-relaxed whitespace-pre-wrap">
             {product.description}
           </p>
         </div>
@@ -219,7 +219,9 @@ const SingleProductDetails: React.FC<SingleProductDetailsProps> = ({
         {/* ICP */}
         <div>
           <h3 className="text-sm font-semibold text-gray-600 mb-1">ICP</h3>
-          <p className="text-gray-700 text-base">{product.icp_description}</p>
+          <p className="text-gray-700 text-base whitespace-pre-wrap">
+            {product.icp_description}
+          </p>
         </div>
 
         {/* Personas */}

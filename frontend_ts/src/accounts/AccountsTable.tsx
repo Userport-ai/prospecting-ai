@@ -264,8 +264,8 @@ export default function AccountsTable() {
   // Current Page number (fetched from server). Valid page numbers start from 1.
   const [curPageNum, setCurPageNum] = useState(0);
   // Current page size.
-  const [curPageSize, setCurPageSize] = useState<number>(20);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [curPageSize, setCurPageSize] = useState<number>(100);
+  const [products, setProducts] = useState<Product[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
@@ -336,14 +336,20 @@ export default function AccountsTable() {
   useEffect(() => {
     setLoading(true);
     listAccountsHelper(1)
-      .then(async () => {
-        const products = await listProducts(authContext);
-        setProducts(products);
-      })
       .catch((error) =>
         setError(new Error(`Failed to fetch Accounts: ${error.message}`))
       )
-      .finally(() => setLoading(false));
+      .finally(async () => {
+        setLoading(false);
+
+        // Load products in the background so it doesn't delay loading UI.
+        try {
+          const products = await listProducts(authContext);
+          setProducts(products);
+        } catch (err) {
+          console.error("Error fetching Products:", err);
+        }
+      });
   }, [authContext, curPageSize]);
 
   // Handle user request to go to page with improved loading
@@ -435,7 +441,9 @@ export default function AccountsTable() {
       <div className="flex items-center gap-4">
         <h1 className="font-bold text-gray-600 text-2xl">Accounts</h1>
         {/* Add Accounts to the table. */}
-        <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
+        {products && (
+          <AddAccounts products={products} onAccountsAdded={onAccountsAdded} />
+        )}
 
         {/* Subtle background refresh indicator */}
         {backgroundRefreshing && (

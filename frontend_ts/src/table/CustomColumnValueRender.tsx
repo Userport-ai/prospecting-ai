@@ -10,28 +10,65 @@ import { Info, Play, Loader2 } from "lucide-react";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import JsonDataView from "@/components/common/JsonDataView";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 // Import the function to trigger generation
 import { generateCustomColumnValues } from "@/services/CustomColumn";
 
-const RationaleTooltip = ({ rationale }: { rationale: string | null }) => {
-  if (!rationale) return null;
+// Helper to remove markdown backticks so that the Markdown renderer
+// does not render it as a Code block. This is needed because LLM
+// hallucinates these backticks.
+const removeMarkdownBackticks = (text: string | null) => {
+  if (!text) {
+    return "";
+  }
+  if (text.startsWith("```markdown")) {
+    text = text.split("markdown").join("");
+  }
+  // Replace all backticks.
+  return text.split("```").join("");
+};
+
+// Uncomment if this is needed in the future otherwise can be deleted
+// const RationaleTooltip = ({ rationale }: { rationale: string | null }) => {
+//   if (!rationale) return null;
+//   return (
+//     <Tooltip>
+//       <TooltipTrigger asChild>
+//         <Info
+//           size={14}
+//           className="ml-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+//         />
+//       </TooltipTrigger>
+//       <TooltipContent
+//         className="max-w-xs p-2 bg-gray-800 text-white rounded text-xs"
+//         side="top"
+//       >
+//         <p className="font-semibold mb-1">Rationale:</p>
+//         <p>{rationale}</p>
+//       </TooltipContent>
+//     </Tooltip>
+//   );
+// };
+
+const RationaleAccordion: React.FC<{ rationale: string | null }> = ({
+  rationale,
+}) => {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Info
-          size={14}
-          className="ml-1 text-gray-400 hover:text-gray-600 cursor-pointer"
-        />
-      </TooltipTrigger>
-      <TooltipContent
-        className="max-w-xs p-2 bg-gray-800 text-white rounded text-xs"
-        side="top"
-      >
-        <p className="font-semibold mb-1">Rationale:</p>
-        <p>{rationale}</p>
-      </TooltipContent>
-    </Tooltip>
+    <Accordion type="single" collapsible className="w-full">
+      <AccordionItem value="item-1">
+        <AccordionTrigger>Rationale</AccordionTrigger>
+        <AccordionContent>
+          {" "}
+          <MarkdownRenderer content={removeMarkdownBackticks(rationale)} />
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   );
 };
 
@@ -42,7 +79,7 @@ const renderValueWithTooltip = (
   return (
     <div className="flex-col justify-center">
       {valueElement}
-      <RationaleTooltip rationale={rationale} />
+      <RationaleAccordion rationale={rationale} />
     </div>
   );
 };
@@ -153,17 +190,6 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
       </div>
     );
   }
-
-  // Helper to remove markdown backticks so that the Markdown renderer
-  // does not render it as a Code block. This is needed because LLM
-  // hallucinates these backticks.
-  const removeMarkdownBackticks = (text: string) => {
-    if (text.startsWith("```markdown")) {
-      text = text.split("markdown").join("");
-    }
-    // Replace all backticks.
-    return text.split("```").join("");
-  };
 
   // Render based on response type
   switch (customColumnValueData.response_type) {
