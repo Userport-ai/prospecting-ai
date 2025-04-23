@@ -42,7 +42,15 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
           </ul>
         ),
         li: ({ children }) => (
-          <li style={{ marginBottom: "1rem" }}>{children}</li>
+          <li
+            style={{
+              marginBottom: "1rem",
+              color: "#424242",
+              fontSize: "0.9rem",
+            }}
+          >
+            {children}
+          </li>
         ), // Add spacing between items
         a: ({ href, children }) => (
           <a
