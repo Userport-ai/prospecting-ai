@@ -46,7 +46,7 @@ const EditProduct = () => {
   };
 
   return (
-    <div className="mt-10 flex flex-col gap-4 w-[40rem]">
+    <div className="mt-10 flex flex-col gap-4 w-[90%]">
       {error && <p className="text-sm text-red-500">{error.message}</p>}
       <ProductForm
         product={product!}
