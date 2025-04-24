@@ -586,7 +586,7 @@ class GeminiService(AIService):
                 return {} if is_json else "", token_usage
 
             response_text = response.text
-            logger.debug(f"Gemini response: {response_text}")
+            logger.debug(f"Gemini response: {response}")
 
             # Estimate token usage based on character count
             prompt_tokens = len(prompt) // self.avg_chars_per_token
@@ -795,7 +795,7 @@ class GeminiService(AIService):
                 return {} if response_schema else "", token_usage
 
             response_text = response.text
-            logger.debug(f"Gemini search response: {response_text}...")
+            logger.debug(f"Gemini search response: {response}...")
 
             # Estimate token usage with search multiplier
             multiplier = 1.0

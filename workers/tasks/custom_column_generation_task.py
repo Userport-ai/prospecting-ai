@@ -88,7 +88,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         """Configure the AI service with factory pattern."""
         factory = AIServiceFactory()
         self.model = factory.create_service("gemini", model_name="gemini-2.5-pro-preview-03-25")
-        self.search_model = factory.create_service("gemini", model_name="gemini-2.5-pro-preview-03-25")
+        self.search_model = factory.create_service("gemini", model_name="gemini-2.5-pro-preview-03-25", default_temperature=0.1)
 
     @property
     def enrichment_type(self) -> str:
@@ -548,9 +548,9 @@ class CustomColumnTask(AccountEnrichmentTask):
 
 ```json
 {{
+  "rationale": "<string: Explanation of derivation, sources used, or statement that info wasn't found>",
   "value": <Value conforming to {response_type}, including source URLs where applicable>,
-  "confidence_score": <float, 0.0-1.0>,
-  "rationale": "<string: Explanation of derivation, sources used, or statement that info wasn't found>"
+  "confidence_score": <float, 0.0-1.0>
 }}"""
 
     def _get_format_for_response_type(self, column_config: Dict[str, Any]) -> str:
