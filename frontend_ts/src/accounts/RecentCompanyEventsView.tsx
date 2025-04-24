@@ -8,8 +8,8 @@ const RecentCompanyEventsView: React.FC<{
   }
   return (
     <div className="flex flex-col gap-6">
-      {recentEvents.map((rEvent) => (
-        <div key={rEvent.title} className="flex flex-col">
+      {recentEvents.map((rEvent, index) => (
+        <div key={index} className="flex flex-col">
           <p className="text-md text-gray-800">{rEvent.title}</p>
           <a
             href={rEvent.source}
