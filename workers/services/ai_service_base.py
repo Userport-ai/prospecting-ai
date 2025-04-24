@@ -1,14 +1,23 @@
+import enum
 import hashlib
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional, Union, Tuple, List
+from typing import Dict, Any, Optional, Union, Tuple, List, TypeVar
 
 from google.cloud import bigquery
 
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
 from services.ai_cache_service import AICacheService
+
+
+class ThinkingBudget(enum.Enum):
+    """Enum for thinking budget levels."""
+    LOW = 1024
+    MEDIUM = 8192
+    HIGH = 24576
+
 
 
 class AIService(ABC):
@@ -19,7 +28,8 @@ class AIService(ABC):
             model_name: Optional[str] = None,
             cache_service: Optional[AICacheService] = None,
             tenant_id: Optional[str] = None,
-            default_temperature: Optional[float] = None
+            default_temperature: Optional[float] = None,
+            thinking_budget: Optional[ThinkingBudget] = None
     ):
         """Initialize service with token tracking and optional caching."""
         self.provider_name = "base"  # Override in subclasses
@@ -28,6 +38,7 @@ class AIService(ABC):
         self.cache_ttl_hours = 24  # Default cache TTL
         self.model = model_name  # Model name to be used by the service
         self.default_temperature = default_temperature  # Default temperature
+        self.thinking_budget = thinking_budget  # Thinking budget parameter
 
     # ===============================
     # Core Content Generation Methods

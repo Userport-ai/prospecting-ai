@@ -1,4 +1,5 @@
 import os
+import enum
 from typing import Dict, Any, Optional, Union, Tuple
 
 import google.genai as genai
@@ -10,8 +11,7 @@ from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
 from services.ai_cache_service import AICacheService
-from services.ai_service_base import AIService
-
+from services.ai_service_base import AIService, ThinkingBudget
 
 # Retry configurations
 GEMINI_RETRY_CONFIG = RetryConfig(
@@ -37,7 +37,8 @@ class GeminiService(AIService):
             model_name: Optional[str] = None,
             cache_service: Optional[AICacheService] = None,
             tenant_id: Optional[str] = None,
-            default_temperature: Optional[float] = 0.0  # Default to 0.0 for deterministic outputs
+            default_temperature: Optional[float] = 0.0,  # Default to 0.0 for deterministic outputs
+            thinking_budget: Optional[ThinkingBudget] = None
     ):
         """Initialize Gemini client."""
         super().__init__(
@@ -46,6 +47,7 @@ class GeminiService(AIService):
             tenant_id=tenant_id,
             default_temperature=default_temperature
         )
+        self.thinking_budget = thinking_budget
         self.provider_name = "gemini"
 
         api_key = os.getenv("GEMINI_API_TOKEN")
@@ -215,6 +217,15 @@ class GeminiService(AIService):
         """Run Gemini's synchronous generate_content in a separate thread"""
         # Create a GenerateContentConfig object from the config dictionary
         config = types.GenerateContentConfig(**config_params) if config_params else None
+        
+        # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
+        if self.model and self.model.startswith('gemini-2.5-flash') and self.thinking_budget:
+            if not config:
+                config = types.GenerateContentConfig()
+            config.thinking_config = types.ThinkingConfig(
+                thinking_budget=self.thinking_budget.value if isinstance(self.thinking_budget, enum.Enum) else 0,
+                include_thoughts=True
+            )
 
         return self.client.models.generate_content(
             model=self.model,
@@ -233,13 +244,23 @@ class GeminiService(AIService):
         if temperature is not None:
             config_params['temperature'] = temperature
 
+        # Create config
+        config = types.GenerateContentConfig(
+            tools=[search_tool],
+            **config_params
+        )
+        
+        # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
+        if self.model and self.model.startswith('gemini-2.5-flash') and self.thinking_budget:
+            config.thinking_config = types.ThinkingConfig(
+                thinking_budget=self.thinking_budget.value if isinstance(self.thinking_budget, enum.Enum) else 0,
+                include_thoughts=True
+            )
+
         return self.client.models.generate_content(
             model=self.model,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[search_tool],
-                **config_params
-            )
+            config=config
         )
 
     # ===============================

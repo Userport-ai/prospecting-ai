@@ -5,7 +5,7 @@ from google.cloud import bigquery
 
 from utils.loguru_setup import logger
 from services.ai_cache_service import AICacheService
-from services.ai_service_base import AIService
+from services.ai_service_base import AIService, ThinkingBudget
 from services.gemini_service import GeminiService
 from services.openai_service import OpenAIService
 
@@ -59,7 +59,8 @@ class AIServiceFactory:
             tenant_id: Optional[str] = None,
             model_name: Optional[str] = None,
             cache_ttl_hours: Optional[int] = 24,
-            default_temperature: Optional[float] = 0.2
+            default_temperature: Optional[float] = 0.2,
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> AIService:
         """
         Create an AI service instance with optional caching.
@@ -70,6 +71,7 @@ class AIServiceFactory:
             tenant_id: Optional tenant ID for multi-tenancy
             cache_ttl_hours: Cache TTL in hours (only used if caching is enabled)
             default_temperature: Default temperature setting (0.0 for deterministic outputs)
+            thinking_budget: Optional thinking budget level (ThinkingBudget enum)
 
         Returns:
             AIService instance (OpenAIService or GeminiService)
@@ -88,7 +90,8 @@ class AIServiceFactory:
                 model_name=model_name,
                 cache_service=self.cache_service,
                 tenant_id=tenant_id,
-                default_temperature=default_temperature
+                default_temperature=default_temperature,
+                thinking_budget=thinking_budget
             )
         else:
             raise ValueError(f"Unsupported AI provider: {provider}")

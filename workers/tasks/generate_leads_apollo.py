@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, List, Optional, Union
 
 from services.ai_service import AIServiceFactory
+from services.ai_service_base import ThinkingBudget
 from services.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
 from services.jina_service import JinaService
@@ -362,7 +363,7 @@ class ApolloLeadsTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self) -> None:
         """Configure the Gemini AI service."""
-        self.model = AIServiceFactory().create_service("gemini", default_temperature=ApolloConfig.default_temperature)
+        self.model = AIServiceFactory().create_service("gemini", model_name='gemini-2.5-flash-preview-04-17', thinking_budget=ThinkingBudget.LOW, default_temperature=ApolloConfig.default_temperature)
 
     def _initialize_services(self) -> None:
         """Initialize required services."""

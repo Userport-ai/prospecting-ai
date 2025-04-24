@@ -8,6 +8,7 @@ from google.api_core.exceptions import ResourceExhausted
 
 from models.common import UserportPydanticBaseModel
 from services.ai_service import AIServiceFactory
+from services.ai_service_base import ThinkingBudget
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from tasks.enrichment_task import AccountEnrichmentTask
@@ -435,6 +436,7 @@ class CustomColumnTask(AccountEnrichmentTask):
                 entity_id=entity_id,
                 entity_type=entity_type,
                 column_config=column_config,
+                ai_config=ai_config,
                 entity_context=entity_context,
             )
 
@@ -468,7 +470,9 @@ class CustomColumnTask(AccountEnrichmentTask):
             self.metrics["ai_errors"] += 1
             raise RetryableError(f"AI generation failed: {str(e)}")
 
-    def _create_generation_prompt(self, entity_id: str, column_config: Dict[str, Any], entity_context: Dict[str, Any],
+    def _create_generation_prompt(self, entity_id: str, column_config: Dict[str, Any],
+                                  ai_config: Dict[str, Any],
+                                  entity_context: Dict[str, Any],
                                   entity_type=None) -> str:
         """Create the prompt for value generation with enhanced contextualization."""
         # Extract column description and expected values
@@ -485,6 +489,8 @@ class CustomColumnTask(AccountEnrichmentTask):
         # Get any validation rules
         validation_rules = column_config.get('validation_rules', [])
         validation_text = "\n".join([f"- {rule}" for rule in validation_rules]) if validation_rules else ""
+
+        internet_use_text = "\n".join(f"ALWAYS use web research to find the answer and confirm that the answer you're giving is accurate." if ai_config.get('use_internet', False) else "Only use the provided context and DO NOT use web research to find the answer.") if ai_config else ""
 
         # Define conditional sections
         examples_section = f"""
@@ -504,7 +510,8 @@ class CustomColumnTask(AccountEnrichmentTask):
         todays_date = datetime.now().strftime("%Y-%m-%d")
         return f"""**Persona:** You are an AI assistant acting as an experienced Business Development Representative (BDR).
 
-**Goal:** Analyze the provided entity information and answer a specific question accurately and concisely, performing web research if necessary.
+**Goal:** Analyze the provided entity information and answer a specific question truthfully, accurately and concisely.
+{internet_use_text}
 
 **Input Context:**
 
