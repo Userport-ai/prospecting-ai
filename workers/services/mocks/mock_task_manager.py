@@ -38,7 +38,7 @@ class MockTaskManager:
         task_instance = task_registry_instance.get_task(task.get("task_name"))
         if not task_instance or not task.get("task_name"):
             raise ValueError(f"No task found with name: {task.get('task_name')}")
-        await task_instance.execute(task.get("payload"))
+        await task_instance.run_task(task.get("payload"))
         task["status"] = "completed"
 
         print(f"Executed task {task_id}: {task}")

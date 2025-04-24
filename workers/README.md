@@ -37,18 +37,54 @@ workers/
    uvicorn main:app --reload
    ```
 
-4. Build using Docker
+## Docker Setup
+
+1. Build using Docker
    ```bash
-   docker build -t userport-workers-dev .
+   docker build -t userport-workers:dev .
    ```
 
-5. Run built Docker container
+2. Run built Docker container
    ```bash
    docker run -p 8080:8080 --env-file .env \
    -v $(pwd):/app \
    -v $(pwd)/secrets/service-account.json:/secrets/service-account.json \
-   userport-workers-dev
-  ```
+   userport-workers:dev
+   ```
+
+## Debugging with IntelliJ IDEA
+
+1. Build the Docker image with debugging support:
+   ```bash
+   docker build -t userport-workers:dev .
+   ```
+
+2. In IntelliJ IDEA:
+   - Go to Run → Edit Configurations
+   - Click "+" and select "Python Remote Debug"
+   - Configure:
+     - Name: "Userport Workers Debug"
+     - Local host name: localhost
+     - Local port: 5678
+     - Path mappings: Local path `/path/to/workers` → Remote path `/app`
+   - Click "OK"
+
+3. Start the debug server in IntelliJ IDEA first:
+   - Set your breakpoints
+   - Select your "Userport Workers Debug" configuration 
+   - Click the debug icon (or press Shift+F9)
+   - IntelliJ will show "Waiting for process connection..."
+
+4. Run your Docker container with debugging enabled:
+   ```bash
+   docker run -p 8080:8080 --env-file .env -e REMOTE_DEBUG=true \
+     -v $(pwd):/app \
+     userport-workers:dev
+   ```
+
+5. The container will connect to the debugger and stop at your breakpoints.
+
+**Note:** If you encounter "Address already in use" errors, make sure no other process is using port 5678.
 
 ## Usage
 
