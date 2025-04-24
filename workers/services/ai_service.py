@@ -46,6 +46,7 @@ OPENAI_RETRY_CONFIG = RetryConfig(
     ]
 )
 
+
 class AICacheService:
     """Service for caching AI prompts and responses."""
 
@@ -345,7 +346,8 @@ class AIService(ABC):
             model_name: Optional[str] = None,
             cache_service: Optional[AICacheService] = None,
             tenant_id: Optional[str] = None,
-            default_temperature: Optional[float] = None
+            default_temperature: Optional[float] = None,
+            top_p: Optional[float] = None
     ):
         """Initialize service with token tracking and optional caching."""
         self.provider_name = "base"  # Override in subclasses
@@ -354,6 +356,7 @@ class AIService(ABC):
         self.cache_ttl_hours = 24  # Default cache TTL
         self.model = model_name  # Model name to be used by the service
         self.default_temperature = default_temperature  # Default temperature
+        self.top_p = top_p  # Default Top P if provided.
 
     def _create_token_usage(
             self,
@@ -371,7 +374,7 @@ class AIService(ABC):
             total_cost_in_usd=total_cost,
             provider=self.provider_name
         )
-        
+
     def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
         """Extract JSON content from text response.
         Handles various formats including JSON with prefixes, markdown code blocks, etc.
@@ -379,7 +382,7 @@ class AIService(ABC):
         try:
             # Clean response text of common formatting
             text = text.strip()
-            
+
             # Remove markdown code block markers
             if text.startswith("```json"):
                 text = text[7:]
@@ -388,7 +391,7 @@ class AIService(ABC):
             if text.endswith("```"):
                 text = text[:-3]
             text = text.strip()
-            
+
             # Strategy 1: Try direct JSON parsing
             try:
                 return json.loads(text)
@@ -396,12 +399,12 @@ class AIService(ABC):
                 # Strategy 2: Find JSON between curly braces
                 json_start = text.find('{')
                 json_end = text.rfind('}') + 1
-                
+
                 if 0 <= json_start < json_end:
                     extracted_json = text[json_start:json_end]
                     logger.debug(f"Extracted JSON from character {json_start} to {json_end}")
                     return json.loads(extracted_json)
-                    
+
                 # If all attempts fail, raise the original error
                 raise
         except Exception as e:
@@ -524,6 +527,7 @@ class AIService(ABC):
         """
         pass
 
+
 class GeminiService(AIService):
     """Gemini implementation of AI service."""
 
@@ -532,14 +536,16 @@ class GeminiService(AIService):
             model_name: Optional[str] = None,
             cache_service: Optional[AICacheService] = None,
             tenant_id: Optional[str] = None,
-            default_temperature: Optional[float] = 0.0  # Default to 0.0 for deterministic outputs
+            default_temperature: Optional[float] = 0.0,  # Default to 0.0 for deterministic outputs
+            top_p: Optional[float] = 0.95  # Default value on AI studio.
     ):
         """Initialize Gemini client."""
         super().__init__(
             model_name=model_name,
             cache_service=cache_service,
             tenant_id=tenant_id,
-            default_temperature=default_temperature
+            default_temperature=default_temperature,
+            top_p=top_p
         )
         self.provider_name = "gemini"
 
@@ -786,7 +792,8 @@ class GeminiService(AIService):
             response = await self._generate_search_content_in_thread(
                 prompt=enhanced_prompt,
                 search_params=search_params,
-                temperature=self.default_temperature
+                temperature=self.default_temperature,
+                top_p=self.top_p
             )
 
             if not response or not hasattr(response, 'text'):
@@ -836,7 +843,7 @@ class GeminiService(AIService):
             return error_result, token_usage
 
     @to_thread
-    def _generate_search_content_in_thread(self, prompt: str, search_params: Dict[str, Any], temperature: Optional[float] = None):
+    def _generate_search_content_in_thread(self, prompt: str, search_params: Dict[str, Any], temperature: Optional[float] = None, top_p: Optional[float] = None):
         """Execute Gemini's search-enabled content generation in a separate thread."""
         # Create the Google Search tool
         search_tool = types.Tool(google_search=types.GoogleSearch(**search_params))
@@ -845,6 +852,8 @@ class GeminiService(AIService):
         config_params = {}
         if temperature is not None:
             config_params['temperature'] = temperature
+        if top_p is not None:
+            config_params['top_p'] = top_p
 
         return self.client.models.generate_content(
             model=self.model,
@@ -971,6 +980,7 @@ class GeminiService(AIService):
                 logger.warning(f"Schema validation failed: {str(e)}. Using unvalidated result.")
 
         return result
+
 
 class OpenAIService(AIService):
     """OpenAI implementation of AI service."""
@@ -1273,7 +1283,6 @@ class OpenAIService(AIService):
             provider=self.provider_name
         )
 
-
     async def _execute_search_request(
             self,
             prompt: str,
@@ -1478,6 +1487,7 @@ class OpenAIService(AIService):
 
         return result
 
+
 class AIServiceFactory:
     """Factory for creating AI service instances with integrated caching."""
 
@@ -1519,7 +1529,8 @@ class AIServiceFactory:
             tenant_id: Optional[str] = None,
             model_name: Optional[str] = None,
             cache_ttl_hours: Optional[int] = 24,
-            default_temperature: Optional[float] = 0.2
+            default_temperature: Optional[float] = 0.2,
+            top_p: Optional[float] = 0.95
     ) -> AIService:
         """
         Create an AI service instance with optional caching.
@@ -1548,7 +1559,8 @@ class AIServiceFactory:
                 model_name=model_name,
                 cache_service=self.cache_service,
                 tenant_id=tenant_id,
-                default_temperature=default_temperature
+                default_temperature=default_temperature,
+                top_p=top_p
             )
         else:
             raise ValueError(f"Unsupported AI provider: {provider}")
