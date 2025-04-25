@@ -7,8 +7,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from google.api_core.exceptions import ResourceExhausted
 
 from models.common import UserportPydanticBaseModel
-from services.ai_service import AIServiceFactory
-from services.ai_service_base import ThinkingBudget
+from services.ai.ai_service import AIServiceFactory
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from tasks.enrichment_task import AccountEnrichmentTask
@@ -490,7 +489,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         validation_rules = column_config.get('validation_rules', [])
         validation_text = "\n".join([f"- {rule}" for rule in validation_rules]) if validation_rules else ""
 
-        internet_use_text = "\n".join(f"ALWAYS use web research to find the answer and confirm that the answer you're giving is accurate." if ai_config.get('use_internet', False) else "Only use the provided context and DO NOT use web research to find the answer.") if ai_config else ""
+        internet_use_text = "\n".join(f"ALWAYS use web research to find the answer and confirm that the answer you're giving is accurate. DO NOT SIMULATE Web searches, perform actual research." if ai_config.get('use_internet', False) else "Only use the provided context and DO NOT use web research to find the answer.") if ai_config else ""
 
         # Define conditional sections
         examples_section = f"""
