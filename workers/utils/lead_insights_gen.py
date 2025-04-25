@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from google.api_core.exceptions import ResourceExhausted
 
 from models.lead_activities import LeadResearchReport, ContentDetails, OpenAITokenUsage
-from services.ai_service import AIServiceFactory
+from services.ai.ai_service import AIServiceFactory
 from utils.retry_utils import RetryConfig, RetryableError, with_retry
 from dateutil.relativedelta import relativedelta
 from utils.loguru_setup import logger

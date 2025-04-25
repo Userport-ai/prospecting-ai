@@ -8,8 +8,8 @@ from utils.async_utils import run_in_thread
 from utils.retry_utils import RetryConfig, with_retry
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
-from services.ai_cache_service import AICacheService
-from services.ai_service_base import AIService
+from services.ai.ai_cache_service import AICacheService
+from services.ai.ai_service_base import AIService
 
 
 # Retry configurations

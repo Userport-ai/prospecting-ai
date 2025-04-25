@@ -11,8 +11,8 @@ import requests
 
 from models.accounts import AccountInfo, Financials
 from models.builtwith import EnrichmentResult
-from services.ai_service import AIServiceFactory, AIService
-from services.api_cache_service import APICacheService
+from services.ai.ai_service import AIServiceFactory, AIService
+from services.ai.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.builtwith_service import BuiltWithService
 from services.django_callback_service import CallbackService

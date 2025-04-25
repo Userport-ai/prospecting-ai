@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 
 from google.cloud import bigquery
 
-from services.ai_service import AICacheService
+from services.ai.ai_service import AICacheService
 from services.django_callback_service import CallbackService
 from services.task_result_manager import TaskResultManager
 from utils.loguru_setup import logger, set_trace_context

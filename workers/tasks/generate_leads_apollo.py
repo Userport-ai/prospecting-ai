@@ -10,9 +10,9 @@ import httpx
 from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, List, Optional, Union
 
-from services.ai_service import AIServiceFactory
-from services.ai_service_base import ThinkingBudget
-from services.api_cache_service import APICacheService, cached_request
+from services.ai.ai_service import AIServiceFactory
+from services.ai.ai_service_base import ThinkingBudget
+from services.ai.api_cache_service import APICacheService, cached_request
 from services.bigquery_service import BigQueryService
 from services.jina_service import JinaService
 from services.proxycurl_service import ProxyCurlService

@@ -1,7 +1,7 @@
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from utils.loguru_setup import logger
-from services.ai_service import AIService
+from services.ai.ai_service import AIService
 
 class Competitor(BaseModel):
     name: str = Field(alias="company_name")

@@ -1,11 +1,10 @@
 import os
 from datetime import datetime
-from time import time
 from typing import Optional, Dict, Any
 
 from models.builtwith import EnrichmentResult, BuiltWithApiResponse, TechnologyProfile, EnrichmentError, TechnologyBase, \
     TechnologyDetail, QualityMetrics, MetaData
-from services.api_cache_service import APICacheService, cached_request
+from services.ai.api_cache_service import APICacheService, cached_request
 from utils.retry_utils import RetryConfig, RetryableError, with_retry
 from utils.loguru_setup import logger
 

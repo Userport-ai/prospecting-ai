@@ -10,8 +10,8 @@ from utils.async_utils import to_thread, to_cpu_thread
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
-from services.ai_cache_service import AICacheService
-from services.ai_service_base import AIService, ThinkingBudget
+from services.ai.ai_cache_service import AICacheService
+from services.ai.ai_service_base import AIService, ThinkingBudget
 
 # Retry configurations
 GEMINI_RETRY_CONFIG = RetryConfig(

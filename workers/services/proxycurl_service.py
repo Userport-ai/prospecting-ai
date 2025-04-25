@@ -2,12 +2,12 @@ from datetime import datetime, timezone
 import os
 import asyncio
 import httpx
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any
 from difflib import SequenceMatcher
 
 from models.leads import ProxyCurlPersonProfile, ProxyCurlSearchResponse, EnrichedLead
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
-from services.api_cache_service import APICacheService, cached_request
+from services.ai.api_cache_service import APICacheService, cached_request
 from utils.loguru_setup import logger
 
 # Configure logging

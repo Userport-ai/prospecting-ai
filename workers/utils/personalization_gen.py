@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 
 from models.lead_activities import LeadResearchReport, ContentDetails, OpenAITokenUsage
-from services.ai_service import AIServiceFactory
+from services.ai.ai_service import AIServiceFactory
 from utils.loguru_setup import logger
 
 

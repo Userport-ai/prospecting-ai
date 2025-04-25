@@ -3,13 +3,13 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional, Union, Tuple, List, TypeVar
+from typing import Dict, Any, Optional, Union, Tuple
 
 from google.cloud import bigquery
 
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
-from services.ai_cache_service import AICacheService
+from services.ai.ai_cache_service import AICacheService
 
 
 class ThinkingBudget(enum.Enum):

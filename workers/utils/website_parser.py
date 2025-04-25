@@ -2,7 +2,7 @@ import os
 import asyncio
 import httpx
 from typing import List, Dict, Any
-from services.ai_service import AIServiceFactory
+from services.ai.ai_service import AIServiceFactory
 from google.api_core.exceptions import ResourceExhausted
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.loguru_setup import logger

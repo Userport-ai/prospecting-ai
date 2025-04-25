@@ -5,8 +5,8 @@ import httpx
 from pydantic import BaseModel, Field
 
 from models.accounts import BrightDataAccount, AccountInfo, RecentDevelopments
-from services.ai_service import AIServiceFactory
-from services.api_cache_service import APICacheService
+from services.ai.ai_service import AIServiceFactory
+from services.ai.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.brightdata_service import BrightDataService
 from services.builtwith_service import BuiltWithService

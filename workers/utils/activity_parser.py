@@ -9,7 +9,7 @@ from google.api_core.exceptions import ResourceExhausted
 from markdownify import markdownify
 
 from models.lead_activities import LinkedInActivity, ContentDetails, OpenAITokenUsage
-from services.ai_service import AIServiceFactory
+from services.ai.ai_service import AIServiceFactory
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.loguru_setup import logger
 

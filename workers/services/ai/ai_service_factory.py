@@ -4,10 +4,10 @@ from typing import Optional
 from google.cloud import bigquery
 
 from utils.loguru_setup import logger
-from services.ai_cache_service import AICacheService
-from services.ai_service_base import AIService, ThinkingBudget
-from services.gemini_service import GeminiService
-from services.openai_service import OpenAIService
+from services.ai.ai_cache_service import AICacheService
+from services.ai.ai_service_base import AIService, ThinkingBudget
+from services.ai.gemini_service import GeminiService
+from services.ai.openai_service import OpenAIService
 
 
 class AIServiceFactory:
