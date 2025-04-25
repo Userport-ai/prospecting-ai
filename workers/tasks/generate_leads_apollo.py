@@ -789,7 +789,12 @@ class ApolloLeadsTask(AccountEnrichmentTask):
             #     evaluated_leads=evaluated_leads_dict_list
             # )
 
-            score_distribution = self._calculate_score_distribution(evaluated_leads_dict_list)
+            try:
+                score_distribution = self._calculate_score_distribution(evaluated_leads_dict_list)
+            except Exception as e:
+                logger.error(f"Error calculating score distribution: {str(e)}", exc_info=True)
+                score_distribution = {}
+
             qualified_leads_dict_list = [l for l in evaluated_leads_dict_list if l['fit_score'] >= self.config.fit_score_threshold]
 
             result = {
@@ -1564,6 +1569,9 @@ class ApolloLeadsTask(AccountEnrichmentTask):
         scores = []
         for lead in evaluated_leads:
             score = lead.get('fit_score', 0)
+            if score is None:
+                logger.warning(f"Missing fit score for lead: {lead}, skipping")
+                continue
             scores.append(score)
 
             # Update distribution categories
