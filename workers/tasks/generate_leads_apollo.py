@@ -195,10 +195,11 @@ Important:
 *. Only assign null when there is NO conceivable match at all with any persona type.
 *. Evaluate each lead independently, without referring to the other leads.
 *. Assign a Fit Score from 0 to 100, where 100 indicates a perfect fit to the persona type, ICP and 0 indicates no alignment.
-*. The more Signals you find in the Lead's profile that are relevant to your Product, the higher their score.
+*. The more Signals you find in the Lead's profile that are relevant to your Product, the higher their score. 
 *. If the lead has started a new role recently or has recently been promoted, consider these as Signals as well.
 *. Rationale should highlight and cite the specific Signals from the Lead's Profile that supports the score. If there are no Signals, say "No Signals found".
-*. Write full sentences for bullet points in `matching_signals` and explain each signal with rationale from the lead's profile. Don't make up any reasons.
+*. Write full sentences for bullet points in `matching_signals` and explain each signal with rationale from the lead's profile. Don't make up any reasons. 
+*. Combine similar signals to reduce repetitive bullet points. Skip obvious points like “Lead currently works at XYZ company” since all leads are from that company. You may mention past companies if relevant.
 
 Evaluate each lead and return a JSON response with this structure:
 {{
