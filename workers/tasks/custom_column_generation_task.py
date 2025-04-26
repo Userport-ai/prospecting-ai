@@ -8,6 +8,7 @@ from google.api_core.exceptions import ResourceExhausted
 
 from models.common import UserportPydanticBaseModel
 from services.ai.ai_service import AIServiceFactory
+from services.ai.ai_service_base import ThinkingBudget
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from tasks.enrichment_task import AccountEnrichmentTask
@@ -443,12 +444,17 @@ class CustomColumnTask(AccountEnrichmentTask):
             logger.debug(f"Generating column value for entity {entity_id}")
             start_time = time.time()
             if ai_config and ai_config.get('use_internet', False):
+                # Use zero thinking budget by default for web search to prevent hallucination and simulated searches
+                thinking_budget = ai_config.get('thinking_budget', ThinkingBudget.ZERO)
                 response = await self.search_model.generate_search_content(prompt,
                                                                            search_context_size="high",
                                                                            force_refresh=True,
-                                                                           operation_tag='custom_column_with_internet')
+                                                                           operation_tag='custom_column_with_internet',
+                                                                           thinking_budget=thinking_budget)
             else:
-                response = await self.model.generate_content(prompt, is_json=True, operation_tag='custom_column')
+                # For non-internet based generation, use the default thinking budget in the model
+                thinking_budget = ai_config.get('thinking_budget', None)
+                response = await self.model.generate_content(prompt, is_json=True, thinking_budget=thinking_budget, operation_tag='custom_column')
             generation_time = time.time() - start_time
             logger.debug(f"Value generation for entity {entity_id} completed in {generation_time:.2f}s")
 

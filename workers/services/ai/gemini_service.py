@@ -72,7 +72,8 @@ class GeminiService(AIService):
             prompt: str,
             is_json: bool = True,
             operation_tag: str = "default",
-            temperature: Optional[float] = None
+            temperature: Optional[float] = None,
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content using Gemini without using cache."""
         try:
@@ -89,7 +90,7 @@ class GeminiService(AIService):
                 config_params['response_mime_type'] = 'application/json'
 
             # Run in thread since we're using the synchronous API
-            response = await self._generate_content_in_thread(prompt, config_params)
+            response = await self._generate_content_in_thread(prompt, config_params, thinking_budget)
 
             if not response or not hasattr(response, 'text'):
                 logger.warning("Empty response from Gemini")
@@ -133,7 +134,8 @@ class GeminiService(AIService):
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             response_schema: Optional[Any] = None,
-            operation_tag: str = "search"
+            operation_tag: str = "search",
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Execute search request using Gemini API."""
         try:
@@ -159,7 +161,8 @@ class GeminiService(AIService):
             response = await self._generate_search_content_in_thread(
                 prompt=enhanced_prompt,
                 search_params=search_params,
-                temperature=self.default_temperature
+                temperature=self.default_temperature,
+                thinking_budget=thinking_budget
             )
 
             if not response or not hasattr(response, 'text'):
@@ -213,17 +216,20 @@ class GeminiService(AIService):
     # ===============================
 
     @to_thread
-    def _generate_content_in_thread(self, prompt: str, config_params: Dict[str, Any]):
+    def _generate_content_in_thread(self, prompt: str, config_params: Dict[str, Any], thinking_budget: Optional[ThinkingBudget] = None):
         """Run Gemini's synchronous generate_content in a separate thread"""
         # Create a GenerateContentConfig object from the config dictionary
         config = types.GenerateContentConfig(**config_params) if config_params else None
         
+        # Use provided thinking_budget if available, otherwise use the default
+        current_thinking_budget = thinking_budget if thinking_budget is not None else self.thinking_budget
+        
         # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
-        if self.model and self.model.startswith('gemini-2.5-flash') and self.thinking_budget:
+        if self.model and self.model.startswith('gemini-2.5-flash') and current_thinking_budget:
             if not config:
                 config = types.GenerateContentConfig()
             config.thinking_config = types.ThinkingConfig(
-                thinking_budget=self.thinking_budget.value if isinstance(self.thinking_budget, enum.Enum) else 0,
+                thinking_budget=current_thinking_budget.value if isinstance(current_thinking_budget, enum.Enum) else 0,
                 include_thoughts=True
             )
 
@@ -234,7 +240,7 @@ class GeminiService(AIService):
         )
 
     @to_thread
-    def _generate_search_content_in_thread(self, prompt: str, search_params: Dict[str, Any], temperature: Optional[float] = None):
+    def _generate_search_content_in_thread(self, prompt: str, search_params: Dict[str, Any], temperature: Optional[float] = None, thinking_budget: Optional[ThinkingBudget] = None):
         """Execute Gemini's search-enabled content generation in a separate thread."""
         # Create the Google Search tool
         search_tool = types.Tool(google_search=types.GoogleSearch(**search_params))
@@ -250,10 +256,13 @@ class GeminiService(AIService):
             **config_params
         )
         
+        # Use provided thinking_budget if available, otherwise use the default
+        current_thinking_budget = thinking_budget if thinking_budget is not None else self.thinking_budget
+        
         # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
-        if self.model and self.model.startswith('gemini-2.5-flash') and self.thinking_budget:
+        if self.model and self.model.startswith('gemini-2.5-flash') and current_thinking_budget:
             config.thinking_config = types.ThinkingConfig(
-                thinking_budget=self.thinking_budget.value if isinstance(self.thinking_budget, enum.Enum) else 0,
+                thinking_budget=current_thinking_budget.value if isinstance(current_thinking_budget, enum.Enum) else 0,
                 include_thoughts=True
             )
 

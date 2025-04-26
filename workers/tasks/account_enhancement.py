@@ -737,7 +737,6 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 extraction_prompt,
                 is_json=True,
                 operation_tag="structured_data_extraction"
-                # temperature can be specified here to override default if needed
             )
 
             # --- MODIFICATION START ---
@@ -829,8 +828,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             analysis_text = await gemini_service.generate_content(
                 analysis_prompt,
                 is_json=False,
-                operation_tag="business_analysis"
-                # temperature can be specified here to override default if needed
+                operation_tag="business_analysis",
             )
 
             if not isinstance(analysis_text, str) or not analysis_text.strip():

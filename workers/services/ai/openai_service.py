@@ -9,8 +9,7 @@ from utils.retry_utils import RetryConfig, with_retry
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
 from services.ai.ai_cache_service import AICacheService
-from services.ai.ai_service_base import AIService
-
+from services.ai.ai_service_base import AIService, ThinkingBudget
 
 # Retry configurations
 OPENAI_RETRY_CONFIG = RetryConfig(
@@ -74,7 +73,8 @@ class OpenAIService(AIService):
             prompt: str,
             is_json: bool = True,
             operation_tag: str = "default",
-            temperature: Optional[float] = None
+            temperature: Optional[float] = None,
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content using OpenAI without using cache."""
         try:
@@ -148,7 +148,8 @@ class OpenAIService(AIService):
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             response_schema: Optional[Any] = None,
-            operation_tag: str = "search"
+            operation_tag: str = "search",
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> Tuple[Dict[str, Any], TokenUsage]:
         """
         Execute a search API request to OpenAI.
