@@ -14,10 +14,23 @@ from services.ai.ai_cache_service import AICacheService
 
 class ThinkingBudget(enum.Enum):
     """Enum for thinking budget levels."""
+    ZERO=0
     LOW = 1024
     MEDIUM = 8192
     HIGH = 24576
 
+SUPPORTED_MODEL_NAMES = [
+    # OpenAI
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4.1-nano",
+    "gpt-4o",
+    "gpt-4o-mini",
+    # Google Gemini
+    "gemini-2.5-flash-preview-04-17",
+    "gemini-2.5-pro-preview-03-25",
+    "gemini-2.0-flash",
+]
 
 
 class AIService(ABC):
@@ -31,6 +44,9 @@ class AIService(ABC):
             default_temperature: Optional[float] = None,
             thinking_budget: Optional[ThinkingBudget] = None
     ):
+        if model_name and not self.is_supported_model(model_name):
+            raise ValueError(f"Model {model_name} is not supported by this service.")
+
         """Initialize service with token tracking and optional caching."""
         self.provider_name = "base"  # Override in subclasses
         self.cache_service = cache_service
@@ -44,13 +60,21 @@ class AIService(ABC):
     # Core Content Generation Methods
     # ===============================
 
+    @staticmethod
+    def is_supported_model(name: str) -> bool:
+        """
+        Returns True if `name` is one of the supported model identifiers.
+        """
+        return name in SUPPORTED_MODEL_NAMES
+
     @abstractmethod
     async def _generate_content_without_cache(
             self,
             prompt: str,
             is_json: bool = True,
             operation_tag: str = "default",
-            temperature: Optional[float] = None
+            temperature: Optional[float] = None,
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content from prompt without using cache."""
         pass
@@ -61,7 +85,8 @@ class AIService(ABC):
             is_json: bool = True,
             operation_tag: str = "default",
             force_refresh: bool = False,
-            temperature: Optional[float] = None
+            temperature: Optional[float] = None,
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> Union[Dict[str, Any], str]:
         """Generate content from prompt, using cache if available."""
         # Use provided temperature or fall back to default
@@ -90,7 +115,8 @@ class AIService(ABC):
             prompt=prompt,
             is_json=is_json,
             operation_tag=operation_tag,
-            temperature=used_temperature
+            temperature=used_temperature,
+            thinking_budget=thinking_budget
         )
 
         if self.cache_service:
@@ -134,7 +160,8 @@ class AIService(ABC):
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "search",
-            force_refresh: bool = True
+            force_refresh: bool = True,
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability.
 
@@ -159,7 +186,8 @@ class AIService(ABC):
             prompt=prompt,
             search_context_size=search_context_size,
             user_location=user_location,
-            operation_tag=operation_tag
+            operation_tag=operation_tag,
+            thinking_budget=thinking_budget
         )
 
         # Store result in cache
@@ -180,7 +208,8 @@ class AIService(ABC):
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "structured_search",
-            force_refresh: bool = False
+            force_refresh: bool = False,
+            thinking_budget: Optional[ThinkingBudget] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability and structured output format.
 
@@ -210,7 +239,8 @@ class AIService(ABC):
             search_context_size=search_context_size,
             user_location=user_location,
             response_schema=response_schema,
-            operation_tag=operation_tag
+            operation_tag=operation_tag,
+            thinking_budget=thinking_budget
         )
 
         # Handle refusals if present
