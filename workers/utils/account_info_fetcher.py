@@ -94,20 +94,29 @@ class AccountInfoFetcher:
         """Get Account information for given website."""
         try:
             logger.debug(f"Starting fetch of Account information v2 for website: {self.website}")
+            domain = UrlUtils.get_domain(url=self.website)
+
             website_overview: str = await self._fetch_website_overview()
             logger.debug(f"Fetched website overview for website: {self.website}")
 
             # Try web search first.
+            logger.info(f"Account Info: Trying web search first")
             try:
-                brightdata_account = await self._web_search(website_overview=website_overview)
+                brightdata_account = await self._web_search(domain=domain, website_overview=website_overview)
                 return self._to_account_info(brightdata_account)
             except Exception as e:
-                logger.error(f"Web Search: Failed to lookup LinkedIn page with error: {str(e)}")
+                logger.error(f"Account Info: Failed web search with error: {str(e)}")
 
-            # TODO: Try other options next.
+            # Try Built With next.
+            logger.info(f"Account Info: Trying BuiltWith next")
+            try:
+                brightdata_account = await self._lookup_builtwith(domain=domain, website_overview=website_overview)
+                return self._to_account_info(brightdata_account)
+            except Exception as e:
+                logger.error(f"Account Info: Failed Builtwith lookup with error: {str(e)}")
 
         except Exception as e:
-            logger.error(f"Failed to get Account information with error: {str(e)}", exc_info=True)
+            logger.error(f"Account info: Failed to get with error: {str(e)}", exc_info=True)
             raise
 
     async def _fetch_website_overview(self) -> str:
@@ -116,32 +125,53 @@ class AccountInfoFetcher:
         response = await self.model.generate_content(prompt=prompt, is_json=False, operation_tag="website_overview")
         return response
 
-    async def _web_search(self, website_overview: str) -> BrightDataAccount:
+    async def _web_search(self, domain: str, website_overview: str) -> BrightDataAccount:
         """Perform web search and return the correct LinkedIn page."""
-        domain = UrlUtils.get_domain(url=self.website)
         query = f"{domain} LinkedIn Page"
         response_json: str = await self.jina_service.search_query(query=query, headers={"X-Respond-With": "no-content", "Accept": "application/json"})
         search_results: Optional[List[JinaSearchResults.Result]] = JinaSearchResults.model_validate_json(response_json).data
         if not search_results:
             raise ValueError(f"No Jina search results found for query: {query}")
 
-        logger.debug(f"Got {len(search_results)} Jina Search results for query: {query} are: {search_results}")
+        web_search_urls: List[str] = [result.url for result in search_results]
+        logger.debug(f"Got {len(search_results)} Web Search URLs for query: {query} are: {web_search_urls}")
 
-        # Filter only valid LinkedIn company/school results.
-        valid_linkedin_urls: List[str] = [result.url for result in list(filter(lambda result: self._is_valid_linkedin_url(result.url), search_results))]
+        # Select the correct Brightdata LinkedIn account.
+        selected_account: BrightDataAccount = await self._fetch_and_select_linkedin_url(potential_urls=web_search_urls, website_overview=website_overview)
+        logger.debug(f"Web Search: Found LinkedIn page with URL: {selected_account.url}")
+
+        return selected_account
+
+    async def _lookup_builtwith(self, domain: str, website_overview: str) -> BrightDataAccount:
+        """Lookup Builtwith to find LinkedIn URL and return the correct LinkedIn page."""
+        builtwith_result = await self.builtwith_service.get_technology_profile(domain=domain)
+        if not builtwith_result:
+            raise ValueError(f"Builtwith: Failed to get result for domain: {domain}")
+
+        bw_linkedin_urls: Optional[List[str]] = builtwith_result.get_account_linkedin_urls()
+        if not bw_linkedin_urls:
+            raise ValueError(f"Builtwith: No LinkedIn URLs found for domain: {domain}")
+
+        logger.debug(f"Builtwith: Found {len(bw_linkedin_urls)} LinkedIn URLs: {bw_linkedin_urls}")
+
+        selected_account: BrightDataAccount = await self._fetch_and_select_linkedin_url(potential_urls=bw_linkedin_urls, website_overview=website_overview)
+        logger.debug(f"Builtwith: Found LinkedIn page with URL: {selected_account.url}")
+
+        return selected_account
+
+    async def _fetch_and_select_linkedin_url(self, potential_urls: List[str], website_overview: str):
+        """Helper that calls Brightdata and LLM to select the correct LinkedIn URL for the given input URLs."""
+        valid_linkedin_urls: List[str] = list(filter(lambda url: self._is_valid_linkedin_url(url), potential_urls))
         if len(valid_linkedin_urls) == 0:
-            raise ValueError(f"Web Search: No Valid LinkedIn URLs not found for query: {query}")
+            raise ValueError(f"No Valid LinkedIn URLs not found among URLs: {potential_urls}")
 
         # Get LinkedIn pages.
         brightdata_accounts = await self._fetch_from_brightdata(valid_linkedin_urls)
         if len(brightdata_accounts) == 0:
-            raise ValueError(f"Web Search: No Brightdata accounts found for LinkedIn URLs: {valid_linkedin_urls}")
+            raise ValueError(f"No Brightdata accounts found for LinkedIn URLs: {valid_linkedin_urls}")
 
         # Select the correct Brightdata LinkedIn account.
-        selected_account: BrightDataAccount = await self._get_correct_linkedin_page(website_overview=website_overview, brightdata_accounts=brightdata_accounts)
-        logger.debug(f"Web Search: Found LinkedIn page: {selected_account}")
-
-        return selected_account
+        return await self._get_correct_linkedin_page(website_overview=website_overview, brightdata_accounts=brightdata_accounts)
 
     def _is_valid_linkedin_url(self, url: str):
         """Returns true if valid linkedin URL of company/school and false if not.
@@ -440,7 +470,7 @@ async def main():
     # website = "https://nubela.co/proxycurl"
     # website = "https://brightdata.com"
     # website = "https://www.observeinc.com"
-    website = "https://gomotive.com/"
+    website = "https://www.incred.com/"
     fetcher = AccountInfoFetcher(website=website)
 
     account_info = await fetcher.get_v2()
