@@ -377,11 +377,10 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         processed_count = 0
         total_accounts = len(accounts)
 
-
         self.gemini_service = self.ai_factory.create_service(provider="gemini", model_name="gemini-2.5-pro-preview-03-25",
-                                                        default_temperature=0.1)
+                                                             default_temperature=0.1)
         self.openai_service = self.ai_factory.create_service(provider="openai", model_name="gpt-4o",
-                                                        default_temperature=0.1)
+                                                             default_temperature=0.1)
 
         for account in accounts:
             processed_count += 1
@@ -413,7 +412,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 # --- Fetch Basic Account Info ---
                 logger.debug(f"Job {job_id}, Account {account_id}: Fetching Basic Account information")
                 account_info_fetcher = AccountInfoFetcher(website=website)
-                account_info: AccountInfo = await account_info_fetcher.get()
+                account_info: AccountInfo = await account_info_fetcher.get_v2()
                 await callback_service.send_callback(
                     job_id=job_id, account_id=account_id, status='processing', enrichment_type='company_info',
                     is_partial=True, completion_percentage=int((processed_count - 0.8) / total_accounts * 100),
@@ -444,9 +443,11 @@ class AccountEnhancementTask(AccountEnrichmentTask):
                 account_info.customers = (structured_data.get('market_position') or {}).get('customers') or []
                 account_info.competitors = (structured_data.get('market_position') or {}).get('competitors') or []
                 if account_info.linkedin_url:  # Ensure LinkedIn URL from fetcher is added
-                    if 'digital_presence' not in structured_data: structured_data['digital_presence'] = {}
-                    if 'social_media' not in structured_data['digital_presence']: structured_data['digital_presence'][
-                        'social_media'] = {}
+                    if 'digital_presence' not in structured_data:
+                        structured_data['digital_presence'] = {}
+                    if 'social_media' not in structured_data['digital_presence']:
+                        structured_data['digital_presence'][
+                            'social_media'] = {}
                     structured_data['digital_presence']['social_media']['linkedin'] = account_info.linkedin_url
                     if not self._is_valid_linkedin_url(account_info.linkedin_url):
                         logger.warning(f"LinkedIn URL - {account_info.linkedin_url} is invalid!")
@@ -622,7 +623,6 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             "error": error_details.get('message', 'Unknown error')
         })
 
-
     async def _fetch_technology_stack(self, website: str, account_id: str,
                                       existing_technologies: List[str]) -> tuple[List[str], Optional[EnrichmentResult]]:
         """
@@ -685,10 +685,10 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         try:
             # Basic validation of LinkedIn company URL format
             return (
-                    url.startswith('https://www.linkedin.com/company/') and
-                    len(url) > len('https://www.linkedin.com/company/') and
-                    ' ' not in url and
-                    '\n' not in url
+                url.startswith('https://www.linkedin.com/company/') and
+                len(url) > len('https://www.linkedin.com/company/') and
+                ' ' not in url and
+                '\n' not in url
             )
         except Exception as e:
             logger.error(f"Error validating LinkedIn URL '{url}': {str(e)}")
@@ -845,7 +845,8 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
     def _format_location(self, location_data: Optional[Dict]) -> Optional[str]:
         """Format location from structured data"""
-        if not location_data: return None
+        if not location_data:
+            return None
         hq = location_data.get('headquarters') or {}
         parts = [
             hq.get('city'),
@@ -858,7 +859,8 @@ class AccountEnhancementTask(AccountEnrichmentTask):
 
     def _extract_technologies(self, tech_data: Optional[Dict]) -> List[str]:
         """Extract and flatten technology information"""
-        if not tech_data: return []
+        if not tech_data:
+            return []
         tech_lists = [
             tech_data.get('programming_languages') or [],
             tech_data.get('frameworks') or [],

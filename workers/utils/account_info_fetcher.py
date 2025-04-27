@@ -89,7 +89,7 @@ class AccountInfoFetcher:
             logger.error(f"Failed to configure one of AccountInfoFetcher's Services: {str(e)}", exc_info=True)
             raise
 
-    @with_retry(retry_config=ACCOUNT_FETCHER_RETRY_CONFIG, operation_name="_fetch_account_info")
+    @with_retry(retry_config=ACCOUNT_FETCHER_RETRY_CONFIG, operation_name="_fetch_account_info_v2")
     async def get_v2(self) -> AccountInfo:
         """Get Account information for given website."""
         try:
