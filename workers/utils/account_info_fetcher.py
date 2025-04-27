@@ -10,11 +10,12 @@ from services.ai.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.brightdata_service import BrightDataService
 from services.builtwith_service import BuiltWithService
-from services.jina_service import JinaService
+from services.jina_service import JinaService, JinaSearchResults
 from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.url_utils import UrlUtils
 from utils.loguru_setup import logger
+from urllib.parse import urlparse
 
 # Configure logging
 
@@ -87,6 +88,178 @@ class AccountInfoFetcher:
         except Exception as e:
             logger.error(f"Failed to configure one of AccountInfoFetcher's Services: {str(e)}", exc_info=True)
             raise
+
+    @with_retry(retry_config=ACCOUNT_FETCHER_RETRY_CONFIG, operation_name="_fetch_account_info")
+    async def get_v2(self) -> AccountInfo:
+        """Get Account information for given website."""
+        try:
+            logger.debug(f"Starting fetch of Account information v2 for website: {self.website}")
+            website_overview: str = await self._fetch_website_overview()
+            logger.debug(f"Fetched website overview for website: {self.website}")
+
+            # Try web search first.
+            try:
+                brightdata_account = await self._web_search(website_overview=website_overview)
+                return self._to_account_info(brightdata_account)
+            except Exception as e:
+                logger.error(f"Web Search: Failed to lookup LinkedIn page with error: {str(e)}")
+
+            # TODO: Try other options next.
+
+        except Exception as e:
+            logger.error(f"Failed to get Account information with error: {str(e)}", exc_info=True)
+            raise
+
+    async def _fetch_website_overview(self) -> str:
+        """Fetches overview of the website. Used to figure out the correct LinkedIn URL associated with the website."""
+        prompt = f"Provide overview of the company with website {self.website}."
+        response = await self.model.generate_content(prompt=prompt, is_json=False, operation_tag="website_overview")
+        return response
+
+    async def _web_search(self, website_overview: str) -> BrightDataAccount:
+        """Perform web search and return the correct LinkedIn page."""
+        domain = UrlUtils.get_domain(url=self.website)
+        query = f"{domain} LinkedIn Page"
+        response_json: str = await self.jina_service.search_query(query=query, headers={"X-Respond-With": "no-content", "Accept": "application/json"})
+        search_results: Optional[List[JinaSearchResults.Result]] = JinaSearchResults.model_validate_json(response_json).data
+        if not search_results:
+            raise ValueError(f"No Jina search results found for query: {query}")
+
+        logger.debug(f"Got {len(search_results)} Jina Search results for query: {query} are: {search_results}")
+
+        # Filter only valid LinkedIn company/school results.
+        valid_linkedin_urls: List[str] = [result.url for result in list(filter(lambda result: self._is_valid_linkedin_url(result.url), search_results))]
+        if len(valid_linkedin_urls) == 0:
+            raise ValueError(f"Web Search: No Valid LinkedIn URLs not found for query: {query}")
+
+        # Get LinkedIn pages.
+        brightdata_accounts = await self._fetch_from_brightdata(valid_linkedin_urls)
+        if len(brightdata_accounts) == 0:
+            raise ValueError(f"Web Search: No Brightdata accounts found for LinkedIn URLs: {valid_linkedin_urls}")
+
+        # Select the correct Brightdata LinkedIn account.
+        selected_account: BrightDataAccount = await self._get_correct_linkedin_page(website_overview=website_overview, brightdata_accounts=brightdata_accounts)
+        logger.debug(f"Web Search: Found LinkedIn page: {selected_account}")
+
+        return selected_account
+
+    def _is_valid_linkedin_url(self, url: str):
+        """Returns true if valid linkedin URL of company/school and false if not.
+
+        Valid URLs:
+        1. https://www.linkedin.com/company/gleanwork
+        2. http://www.linkedin.com/company/coderhq
+        3. https://www.linkedin.com/school/emory-university/
+
+        Invalid URLs:
+        1. http://in.linkedin.com/company/impactdotcom?trk=ppro_cpr
+        2. https://www.linkedin.com/company/google/jobs
+        3. https://pf.linkedin.com/company/google?trk=public_profile_profile-section-card_subtitle-click
+        """
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme not in {"http", "https"}:
+                return False
+            if "linkedin.com" not in parsed.netloc:
+                return False
+            path_parts = parsed.path.strip("/").split("/")
+
+            if len(path_parts) != 2:
+                return False
+
+            first, second = path_parts
+            if first not in {"company", "school"}:
+                return False
+            if not second:  # slug should not be empty
+                return False
+            if parsed.query:  # query string should ideally not be present
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Encountered error when checking if valid LinkedIn URL: {url} with error: {str(e)}")
+            return False
+
+    async def _fetch_from_brightdata(self, linkedin_urls: List[str]) -> List[BrightDataAccount]:
+        """Fetch LinkedIn pages for the given LinkedIn URLs."""
+        snapshot_id: str = await self.brightdata_service.trigger_account_data_collection(account_linkedin_urls=linkedin_urls)
+        logger.debug(f"Triggered Bright Data collection with Snapshot ID: {snapshot_id}")
+
+        brightdata_accounts: List[BrightDataAccount] = await self.brightdata_service.collect_account_data(snapshot_id=snapshot_id)
+        logger.debug(f"Collected: {len(brightdata_accounts)} Bright Data Accounts for Snapshot ID: {snapshot_id}")
+
+        # Filter out dead page accounts.
+        brightdata_accounts = list(filter(lambda account: account.warning_code == None, brightdata_accounts))
+        logger.debug(f"After skipping dead page accounts, got: {len(brightdata_accounts)} Brightdata Accounts for Snapshot ID: {snapshot_id}")
+
+        return brightdata_accounts
+
+    @with_retry(retry_config=ACCOUNT_FETCHER_RETRY_CONFIG, operation_name="_get_correct_linkedin_page")
+    async def _get_correct_linkedin_page(self, website_overview: str, brightdata_accounts: List[BrightDataAccount]) -> BrightDataAccount:
+        """Return the correct LinkedIn page from given list of bright data linkedin pages using website overview for matching."""
+        account_pages = []
+        for i, account in enumerate(brightdata_accounts):
+            account_repr = f"Company ID: {i}\n{account.model_dump_json(include=account.get_serialization_fields(), indent=2)}"
+            account_pages.append(account_repr)
+        account_pages_repr = "\n\n".join(account_pages)
+        prompt = f"""
+You are a very intelligent person who is tasked finding the correct LikedIn page for a given Company.
+You are provided with the following inputs:
+1. Overview of the Company.
+2. A list of LinkedIn Pages of companies.
+
+Using these inputs, find the LinkedIn page that most accurately matches the Company's Overview.
+Return the ID of the matched page and the rationale as a JSON response with the following structure:
+{{
+    "rationale": string,
+    "matching_company_id": number,
+}}
+
+
+\"\"\"
+## Company Overview
+{website_overview}
+
+## Company LinkedIn Pages
+{account_pages_repr}
+\"\"\"
+"""
+        try:
+            response = await self.model.generate_content(prompt=prompt, is_json=True, force_refresh=True)
+            if "matching_company_id" not in response:
+                raise ValueError(f"matching_company_id not found")
+
+            company_id = int(response["matching_company_id"])
+            if company_id < 0 or company_id >= len(brightdata_accounts):
+                raise ValueError(f"Invalid matching_company_id value: {company_id}")
+
+            return brightdata_accounts[company_id]
+
+        except Exception as e:
+            raise FailedToSelectAccountError(f"Failed to Select LinkedIn page with error: {str(e)}")
+
+    def _to_account_info(self, bd_account: BrightDataAccount):
+        return AccountInfo(
+            name=bd_account.name,
+            website=self.website,  # Using provided website instead of result from LinkedIn page which could be a bit.ly link.
+            linkedin_url=bd_account.url,
+            employee_count=bd_account.employees_in_linkedin,
+            company_size=bd_account.company_size,
+            about=bd_account.about,
+            description=bd_account.description,
+            slogan=bd_account.slogan,
+            industries=bd_account.industries,
+            categories=bd_account.specialties,
+            headquarters=bd_account.headquarters,
+            organization_type=bd_account.organization_type,
+            founded_year=bd_account.founded,
+            logo=bd_account.logo,
+            crunchbase_url=bd_account.crunchbase_url,
+            locations=bd_account.formatted_locations,
+            location_country_codes=bd_account.country_codes_array,
+            recent_developments=RecentDevelopments(linkedin_posts=bd_account.updates)
+        )
 
     @with_retry(retry_config=ACCOUNT_FETCHER_RETRY_CONFIG, operation_name="_fetch_account_info")
     async def get(self) -> AccountInfo:
@@ -263,26 +436,21 @@ class AccountInfoFetcher:
             raise FailedToSelectAccountError(f"Failed to select Correct Brightdata Account with error: {str(e)}")
 
 
-"""
-For testing
 async def main():
     # website = "https://nubela.co/proxycurl"
     # website = "https://brightdata.com"
-    website = "https://www.observeinc.com"
+    # website = "https://www.observeinc.com"
+    website = "https://gomotive.com/"
     fetcher = AccountInfoFetcher(website=website)
 
-    account_info = await fetcher.get()
-
-    import pprint
-    pprint.pprint(account_info)
+    account_info = await fetcher.get_v2()
 
 if __name__ == "__main__":
     import asyncio
-    
+
     # Logging configuration is now in utils/loguru_setup.py
 
     from dotenv import load_dotenv
     load_dotenv()
 
     asyncio.run(main())
-"""

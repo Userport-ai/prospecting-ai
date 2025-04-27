@@ -7,6 +7,8 @@ from typing import Dict
 
 from utils.connection_pool import ConnectionPool
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
 JINA_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
@@ -22,6 +24,16 @@ JINA_RETRY_CONFIG = RetryConfig(
         httpcore.ReadTimeout,
     ]
 )
+
+
+class JinaSearchResults(BaseModel):
+    class Result(BaseModel):
+        title: Optional[str] = None
+        url: Optional[str] = None
+        description: Optional[str] = None
+    code: Optional[int] = None
+    status: Optional[int] = None
+    data: Optional[List[Result]] = None
 
 
 class JinaService:
@@ -61,7 +73,7 @@ class JinaService:
     @with_retry(retry_config=JINA_RETRY_CONFIG, operation_name="_call_jina_search_api")
     async def search_query(self, query: str, headers: Dict[str, str]) -> str:
         """
-        Calls Jina Reader API (with retries) and returns the parsed web page for given URL.
+        Calls Jina Search API (with retries) and returns the results.
 
         No need to add Authorization header in the argument, that will be added automatically in the final request.
         """
@@ -72,3 +84,31 @@ class JinaService:
             response = await client.get(url=endpoint, headers=finalHeaders, timeout=self.API_TIMEOUT)
             response.raise_for_status()
             return response.text
+
+
+async def main():
+    import json
+    logger = logging.getLogger(__name__)
+
+    jina_service = JinaService()
+    logger.info("Successfully configured Jina Service")
+
+    domain = "google.com"
+    query = f"{domain} LinkedIn Page"
+    response = await jina_service.search_query(query=query, headers={"X-Respond-With": "no-content", "Accept": "application/json"})
+
+    search_result = JinaSearchResults.model_validate_json(response)
+    logger.info(f"{search_result.data}")
+
+if __name__ == "__main__":
+    import asyncio
+    import logging
+
+    logging.basicConfig(level=logging.DEBUG)
+
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    # asyncio.run(summarize_website())
+
+    asyncio.run(main())

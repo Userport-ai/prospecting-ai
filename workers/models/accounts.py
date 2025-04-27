@@ -151,6 +151,22 @@ class BrightDataAccount(UserportPydanticBaseModel):
     warning: Optional[str] = Field(default=None, description="Example warning text: 4XX page - dead page")
     warning_code: Optional[str] = Field(default=None, description="Example code: dead_page")
 
+    def get_serialization_fields(self) -> Dict[str, Any]:
+        """Fields that will be used to serialize Brightdata Account during LinkedIn page selection."""
+        return {
+            "name": True,
+            "website": True,
+            "url": True,
+            "about": True,
+            "description": True,
+            "specialties": True,
+            "employees_in_linkedin": True,
+            "organization_type": True,
+            "industries": True,
+            "founded": True,
+            "headquarters": True,
+        }
+
 
 class SearchApolloOrganizationsResponse(UserportPydanticBaseModel):
     """Apollo Leads search response."""
