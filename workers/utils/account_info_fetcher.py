@@ -121,14 +121,35 @@ class AccountInfoFetcher:
 
     async def _fetch_website_overview(self) -> str:
         """Fetches overview of the website. Used to figure out the correct LinkedIn URL associated with the website."""
-        prompt = f"Provide overview of the company with website {self.website}."
+        page_markdown: Optional[str] = None
+        # Try Jina first.
+        try:
+            page_markdown = await self.jina_service.read_url(url=self.website, headers={"X-Return-Format": "markdown"})
+            logger.debug("Fetched Website Markdown")
+        except Exception as e:
+            logger.error(f"Failed to read website markdown: {str(e)}")
+            page_markdown = None
+
+        prompt = ""
+        if page_markdown:
+            # Find Company overview using Website markdown.
+            prompt = f"""
+Provide overview of the company using its website markdown below.
+
+## Website Markdown
+{page_markdown}
+"""
+        else:
+            # Find company overview using website.
+            prompt = f"Provide overview of the company with website {self.website}."
+
         response = await self.model.generate_content(prompt=prompt, is_json=False, operation_tag="website_overview")
         return response
 
     async def _web_search(self, domain: str, website_overview: str) -> BrightDataAccount:
         """Perform web search and return the correct LinkedIn page."""
         query = f"{domain} LinkedIn Page"
-        response_json: str = await self.jina_service.search_query(query=query, headers={"X-Respond-With": "no-content", "Accept": "application/json"})
+        response_json: str = await self.jina_service.search_query(query=query, headers={"X-Respond-With": "no-content", "Accept": "application/json", "X-No-Cache": "true"})
         search_results: Optional[List[JinaSearchResults.Result]] = JinaSearchResults.model_validate_json(response_json).data
         if not search_results:
             raise ValueError(f"No Jina search results found for query: {query}")
@@ -471,9 +492,12 @@ async def main():
     # website = "https://brightdata.com"
     # website = "https://www.observeinc.com"
     website = "https://www.incred.com/"
+    # website = "http://www.dobackflip.com"
     fetcher = AccountInfoFetcher(website=website)
 
     account_info = await fetcher.get_v2()
+
+    # await fetcher._fetch_website_overview()
 
 if __name__ == "__main__":
     import asyncio
