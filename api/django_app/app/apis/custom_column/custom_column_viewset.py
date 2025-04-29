@@ -249,31 +249,76 @@ class CustomColumnViewSet(TenantScopedViewSet):
             "direct_dependents": CustomColumnSerializer(direct_dependent_columns, many=True).data,
             "all_dependents": CustomColumnSerializer(all_dependent_columns, many=True).data
         })
-        
+
     @action(detail=False, methods=['post'], url_path='generate-with-dependencies')
     def generate_with_dependencies(self, request):
-        """Generate values for multiple columns respecting dependencies."""
+        """
+        Generate values for multiple columns respecting dependencies.
+
+        Parameters:
+            entity_ids: List of entity IDs to process
+            column_ids: Optional list of column IDs to process
+            entity_type: Optional entity type (used if column_ids not provided)
+            batch_size: Batch size for processing (default: 10)
+            find_dependencies: Whether to automatically find and include all prerequisite
+                              columns that these columns depend on (default: False)
+        """
         # Get required parameters
         entity_ids = request.data.get('entity_ids', [])
         column_ids = request.data.get('column_ids', [])
         entity_type = request.data.get('entity_type')
         batch_size = request.data.get('batch_size', 10)
-        
+
+        # New parameter
+        find_dependencies = request.data.get('find_dependencies', False)
+
         if not entity_ids:
             return Response(
                 {"error": "No entity IDs provided"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-            
+
         if not column_ids and not entity_type:
             return Response(
                 {"error": "Either column_ids or entity_type must be provided"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-            
+
         try:
-            # Get all the columns first
+            # Get initial column set
             if column_ids:
+                # Convert to strings for consistency
+                column_ids = [str(col_id) for col_id in column_ids]
+
+                # If requested, find and include all prerequisite columns (dependencies)
+                if find_dependencies:
+                    # Collect all column IDs, preserving the original order but removing duplicates
+                    # If a column appears in both original list and as a dependency, the original position is preserved
+                    all_column_ids = []
+                    seen = set()
+
+                    # Start with the explicitly requested columns (in their original order)
+                    for col_id in column_ids:
+                        if col_id not in seen:
+                            all_column_ids.append(col_id)
+                            seen.add(col_id)
+
+                    # Then add any additional dependencies that weren't in the original list
+                    for col_id in column_ids:
+                        # Get all prerequisites for this column
+                        dependencies = DependencyGraphService.get_all_dependencies(col_id)
+
+                        # Add dependencies if they haven't been seen before
+                        for dep_id in dependencies:
+                            if dep_id not in seen:
+                                all_column_ids.append(dep_id)
+                                seen.add(dep_id)
+
+                    # Use the expanded list with duplicates removed
+                    logger.info(f"Expanded column list from {len(column_ids)} to {len(all_column_ids)} columns including prerequisites")
+                    column_ids = all_column_ids
+
+                # Get the columns from the database
                 columns = CustomColumn.objects.filter(
                     id__in=column_ids,
                     tenant=request.tenant
@@ -286,13 +331,13 @@ class CustomColumnViewSet(TenantScopedViewSet):
                     is_active=True,
                     deleted_at__isnull=True
                 )
-                
+
             if not columns.exists():
                 return Response(
                     {"message": "No columns found to generate values for"},
                     status=status.HTTP_200_OK
                 )
-                
+
             # Sort the columns based on their dependencies
             sorted_columns = list(columns)
             try:
@@ -301,15 +346,22 @@ class CustomColumnViewSet(TenantScopedViewSet):
                 )
                 # Convert back to model instances
                 id_to_column = {str(c.id): c for c in columns}
-                sorted_columns = [id_to_column[col_id] for col_id in sorted_column_ids]
+                sorted_columns = [id_to_column[col_id] for col_id in sorted_column_ids if col_id in id_to_column]
             except Exception as e:
                 logger.error(f"Error sorting columns by dependencies: {str(e)}")
                 # Continue with unsorted columns if there was an error
-            
+
+            # Make sure we have at least one column
+            if not sorted_columns:
+                return Response(
+                    {"message": "No valid columns found after dependency sorting"},
+                    status=status.HTTP_200_OK
+                )
+
             # Get the first column and remaining columns
             first_column = sorted_columns[0]
             remaining_columns = sorted_columns[1:]
-            
+
             # Create orchestration data for the first column
             orchestration_data = {
                 'next_columns': [str(c.id) for c in remaining_columns],
@@ -317,10 +369,10 @@ class CustomColumnViewSet(TenantScopedViewSet):
                 'batch_size': batch_size,
                 'tenant_id': str(request.tenant.id)
             }
-            
+
             # Generate the first column with orchestration data
             from app.utils.custom_column_utils import trigger_custom_column_generation
-            
+
             results = trigger_custom_column_generation(
                 tenant_id=str(request.tenant.id),
                 column_id=str(first_column.id),
@@ -328,21 +380,21 @@ class CustomColumnViewSet(TenantScopedViewSet):
                 batch_size=batch_size,
                 orchestration_data=orchestration_data
             )
-            
+
             return Response({
                 "message": f"Started dependency-aware generation for {len(sorted_columns)} columns",
                 "columns": [str(c.id) for c in sorted_columns],
                 "first_column": str(first_column.id),
+                "total_columns": len(sorted_columns),
                 "results": results
             })
-            
+
         except Exception as e:
             logger.error(f"Error in dependency-aware column generation: {str(e)}", exc_info=True)
             return Response(
                 {"error": f"Failed to start generation: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class LeadCustomColumnValueViewSet(TenantScopedViewSet):
     """ViewSet for managing LeadCustomColumnValue."""

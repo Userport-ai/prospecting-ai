@@ -128,6 +128,7 @@ class CallbackService:
             status: str,
             enrichment_type: str = 'company_info',
             lead_id: str = None,
+            orchestration_data: Optional[Dict[str, Any]] = None,
             raw_data: Optional[Dict[str, Any]] = None,
             processed_data: Optional[Dict[str, Any]] = None,
             error_details: Optional[Dict[str, Any]] = None,
@@ -155,7 +156,8 @@ class CallbackService:
                 "enrichment_type": enrichment_type,
                 "source": source,
                 "is_partial": is_partial,
-                "completion_percentage": completion_percentage
+                "completion_percentage": completion_percentage,
+                "orchestration_data": orchestration_data,
             }
 
             # Add optional data
@@ -223,6 +225,7 @@ class CallbackService:
             status: str,
             enrichment_type: str = 'company_info',
             lead_id: str = None,
+            orchestration_data: Optional[Dict[str, Any]] = None,
             raw_data: Optional[Dict[str, Any]] = None,
             processed_data: Optional[Dict[str, Any]] = None,
             error_details: Optional[Dict[str, Any]] = None,
@@ -240,6 +243,7 @@ class CallbackService:
                 lead_id = lead_id,
                 status=status,
                 enrichment_type=enrichment_type,
+                orchestration_data=orchestration_data,
                 raw_data = self._serialize(raw_data),
                 processed_data = self._serialize(processed_data),
                 error_details = self._serialize(error_details),
