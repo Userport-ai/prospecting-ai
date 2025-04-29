@@ -12,6 +12,7 @@ import requests
 from models.accounts import AccountInfo, Financials
 from models.builtwith import EnrichmentResult
 from services.ai.ai_service import AIServiceFactory, AIService
+from services.ai.ai_service_base import ThinkingBudget
 from services.ai.api_cache_service import APICacheService
 from services.bigquery_service import BigQueryService
 from services.builtwith_service import BuiltWithService
@@ -378,9 +379,9 @@ class AccountEnhancementTask(AccountEnrichmentTask):
         total_accounts = len(accounts)
 
         self.gemini_service = self.ai_factory.create_service(provider="gemini", model_name="gemini-2.5-pro-preview-03-25",
-                                                             default_temperature=0.1)
-        self.openai_service = self.ai_factory.create_service(provider="openai", model_name="gpt-4o",
-                                                             default_temperature=0.1)
+                                                             default_temperature=0.1, thinking_budget=ThinkingBudget.HIGH)
+        # self.openai_service = self.ai_factory.create_service(provider="openai", model_name="gpt-4o",
+        #                                                      default_temperature=0.1)
 
         for account in accounts:
             processed_count += 1

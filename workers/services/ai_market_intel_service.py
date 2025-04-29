@@ -1,5 +1,7 @@
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
+
+from services.ai.ai_service_base import ThinkingBudget
 from utils.loguru_setup import logger
 from services.ai.ai_service import AIService
 
@@ -100,7 +102,9 @@ class AICompanyIntelService:
                 prompt=prompt,
                 response_schema=CompetitorIntelligence,
                 search_context_size="medium",
-                operation_tag="competitor_intelligence"
+                operation_tag="competitor_intelligence",
+                thinking_budget=ThinkingBudget.ZERO,
+                temperature=0.1
             )
 
             logger.debug(f"Successfully fetched competitor intelligence for {website}")
@@ -131,7 +135,9 @@ class AICompanyIntelService:
                 prompt=prompt,
                 response_schema=CustomerEventIntelligence,
                 search_context_size="medium",
-                operation_tag="customer_event_intelligence"
+                operation_tag="customer_event_intelligence",
+                thinking_budget=ThinkingBudget.ZERO,
+                temperature=0.1
             )
 
             logger.debug(f"Successfully fetched customer and event intelligence for {website}")
@@ -243,6 +249,8 @@ Ensure that:
 - Give at least 3 most recent events.
 - Each entry is supported by at least one reputable source.
 - There is no additional commentary or text outside the JSON structure.
+- Keep the events in reverse chronological order (most recent first).
+- Make sure no event is older than 6 months.
 """
 
     def _get_empty_intelligence(self) -> Dict[str, Any]:

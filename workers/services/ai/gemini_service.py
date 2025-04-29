@@ -135,6 +135,7 @@ class GeminiService(AIService):
             user_location: Optional[Dict[str, Any]] = None,
             response_schema: Optional[Any] = None,
             operation_tag: str = "search",
+            temperature: Optional[float] = None,
             thinking_budget: Optional[ThinkingBudget] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Execute search request using Gemini API."""
@@ -161,7 +162,7 @@ class GeminiService(AIService):
             response = await self._generate_search_content_in_thread(
                 prompt=enhanced_prompt,
                 search_params=search_params,
-                temperature=self.default_temperature,
+                temperature= temperature if temperature is not None else self.default_temperature,
                 thinking_budget=thinking_budget
             )
 

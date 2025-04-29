@@ -182,7 +182,7 @@ class OpenAIService(AIService):
                 model=self.model,
                 tools=[search_tool],
                 input=enhanced_prompt,
-                temperature=self.default_temperature
+                temperature=temperature if temperature is not None else self.default_temperature
             )
 
             # Extract the output text

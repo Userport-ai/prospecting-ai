@@ -44,7 +44,7 @@ class AIService(ABC):
             default_temperature: Optional[float] = None,
             thinking_budget: Optional[ThinkingBudget] = None
     ):
-        if model_name and not self.is_supported_model(model_name):
+        if not self.is_supported_model(model_name):
             raise ValueError(f"Model {model_name} is not supported by this service.")
 
         """Initialize service with token tracking and optional caching."""
@@ -65,7 +65,7 @@ class AIService(ABC):
         """
         Returns True if `name` is one of the supported model identifiers.
         """
-        return name in SUPPORTED_MODEL_NAMES
+        return name and name in SUPPORTED_MODEL_NAMES
 
     @abstractmethod
     async def _generate_content_without_cache(
@@ -149,7 +149,9 @@ class AIService(ABC):
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             response_schema: Optional[Any] = None,
-            operation_tag: str = "search"
+            operation_tag: str = "search",
+            temperature: Optional[float] = None,
+            thinking_budget: Optional[ThinkingBudget] = None,
     ) -> Tuple[Dict[str, Any], TokenUsage]:
         """Execute a search request specific to the provider."""
         pass
@@ -161,6 +163,7 @@ class AIService(ABC):
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "search",
             force_refresh: bool = True,
+            temperature = 0.1,
             thinking_budget: Optional[ThinkingBudget] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability.
@@ -187,6 +190,7 @@ class AIService(ABC):
             search_context_size=search_context_size,
             user_location=user_location,
             operation_tag=operation_tag,
+            temperature=temperature,
             thinking_budget=thinking_budget
         )
 
@@ -209,6 +213,7 @@ class AIService(ABC):
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "structured_search",
             force_refresh: bool = False,
+            temperature = 0.1,
             thinking_budget: Optional[ThinkingBudget] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability and structured output format.
@@ -240,7 +245,8 @@ class AIService(ABC):
             user_location=user_location,
             response_schema=response_schema,
             operation_tag=operation_tag,
-            thinking_budget=thinking_budget
+            thinking_budget=thinking_budget,
+            temperature=temperature
         )
 
         # Handle refusals if present

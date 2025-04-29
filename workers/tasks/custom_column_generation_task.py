@@ -446,15 +446,18 @@ class CustomColumnTask(AccountEnrichmentTask):
             if ai_config and ai_config.get('use_internet', False):
                 # Use zero thinking budget by default for web search to prevent hallucination and simulated searches
                 thinking_budget = ai_config.get('thinking_budget', ThinkingBudget.ZERO)
+                temperature = ai_config.get('temperature', 0.0)
                 response = await self.search_model.generate_search_content(prompt,
                                                                            search_context_size="high",
                                                                            force_refresh=True,
                                                                            operation_tag='custom_column_with_internet',
+                                                                           temperature = temperature,
                                                                            thinking_budget=thinking_budget)
             else:
                 # For non-internet based generation, use the default thinking budget in the model
                 thinking_budget = ai_config.get('thinking_budget', None)
-                response = await self.model.generate_content(prompt, is_json=True, thinking_budget=thinking_budget, operation_tag='custom_column')
+                temperature = ai_config.get('temperature', 0.8)
+                response = await self.model.generate_content(prompt, is_json=True, thinking_budget=thinking_budget, temperature=temperature, operation_tag='custom_column')
             generation_time = time.time() - start_time
             logger.debug(f"Value generation for entity {entity_id} completed in {generation_time:.2f}s")
 
