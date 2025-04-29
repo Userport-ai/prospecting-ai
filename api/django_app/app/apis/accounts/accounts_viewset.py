@@ -204,18 +204,11 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
             logger.info(f"Triggered Bulk Account Enrichments successfully for Accounts: {accounts_data}.")
 
-            custom_column_jobs = trigger_custom_column_generation(
-                tenant_id=str(request.tenant.id),
-                entity_type=CustomColumn.EntityType.ACCOUNT,
-                entity_ids=[str(account.id) for account in created_accounts]
-            )
-
             response_data = {
                 "message": "Accounts created successfully",
                 "account_count": len(created_accounts),
                 "accounts": AccountDetailsSerializer(created_accounts, many=True).data,
-                "enrichment_responses": enrichment_responses,
-                "custom_column_jobs": custom_column_jobs
+                "enrichment_responses": enrichment_responses
             }
 
             return Response(response_data, status=status.HTTP_201_CREATED)

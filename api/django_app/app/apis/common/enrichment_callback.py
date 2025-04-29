@@ -14,6 +14,8 @@ from app.apis.leads.streaming_leads_callback_handler_v2 import StreamingCallback
 from app.models import Lead
 from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType, EnrichmentStatus
 from app.models.accounts import Account
+from app.models.custom_column import CustomColumn
+from app.services.column_generation_orchestrator import ColumnGenerationOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,25 @@ def should_process_callback(current_status: Optional[AccountEnrichmentStatus], n
             return False, "Cannot update failed status except to completed"
 
     return True, None
+
+async def _trigger_custom_column_generation_after_enrichment(account, account_id):
+    """Trigger custom column generation after account enrichment is complete."""
+    logger.info(f"Triggering custom column generation for account {account_id} after enrichment")
+    try:
+        # Start orchestrated generation for all account-type columns
+        orchestration_result = await ColumnGenerationOrchestrator.start_orchestrated_generation(
+            tenant_id=str(account.tenant_id),
+            entity_ids=[account_id],
+            entity_type=CustomColumn.EntityType.ACCOUNT.value(),
+            batch_size=10
+        )
+
+        logger.info(f"Custom column orchestration started: {orchestration_result}")
+        return orchestration_result
+    except Exception as e:
+        logger.error(f"Failed to trigger custom column generation after enrichment: {str(e)}", exc_info=True)
+        # Don't raise - we don't want to fail the callback if column generation fails
+        return {"error": str(e), "status": "failed"}
 
 
 def update_enrichment_status(
@@ -225,6 +246,9 @@ def enrichment_callback(request):
                         else:
                             # Use existing account enrichment function for other types
                             _update_account_from_enrichment(account, enrichment_type, processed_data)
+                            # After enrichment is complete, trigger custom column generation
+                            # We use asyncio.create_task to run this non-blocking
+                            _trigger_custom_column_generation_after_enrichment(account, account_id)
 
         return Response({
             "status": "success",

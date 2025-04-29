@@ -276,6 +276,8 @@ class CustomColumnTask(AccountEnrichmentTask):
             self.metrics["processing_time"] = time.time() - start_time
             self.metrics["avg_confidence_score"] = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
 
+            orchestration_data = payload.get('orchestration_data', {})
+
             # Send completion callback
             await callback_service.send_callback(
                 job_id=job_id,
@@ -284,6 +286,7 @@ class CustomColumnTask(AccountEnrichmentTask):
                 enrichment_type=self.ENRICHMENT_TYPE,
                 source="custom_column",
                 completion_percentage=100,
+                orchestration_data=orchestration_data if orchestration_data else None,
                 processed_data={
                     'successful_count': successful_count,
                     'failed_count': failed_count,

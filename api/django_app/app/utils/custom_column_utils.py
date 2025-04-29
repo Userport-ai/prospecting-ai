@@ -502,6 +502,7 @@ def trigger_custom_column_generation(
         job_id: Optional job ID for tracking
         batch_size: Number of entities to process in each batch (default: 10)
         respect_dependencies: Whether to respect dependencies between columns (default: True)
+        orchestration_data: Orchestration data to be passed to the worker service
 
     Returns:
         List of dictionaries with job information
