@@ -112,24 +112,6 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     } as CustomColumnMeta,
   },
   {
-    id: "location",
-    accessorFn: (row) => row.location,
-    header: "HQ",
-    minSize: 100,
-    maxSize: 100,
-    cell: (info) => {
-      const hq = info.getValue() as string | null;
-      if (!hq) {
-        return null;
-      }
-      return <p className="whitespace-normal break-words">{hq}</p>;
-    },
-    meta: {
-      displayName: "HQ",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
     id: "employee_count",
     accessorFn: (row) => row.employee_count,
     header: "Employee Count",
@@ -144,6 +126,24 @@ const baseAccountColumns: ColumnDef<AccountRow>[] = [
     },
     meta: {
       displayName: "Employee Count",
+      visibleInitially: true,
+    } as CustomColumnMeta,
+  },
+  {
+    id: "location",
+    accessorFn: (row) => row.location,
+    header: "HQ",
+    minSize: 100,
+    maxSize: 100,
+    cell: (info) => {
+      const hq = info.getValue() as string | null;
+      if (!hq) {
+        return null;
+      }
+      return <p className="whitespace-normal break-words">{hq}</p>;
+    },
+    meta: {
+      displayName: "HQ",
       visibleInitially: true,
     } as CustomColumnMeta,
   },
