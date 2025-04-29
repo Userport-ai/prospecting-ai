@@ -11,6 +11,8 @@ import uuid
 from typing import List, Dict, Any, Optional
 from django.db import transaction
 
+from app.services.dependency_graph_service import DependencyGraphService
+
 from app.models import Lead, Account
 from app.models.custom_column import (
     CustomColumn, AccountCustomColumnValue, LeadCustomColumnValue
@@ -446,6 +448,35 @@ def get_column_config(custom_column: CustomColumn) -> Dict[str, Any]:
     }
 
 
+def sort_columns_by_dependencies(columns):
+    """
+    Sort custom columns by their dependencies, so that dependencies are processed first.
+    
+    Args:
+        columns: QuerySet of CustomColumn objects
+        
+    Returns:
+        List of CustomColumn objects sorted by dependencies (dependencies first)
+    """
+    # Get IDs of all columns
+    column_ids = [str(col.id) for col in columns]
+    
+    try:
+        # Use the dependency service to sort the columns
+        sorted_ids = DependencyGraphService.topological_sort(column_ids)
+        
+        # Create a mapping of ID to column
+        id_to_column = {str(col.id): col for col in columns}
+        
+        # Return columns in sorted order
+        return [id_to_column[col_id] for col_id in sorted_ids]
+        
+    except ValueError as e:
+        # If there's a cycle in the dependencies, log it and return columns in original order
+        logger.error(f"Error sorting columns by dependencies: {str(e)}")
+        return list(columns)
+
+
 def trigger_custom_column_generation(
         tenant_id: str,
         column_id: Optional[str] = None,
@@ -453,7 +484,9 @@ def trigger_custom_column_generation(
         entity_ids: Optional[List[str]] = None,
         request_id: Optional[str] = None,
         job_id: Optional[str] = None,
-        batch_size: int = 10  # Default batch size of 10
+        batch_size: int = 10,  # Default batch size of 10
+        respect_dependencies: bool = True,  # Whether to respect dependencies between columns
+        orchestration_data: Optional[Dict[str, Any]] = None  # Data for orchestration chain
 ) -> List[Dict[str, Any]]:
     """
     Trigger custom column value generation for entity IDs with batching support.
@@ -468,6 +501,7 @@ def trigger_custom_column_generation(
         request_id: Optional request ID for idempotency
         job_id: Optional job ID for tracking
         batch_size: Number of entities to process in each batch (default: 10)
+        respect_dependencies: Whether to respect dependencies between columns (default: True)
 
     Returns:
         List of dictionaries with job information
@@ -494,6 +528,10 @@ def trigger_custom_column_generation(
     else:
         logger.error("Either column_id or entity_type must be provided")
         return [{"error": "Either column_id or entity_type must be provided"}]
+        
+    # Sort columns by dependencies if requested and if we have multiple columns
+    if respect_dependencies and len(columns) > 1:
+        columns = sort_columns_by_dependencies(columns)
 
     # For each column, trigger generation
     for column in columns:
@@ -546,6 +584,14 @@ def trigger_custom_column_generation(
                         "original_request_id": request_id or str(uuid.uuid4())
                     }
                 }
+                
+                # Add orchestration data if provided
+                if orchestration_data:
+                    # Include tenant ID in orchestration data so it can be used in the callback
+                    if 'tenant_id' not in orchestration_data:
+                        orchestration_data['tenant_id'] = tenant_id
+                        
+                    payload["orchestration_data"] = orchestration_data
 
                 ai_config = column.ai_config
 

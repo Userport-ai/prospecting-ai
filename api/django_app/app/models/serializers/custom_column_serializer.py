@@ -1,19 +1,79 @@
 from rest_framework import serializers
-from app.models.custom_column import CustomColumn, LeadCustomColumnValue, AccountCustomColumnValue
+from app.models.custom_column import (
+    CustomColumn, LeadCustomColumnValue, AccountCustomColumnValue,
+    CustomColumnDependency
+)
+
+
+class DependencySerializer(serializers.ModelSerializer):
+    """Serializer for CustomColumnDependency model."""
+    
+    dependent_column_name = serializers.CharField(source='dependent_column.name', read_only=True)
+    required_column_name = serializers.CharField(source='required_column.name', read_only=True)
+    
+    class Meta:
+        model = CustomColumnDependency
+        fields = [
+            'id', 'dependent_column', 'dependent_column_name', 
+            'required_column', 'required_column_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'dependent_column_name', 'required_column_name']
+        
+    def create(self, validated_data):
+        """
+        Create and return a new CustomColumnDependency instance, 
+        ensuring that full_clean() is called.
+        """
+        instance = CustomColumnDependency(**validated_data)
+        instance.full_clean()  # This will trigger the clean method
+        instance.save()
+        return instance
+        
+    def update(self, instance, validated_data):
+        """
+        Update and return an existing CustomColumnDependency instance,
+        ensuring that full_clean() is called.
+        """
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.full_clean()  # This will trigger the clean method
+        instance.save()
+        return instance
 
 
 class CustomColumnSerializer(serializers.ModelSerializer):
     """Serializer for CustomColumn model."""
-
+    
+    # Get the IDs of columns this column depends on
+    dependencies = serializers.SerializerMethodField()
+    
+    # Get the IDs of columns that depend on this column
+    dependents = serializers.SerializerMethodField()
+    
     class Meta:
         model = CustomColumn
         fields = [
             'id', 'name', 'description', 'question', 'entity_type',
             'response_type', 'response_config', 'ai_config', 'context_type',
-            'last_refresh', 'is_active',
+            'last_refresh', 'is_active', 'dependencies', 'dependents',
             'created_at', 'updated_at', 'created_by'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'dependents']
+        
+    def get_dependencies(self, obj):
+        """Get the IDs of columns this column depends on."""
+        dependencies = CustomColumnDependency.objects.filter(
+            dependent_column=obj
+        ).values_list('required_column_id', flat=True)
+        return [str(dep_id) for dep_id in dependencies]
+        
+    def get_dependents(self, obj):
+        """Get the IDs of columns that depend on this column."""
+        dependents = CustomColumnDependency.objects.filter(
+            required_column=obj
+        ).values_list('dependent_column_id', flat=True)
+        return [str(dep_id) for dep_id in dependents]
 
     def validate_response_config(self, value):
         """Validate response_config based on response_type."""

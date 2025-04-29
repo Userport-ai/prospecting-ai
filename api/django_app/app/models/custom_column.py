@@ -131,3 +131,66 @@ class AccountCustomColumnValue(BaseCustomColumnValue):
             models.Index(fields=['account']),
         ]
         db_table = 'account_custom_column_values'
+
+
+class CustomColumnDependency(BaseMixin):
+    """Model for tracking dependencies between custom columns."""
+    
+    dependent_column = models.ForeignKey(
+        CustomColumn, 
+        on_delete=models.CASCADE, 
+        related_name='dependencies'
+    )
+    required_column = models.ForeignKey(
+        CustomColumn, 
+        on_delete=models.CASCADE, 
+        related_name='dependents'
+    )
+    
+    class Meta:
+        unique_together = [['dependent_column', 'required_column']]
+        db_table = 'custom_column_dependencies'
+        
+    def clean(self):
+        super().clean()
+        # Prevent self-dependencies
+        if self.dependent_column == self.required_column:
+            raise ValidationError("A column cannot depend on itself")
+            
+        # Ensure entity types match
+        if self.dependent_column.entity_type != self.required_column.entity_type:
+            raise ValidationError(
+                "Dependencies can only be created between columns of the same entity type"
+            )
+            
+        # Check for cycles in the dependency graph
+        from app.services.dependency_graph_service import DependencyGraphService
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        if self.pk is None:  # Only check for new dependencies
+            dependent_id = str(self.dependent_column.id)
+            required_id = str(self.required_column.id)
+            
+            logger.debug(f"Checking cycle in model validation: {dependent_id} -> {required_id}")
+            
+            # Check for direct cycle first
+            if self.dependent_column.id == self.required_column.id:
+                logger.error(f"Self-reference detected: {dependent_id}")
+                raise ValidationError("A column cannot depend on itself")
+                
+            # Check for existing cycle in reverse direction
+            reverse_dependency_exists = CustomColumnDependency.objects.filter(
+                dependent_column=self.required_column,
+                required_column=self.dependent_column
+            ).exists()
+            
+            if reverse_dependency_exists:
+                logger.error(f"Direct cycle detected: {required_id} -> {dependent_id} already exists")
+                raise ValidationError("This dependency would create a circular reference")
+                
+            # Check for indirect cycles
+            if DependencyGraphService.would_create_cycle(dependent_id, required_id):
+                logger.error(f"Indirect cycle detected between {dependent_id} and {required_id}")
+                raise ValidationError("This dependency would create a circular reference")
