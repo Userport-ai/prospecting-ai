@@ -10,6 +10,7 @@ from google.cloud import bigquery
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
 from services.ai.ai_cache_service import AICacheService
+from json_repair import loads as repair_loads
 
 
 class ThinkingBudget(enum.Enum):
@@ -310,40 +311,14 @@ class AIService(ABC):
         )
 
     def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
-        """Extract JSON content from text response.
-        Handles various formats including JSON with prefixes, markdown code blocks, etc.
-        """
+        """Extract JSON content from text response."""
         try:
-            # Clean response text of common formatting
-            text = text.strip()
-
-            # Remove markdown code block markers
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-
-            # Strategy 1: Try direct JSON parsing
-            try:
-                return json.loads(text)
-            except json.JSONDecodeError:
-                # Strategy 2: Find JSON between curly braces
-                json_start = text.find('{')
-                json_end = text.rfind('}') + 1
-
-                if 0 <= json_start < json_end:
-                    extracted_json = text[json_start:json_end]
-                    logger.debug(f"Extracted JSON from character {json_start} to {json_end}")
-                    return json.loads(extracted_json)
-
-                # If all attempts fail, raise the original error
-                raise
+            # Let json_repair handle everything - it returns Python objects directly
+            return repair_loads(text)
         except Exception as e:
-            logger.error(f"Error parsing JSON response from {text[:100]!r}. Error: {str(e)}")
+            logger.error(f"Error parsing JSON response: {str(e)}")
             return {}
+
 
     # ===============================
     # Cache-related Methods

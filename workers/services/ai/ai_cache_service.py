@@ -8,6 +8,7 @@ from google.cloud import bigquery
 from utils.async_utils import to_thread
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
+from json_repair import repair_json
 
 
 class AICacheService:
@@ -230,15 +231,16 @@ class AICacheService:
         response_data = None
         response_text = None
 
-        if is_json:
-            # Handle JSON responses - explicitly serialize to JSON string
+        try:
             if isinstance(response, dict):
-                response_data = json.dumps(response)
+                # First try standard JSON serialization
+                response_data = json.dumps(response, ensure_ascii=False)
             else:
-                # For non-dict responses, wrap in a dict and serialize
-                response_data = json.dumps({"data": str(response)})
-        else:
-            response_text = str(response)
+                # For non-dict responses, wrap in a dict
+                response_data = json.dumps({"data": str(response)}, ensure_ascii=False)
+        except Exception as e:
+            logger.warning(f"JSON serialization failed, attempting repair: {str(e)}")
+            response_data = repair_json(str(response), ensure_ascii=False)
 
         row = {
             "cache_key": cache_key,
