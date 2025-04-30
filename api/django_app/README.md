@@ -23,6 +23,42 @@ sowrabh@Sowrabhs-MacBook-Pro django_app % docker run -it --rm \
     userport-app:dev
 ```
 
+### Running Tests
+
+All tests must be run from within the Docker container, not from your host machine. This is because the test environment relies on the Docker configuration to access the database and other dependencies.
+
+To enter the Docker shell, use:
+```bash
+docker exec -it $(docker ps | grep userport-app | awk '{print $1}') bash
+```
+
+Once inside the Docker container, you can run the following test commands:
+
+#### Dependency Graph Tests
+```bash
+# Run as a Django unit test
+python manage.py test app.manual_tests.test_dependency_graph.DependencyGraphServiceTests
+
+# Run as a standalone script
+python manage.py shell < app/manual_tests/test_dependency_graph.py
+```
+
+#### API Tests
+```bash
+# Run as Django unit tests
+python manage.py test app.manual_tests.test_column_dependencies_api.ColumnDependencyAPITests
+python manage.py test app.manual_tests.test_column_dependencies_api.GenerateWithDependenciesTests
+
+# Run as a standalone script (manual mode)
+python manage.py shell < app/manual_tests/test_column_dependencies_api.py
+```
+
+#### E2E Tests
+```bash
+# Update token and entity IDs in the script first
+python -m pytest app/manual_tests/e2e/test_custom_column_dependencies_api.py -v
+```
+
 ### GKE logs
 
 Add the following filters to GKE logs to filter out Health Check logs

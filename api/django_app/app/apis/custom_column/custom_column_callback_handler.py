@@ -6,7 +6,9 @@ from app.models.custom_column import (
 )
 import logging
 import json
+import asyncio
 from django.db.models import Count
+from app.services.column_generation_orchestrator import ColumnGenerationOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,53 @@ class CustomColumnCallbackHandler:
             processed_data = data.get('processed_data', {})
             values = processed_data.get('values', [])
             completion_percentage = data.get('completion_percentage', 0)
-            column_id = processed_data.get('column_id')  # Some callbacks might include this directly
+
+            # Check for orchestration data
+            orchestration_data = data.get('orchestration_data', {})
+            logger.debug(f"Orchestration data: {orchestration_data}, status: {status}")
+            column_id = values[0].get('column_id') if values else None # Get column_id from the first value
+            # If this is a completion callback and has orchestration data, handle next steps
+            if status == 'completed' and orchestration_data :
+                logger.info(f"Handling completed column {column_id} with orchestration data")
+
+                # Extract orchestration data
+                next_column_ids = orchestration_data.get('next_columns', [])
+                entity_ids = orchestration_data.get('entity_ids', [])
+                batch_size = orchestration_data.get('batch_size', 10)
+                tenant_id = orchestration_data.get('tenant_id')
+
+                # If there are next columns to process, trigger them
+                if next_column_ids and entity_ids and tenant_id:
+                    try:
+                        logger.info(f"Triggering next column {next_column_ids[0]} in orchestration")
+
+                        # Process the next column in the orchestration chain
+                        from app.utils.custom_column_utils import trigger_custom_column_generation
+
+                        # Trigger the next column
+                        next_column_id = next_column_ids[0]
+                        remaining_column_ids = next_column_ids[1:]
+
+                        # Create orchestration data for the next column
+                        next_orchestration_data = {
+                            'next_columns': remaining_column_ids,
+                            'entity_ids': entity_ids,
+                            'batch_size': batch_size,
+                            'tenant_id': tenant_id
+                        }
+
+                        # Trigger the next column with updated orchestration data
+                        trigger_custom_column_generation(
+                            tenant_id=tenant_id,
+                            column_id=next_column_id,
+                            entity_ids=entity_ids,
+                            batch_size=batch_size,
+                            orchestration_data=next_orchestration_data
+                        )
+
+                        logger.info(f"Successfully triggered next column {next_column_id} in orchestration")
+                    except Exception as e:
+                        logger.error(f"Error triggering next column in orchestration: {str(e)}", exc_info=True)
 
             # Log the callback
             logger.info(
