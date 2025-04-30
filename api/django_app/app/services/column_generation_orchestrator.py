@@ -35,13 +35,13 @@ class ColumnGenerationOrchestrator:
     """
     
     @classmethod
-    async def start_orchestrated_generation(
+    def start_orchestrated_generation(
         cls,
         tenant_id: str,
         entity_ids: List[str],
         column_ids: Optional[List[str]] = None,
         entity_type: Optional[str] = None,
-        batch_size: int = 10
+        batch_size: int = 1
     ) -> Dict[str, Any]:
         """
         Start the orchestrated generation of custom columns.
@@ -58,7 +58,8 @@ class ColumnGenerationOrchestrator:
         """
         # Create a unique orchestration ID
         orchestration_id = str(uuid.uuid4())
-        
+
+        logger.debug(f"Starting orchestrated generation {orchestration_id} for columns: {column_ids} ")
         # Get columns to generate
         if column_ids:
             columns = CustomColumn.objects.filter(
@@ -101,7 +102,7 @@ class ColumnGenerationOrchestrator:
                 remaining_columns = sorted_columns[1:]
                 
                 # Generate the first column
-                result = await cls._generate_column(
+                result = cls._generate_column(
                     tenant_id=tenant_id,
                     column=first_column,
                     entity_ids=entity_ids,
@@ -163,7 +164,7 @@ class ColumnGenerationOrchestrator:
             return columns
     
     @classmethod
-    async def _generate_column(
+    def _generate_column(
         cls,
         tenant_id: str,
         column: CustomColumn,
@@ -212,7 +213,8 @@ class ColumnGenerationOrchestrator:
                 "orchestration_data": {
                     "next_columns": [str(col.id) for col in (next_columns or [])],
                     "entity_ids": entity_ids,
-                    "batch_size": batch_size
+                    "batch_size": batch_size,
+                    "tenant_id": tenant_id,
                 }
             }
             
@@ -295,7 +297,7 @@ class ColumnGenerationOrchestrator:
             next_column = CustomColumn.objects.get(id=next_column_id)
             
             # Generate the next column
-            result = await cls._generate_column(
+            result = cls._generate_column(
                 tenant_id=next_column.tenant_id,
                 column=next_column,
                 entity_ids=entity_ids,

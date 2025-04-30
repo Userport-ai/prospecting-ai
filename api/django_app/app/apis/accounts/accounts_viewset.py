@@ -146,7 +146,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             enrichment_responses = self._trigger_enrichments(account)
             response.data['enrichment_responses'] = enrichment_responses
 
-            logger.info(f"Triggerd Account Enrichment successfully for Account: {account}.")
+            logger.info(f"Triggered Account Enrichment successfully for Account: {account}.")
 
         return response
 

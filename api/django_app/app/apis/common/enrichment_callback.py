@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Dict, Any, Optional, Tuple
 
@@ -16,6 +17,7 @@ from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentTyp
 from app.models.accounts import Account
 from app.models.custom_column import CustomColumn
 from app.services.column_generation_orchestrator import ColumnGenerationOrchestrator
+from app.utils.async_utils import run_async_in_thread
 
 logger = logging.getLogger(__name__)
 
@@ -70,16 +72,16 @@ def should_process_callback(current_status: Optional[AccountEnrichmentStatus], n
 
     return True, None
 
-async def _trigger_custom_column_generation_after_enrichment(account, account_id):
+def _trigger_custom_column_generation_after_enrichment(account, account_id):
     """Trigger custom column generation after account enrichment is complete."""
     logger.info(f"Triggering custom column generation for account {account_id} after enrichment")
     try:
         # Start orchestrated generation for all account-type columns
-        orchestration_result = await ColumnGenerationOrchestrator.start_orchestrated_generation(
+        orchestration_result = ColumnGenerationOrchestrator.start_orchestrated_generation(
             tenant_id=str(account.tenant_id),
             entity_ids=[account_id],
-            entity_type=CustomColumn.EntityType.ACCOUNT.value(),
-            batch_size=10
+            entity_type=CustomColumn.EntityType.ACCOUNT.value,
+            batch_size=1
         )
 
         logger.info(f"Custom column orchestration started: {orchestration_result}")
@@ -185,6 +187,7 @@ def enrichment_callback(request):
             else:
                 return Response({"error": "Failed to process custom column callback"}, status=500)
         else:
+            logger.debug(f"Processing enrichment callback for account {account_id}, type {enrichment_type}")
             with transaction.atomic():
                 account = Account.objects.select_for_update().get(id=account_id)
 
@@ -234,6 +237,8 @@ def enrichment_callback(request):
                                 "total_pages": pagination_data.get('total_pages')
                             })
                 else:
+                    logger.debug(f"Processing2 enrichment type {enrichment_type} for account {account_id}, status {status}, data {processed_data}")
+
                     if status == EnrichmentStatus.COMPLETED and processed_data:
                         if enrichment_type == EnrichmentType.LEAD_LINKEDIN_RESEARCH:
                             if not lead_id:
@@ -244,10 +249,10 @@ def enrichment_callback(request):
                                 processed_data=processed_data
                             )
                         else:
+                            logger.debug(f"Processing3 {enrichment_type} for {account_id}")
                             # Use existing account enrichment function for other types
                             _update_account_from_enrichment(account, enrichment_type, processed_data)
                             # After enrichment is complete, trigger custom column generation
-                            # We use asyncio.create_task to run this non-blocking
                             _trigger_custom_column_generation_after_enrichment(account, account_id)
 
         return Response({
