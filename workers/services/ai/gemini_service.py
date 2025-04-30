@@ -95,7 +95,7 @@ class GeminiService(AIService):
             if not response or not hasattr(response, 'text'):
                 logger.warning("Empty response from Gemini")
                 token_usage = self._create_token_usage(0, 0, operation_tag)
-                return {} if is_json else "", token_usage
+                raise ValueError("Empty response from Gemini")
 
             response_text = response.text
             logger.debug(f"Gemini response: {response}")
@@ -142,6 +142,8 @@ class GeminiService(AIService):
         try:
             # Prepare enhanced prompt based on schema if provided
             enhanced_prompt = prompt
+            # Configure search parameters
+            search_params = {}
             if response_schema and hasattr(response_schema, "model_fields"):
                 schema_description = []
                 for field_name, field_info in response_schema.model_fields.items():
@@ -150,11 +152,11 @@ class GeminiService(AIService):
                     schema_description.append(f"- {field_name}: {field_type}{' - ' + description if description else ''}")
 
                 enhanced_prompt = f"{prompt}\n\nRespond with JSON data in this structure:\n{chr(10).join(schema_description)}\n\nEnsure your response is valid JSON."
+                search_params['response_mime_type'] = 'application/json'
             else:
                 enhanced_prompt = f"{prompt}\n\nRespond with valid JSON data."
 
-            # Configure search parameters
-            search_params = {}
+
             if user_location:
                 search_params["user_location"] = user_location
 
@@ -168,8 +170,8 @@ class GeminiService(AIService):
 
             if not response or not hasattr(response, 'text'):
                 logger.warning("Empty search response from Gemini")
-                token_usage = self._create_token_usage(0, 0, operation_tag)
-                return {} if response_schema else "", token_usage
+                # token_usage = self._create_token_usage(0, 0, operation_tag)
+                raise ValueError("Empty response from Gemini")
 
             response_text = response.text
             logger.debug(f"Gemini search response: {response}...")
@@ -226,13 +228,17 @@ class GeminiService(AIService):
         current_thinking_budget = thinking_budget if thinking_budget is not None else self.thinking_budget
         
         # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
-        if self.model and self.model.startswith('gemini-2.5-flash') and current_thinking_budget:
+        if self.model and self.model.startswith('gemini-2.5') and current_thinking_budget:
             if not config:
                 config = types.GenerateContentConfig()
             config.thinking_config = types.ThinkingConfig(
                 thinking_budget=current_thinking_budget.value if isinstance(current_thinking_budget, enum.Enum) else 0,
                 include_thoughts=True
             )
+
+        # Set response mime type if provided
+        if 'response_mime_type' in config_params:
+            config.response_mime_type = config_params['response_mime_type']
 
         return self.client.models.generate_content(
             model=self.model,
@@ -261,11 +267,13 @@ class GeminiService(AIService):
         current_thinking_budget = thinking_budget if thinking_budget is not None else self.thinking_budget
         
         # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
-        if self.model and self.model.startswith('gemini-2.5-flash') and current_thinking_budget:
+        if self.model and self.model.startswith('gemini-2.5') and current_thinking_budget:
             config.thinking_config = types.ThinkingConfig(
                 thinking_budget=current_thinking_budget.value if isinstance(current_thinking_budget, enum.Enum) else 0,
                 include_thoughts=True
             )
+        # Set response mime type if provided
+        config.response_mime_type = search_params['response_mime_type'] if 'response_mime_type' in search_params else None
 
         return self.client.models.generate_content(
             model=self.model,

@@ -10,14 +10,16 @@ from google.cloud import bigquery
 from utils.token_usage import TokenUsage
 from utils.loguru_setup import logger
 from services.ai.ai_cache_service import AICacheService
+from json_repair import loads as repair_loads
 
 
 class ThinkingBudget(enum.Enum):
     """Enum for thinking budget levels."""
-    ZERO=0
+    ZERO = 0
     LOW = 1024
     MEDIUM = 8192
     HIGH = 24576
+
 
 SUPPORTED_MODEL_NAMES = [
     # OpenAI
@@ -44,7 +46,7 @@ class AIService(ABC):
             default_temperature: Optional[float] = None,
             thinking_budget: Optional[ThinkingBudget] = None
     ):
-        if not self.is_supported_model(model_name):
+        if model_name and not self.is_supported_model(model_name):
             raise ValueError(f"Model {model_name} is not supported by this service.")
 
         """Initialize service with token tracking and optional caching."""
@@ -111,13 +113,17 @@ class AIService(ABC):
             if cached_response:
                 return cached_response["content"]
 
-        response, token_usage = await self._generate_content_without_cache(
-            prompt=prompt,
-            is_json=is_json,
-            operation_tag=operation_tag,
-            temperature=used_temperature,
-            thinking_budget=thinking_budget
-        )
+        try:
+            response, token_usage = await self._generate_content_without_cache(
+                prompt=prompt,
+                is_json=is_json,
+                operation_tag=operation_tag,
+                temperature=used_temperature,
+                thinking_budget=thinking_budget
+            )
+        except ValueError as ve:
+            logger.error(f"Got empty response while generating content: {ve}")
+            return {} # Empty response
 
         if self.cache_service:
             try:
@@ -163,7 +169,7 @@ class AIService(ABC):
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "search",
             force_refresh: bool = True,
-            temperature = 0.1,
+            temperature=0.1,
             thinking_budget: Optional[ThinkingBudget] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability.
@@ -213,7 +219,7 @@ class AIService(ABC):
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "structured_search",
             force_refresh: bool = False,
-            temperature = 0.1,
+            temperature=0.1,
             thinking_budget: Optional[ThinkingBudget] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability and structured output format.
@@ -309,40 +315,14 @@ class AIService(ABC):
         )
 
     def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
-        """Extract JSON content from text response.
-        Handles various formats including JSON with prefixes, markdown code blocks, etc.
-        """
+        """Extract JSON content from text response."""
         try:
-            # Clean response text of common formatting
-            text = text.strip()
-
-            # Remove markdown code block markers
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-
-            # Strategy 1: Try direct JSON parsing
-            try:
-                return json.loads(text)
-            except json.JSONDecodeError:
-                # Strategy 2: Find JSON between curly braces
-                json_start = text.find('{')
-                json_end = text.rfind('}') + 1
-
-                if 0 <= json_start < json_end:
-                    extracted_json = text[json_start:json_end]
-                    logger.debug(f"Extracted JSON from character {json_start} to {json_end}")
-                    return json.loads(extracted_json)
-
-                # If all attempts fail, raise the original error
-                raise
+            # Let json_repair handle everything - it returns Python objects directly
+            return repair_loads(text)
         except Exception as e:
-            logger.error(f"Error parsing JSON response from {text[:100]!r}. Error: {str(e)}")
+            logger.error(f"Error parsing JSON response: {str(e)}")
             return {}
+
 
     # ===============================
     # Cache-related Methods
