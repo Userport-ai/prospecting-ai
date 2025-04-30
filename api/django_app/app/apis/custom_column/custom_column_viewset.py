@@ -260,17 +260,12 @@ class CustomColumnViewSet(TenantScopedViewSet):
             column_ids: Optional list of column IDs to process
             entity_type: Optional entity type (used if column_ids not provided)
             batch_size: Batch size for processing (default: 10)
-            find_dependencies: Whether to automatically find and include all prerequisite
-                              columns that these columns depend on (default: False)
         """
         # Get required parameters
         entity_ids = request.data.get('entity_ids', [])
         column_ids = request.data.get('column_ids', [])
         entity_type = request.data.get('entity_type')
         batch_size = request.data.get('batch_size', 10)
-
-        # New parameter
-        find_dependencies = request.data.get('find_dependencies', False)
 
         if not entity_ids:
             return Response(
@@ -290,29 +285,29 @@ class CustomColumnViewSet(TenantScopedViewSet):
                 # Convert to strings for consistency
                 column_ids = [str(col_id) for col_id in column_ids]
 
-                # If requested, find and include all prerequisite columns (dependencies)
-                if find_dependencies:
-                    # Collect all column IDs, preserving the original order but removing duplicates
-                    # If a column appears in both original list and as a dependency, the original position is preserved
-                    all_column_ids = []
-                    seen = set()
+                # Collect all column IDs, preserving the original order but removing duplicates
+                # If a column appears in both original list and as a dependency, the original position is preserved
+                all_column_ids = []
+                seen = set()
 
-                    # Start with the explicitly requested columns (in their original order)
-                    for col_id in column_ids:
-                        if col_id not in seen:
-                            all_column_ids.append(col_id)
-                            seen.add(col_id)
+                # Start with the explicitly requested columns (in their original order)
+                for col_id in column_ids:
+                    if col_id not in seen:
+                        all_column_ids.append(col_id)
+                        seen.add(col_id)
 
-                    # Then add any additional dependencies that weren't in the original list
-                    for col_id in column_ids:
-                        # Get all prerequisites for this column
-                        dependencies = DependencyGraphService.get_all_dependencies(col_id)
+                # Then add any additional dependencies that weren't in the original list
+                for col_id in column_ids:
+                    # Get all prerequisites for this column
+                    dependencies = DependencyGraphService.get_all_dependencies(col_id)
 
-                        # Add dependencies if they haven't been seen before
-                        for dep_id in dependencies:
-                            if dep_id not in seen:
-                                all_column_ids.append(dep_id)
-                                seen.add(dep_id)
+                    logger.debug("Dependencies for column %s: %s", col_id, dependencies)
+
+                    # Add dependencies if they haven't been seen before
+                    for dep_id in dependencies:
+                        if dep_id not in seen:
+                            all_column_ids.append(dep_id)
+                            seen.add(dep_id)
 
                     # Use the expanded list with duplicates removed
                     logger.info(f"Expanded column list from {len(column_ids)} to {len(all_column_ids)} columns including prerequisites")
@@ -323,6 +318,7 @@ class CustomColumnViewSet(TenantScopedViewSet):
                     id__in=column_ids,
                     tenant=request.tenant
                 )
+                logger.debug("Columns to process: %s", columns)
             else:
                 # Get all active columns for the entity type
                 columns = CustomColumn.objects.filter(
