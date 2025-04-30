@@ -14,10 +14,11 @@ from services.ai.ai_cache_service import AICacheService
 
 class ThinkingBudget(enum.Enum):
     """Enum for thinking budget levels."""
-    ZERO=0
+    ZERO = 0
     LOW = 1024
     MEDIUM = 8192
     HIGH = 24576
+
 
 SUPPORTED_MODEL_NAMES = [
     # OpenAI
@@ -44,7 +45,7 @@ class AIService(ABC):
             default_temperature: Optional[float] = None,
             thinking_budget: Optional[ThinkingBudget] = None
     ):
-        if not self.is_supported_model(model_name):
+        if model_name and not self.is_supported_model(model_name):
             raise ValueError(f"Model {model_name} is not supported by this service.")
 
         """Initialize service with token tracking and optional caching."""
@@ -163,7 +164,7 @@ class AIService(ABC):
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "search",
             force_refresh: bool = True,
-            temperature = 0.1,
+            temperature=0.1,
             thinking_budget: Optional[ThinkingBudget] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability.
@@ -213,7 +214,7 @@ class AIService(ABC):
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "structured_search",
             force_refresh: bool = False,
-            temperature = 0.1,
+            temperature=0.1,
             thinking_budget: Optional[ThinkingBudget] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability and structured output format.
