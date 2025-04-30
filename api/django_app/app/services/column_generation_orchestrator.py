@@ -94,7 +94,7 @@ class ColumnGenerationOrchestrator:
             column_list = list(columns)
             sorted_columns = cls._sort_columns_by_dependencies(column_list)
             
-            logger.info(f"Sorted {len(sorted_columns)} columns for orchestrated generation")
+            logger.info(f"Sorted {len(sorted_columns)} columns for orchestrated generation, {sorted_columns}")
             
             # Start the first column in the chain
             if sorted_columns:
@@ -151,7 +151,7 @@ class ColumnGenerationOrchestrator:
         try:
             # Use the dependency service to sort the columns
             sorted_ids = DependencyGraphService.topological_sort(column_ids)
-            
+
             # Create a mapping of ID to column
             id_to_column = {str(col.id): col for col in columns}
             
