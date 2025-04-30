@@ -113,13 +113,17 @@ class AIService(ABC):
             if cached_response:
                 return cached_response["content"]
 
-        response, token_usage = await self._generate_content_without_cache(
-            prompt=prompt,
-            is_json=is_json,
-            operation_tag=operation_tag,
-            temperature=used_temperature,
-            thinking_budget=thinking_budget
-        )
+        try:
+            response, token_usage = await self._generate_content_without_cache(
+                prompt=prompt,
+                is_json=is_json,
+                operation_tag=operation_tag,
+                temperature=used_temperature,
+                thinking_budget=thinking_budget
+            )
+        except ValueError as ve:
+            logger.error(f"Got empty response while generating content: {ve}")
+            return {} # Empty response
 
         if self.cache_service:
             try:

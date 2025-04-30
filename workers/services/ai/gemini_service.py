@@ -95,7 +95,7 @@ class GeminiService(AIService):
             if not response or not hasattr(response, 'text'):
                 logger.warning("Empty response from Gemini")
                 token_usage = self._create_token_usage(0, 0, operation_tag)
-                return {} if is_json else "", token_usage
+                raise ValueError("Empty response from Gemini")
 
             response_text = response.text
             logger.debug(f"Gemini response: {response}")
@@ -170,8 +170,8 @@ class GeminiService(AIService):
 
             if not response or not hasattr(response, 'text'):
                 logger.warning("Empty search response from Gemini")
-                token_usage = self._create_token_usage(0, 0, operation_tag)
-                return {} if response_schema else "", token_usage
+                # token_usage = self._create_token_usage(0, 0, operation_tag)
+                raise ValueError("Empty response from Gemini")
 
             response_text = response.text
             logger.debug(f"Gemini search response: {response}...")
