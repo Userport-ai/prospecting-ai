@@ -297,9 +297,8 @@ class DependencyGraphService:
         for node in graph:
             if not visited[node]:
                 dfs(node)
-        
-        # Reverse to get correct order (dependencies first)
-        return list(reversed(sorted_columns))
+
+        return list(sorted_columns)
     
     @classmethod
     def get_missing_dependencies(cls, column_id: str, available_values: List[str]) -> List[str]:
