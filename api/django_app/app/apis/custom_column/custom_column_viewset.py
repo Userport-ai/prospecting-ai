@@ -126,7 +126,7 @@ class CustomColumnViewSet(TenantScopedViewSet):
 
     @action(detail=True, methods=['post'])
     def generate_values(self, request, pk=None):
-        """Trigger generation of values for this custom column."""
+        """Generate values for this custom column and its dependencies(if asked to)."""
         custom_column = self.get_object()
 
         # Get entity IDs to process
@@ -137,120 +137,84 @@ class CustomColumnViewSet(TenantScopedViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            # Create a unique request ID for idempotency and job_id
-            request_id = str(uuid.uuid4())
-            job_id = str(uuid.uuid4())
+        # Check if we should process dependencies
+        process_dependencies = request.data.get('process_dependencies', False)
 
-            # Use atomic transaction for all database operations
-            with transaction.atomic():
-                # Update column's last_refresh
-                custom_column.last_refresh = timezone.now()
-                custom_column.save(update_fields=['last_refresh', 'updated_at'])
+        if not process_dependencies:
+            # Original single-column logic - keep this as is for backward compatibility
+            try:
+                # Create a unique request ID for idempotency and job_id
+                request_id = str(uuid.uuid4())
+                job_id = str(uuid.uuid4())
 
-            # Use the utility function to trigger generation
-            results = trigger_custom_column_generation(
-                tenant_id=str(request.tenant.id),
-                column_id=str(custom_column.id),
-                entity_ids=entity_ids,
-                request_id=request_id,
-                job_id=job_id
-            )
+                # Use atomic transaction for all database operations
+                with transaction.atomic():
+                    # Update column's last_refresh
+                    custom_column.last_refresh = timezone.now()
+                    custom_column.save(update_fields=['last_refresh', 'updated_at'])
 
-            if not results:
-                return Response(
-                    {"error": "Failed to trigger generation"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                # Use the utility function to trigger generation
+                results = trigger_custom_column_generation(
+                    tenant_id=str(request.tenant.id),
+                    column_id=str(custom_column.id),
+                    entity_ids=entity_ids,
+                    request_id=request_id,
+                    job_id=job_id
                 )
 
-            result = results[0]  # We only have one result since we specified column_id
+                if not results:
+                    return Response(
+                        {"error": "Failed to trigger generation"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
 
-            return Response({
-                "message": "Values generation initiated",
-                "job_id": result.get("job_id", job_id),
-                "entity_count": len(entity_ids),
-                "request_id": request_id
-            })
+                result = results[0]  # We only have one result since we specified column_id
 
-        except Exception as e:
-            # Log the error with traceback
-            logger.error(f"Error triggering custom column generation: {str(e)}", exc_info=True)
-            return Response(
-                {"error": f"Failed to trigger generation: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+                return Response({
+                    "message": "Values generation initiated",
+                    "job_id": result.get("job_id", job_id),
+                    "entity_count": len(entity_ids),
+                    "request_id": request_id
+                })
 
-    @action(detail=True, methods=['post'], url_path='force-refresh')
-    def force_refresh(self, request, pk=None):
-        """Force refresh all values for this custom column."""
-        custom_column = self.get_object()
-
-        # Get entity IDs based on entity_type
-        entity_ids = []
-        if custom_column.entity_type == CustomColumn.EntityType.LEAD:
-            # Get all lead IDs for this tenant
-            entity_ids = list(str(id) for id in
-                              Lead.objects.filter(tenant=request.tenant).values_list('id', flat=True)
-                              )
+            except Exception as e:
+                # Log the error with traceback
+                logger.error(f"Error triggering custom column generation: {str(e)}", exc_info=True)
+                return Response(
+                    {"error": f"Failed to trigger generation: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
         else:
-            # Get all account IDs for this tenant
-            entity_ids = list(str(id) for id in
-                              Account.objects.filter(tenant=request.tenant).values_list('id', flat=True)
-                              )
+            column_ids = request.data.get('column_ids', [])
 
-        if not entity_ids:
-            return Response(
-                {"message": "No entities found to refresh"},
-                status=status.HTTP_200_OK
-            )
+            # Ensure the current column is in the list
+            if str(custom_column.id) not in column_ids:
+                column_ids.append(str(custom_column.id))
 
-        # Create a new request with these entity IDs
-        request.data['entity_ids'] = entity_ids
-        return self.generate_values(request, pk)
-        
-    @action(detail=True, methods=['get'], url_path='dependencies')
-    def get_dependencies(self, request, pk=None):
-        """Get all dependencies for this column, both direct and indirect."""
-        column = self.get_object()
-        
-        direct_dependencies = DependencyGraphService.get_dependencies(str(column.id))
-        all_dependencies = DependencyGraphService.get_all_dependencies(str(column.id))
-        
-        # Get the actual column objects
-        direct_dependency_columns = CustomColumn.objects.filter(
-            id__in=direct_dependencies
-        )
-        all_dependency_columns = CustomColumn.objects.filter(
-            id__in=all_dependencies
-        )
-        
-        return Response({
-            "direct_dependencies": CustomColumnSerializer(direct_dependency_columns, many=True).data,
-            "all_dependencies": CustomColumnSerializer(all_dependency_columns, many=True).data
-        })
-    
-    @action(detail=True, methods=['get'], url_path='dependents')
-    def get_dependents(self, request, pk=None):
-        """Get all columns that depend on this column, both direct and indirect."""
-        column = self.get_object()
-        
-        direct_dependents = DependencyGraphService.get_dependents(str(column.id))
-        all_dependents = DependencyGraphService.get_all_dependents(str(column.id))
-        
-        # Get the actual column objects
-        direct_dependent_columns = CustomColumn.objects.filter(
-            id__in=direct_dependents
-        )
-        all_dependent_columns = CustomColumn.objects.filter(
-            id__in=all_dependents
-        )
-        
-        return Response({
-            "direct_dependents": CustomColumnSerializer(direct_dependent_columns, many=True).data,
-            "all_dependents": CustomColumnSerializer(all_dependent_columns, many=True).data
-        })
+            # Set up needed parameters
+            modified_data = request.data.copy()
+            modified_data['column_ids'] = column_ids
+            modified_data['entity_type'] = custom_column.entity_type
 
-    @action(detail=False, methods=['post'], url_path='generate-with-dependencies')
+            # Create a modified request object
+            modified_request = type('ModifiedRequest', (), {})()
+            modified_request.data = modified_data
+            modified_request.tenant = request.tenant
+
+            # Call the existing method
+            return self.generate_with_dependencies(modified_request)
+
+    @action(detail=False, methods=['post'], url_path='generate-values')
+    def generate_values_collection(self, request):
+        """
+        Generate values for multiple columns respecting dependencies.
+
+        This endpoint routes to the existing generate_with_dependencies method
+        for backward compatibility and minimal code changes.
+        """
+        # Simply delegate to the existing method
+        return self.generate_with_dependencies(request)
+
     def generate_with_dependencies(self, request):
         """
         Generate values for multiple columns respecting dependencies.
@@ -310,7 +274,7 @@ class CustomColumnViewSet(TenantScopedViewSet):
                             seen.add(dep_id)
 
                     # Use the expanded list with duplicates removed
-                    logger.info(f"Expanded column list from {len(column_ids)} to {len(all_column_ids)} columns including prerequisites")
+                    logger.info(f"Expanded column list from {len(column_ids)} to {len(all_column_ids)} columns")
                     column_ids = all_column_ids
 
                 # Get the columns from the database
@@ -354,6 +318,16 @@ class CustomColumnViewSet(TenantScopedViewSet):
                     status=status.HTTP_200_OK
                 )
 
+            # Create a unique request ID for tracking
+            request_id = str(uuid.uuid4())
+
+            # Update last_refresh for all columns
+            with transaction.atomic():
+                now = timezone.now()
+                for col in sorted_columns:
+                    col.last_refresh = now
+                    col.save(update_fields=['last_refresh', 'updated_at'])
+
             # Get the first column and remaining columns
             first_column = sorted_columns[0]
             remaining_columns = sorted_columns[1:]
@@ -363,18 +337,20 @@ class CustomColumnViewSet(TenantScopedViewSet):
                 'next_columns': [str(c.id) for c in remaining_columns],
                 'entity_ids': entity_ids,
                 'batch_size': batch_size,
-                'tenant_id': str(request.tenant.id)
+                'tenant_id': str(request.tenant.id),
+                'request_id': request_id
             }
 
             # Generate the first column with orchestration data
-            from app.utils.custom_column_utils import trigger_custom_column_generation
-
+            job_id = str(uuid.uuid4())
             results = trigger_custom_column_generation(
                 tenant_id=str(request.tenant.id),
                 column_id=str(first_column.id),
                 entity_ids=entity_ids,
                 batch_size=batch_size,
-                orchestration_data=orchestration_data
+                orchestration_data=orchestration_data,
+                request_id=request_id,
+                job_id=job_id
             )
 
             return Response({
@@ -382,6 +358,8 @@ class CustomColumnViewSet(TenantScopedViewSet):
                 "columns": [str(c.id) for c in sorted_columns],
                 "first_column": str(first_column.id),
                 "total_columns": len(sorted_columns),
+                "entity_count": len(entity_ids),
+                "request_id": request_id,
                 "results": results
             })
 
