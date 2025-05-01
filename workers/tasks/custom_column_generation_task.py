@@ -456,7 +456,7 @@ class CustomColumnTask(AccountEnrichmentTask):
                                                                            search_context_size="high",
                                                                            force_refresh=True,
                                                                            operation_tag='custom_column_with_internet',
-                                                                           temperature = temperature,
+                                                                           temperature=temperature,
                                                                            thinking_budget=thinking_budget)
             else:
                 # For non-internet based generation, use the default thinking budget in the model
@@ -503,7 +503,11 @@ class CustomColumnTask(AccountEnrichmentTask):
         validation_rules = column_config.get('validation_rules', [])
         validation_text = "\n".join([f"- {rule}" for rule in validation_rules]) if validation_rules else ""
 
-        internet_use_text = "\n".join(f"ALWAYS use web research to find the answer and confirm that the answer you're giving is accurate. DO NOT SIMULATE Web searches, perform actual research." if ai_config.get('use_internet', False) else "Only use the provided context and DO NOT use web research to find the answer.") if ai_config else ""
+        internet_use_text = ""
+        if ai_config and ai_config.get('use_internet', False):
+            internet_use_text = "\nALWAYS use web research to find the answer and confirm that the answer you're giving is accurate. DO NOT SIMULATE Web searches, perform actual research.\n"
+        else:
+            internet_use_text = "\nOnly use the provided context and DO NOT use web research to find the answer.\n"
 
         # Define conditional sections
         examples_section = f"""
