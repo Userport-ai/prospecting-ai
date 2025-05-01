@@ -2,6 +2,7 @@ import os
 import enum
 from typing import Dict, Any, Optional, Union, Tuple
 
+import random
 import google.genai as genai
 from google.api_core.exceptions import ResourceExhausted as GoogleAPIResourceExhausted
 from google.genai import types
@@ -156,25 +157,37 @@ class GeminiService(AIService):
             else:
                 enhanced_prompt = f"{prompt}\n\nRespond with valid JSON data."
 
-
             if user_location:
                 search_params["user_location"] = user_location
 
-            # Run in thread since we're using the synchronous API
-            response = await self._generate_search_content_in_thread(
-                prompt=enhanced_prompt,
-                search_params=search_params,
-                temperature= temperature if temperature is not None else self.default_temperature,
-                thinking_budget=thinking_budget
-            )
+            # Try multiple times untile grounding result is found.
+            current_temperature = temperature if temperature is not None else self.default_temperature
+            response = None
+            for i in range(5):
+                # Run in thread since we're using the synchronous API
+                response = await self._generate_search_content_in_thread(
+                    prompt=enhanced_prompt,
+                    search_params=search_params,
+                    temperature=current_temperature,
+                    thinking_budget=thinking_budget
+                )
+                if not response or not hasattr(response, 'text'):
+                    logger.warning("Empty search response from Gemini")
+                    # token_usage = self._create_token_usage(0, 0, operation_tag)
+                    raise ValueError("Empty response from Gemini")
 
-            if not response or not hasattr(response, 'text'):
-                logger.warning("Empty search response from Gemini")
-                # token_usage = self._create_token_usage(0, 0, operation_tag)
-                raise ValueError("Empty response from Gemini")
+                if response.candidates[0].grounding_metadata.web_search_queries == None:
+                    # Response is not grounded in web search, try with another temperature.
+                    logger.debug(f"Gemini search was not grounded at temperature: {current_temperature} in attempt number: {i+1}")
+                    current_temperature = random.uniform(0, 0.3)
+                else:
+                    # Response grounded in web search.
+                    logger.debug(f"Gemini search grounded at temperature: {current_temperature} in attempt number: {i+1}")
+                    break
 
             response_text = response.text
-            logger.debug(f"Gemini search response: {response}...")
+            logger.debug(f"Gemini search response : {response}...")
+            logger.debug(f"Gemini web search queries performed: {response.candidates[0].grounding_metadata.web_search_queries}")
 
             # Estimate token usage with search multiplier
             multiplier = 1.0
@@ -223,10 +236,10 @@ class GeminiService(AIService):
         """Run Gemini's synchronous generate_content in a separate thread"""
         # Create a GenerateContentConfig object from the config dictionary
         config = types.GenerateContentConfig(**config_params) if config_params else None
-        
+
         # Use provided thinking_budget if available, otherwise use the default
         current_thinking_budget = thinking_budget if thinking_budget is not None else self.thinking_budget
-        
+
         # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
         if self.model and self.model.startswith('gemini-2.5') and current_thinking_budget:
             if not config:
@@ -262,10 +275,10 @@ class GeminiService(AIService):
             tools=[search_tool],
             **config_params
         )
-        
+
         # Use provided thinking_budget if available, otherwise use the default
         current_thinking_budget = thinking_budget if thinking_budget is not None else self.thinking_budget
-        
+
         # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
         if self.model and self.model.startswith('gemini-2.5') and current_thinking_budget:
             config.thinking_config = types.ThinkingConfig(
