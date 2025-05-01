@@ -250,7 +250,7 @@ class GeminiService(AIService):
     def _generate_search_content_in_thread(self, prompt: str, search_params: Dict[str, Any], temperature: Optional[float] = None, thinking_budget: Optional[ThinkingBudget] = None):
         """Execute Gemini's search-enabled content generation in a separate thread."""
         # Create the Google Search tool
-        search_tool = types.Tool(google_search=types.GoogleSearch(**search_params))
+        search_tool = types.Tool(google_search=types.GoogleSearch())
 
         # Prepare generation config
         config_params = {}
