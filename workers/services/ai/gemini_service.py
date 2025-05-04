@@ -159,7 +159,7 @@ class GeminiService(AIService):
             if user_location:
                 search_params["user_location"] = user_location
 
-            # Try multiple times untile grounding result is found.
+            # Try multiple times until grounding result is found.
             current_temperature = temperature if temperature is not None else self.default_temperature
             response = None
             for i in range(5):
@@ -170,23 +170,48 @@ class GeminiService(AIService):
                     temperature=current_temperature,
                     thinking_budget=thinking_budget
                 )
-                if not response or not hasattr(response, 'text'):
-                    logger.warning("Empty search response from Gemini")
-                    # token_usage = self._create_token_usage(0, 0, operation_tag)
-                    raise ValueError("Empty response from Gemini")
+                logger.debug(f"Gemini search response : {response}...")
 
-                if response.candidates[0].grounding_metadata.web_search_queries == None:
+                # Check if response is valid before accessing its properties
+                if not response or not hasattr(response, 'candidates') or not response.candidates:
+                    logger.warning("Empty or invalid search response from Gemini")
+                    # Adjust temperature and try again
+                    current_temperature = random.uniform(0, 0.3)
+                    continue
+
+                if not hasattr(response.candidates[0], 'grounding_metadata'):
+                    logger.warning("Response lacks grounding_metadata")
+                    current_temperature = random.uniform(0, 0.3)
+                    continue
+
+                if not hasattr(response.candidates[0].grounding_metadata, 'web_search_queries'):
+                    logger.warning("Response lacks web_search_queries attribute")
+                    current_temperature = random.uniform(0, 0.3)
+                    continue
+
+                # Check if grounding happened by checking web_search_queries or rendered_content (with hasattr guard)
+                if (
+                    response.candidates[0].grounding_metadata.web_search_queries is not None
+                    or (
+                        hasattr(response.candidates[0].grounding_metadata, 'search_entry_point')
+                        and hasattr(response.candidates[0].grounding_metadata.search_entry_point, 'rendered_content')
+                        and response.candidates[0].grounding_metadata.search_entry_point.rendered_content is not None
+                    )
+                ):
+                    # Response grounded in web search.
+                    logger.debug(f"Gemini search grounded at temperature: {current_temperature} in attempt number: {i+1}")
+                    logger.debug(f"Gemini web search queries performed: {response.candidates[0].grounding_metadata.web_search_queries}")
+                    break
+                else:
                     # Response is not grounded in web search, try with another temperature.
                     logger.debug(f"Gemini search was not grounded at temperature: {current_temperature} in attempt number: {i+1}")
                     current_temperature = random.uniform(0, 0.3)
-                else:
-                    # Response grounded in web search.
-                    logger.debug(f"Gemini search grounded at temperature: {current_temperature} in attempt number: {i+1}")
-                    break
+
+            if not response or not hasattr(response, 'text'):
+                logger.warning("Empty search response from Gemini")
+                raise ValueError("Empty response from Gemini")
 
             response_text = response.text
-            logger.debug(f"Gemini search response : {response}...")
-            logger.debug(f"Gemini web search queries performed: {response.candidates[0].grounding_metadata.web_search_queries}")
 
             # Estimate token usage with search multiplier
             multiplier = 1.0
