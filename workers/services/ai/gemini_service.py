@@ -153,7 +153,6 @@ class GeminiService(AIService):
                     schema_description.append(f"- {field_name}: {field_type}{' - ' + description if description else ''}")
 
                 enhanced_prompt = f"{prompt}\n\nRespond with JSON data in this structure:\n{chr(10).join(schema_description)}\n\nEnsure your response is valid JSON."
-                search_params['response_mime_type'] = 'application/json'
             else:
                 enhanced_prompt = f"{prompt}\n\nRespond with valid JSON data."
 
@@ -285,8 +284,6 @@ class GeminiService(AIService):
                 thinking_budget=current_thinking_budget.value if isinstance(current_thinking_budget, enum.Enum) else 0,
                 include_thoughts=True
             )
-        # Set response mime type if provided
-        config.response_mime_type = search_params['response_mime_type'] if 'response_mime_type' in search_params else None
 
         return self.client.models.generate_content(
             model=self.model,
