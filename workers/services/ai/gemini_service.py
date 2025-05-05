@@ -162,7 +162,7 @@ class GeminiService(AIService):
             # Try multiple times until grounding result is found.
             current_temperature = temperature if temperature is not None else self.default_temperature
             response = None
-            for i in range(5):
+            for i in range(10):
                 # Run in thread since we're using the synchronous API
                 response = await self._generate_search_content_in_thread(
                     prompt=enhanced_prompt,
@@ -176,17 +176,17 @@ class GeminiService(AIService):
                 if not response or not hasattr(response, 'candidates') or not response.candidates:
                     logger.warning("Empty or invalid search response from Gemini")
                     # Adjust temperature and try again
-                    current_temperature = random.uniform(0, 0.3)
+                    current_temperature = random.uniform(0, 0.2)
                     continue
 
                 if not hasattr(response.candidates[0], 'grounding_metadata'):
                     logger.warning("Response lacks grounding_metadata")
-                    current_temperature = random.uniform(0, 0.3)
+                    current_temperature = random.uniform(0, 0.2)
                     continue
 
                 if not hasattr(response.candidates[0].grounding_metadata, 'web_search_queries'):
                     logger.warning("Response lacks web_search_queries attribute")
-                    current_temperature = random.uniform(0, 0.3)
+                    current_temperature = random.uniform(0, 0.2)
                     continue
 
                 # Check if grounding happened by checking web_search_queries or rendered_content (with hasattr guard)
@@ -205,7 +205,7 @@ class GeminiService(AIService):
                 else:
                     # Response is not grounded in web search, try with another temperature.
                     logger.debug(f"Gemini search was not grounded at temperature: {current_temperature} in attempt number: {i+1}")
-                    current_temperature = random.uniform(0, 0.3)
+                    current_temperature = random.uniform(0, 0.2)
 
             if not response or not hasattr(response, 'text'):
                 logger.warning("Empty search response from Gemini")
