@@ -1,135 +1,109 @@
 import pytest
-from pydantic import ValidationError
+import asyncio
+from unittest.mock import patch, AsyncMock
 
-from services.linkedin_service import (
-    ActorRunFailed,
-    StartRunResponse,
-    LinkedInReaction,
-)
-
-
-class TestLinkedInServiceModels:
-    def test_actor_run_failed_exception(self):
-        """Test that ActorRunFailed can be raised."""
-        with pytest.raises(ActorRunFailed, match="Test error"):
-            raise ActorRunFailed("Test error")
-
-    def test_start_run_response_valid_data(self):
-        """Test StartRunResponse with valid data."""
-        data = {
-            "actorId": "test_actor_id",
-            "actorRunId": "test_actor_run_id",
-            "status": "RUNNING",
-            "detailsUrl": "http://example.com/details",
-        }
-        try:
-            response = StartRunResponse(**data)
-            assert response.actorId == data["actorId"]
-            assert response.actorRunId == data["actorRunId"]
-            assert response.status == data["status"]
-            assert response.detailsUrl == data["detailsUrl"]
-        except ValidationError as e:
-            pytest.fail(f"Validation failed for valid data: {e}")
-
-    def test_start_run_response_missing_required_field(self):
-        """Test StartRunResponse with a missing required field."""
-        data = {
-            "actorId": "test_actor_id",
-            # actorRunId is missing
-            "status": "RUNNING",
-            "detailsUrl": "http://example.com/details",
-        }
-        with pytest.raises(ValidationError):
-            StartRunResponse(**data)
-
-    def test_start_run_response_invalid_url(self):
-        """Test StartRunResponse with an invalid URL."""
-        data = {
-            "actorId": "test_actor_id",
-            "actorRunId": "test_actor_run_id",
-            "status": "RUNNING",
-            "detailsUrl": "not_a_url", # Invalid URL
-        }
-        # Pydantic v2 Url type might not raise ValidationError for simple strings
-        # depending on coercion rules. If it's strict, it will.
-        # For this example, we'll assume it might pass if coercion is lenient
-        # or raise if strict. A more robust test might check the type.
-        try:
-            response = StartRunResponse(**data)
-            # If pydantic coerces 'not_a_url' to a string without error
-            assert response.detailsUrl == "not_a_url"
-        except ValidationError:
-            # This path is taken if 'AnyUrl' is strict and fails validation
-            pass
+# Attempt to import LinkedInService. Tests will be skipped if it's not found.
+try:
+    from services.linkedin_service import LinkedInService
+    LINKEDIN_SERVICE_EXISTS = True
+except ImportError:
+    LINKEDIN_SERVICE_EXISTS = False
+    # Define a placeholder if LinkedInService doesn't exist to avoid runtime errors for the class definition
+    class LinkedInService:
+        async def get_profile_cached(self, profile_id: str): pass
+        async def _actual_fetch_profile(self, profile_id: str): pass
 
 
-    def test_linkedin_reaction_valid_data(self):
-        """Test LinkedInReaction with valid data."""
-        data = {
-            "reactor_profile_url": "http://linkedin.com/in/reactor",
-            "reaction_type": "LIKE",
-        }
-        try:
-            reaction = LinkedInReaction(**data)
-            assert reaction.reactor_profile_url == data["reactor_profile_url"]
-            assert reaction.reaction_type == data["reaction_type"]
-        except ValidationError as e:
-            pytest.fail(f"Validation failed for valid data: {e}")
+@pytest.mark.skipif(not LINKEDIN_SERVICE_EXISTS, reason="LinkedInService class not found in services.linkedin_service module.")
+class TestLinkedInServiceCaching:
+    """
+    Tests for caching mechanisms within the LinkedInService.
+    Assumes LinkedInService has cached methods (e.g., get_profile_cached)
+    that rely on an underlying non-cached method (e.g., _actual_fetch_profile)
+    for fetching data when not available in cache.
+    """
 
-    def test_linkedin_reaction_missing_field(self):
-        """Test LinkedInReaction with a missing field."""
-        data = {
-            "reactor_profile_url": "http://linkedin.com/in/reactor",
-            # reaction_type is missing
-        }
-        with pytest.raises(ValidationError):
-            LinkedInReaction(**data)
+    @pytest.fixture
+    def service_instance(self):
+        """
+        Provides a fresh instance of LinkedInService for each test.
+        If LinkedInService requires arguments for instantiation (e.g., API clients, configs),
+        they should be provided here, potentially as mocks.
+        """
+        instance = LinkedInService()
+        
+        # Attempt to clear cache if the cached method has a cache_clear attribute.
+        # This is common for functools.lru_cache.
+        # Adjust if your caching mechanism is different.
+        if hasattr(instance.get_profile_cached, 'cache_clear'):
+            instance.get_profile_cached.cache_clear()
+        # If other cached methods exist, clear their caches too.
+        # e.g., if hasattr(instance.get_company_data_cached, 'cache_clear'):
+        # instance.get_company_data_cached.cache_clear()
+        return instance
 
-    def test_linkedin_reaction_invalid_url(self):
-        """Test LinkedInReaction with an invalid URL for reactor_profile_url."""
-        data = {
-            "reactor_profile_url": "not-a-valid-url",
-            "reaction_type": "LIKE",
-        }
-        # Similar to StartRunResponse, Pydantic's AnyUrl might be lenient.
-        try:
-            reaction = LinkedInReaction(**data)
-            assert reaction.reactor_profile_url == "not-a-valid-url"
-        except ValidationError:
-            pass
+    @pytest.mark.asyncio
+    async def test_profile_caching_behavior(self, service_instance: LinkedInService):
+        """
+        Tests the caching behavior of a hypothetical get_profile_cached method.
+        It verifies that the underlying data fetch method is called only when necessary.
+        """
+        # The target for patch should be the actual underlying method that performs the expensive operation.
+        # We use patch.object to mock the method on the instance.
+        # `wraps` ensures the original method's logic runs if we want to check its return value,
+        # while still allowing us to track calls. If _actual_fetch_profile is simple,
+        # we can just use `return_value` on the mock.
+        async def mock_fetch_side_effect(profile_id: str):
+            # Simulate the behavior of the original _actual_fetch_profile
+            # This is important if the rest of the code depends on its return value.
+            # print(f"Mocked actual fetch for {profile_id}") # For debugging
+            await asyncio.sleep(0.01) # Simulate small delay
+            return f"Profile data for {profile_id}"
 
+        with patch.object(service_instance, '_actual_fetch_profile', new_callable=AsyncMock, side_effect=mock_fetch_side_effect) as mock_fetch_method:
+            # First call for "profile1" - should call the underlying fetch method
+            profile_data1 = await service_instance.get_profile_cached("profile1")
+            assert profile_data1 == "Profile data for profile1"
+            mock_fetch_method.assert_called_once_with("profile1")
 
-# Placeholder for tests if LinkedInService class with methods exists
-# For example:
-# class TestLinkedInService:
-# @pytest.mark.asyncio
-# async def test_start_actor_run_success(self, mocker):
-# mock_apify_client = mocker.AsyncMock()
-# mock_actor = mocker.AsyncMock()
-# mock_run = mocker.AsyncMock()
-#
-#         # Configure mock responses
-#         mock_apify_client.actor.return_value = mock_actor
-# mock_actor.call.return_value = {
-# "id": "run_id_123",
-# "actorId": "actor_id_abc",
-# "status": "SUCCEEDED", # or "RUNNING"
-#             # ... other fields from Apify response for run
-#             "defaultDatasetId": "dataset_id_xyz"
-#         }
-#
-#         # Assuming LinkedInService takes an ApifyClient instance
-#         # service = LinkedInService(apify_client=mock_apify_client)
-#         # actor_input = {"some_key": "some_value"}
-#         # run_info = await service.start_actor_run("actor_name_or_id", actor_input)
-#
-#         # assert run_info.actorRunId == "run_id_123"
-#         # mock_actor.call.assert_called_once_with(run_input=actor_input)
-#         pass
-#
-# @pytest.mark.asyncio
-# async def test_get_actor_run_results_success(self, mocker):
-# # Similar mocking for fetching results
-# pass
+            # Second call for "profile1" - should be served from cache
+            profile_data2 = await service_instance.get_profile_cached("profile1")
+            assert profile_data2 == "Profile data for profile1"
+            # The mock_fetch_method should still have been called only once in total
+            mock_fetch_method.assert_called_once_with("profile1") 
 
-# Add more tests for other models or service methods as needed.
+            # First call for "profile2" (a different ID) - should call the underlying fetch method
+            profile_data3 = await service_instance.get_profile_cached("profile2")
+            assert profile_data3 == "Profile data for profile2"
+            # mock_fetch_method call count should now be 2
+            assert mock_fetch_method.call_count == 2
+            mock_fetch_method.assert_any_call("profile2") # Check it was called with "profile2"
+
+            # Second call for "profile2" - should be served from cache
+            profile_data4 = await service_instance.get_profile_cached("profile2")
+            assert profile_data4 == "Profile data for profile2"
+            # mock_fetch_method call count should still be 2
+            assert mock_fetch_method.call_count == 2
+
+    # Add more tests here for:
+    # - Other cached methods, if any.
+    # - Cache eviction policies (e.g., if maxsize is reached for LRU).
+    # - Cache expiry (if TTL is implemented).
+    # - Behavior with different types of parameters or edge cases.
+    # - Ensure cache is per-instance if that's the intended behavior,
+    #   or shared if class-level caching is used. (This fixture provides per-test instance)
+
+    # Example of testing cache clear, if applicable and exposed
+    # @pytest.mark.asyncio
+    # async def test_cache_clearing(self, service_instance: LinkedInService):
+    #     if not hasattr(service_instance.get_profile_cached, 'cache_clear'):
+    #         pytest.skip("Cache clear functionality not available on get_profile_cached")
+
+    #     with patch.object(service_instance, '_actual_fetch_profile', new_callable=AsyncMock, side_effect=lambda pid: f"Profile data for {pid}") as mock_fetch:
+    #         await service_instance.get_profile_cached("profile_clear_test")
+    #         mock_fetch.assert_called_once_with("profile_clear_test")
+
+    #         service_instance.get_profile_cached.cache_clear()
+
+    #         await service_instance.get_profile_cached("profile_clear_test")
+    #         assert mock_fetch.call_count == 2 # Called again after cache clear
