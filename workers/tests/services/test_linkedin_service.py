@@ -27,10 +27,20 @@ class TestLinkedInServiceCaching:
     def service_instance(self):
         """
         Provides a fresh instance of LinkedInService for each test.
-        If LinkedInService requires arguments for instantiation (e.g., API clients, configs),
-        they should be provided here, potentially as mocks.
+        Mocks APICacheService and BigQueryService to prevent TypeErrors during instantiation
+        if the actual LinkedInService is used.
         """
-        instance = LinkedInService()
+        # Patch the dependencies where they are looked up by services.linkedin_service
+        with patch('services.linkedin_service.BigQueryService') as MockBigQueryService, \
+             patch('services.linkedin_service.APICacheService') as MockAPICacheService:
+
+            # Configure the mocks if necessary for LinkedInService.__init__
+            # For instance, if APICacheService() is expected to return an object
+            # that LinkedInService then uses. For now, default MagicMocks are used.
+            # MockAPICacheService will be called with bq_service=MockBigQueryService(),
+            # which a MagicMock will accept without a TypeError.
+            
+            instance = LinkedInService()  # LinkedInService will use the mocked versions
         
         # Attempt to clear cache if the cached method has a cache_clear attribute.
         # This is common for functools.lru_cache.
