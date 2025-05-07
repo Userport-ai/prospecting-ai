@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, Tuple, List
 import httpx
 from google.cloud import bigquery
 
+from services.bigquery_service import BigQueryService
 from utils.connection_pool import ConnectionPool
 from utils.async_utils import to_thread
 from utils.loguru_setup import logger
@@ -16,20 +17,34 @@ from utils.loguru_setup import logger
 class APICacheService:
     """Service for caching external API requests and responses."""
 
-    def __init__(self, client: bigquery.Client, project_id: str, dataset: str,
+    def __init__(self, bq_service: Optional[BigQueryService] = None, 
+                 client: Optional[bigquery.Client] = None, 
+                 project_id: Optional[str] = None, 
+                 dataset: Optional[str] = None,
                  connection_pool: Optional[ConnectionPool] = None):
         """
         Initialize the cache service.
 
         Args:
-            client: BigQuery client instance
-            project_id: GCP project ID
-            dataset: BigQuery dataset name
+            bq_service: BigQuery service instance (preferred way to initialize)
+            client: BigQuery client instance (alternative to bq_service)
+            project_id: GCP project ID (alternative to bq_service)
+            dataset: BigQuery dataset name (alternative to bq_service)
             connection_pool: Optional connection pool to use for HTTP requests
         """
-        self.client = client
-        self.project_id = project_id
-        self.dataset = dataset
+        if bq_service is not None:
+            # Initialize from BigQueryService
+            self.client = bq_service.client
+            self.project_id = bq_service.project
+            self.dataset = bq_service.dataset
+        elif client is not None and project_id is not None and dataset is not None:
+            # Initialize from individual parameters
+            self.client = client
+            self.project_id = project_id
+            self.dataset = dataset
+        else:
+            raise ValueError("Either bq_service or (client, project_id, dataset) must be provided")
+            
         self.table_name = "api_request_cache"
 
         # Use provided connection pool or create a new one
