@@ -96,7 +96,7 @@ class LinkedInService:
         self.API_TIMEOUT = 30.0  # timeout in seconds.
 
     @with_retry(retry_config=LINKEDIN_RETRY_CONFIG, operation_name="_fetch_linkedin_reactions")
-    async def fetch_reactions(self, lead_linkedin_url: str):
+    async def fetch_reactions(self, lead_linkedin_url: str) -> List[LinkedInReaction]:
         """Fetch LinkedIn Reactions for given Lead's LinkedIn URL."""
         try:
             lead_linkedin_url = lead_linkedin_url.strip("/")
