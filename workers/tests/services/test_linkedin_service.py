@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from workers.services.linkedin_service import (
+from services.linkedin_service import (
     ActorRunFailed,
     StartRunResponse,
     LinkedInReaction,
