@@ -3,7 +3,7 @@ import json
 import asyncio
 import httpx
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Dict, Union, Any
 
 from services.ai.api_cache_service import cached_request, APICacheService
 from services.bigquery_service import BigQueryService
@@ -26,7 +26,7 @@ LINKEDIN_RETRY_CONFIG = RetryConfig(
         ConnectionError,
         httpx.ConnectTimeout,
         httpx.ConnectError,
-        ActorRunFailed
+        ActorRunFailed,
     ]
 )
 
@@ -89,6 +89,165 @@ class LinkedInReaction(BaseModel):
     article: Optional[Article] = Field(default=None)
 
 
+class RapidAPIImage(BaseModel):
+    url: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+
+class RapidAPIAuthor(BaseModel):
+    """Rapid API Author definition."""
+    id: Optional[int] = Field(default=None, description="ID of the Author in LinkedIn, example: 47272776")
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    headline: Optional[str] = None
+    username: Optional[str] = Field(default=None, description="LinkedIn username of the author")
+    url: Optional[str] = Field(default=None, description="Full LinkedIn URL of the author")
+
+    profilePictures: Optional[List[RapidAPIImage]] = None
+    urn: Optional[str] = Field(default=None, description="Example: urn:li:fsd_profile:ACoAAALRU0gBuEAgLlZcahYXe2CfV4RUpfhWTYA")
+
+
+class RapidAPICompany(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = Field(default=None, description="Company page URL, Example: https://www.linkedin.com/company/jetri-education-consulting/")
+    urn: Optional[str] = Field(default=None, description="Company URN, example: 38151421")
+    username: Optional[str] = Field(default=None, description="Company username, example: hirist-tech")
+    companyLogo: Optional[List[RapidAPIImage]] = None
+
+
+class RapidAPIVideo(BaseModel):
+    url: Optional[str] = None
+    poster: Optional[str] = None
+    duration: Optional[int] = None
+    # Omitting two other fields "thumbnails" and "video" since we don't know the types.
+
+
+class RapidAPIPersonMention(BaseModel):
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    urn: Optional[str] = None
+    publicIdentifier: Optional[str] = Field(default=None, description="Example: pramathsinha")
+
+
+class RapidAPICompanyMention(BaseModel):
+    id: Optional[int] = Field(default=None, description="LinkedIn ID of company")
+    name: Optional[str] = None
+    publicIdentifier: Optional[str] = Field(default=None, description="Example: https:www.linkedin.comschoolindian-school-of-business")
+    url: Optional[str] = Field(default=None, description="Example: https://www.linkedin.com/school/indian-school-of-business/")
+
+
+class RapidAPIReaction(BaseModel):
+    class Comment(BaseModel):
+        text: Optional[str] = None
+        author: Optional[RapidAPIAuthor] = None
+        company: Optional[RapidAPICompany] = None
+
+    action: Optional[str] = Field(default=None, description="Example: Anant S. likes this")
+    entityType: Optional[str] = Field(default=None, description="Example: post")
+    author: Optional[RapidAPIAuthor] = None
+    company: Optional[RapidAPICompany] = None
+    text: Optional[str] = None
+
+    totalReactionCount: Optional[int] = None
+    likeCount: Optional[int] = None
+    empathyCount: Optional[int] = None
+    praiseCount: Optional[int] = None
+    repostsCount: Optional[int] = None
+    postUrl: Optional[str] = Field(default=None, description="URL of the post")
+    postedAt: Optional[str] = Field(default=None, description="Example: 2d, 1w, 2mo etc.")
+    postedDate: Optional[str] = Field(default=None, description="Example: 2025-05-05 03:37:40.122 +0000 UTC")
+    shareUrn: Optional[str] = Field(default=None, description="Example: 7325000704052383745")
+    urn: Optional[str] = Field(default=None, description="Example: 7325000705495179264")
+
+    image: Optional[List[RapidAPIImage]] = Field(default=None, description="Images linked to the post content")
+    video: Optional[List[RapidAPIVideo]] = Field(default=None, description="Images linked to the post content")
+    comment: Optional[Comment] = None
+    article: Optional[Dict[str, Any]] = None
+
+
+class RapidAPIReactionsData(BaseModel):
+    items: List[RapidAPIReaction] = Field(..., description="List of Reactions of given user")
+    paginationToken: Optional[str] = Field(default=None, description="Paginationation token for the next page")
+
+
+class RapidAPIPost(BaseModel):
+    author: Optional[RapidAPIAuthor] = None
+    company: Optional[RapidAPICompany] = None
+    reposted: Optional[bool] = Field(default=None, description="Whether post has been reposted or not, None is the same as False based on observed data in prod.")
+    text: Optional[str] = None
+    resharedPost: Optional['RapidAPIPost'] = None
+    postedAt: Optional[str] = Field(default=None, description="Example: 2d, 1w, 2mo etc.")
+    postedDate: Optional[str] = Field(default=None, description="Example: 2025-05-05 03:37:40.122 +0000 UTC")
+    postedDateTimestamp: Optional[int] = Field(default=None, description="Example: 1738726140340")
+    mentions: Optional[List[RapidAPIPersonMention]] = Field(default=None, description="Persons mentioned in the post")
+    companyMentions: Optional[List[RapidAPICompanyMention]] = Field(default=None, description="Companies mentioned in the post")
+
+    totalReactionCount: Optional[int] = None
+    likeCount: Optional[int] = None
+    empathyCount: Optional[int] = None
+    InterestCount: Optional[int] = None
+    praiseCount: Optional[int] = None
+    repostsCount: Optional[int] = None
+    commentsCount: Optional[int] = None
+    postUrl: Optional[str] = Field(default=None, description="URL of the post")
+    shareUrl: Optional[str] = None
+    isBrandPartnership: Optional[bool] = None
+    urn: Optional[str] = Field(default=None, description="Example: 7325000705495179264")
+
+    document: Optional[Dict[str, Any]] = None
+    celebration: Optional[Dict[str, Any]] = None
+    poll: Optional[Dict[str, Any]] = None
+    article: Optional[Dict[str, Any]] = None
+    entity: Optional[Dict[str, Any]] = None
+
+
+class RapidAPIComment(BaseModel):
+    class CommentActivityInfo(BaseModel):
+        text: Optional[str] = None
+        totalReactionCount: Optional[int] = None
+        likeCount: Optional[int] = None
+
+    author: Optional[RapidAPIAuthor] = None
+    company: Optional[RapidAPICompany] = None
+    text: Optional[str] = None
+    resharedPost: Optional['RapidAPIPost'] = None
+    highlightedComments: Optional[List[str]] = Field(default=None, description="Lead's comment on the post which is the main highlight")
+    highlightedCommentsActivityCounts: Optional[List[CommentActivityInfo]] = None
+    postedAt: Optional[str] = Field(default=None, description="Example: 2d, 1w, 2mo etc.")
+    postedDate: Optional[str] = Field(default=None, description="Example: 2025-05-05 03:37:40.122 +0000 UTC")
+    commentedDate: Optional[str] = Field(default=None, description="Example: 2025-05-05 03:37:40.122 +0000 UTC")
+
+    totalReactionCount: Optional[int] = None
+    appreciationCount: Optional[int] = None
+    likeCount: Optional[int] = None
+    empathyCount: Optional[int] = None
+    InterestCount: Optional[int] = None
+    praiseCount: Optional[int] = None
+    repostsCount: Optional[int] = None
+    commentsCount: Optional[int] = None
+    postUrl: Optional[str] = Field(default=None, description="URL of the post")
+    commentUrl: Optional[str] = Field(default=None, description="URL of the specific comment made by lead")
+    urn: Optional[str] = Field(default=None, description="Example: 7325000705495179264")
+
+    image: Optional[List[RapidAPIImage]] = Field(default=None, description="Images linked to the post content")
+    video: Optional[List[RapidAPIVideo]] = Field(default=None, description="Images linked to the post content")
+    article: Optional[Dict[str, Any]] = None
+
+
+class RapidAPIResponse(BaseModel):
+    success: bool = Field(..., description="Whether the request succeeded or not.")
+    message: Optional[str] = None
+    data: Optional[Union[RapidAPIReactionsData, List[RapidAPIPost], List[RapidAPIComment]]] = None
+
+
+class RapidAPILinkedInActivities(BaseModel):
+    """LinkedIn activities consisting of Posts, Comments and Reactions from given lead."""
+    posts: List[RapidAPIPost] = Field(default=[])
+    comments: List[RapidAPIComment] = Field(default=[])
+    reactions: List[RapidAPIReaction] = Field(default=[])
+
+
 class LinkedInService:
     """Service class for handling LinkedIn for data like posts, comments and reactions."""
 
@@ -98,16 +257,15 @@ class LinkedInService:
         self.LINKEDIN_REACTIONS_ACTOR_NAME = "apimaestro~linkedin-profile-reactions"
         self.API_TIMEOUT = 30.0  # timeout in seconds.
         self.cache_service = APICacheService(bq_service=BigQueryService())
+        self.RAPID_API_CHEAPER_BASE_URL = "https://linkedin-api8.p.rapidapi.com/"
+        self.rapid_api_key = os.getenv("RAPID_API_KEY")
+        self.cache_ttl_hours = 24*7  # Cache for 7 days
 
     @with_retry(retry_config=LINKEDIN_RETRY_CONFIG, operation_name="_fetch_linkedin_reactions")
-    async def fetch_reactions(self, lead_linkedin_url: str, force_refresh: bool=False) -> List[LinkedInReaction]:
+    async def fetch_reactions(self, lead_linkedin_url: str, force_refresh: bool = False) -> List[LinkedInReaction]:
         """Fetch LinkedIn Reactions for given Lead's LinkedIn URL."""
         try:
-            lead_linkedin_url = lead_linkedin_url.strip("/")
-            url_list: List[str] = lead_linkedin_url.split("/in/")
-            if len(url_list) != 2:
-                raise ValueError(f"Invalid lead LinkedIn URL format: {lead_linkedin_url}")
-            lead_username = url_list[1]
+            lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
 
             headers = {
                 'Content-Type': 'application/json',
@@ -128,7 +286,7 @@ class LinkedInService:
                         params=cache_params,
                         method="GET",
                         headers=headers,
-                        ttl_hours=24*7  # Cache for 7 days
+                        ttl_hours=self.cache_ttl_hours
                     )
 
                     if status_code < 400 and cached_data:
@@ -197,4 +355,128 @@ class LinkedInService:
                 return reactions
 
         except Exception as e:
-            raise ActorRunFailed(f"LinkedIn Reactions Run failed for {lead_linkedin_url}: {str(e)}")
+            raise ActorRunFailed(f"LinkedIn Reactions Run for lead URL: {lead_linkedin_url} failed with error: {str(e)}")
+
+    async def fetch_recent_linkedin_activities(self, lead_linkedin_url: str) -> RapidAPILinkedInActivities:
+        """Fetches latest Posts, Comments and Reactions from given lead's profile."""
+        linkedin_activities = RapidAPILinkedInActivities(posts=[], comments=[], reactions=[])
+        try:
+            posts = await self.fetch_rapid_api_linkedin_posts(lead_linkedin_url=lead_linkedin_url)
+            linkedin_activities.posts = posts
+        except Exception as e:
+            logger.error(f"{str(e)}")
+
+        try:
+            comments = await self.fetch_rapid_api_linkedin_comments(lead_linkedin_url=lead_linkedin_url)
+            linkedin_activities.comments = comments
+        except Exception as e:
+            logger.error(f"{str(e)}")
+
+        try:
+            reactions = await self.fetch_rapid_api_linkedin_reactions(lead_linkedin_url=lead_linkedin_url)
+            linkedin_activities.reactions = reactions
+        except Exception as e:
+            logger.error(f"{str(e)}")
+
+        return linkedin_activities
+
+    async def fetch_rapid_api_linkedin_posts(self, lead_linkedin_url: str) -> List[RapidAPIPost]:
+        """Fetch Posts of given lead from Rapid API service."""
+        try:
+            lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
+            endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-posts"
+            params = {
+                "username": lead_username,
+                "start": 0
+            }
+            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response_with_retry(endpoint=endpoint, params=params)
+            if not isinstance(rapid_api_response.data, list):
+                raise ValueError(f"Expected list type in Rapid API response data for LinkedIn posts, got {type(rapid_api_response.data)}")
+            posts: List[RapidAPIPost] = rapid_api_response.data
+            logger.debug(f"Got {len(posts)} LinkedIn posts from Rapid API from Lead URL: {lead_linkedin_url}")
+            return posts
+        except Exception as e:
+            raise ValueError(f"Fetching Rapid API LinkedIn Posts for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
+
+    async def fetch_rapid_api_linkedin_comments(self, lead_linkedin_url: str) -> List[RapidAPIComment]:
+        """Fetch Comments of given lead from Rapid API service."""
+        try:
+            lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
+            endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-comments"
+            params = {
+                "username": lead_username,
+            }
+            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response_with_retry(endpoint=endpoint, params=params)
+            if not isinstance(rapid_api_response.data, list):
+                raise ValueError(f"Expected list type in Rapid API response data for LinkedIn comments, got {type(rapid_api_response.data)}")
+            comments: List[RapidAPIComment] = rapid_api_response.data
+            logger.debug(f"Got {len(comments)} LinkedIn comments from Rapid API from Lead URL: {lead_linkedin_url}")
+            return comments
+        except Exception as e:
+            raise ValueError(f"Fetching Rapid API LinkedIn Comments for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
+
+    async def fetch_rapid_api_linkedin_reactions(self, lead_linkedin_url: str) -> List[RapidAPIReaction]:
+        """Fetch Reactions of given lead from Rapid API service."""
+        try:
+            lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
+            endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-likes"
+            params = {
+                "username": lead_username,
+                "start": 0
+            }
+            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response_with_retry(endpoint=endpoint, params=params)
+            reactions: List[RapidAPIReaction] = rapid_api_response.data.items
+            logger.debug(f"Got {len(reactions)} LinkedIn Reactions from Rapid API for Lead URL: {lead_linkedin_url}")
+            return reactions
+        except Exception as e:
+            raise ValueError(f"Fetching Rapid API LinkedIn Reactions for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
+
+    async def _fetch_rapidapi_linkedin_activity_response_with_retry(self, endpoint: str, params: str) -> RapidAPIResponse:
+        """Helper to manually retry RapidAPI responses if they received a 200 but success field is false.
+
+        The response is stored in cache since it had a 200 success code but we want to retry and force refresh in this case.
+
+        See https://rapidapi.com/rockapis-rockapis-default/api/linkedin-api8.
+        """
+        force_refresh = False
+        for i in range(LINKEDIN_RETRY_CONFIG.max_attempts):
+            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response(endpoint=endpoint, params=params, force_refresh=force_refresh)
+            if not rapid_api_response.success:
+                logger.error(f"Rapid API LinkedIn Activity failed in attempt number: {i+1} with response: {rapid_api_response}")
+                force_refresh = True
+                continue
+
+            # Successful response.
+            return rapid_api_response
+
+        raise ValueError(f"Rapid API LinkedIn Activity failed after all attempts with response: {rapid_api_response}")
+
+    @with_retry(retry_config=LINKEDIN_RETRY_CONFIG, operation_name="_rapid_api_fetch_linkedin_activity")
+    async def _fetch_rapidapi_linkedin_activity_response(self, endpoint: str, params: str, force_refresh: bool) -> RapidAPIResponse:
+        """Helper to fetch Rapid API LinkedIn Activity response for given endpoint."""
+        headers = {
+            "x-rapidapi-host": "linkedin-api8.p.rapidapi.com",
+            "x-rapidapi-key": self.rapid_api_key
+        }
+
+        response, status_code = await cached_request(
+            cache_service=self.cache_service,
+            url=endpoint,
+            method='GET',
+            params=params,
+            headers=headers,
+            force_refresh=force_refresh,
+            ttl_hours=self.cache_ttl_hours
+        )
+        if status_code == 200:
+            return RapidAPIResponse(**response)
+
+        raise RetryableError(f"Cache request for LinkedIn Activity URL: {endpoint} and params: {params} failed with status code: {status_code}")
+
+    def _get_username(self, lead_linkedin_url: str) -> str:
+        lead_linkedin_url = lead_linkedin_url.strip("/")
+        url_list: List[str] = lead_linkedin_url.split("/in/")
+        if len(url_list) != 2:
+            raise ValueError(f"Invalid lead LinkedIn URL format : {lead_linkedin_url}")
+        lead_username = url_list[1]
+        return lead_username

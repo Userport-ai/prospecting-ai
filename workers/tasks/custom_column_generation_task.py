@@ -11,7 +11,7 @@ from services.ai.ai_service import AIServiceFactory
 from services.ai.ai_service_base import ThinkingBudget, AIService
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
-from services.linkedin_service import LinkedInService, LinkedInReaction
+from services.linkedin_service import LinkedInService, RapidAPILinkedInActivities
 from tasks.enrichment_task import AccountEnrichmentTask
 from utils.loguru_setup import logger, set_trace_context
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
@@ -466,9 +466,9 @@ class CustomColumnTask(AccountEnrichmentTask):
 
             lead_linkedin_url: Optional[str] = entity_context.get("lead_info", {}).get("linkedin_url")
             if ai_config and ai_config.get('use_linkedin_activity', False) and lead_linkedin_url:
-                # Fetch LinkedIn Activity for the given lead and append it to entity context.
-                linkedin_reactions: List[LinkedInReaction] = await self.linkedin_service.fetch_reactions(lead_linkedin_url=lead_linkedin_url)
-                entity_context["enrichment_linkedin_reactions"] = [r.model_dump() for r in linkedin_reactions]
+                # Fetch LinkedIn Activities for the given lead and append it to entity context.
+                linkedin_activities: RapidAPILinkedInActivities = await self.linkedin_service.fetch_recent_linkedin_activities(lead_linkedin_url=lead_linkedin_url)
+                entity_context["enrichment_recent_linkedin_activities"] = linkedin_activities.model_dump()
 
              # Prepare prompt with context
             prompt = self._create_generation_prompt(
