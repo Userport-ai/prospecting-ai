@@ -203,7 +203,36 @@ class RapidAPIPost(BaseModel):
 
 
 class RapidAPIComment(BaseModel):
-    pass
+    class CommentActivityInfo(BaseModel):
+        text: Optional[str] = None
+        totalReactionCount: Optional[int] = None
+        likeCount: Optional[int] = None
+
+    author: Optional[RapidAPIAuthor] = None
+    company: Optional[RapidAPICompany] = None
+    text: Optional[str] = None
+    resharedPost: Optional['RapidAPIPost'] = None
+    highlightedComments: Optional[List[str]] = Field(default=None, description="Lead's comment on the post which is the main highlight")
+    highlightedCommentsActivityCounts: Optional[List[CommentActivityInfo]] = None
+    postedAt: Optional[str] = Field(default=None, description="Example: 2d, 1w, 2mo etc.")
+    postedDate: Optional[str] = Field(default=None, description="Example: 2025-05-05 03:37:40.122 +0000 UTC")
+    commentedDate: Optional[str] = Field(default=None, description="Example: 2025-05-05 03:37:40.122 +0000 UTC")
+
+    totalReactionCount: Optional[int] = None
+    appreciationCount: Optional[int] = None
+    likeCount: Optional[int] = None
+    empathyCount: Optional[int] = None
+    InterestCount: Optional[int] = None
+    praiseCount: Optional[int] = None
+    repostsCount: Optional[int] = None
+    commentsCount: Optional[int] = None
+    postUrl: Optional[str] = Field(default=None, description="URL of the post")
+    commentUrl: Optional[str] = Field(default=None, description="URL of the specific comment made by lead")
+    urn: Optional[str] = Field(default=None, description="Example: 7325000705495179264")
+
+    image: Optional[List[RapidAPIImage]] = Field(default=None, description="Images linked to the post content")
+    video: Optional[List[RapidAPIVideo]] = Field(default=None, description="Images linked to the post content")
+    article: Optional[Dict[str, Any]] = None
 
 
 class RapidAPIResponse(BaseModel):
@@ -322,7 +351,7 @@ class LinkedInService:
             raise ActorRunFailed(f"LinkedIn Reactions Run for lead URL: {lead_linkedin_url} failed with error: {str(e)}")
 
     async def fetch_rapid_api_linkedin_posts(self, lead_linkedin_url: str) -> List[RapidAPIPost]:
-        """Fetch Latest Posts of given lead from Rapid API service."""
+        """Fetch Posts of given lead from Rapid API service."""
         try:
             lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
             endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-posts"
@@ -332,15 +361,32 @@ class LinkedInService:
             }
             rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response_with_retry(endpoint=endpoint, params=params)
             if not isinstance(rapid_api_response.data, list):
-                raise ValueError(f"Expected list type in Rapid API response data, got {type(rapid_api_response.data)}")
+                raise ValueError(f"Expected list type in Rapid API response data for LinkedIn posts, got {type(rapid_api_response.data)}")
             posts: List[RapidAPIPost] = rapid_api_response.data
             logger.debug(f"Got {len(posts)} LinkedIn posts from Rapid API from Lead URL: {lead_linkedin_url}")
             return posts
         except Exception as e:
             raise ValueError(f"Fetching Rapid API LinkedIn Posts for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
 
+    async def fetch_rapid_api_linkedin_comments(self, lead_linkedin_url: str) -> List[RapidAPIComment]:
+        """Fetch Comments of given lead from Rapid API service."""
+        try:
+            lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
+            endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-comments"
+            params = {
+                "username": lead_username,
+            }
+            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response_with_retry(endpoint=endpoint, params=params)
+            if not isinstance(rapid_api_response.data, list):
+                raise ValueError(f"Expected list type in Rapid API response data for LinkedIn comments, got {type(rapid_api_response.data)}")
+            comments: List[RapidAPIComment] = rapid_api_response.data
+            logger.debug(f"Got {len(comments)} LinkedIn comments from Rapid API from Lead URL: {lead_linkedin_url}")
+            return comments
+        except Exception as e:
+            raise ValueError(f"Fetching Rapid API LinkedIn Comments for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
+
     async def fetch_rapid_api_linkedin_reactions(self, lead_linkedin_url: str) -> List[RapidAPIReaction]:
-        """Fetch Latest reactions of given lead from Rapid API service."""
+        """Fetch Reactions of given lead from Rapid API service."""
         try:
             lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
             endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-likes"
