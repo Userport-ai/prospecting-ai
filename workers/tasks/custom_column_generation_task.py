@@ -8,7 +8,7 @@ from google.api_core.exceptions import ResourceExhausted
 
 from models.common import UserportPydanticBaseModel
 from services.ai.ai_service import AIServiceFactory
-from services.ai.ai_service_base import ThinkingBudget
+from services.ai.ai_service_base import ThinkingBudget, AIService
 from services.bigquery_service import BigQueryService
 from services.django_callback_service import CallbackService
 from services.linkedin_service import LinkedInService, LinkedInReaction
@@ -70,7 +70,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         """Initialize the task with required services."""
         super().__init__(callback_service)
         self.bq_service = BigQueryService()
-        self._configure_ai_service()
+        self._configure_ai_service()  # Initialize with default models
         self.linkedin_service = LinkedInService()
         self._init_metrics()
 
@@ -87,11 +87,33 @@ class CustomColumnTask(AccountEnrichmentTask):
             "start_time": datetime.now(timezone.utc)
         }
 
-    def _configure_ai_service(self) -> None:
-        """Configure the AI service with factory pattern."""
+    def _configure_ai_service(self, ai_config: Optional[Dict[str, Any]] = None) -> None:
+        """Configure the AI service with factory pattern.
+        
+        Args:
+            ai_config: Optional configuration containing model settings.
+                       If provided, uses model specified in ai_config.
+        """
         factory = AIServiceFactory()
-        self.model = factory.create_service("gemini", model_name="gemini-2.5-pro-preview-03-25")
-        self.search_model = factory.create_service("gemini", model_name="gemini-2.5-pro-preview-03-25", default_temperature=0.1)
+        
+        # Default model settings
+        default_provider = "gemini"
+        default_model = "gemini-2.5-flash-preview-04-17"
+        
+        # Check if we should use a custom model from ai_config
+        if ai_config and ai_config.get('model'):
+            model_name = ai_config['model']
+            model_provider = AIService.get_modelprovider(model_name)
+            
+            if model_provider and model_name:
+                logger.debug(f"Configuring with custom model: {model_name} from provider: {model_provider}")
+                self.model = factory.create_service(model_provider, model_name=model_name)
+                self.search_model = factory.create_service(model_provider, model_name=model_name, default_temperature=0.1)
+                return
+        
+        # Fall back to default models if custom configuration isn't provided or valid
+        self.model = factory.create_service(default_provider, model_name=default_model)
+        self.search_model = factory.create_service(default_provider, model_name=default_model, default_temperature=0.1)
 
     @property
     def enrichment_type(self) -> str:
@@ -140,6 +162,10 @@ class CustomColumnTask(AccountEnrichmentTask):
         entity_type = payload.get('entity_type')
         current_stage = 'initialization'
         start_time = time.time()
+        
+        if ai_config and ai_config.get('model'):
+            logger.info(f"Task using custom model configuration from ai_config: {ai_config.get('model')}")
+            self._configure_ai_service(ai_config)
 
         # Update metrics
         self.metrics["total_entities"] = len(entity_ids)

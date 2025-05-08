@@ -20,19 +20,21 @@ class ThinkingBudget(enum.Enum):
     MEDIUM = 8192
     HIGH = 24576
 
+SUPPORTED_MODELS = {
+    # OpenAI models
+    "gpt-4.1": "openai",
+    "gpt-4.1-mini": "openai",
+    "gpt-4.1-nano": "openai",
+    "gpt-4o": "openai",
+    "gpt-4o-mini": "openai",
 
-SUPPORTED_MODEL_NAMES = [
-    # OpenAI
-    "gpt-4.1",
-    "gpt-4.1-mini",
-    "gpt-4.1-nano",
-    "gpt-4o",
-    "gpt-4o-mini",
-    # Google Gemini
-    "gemini-2.5-flash-preview-04-17",
-    "gemini-2.5-pro-preview-03-25",
-    "gemini-2.0-flash",
-]
+    # Google Gemini models
+    "gemini-2.5-flash-preview-04-17": "gemini",
+    "gemini-2.5-pro-preview-03-25": "gemini",
+    "gemini-2.0-flash": "gemini",
+}
+
+SUPPORTED_MODEL_NAMES = list(SUPPORTED_MODELS.keys())
 
 
 class AIService(ABC):
@@ -68,6 +70,10 @@ class AIService(ABC):
         Returns True if `name` is one of the supported model identifiers.
         """
         return name and name in SUPPORTED_MODEL_NAMES
+
+    @staticmethod
+    def get_modelprovider(name: str) -> Optional[str]:
+        return SUPPORTED_MODELS.get(name, None)
 
     @abstractmethod
     async def _generate_content_without_cache(
