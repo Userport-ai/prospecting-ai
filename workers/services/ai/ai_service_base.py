@@ -82,29 +82,56 @@ class AIService(ABC):
             is_json: bool = True,
             operation_tag: str = "default",
             temperature: Optional[float] = None,
-            thinking_budget: Optional[ThinkingBudget] = None
+            thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
-        """Generate content from prompt without using cache."""
+        """Generate content from prompt without using cache.
+        
+        If system_prompt and user_prompt are provided, the prompt parameter is ignored and 
+        the LLM-specific implementation should handle formatting these appropriately for the model.
+        """
         pass
 
     async def generate_content(
             self,
-            prompt: str,
+            prompt: str = None,
             is_json: bool = True,
             operation_tag: str = "default",
             force_refresh: bool = False,
             temperature: Optional[float] = None,
-            thinking_budget: Optional[ThinkingBudget] = None
+            thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Union[Dict[str, Any], str]:
-        """Generate content from prompt, using cache if available."""
+        """Generate content from prompt, using cache if available.
+        
+        This method now supports two ways of providing prompts:
+        1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
+        2. Structured mode: Pass separate system_prompt and user_prompt parameters
+        
+        If both methods are used, structured mode takes precedence.
+        """
         # Use provided temperature or fall back to default
         used_temperature = temperature if temperature is not None else self.default_temperature
+        
+        # Generate a combined prompt for caching purposes if using separate prompts
+        cache_prompt = prompt
+        if system_prompt is not None or user_prompt is not None:
+            # Create a deterministic combined prompt for cache key generation
+            system_part = system_prompt or ""
+            user_part = user_prompt or ""
+            cache_prompt = f"<system>\n{system_part}\n</system>\n\n<user>\n{user_part}\n</user>"
+        
+        # Ensure we have at least one form of prompt
+        if cache_prompt is None:
+            raise ValueError("Either 'prompt' or at least one of 'system_prompt'/'user_prompt' must be provided")
 
         if self.cache_service and not force_refresh:
             cached_response = None
             try:
                 cached_response = await self.cache_service.get_cached_response(
-                    prompt=prompt,
+                    prompt=cache_prompt,
                     provider=self.provider_name,
                     model=self.model,
                     is_json=is_json,
@@ -125,7 +152,9 @@ class AIService(ABC):
                 is_json=is_json,
                 operation_tag=operation_tag,
                 temperature=used_temperature,
-                thinking_budget=thinking_budget
+                thinking_budget=thinking_budget,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt
             )
         except ValueError as ve:
             logger.error(f"Got empty response while generating content: {ve}")
@@ -134,7 +163,7 @@ class AIService(ABC):
         if self.cache_service:
             try:
                 await self.cache_service.cache_response(
-                    prompt=prompt,
+                    prompt=cache_prompt,
                     response=response,
                     token_usage=token_usage,
                     provider=self.provider_name,
@@ -164,27 +193,53 @@ class AIService(ABC):
             operation_tag: str = "search",
             temperature: Optional[float] = None,
             thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Tuple[Dict[str, Any], TokenUsage]:
-        """Execute a search request specific to the provider."""
+        """Execute a search request specific to the provider.
+        
+        If system_prompt and user_prompt are provided, the prompt parameter is ignored and 
+        the LLM-specific implementation should handle formatting these appropriately for the model.
+        """
         pass
 
     async def generate_search_content(
             self,
-            prompt: str,
+            prompt: str = None,
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "search",
             force_refresh: bool = True,
             temperature=0.1,
-            thinking_budget: Optional[ThinkingBudget] = None
+            thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability.
 
         This is a generic implementation that subclasses can override if needed.
+        
+        This method now supports two ways of providing prompts:
+        1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
+        2. Structured mode: Pass separate system_prompt and user_prompt parameters
+        
+        If both methods are used, structured mode takes precedence.
         """
+        # Generate a combined prompt for caching purposes if using separate prompts
+        cache_prompt = prompt
+        if system_prompt is not None or user_prompt is not None:
+            # Create a deterministic combined prompt for cache key generation
+            system_part = system_prompt or ""
+            user_part = user_prompt or ""
+            cache_prompt = f"<system>\n{system_part}\n</system>\n\n<user>\n{user_part}\n</user>"
+        
+        # Ensure we have at least one form of prompt
+        if cache_prompt is None:
+            raise ValueError("Either 'prompt' or at least one of 'system_prompt'/'user_prompt' must be provided")
+            
         # Generate cache key
         cache_key = self._generate_search_cache_key(
-            prompt=prompt,
+            prompt=cache_prompt,
             search_context_size=search_context_size,
             operation_tag=operation_tag,
             user_location=user_location
@@ -203,7 +258,9 @@ class AIService(ABC):
             user_location=user_location,
             operation_tag=operation_tag,
             temperature=temperature,
-            thinking_budget=thinking_budget
+            thinking_budget=thinking_budget,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt
         )
 
         # Store result in cache
@@ -212,32 +269,52 @@ class AIService(ABC):
                 cache_key=cache_key,
                 result=result,
                 token_usage=token_usage,
-                prompt=prompt
+                prompt=cache_prompt
             )
 
         return result
 
     async def generate_structured_search_content(
             self,
-            prompt: str,
-            response_schema: Any,  # Pydantic model class
+            prompt: str = None,
+            response_schema: Optional[Any] = None,  # Pydantic model class
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             operation_tag: str = "structured_search",
             force_refresh: bool = False,
             temperature=0.1,
-            thinking_budget: Optional[ThinkingBudget] = None
+            thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate content with web search capability and structured output format.
 
         This is a generic implementation that subclasses can override if needed.
+        
+        This method now supports two ways of providing prompts:
+        1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
+        2. Structured mode: Pass separate system_prompt and user_prompt parameters
+        
+        If both methods are used, structured mode takes precedence.
         """
+        # Generate a combined prompt for caching purposes if using separate prompts
+        cache_prompt = prompt
+        if system_prompt is not None or user_prompt is not None:
+            # Create a deterministic combined prompt for cache key generation
+            system_part = system_prompt or ""
+            user_part = user_prompt or ""
+            cache_prompt = f"<system>\n{system_part}\n</system>\n\n<user>\n{user_part}\n</user>"
+        
+        # Ensure we have at least one form of prompt
+        if cache_prompt is None:
+            raise ValueError("Either 'prompt' or at least one of 'system_prompt'/'user_prompt' must be provided")
+            
         # Create schema_info for cache key
         schema_info = str(response_schema) if response_schema else None
 
         # Generate cache key
         cache_key = self._generate_search_cache_key(
-            prompt=prompt,
+            prompt=cache_prompt,
             search_context_size=search_context_size,
             operation_tag=operation_tag,
             user_location=user_location,
@@ -258,13 +335,15 @@ class AIService(ABC):
             response_schema=response_schema,
             operation_tag=operation_tag,
             thinking_budget=thinking_budget,
-            temperature=temperature
+            temperature=temperature,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt
         )
 
         # Handle refusals if present
         if "refusal" in result or "error" in result:
             empty_response = {}
-            if hasattr(response_schema, "model_fields"):
+            if response_schema is not None and hasattr(response_schema, "model_fields"):
                 empty_response = {field: [] if "List" in str(field_info.annotation) else None
                                   for field, field_info in response_schema.model_fields.items()}
 
@@ -283,11 +362,11 @@ class AIService(ABC):
                 cache_key=cache_key,
                 result=result,
                 token_usage=token_usage,
-                prompt=prompt
+                prompt=cache_prompt
             )
 
         # Try to validate and convert the result using the schema
-        if hasattr(response_schema, "model_validate"):
+        if response_schema is not None and hasattr(response_schema, "model_validate"):
             try:
                 # This will raise an exception if the result doesn't match the schema
                 validated_model = response_schema.model_validate(result)

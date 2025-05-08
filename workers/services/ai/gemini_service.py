@@ -70,13 +70,22 @@ class GeminiService(AIService):
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_content")
     async def _generate_content_without_cache(
             self,
-            prompt: str,
+            prompt: str = None,
             is_json: bool = True,
             operation_tag: str = "default",
             temperature: Optional[float] = None,
-            thinking_budget: Optional[ThinkingBudget] = None
+            thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
-        """Generate content using Gemini without using cache."""
+        """Generate content using Gemini without using cache.
+        
+        This method now supports two ways of providing prompts:
+        1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
+        2. Structured mode: Pass separate system_prompt and user_prompt parameters
+        
+        If both methods are used, structured mode takes precedence.
+        """
         try:
             # Create config for the API call
             config_params = {}
@@ -86,12 +95,33 @@ class GeminiService(AIService):
             if used_temperature is not None:
                 config_params['temperature'] = used_temperature
 
+            # Determine which prompt to use based on parameters
+            final_prompt = ""
+            
+            if system_prompt is not None or user_prompt is not None:
+                # Structured mode - build combined prompt with system and user parts
+                # For Gemini we need to combine them as it doesn't have native system/user roles
+                system_part = system_prompt or ""
+                user_part = user_prompt or ""
+                
+                if system_part and user_part:
+                    final_prompt = f"SYSTEM INSTRUCTIONS:\n{system_part}\n\nUSER MESSAGE:\n{user_part}"
+                elif system_part:
+                    final_prompt = system_part
+                elif user_part:
+                    final_prompt = user_part
+            else:
+                # Legacy mode - use the prompt parameter
+                final_prompt = prompt
+                
+            # Add JSON format instruction if needed
             if is_json:
-                prompt = f"{prompt}\n\nRespond in JSON format only."
+                if not final_prompt.endswith("Respond in JSON format only."):
+                    final_prompt = f"{final_prompt}\n\nRespond in JSON format only."
                 config_params['response_mime_type'] = 'application/json'
 
             # Run in thread since we're using the synchronous API
-            response = await self._generate_content_in_thread(prompt, config_params, thinking_budget)
+            response = await self._generate_content_in_thread(final_prompt, config_params, thinking_budget)
 
             if not response or not hasattr(response, 'text'):
                 logger.warning("Empty response from Gemini")
@@ -131,30 +161,66 @@ class GeminiService(AIService):
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_search_content")
     async def _execute_search_request(
             self,
-            prompt: str,
+            prompt: str = None,
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             response_schema: Optional[Any] = None,
             operation_tag: str = "search",
             temperature: Optional[float] = None,
-            thinking_budget: Optional[ThinkingBudget] = None
+            thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
-        """Execute search request using Gemini API."""
+        """Execute search request using Gemini API.
+        
+        This method now supports two ways of providing prompts:
+        1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
+        2. Structured mode: Pass separate system_prompt and user_prompt parameters
+        
+        If both methods are used, structured mode takes precedence.
+        """
         try:
-            # Prepare enhanced prompt based on schema if provided
-            enhanced_prompt = prompt
+            # Determine which prompt mode to use
+            using_structured_prompts = system_prompt is not None or user_prompt is not None
+            
+            # Prepare enhanced prompt based on schema and prompt mode
+            enhanced_prompt = ""
+            final_system_part = ""
+            
             # Configure search parameters
             search_params = {}
+            
+            # Define JSON response structure if schema is provided
+            schema_instruction = ""
             if response_schema and hasattr(response_schema, "model_fields"):
                 schema_description = []
                 for field_name, field_info in response_schema.model_fields.items():
                     field_type = str(field_info.annotation)
                     description = getattr(field_info, "description", "")
                     schema_description.append(f"- {field_name}: {field_type}{' - ' + description if description else ''}")
-
-                enhanced_prompt = f"{prompt}\n\nRespond with JSON data in this structure:\n{chr(10).join(schema_description)}\n\nEnsure your response is valid JSON."
+                
+                schema_instruction = f"Respond with JSON data in this structure:\n{chr(10).join(schema_description)}\n\nEnsure your response is valid JSON."
             else:
-                enhanced_prompt = f"{prompt}\n\nRespond with valid JSON data."
+                schema_instruction = "Respond with valid JSON data."
+            
+            if using_structured_prompts:
+                # Handle structured prompts
+                if system_prompt:
+                    final_system_part = f"{system_prompt}\n\n{schema_instruction}"
+                else:
+                    final_system_part = schema_instruction
+                    
+                # Use user prompt if provided, otherwise fall back to legacy prompt
+                enhanced_prompt = user_prompt if user_prompt is not None else prompt
+                
+                # For Gemini, combine system and user parts
+                if final_system_part and enhanced_prompt:
+                    enhanced_prompt = f"SYSTEM INSTRUCTIONS:\n{final_system_part}\n\nUSER MESSAGE:\n{enhanced_prompt}"
+                elif final_system_part:
+                    enhanced_prompt = final_system_part
+            else:
+                # Legacy mode - combine everything
+                enhanced_prompt = f"{prompt}\n\n{schema_instruction}"
 
             if user_location:
                 search_params["user_location"] = user_location
@@ -248,7 +314,9 @@ class GeminiService(AIService):
         except Exception as e:
             logger.error(f"Error in Gemini search request: {str(e)}", exc_info=True)
             error_result = {"error": str(e)}
-            token_usage = self._create_token_usage(len(prompt) // 4, 10, operation_tag, 0.001)
+            # Ensure we have a usable prompt length for token calculation
+            prompt_len = len(prompt) if prompt else 0
+            token_usage = self._create_token_usage(prompt_len // 4, 10, operation_tag, 0.001)
             return error_result, token_usage
 
     # ===============================

@@ -70,24 +70,52 @@ class OpenAIService(AIService):
     @with_retry(retry_config=OPENAI_RETRY_CONFIG, operation_name="_openai_generate_content")
     async def _generate_content_without_cache(
             self,
-            prompt: str,
+            prompt: str = None,
             is_json: bool = True,
             operation_tag: str = "default",
             temperature: Optional[float] = None,
-            thinking_budget: Optional[ThinkingBudget] = None
+            thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
-        """Generate content using OpenAI without using cache."""
+        """Generate content using OpenAI without using cache.
+        
+        This method now supports two ways of providing prompts:
+        1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
+        2. Structured mode: Pass separate system_prompt and user_prompt parameters
+        
+        If both methods are used, structured mode takes precedence.
+        """
         try:
-            messages = [
-                {"role": "user", "content": prompt}
-            ]
+            # Determine which mode to use based on parameters
+            if system_prompt is not None or user_prompt is not None:
+                # Structured mode - build messages from system and user prompts
+                messages = []
+                
+                # Add system message if provided or if we need JSON
+                if system_prompt is not None:
+                    messages.append({"role": "system", "content": system_prompt})
+                elif is_json:
+                    messages.append({
+                        "role": "system",
+                        "content": "You are a helpful assistant that responds only in valid JSON format."
+                    })
+                
+                # Add user message if provided
+                if user_prompt is not None:
+                    messages.append({"role": "user", "content": user_prompt})
+            else:
+                # Legacy mode - use the prompt parameter
+                messages = [
+                    {"role": "user", "content": prompt}
+                ]
 
-            # Add system message for JSON responses
-            if is_json:
-                messages.insert(0, {
-                    "role": "system",
-                    "content": "You are a helpful assistant that responds only in valid JSON format."
-                })
+                # Add system message for JSON responses
+                if is_json:
+                    messages.insert(0, {
+                        "role": "system",
+                        "content": "You are a helpful assistant that responds only in valid JSON format."
+                    })
 
             # Configure response format for JSON if needed
             response_format = {"type": "json_object"} if is_json else None
@@ -144,46 +172,79 @@ class OpenAIService(AIService):
 
     async def _execute_search_request(
             self,
-            prompt: str,
+            prompt: str = None,
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             response_schema: Optional[Any] = None,
             operation_tag: str = "search",
-            thinking_budget: Optional[ThinkingBudget] = None
+            thinking_budget: Optional[ThinkingBudget] = None,
+            system_prompt: Optional[str] = None,
+            user_prompt: Optional[str] = None
     ) -> Tuple[Dict[str, Any], TokenUsage]:
         """
         Execute a search API request to OpenAI.
 
         Implementation of the abstract method from the parent class.
+        This method now supports two ways of providing prompts:
+        1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
+        2. Structured mode: Pass separate system_prompt and user_prompt parameters
+        
+        If both methods are used, structured mode takes precedence.
         """
         try:
             # Create the search tool
             search_tool = self._create_search_tool(search_context_size, user_location)
 
+            # Determine if we're using structured prompts
+            using_structured_prompts = system_prompt is not None or user_prompt is not None
+            
             # For structured outputs, prepare schema information
             schema_description = ""
-
             if response_schema and hasattr(response_schema, "model_fields"):
                 # Since the prompt already contains schema info, we'll only add minimal guidance
                 schema_description = "Make sure your response follows the exact schema structure specified in the prompt."
 
-            # For structured outputs, we want to use the prompt directly without adding extra system messages
-            # that might conflict with the schema already in the prompt
-            if response_schema:
-                # The prompt already contains the schema and format instructions
-                enhanced_prompt = prompt
+            enhanced_prompt = ""
+            
+            if using_structured_prompts:
+                # Use structured prompts with priority
+                if system_prompt is None:
+                    # Default system prompt for search if none provided
+                    system_prompt = "You are a helpful assistant that provides accurate information based on web search results. Format your response as valid JSON."
+                
+                # Add schema guidance if needed
+                if response_schema and hasattr(response_schema, "model_fields"):
+                    system_prompt = f"{system_prompt}\n\n{schema_description}"
+                
+                # Use user prompt if provided, otherwise fall back to legacy prompt
+                enhanced_prompt = user_prompt if user_prompt is not None else prompt
             else:
-                # For non-structured requests, add JSON formatting instruction
-                system_message = "You are a helpful assistant that provides accurate information based on web search results. Format your response as valid JSON."
-                enhanced_prompt = f"{system_message}\n\n{prompt}"
+                # Legacy mode - combine system message with prompt
+                if response_schema:
+                    # The prompt already contains the schema and format instructions
+                    enhanced_prompt = prompt
+                else:
+                    # For non-structured requests, add JSON formatting instruction
+                    system_message = "You are a helpful assistant that provides accurate information based on web search results. Format your response as valid JSON."
+                    enhanced_prompt = f"{system_message}\n\n{prompt}"
 
             # Use the responses API - web search doesn't support parse method
-            response = await self.client.responses.create(
-                model=self.model,
-                tools=[search_tool],
-                input=enhanced_prompt,
-                temperature=temperature if temperature is not None else self.default_temperature
-            )
+            # Prepare request parameters based on prompt mode
+            request_params = {
+                "model": self.model,
+                "tools": [search_tool],
+                "temperature": temperature if temperature is not None else self.default_temperature
+            }
+            
+            # Add input parameters based on whether we're using structured prompts
+            if using_structured_prompts:
+                if system_prompt:
+                    request_params["system"] = system_prompt
+                request_params["input"] = enhanced_prompt
+            else:
+                request_params["input"] = enhanced_prompt
+                
+            response = await self.client.responses.create(**request_params)
 
             # Extract the output text
             output_content = response.output_text
