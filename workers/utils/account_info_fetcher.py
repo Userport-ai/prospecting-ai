@@ -77,7 +77,7 @@ class AccountInfoFetcher:
             )
 
             self.cache_service = APICacheService(
-                client=self.bq_service.client,
+                bq_client=self.bq_service.client,
                 project_id=self.project_id,
                 dataset=self.dataset,
                 connection_pool=self.pool

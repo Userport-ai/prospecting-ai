@@ -291,7 +291,7 @@ class AccountEnhancementTask(AccountEnrichmentTask):
             ),
             timeout=300.0
         )
-        self.cache_service = APICacheService(self.bq_service.client, project_id=project_id, dataset=dataset, connection_pool=self.pool)
+        self.cache_service = APICacheService(bq_client=self.bq_service.client, project_id=project_id, dataset=dataset, connection_pool=self.pool)
 
     def _initialize_credentials(self) -> None:
         """Initialize and validate required API credentials from environment variables."""

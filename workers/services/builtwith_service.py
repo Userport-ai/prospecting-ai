@@ -394,7 +394,7 @@ class BuiltWithService:
 #     # Initialize cache service
 #
 #     return APICacheService(
-#             client=bq_service.client,
+#             bq_client=bq_service.client,
 #             project_id=project_id,
 #             dataset=dataset
 #         )

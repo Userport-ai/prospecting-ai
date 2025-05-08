@@ -17,8 +17,8 @@ from utils.loguru_setup import logger
 class APICacheService:
     """Service for caching external API requests and responses."""
 
-    def __init__(self, bq_service: Optional[BigQueryService] = None, 
-                 client: Optional[bigquery.Client] = None, 
+    def __init__(self, bq_client: Optional[bigquery.Client] = None, 
+                 bq_service: Optional[BigQueryService] = None, 
                  project_id: Optional[str] = None, 
                  dataset: Optional[str] = None,
                  connection_pool: Optional[ConnectionPool] = None):
@@ -26,8 +26,8 @@ class APICacheService:
         Initialize the cache service.
 
         Args:
-            bq_service: BigQuery service instance (preferred way to initialize)
-            client: BigQuery client instance (alternative to bq_service)
+            bq_client: BigQuery client instance (directly passed)
+            bq_service: BigQueryService instance (preferred way to initialize)
             project_id: GCP project ID (alternative to bq_service)
             dataset: BigQuery dataset name (alternative to bq_service)
             connection_pool: Optional connection pool to use for HTTP requests
@@ -37,13 +37,13 @@ class APICacheService:
             self.client = bq_service.client
             self.project_id = bq_service.project
             self.dataset = bq_service.dataset
-        elif client is not None and project_id is not None and dataset is not None:
+        elif bq_client is not None and project_id is not None and dataset is not None:
             # Initialize from individual parameters
-            self.client = client
+            self.client = bq_client
             self.project_id = project_id
             self.dataset = dataset
         else:
-            raise ValueError("Either bq_service or (client, project_id, dataset) must be provided")
+            raise ValueError("Either bq_service or (bq_client, project_id, dataset) must be provided")
             
         self.table_name = "api_request_cache"
 
