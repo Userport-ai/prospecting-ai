@@ -241,6 +241,13 @@ class RapidAPIResponse(BaseModel):
     data: Optional[Union[RapidAPIReactionsData, List[RapidAPIPost], List[RapidAPIComment]]] = None
 
 
+class RapidAPILinkedInActivities(BaseModel):
+    """LinkedIn activities consisting of Posts, Comments and Reactions from given lead."""
+    posts: List[RapidAPIPost] = Field(default=[])
+    comments: List[RapidAPIComment] = Field(default=[])
+    reactions: List[RapidAPIReaction] = Field(default=[])
+
+
 class LinkedInService:
     """Service class for handling LinkedIn for data like posts, comments and reactions."""
 
@@ -349,6 +356,29 @@ class LinkedInService:
 
         except Exception as e:
             raise ActorRunFailed(f"LinkedIn Reactions Run for lead URL: {lead_linkedin_url} failed with error: {str(e)}")
+
+    async def fetch_recent_linkedin_activities(self, lead_linkedin_url: str) -> RapidAPILinkedInActivities:
+        """Fetches latest Posts, Comments and Reactions from given lead's profile."""
+        linkedin_activities = RapidAPILinkedInActivities(posts=[], comments=[], reactions=[])
+        try:
+            posts = await self.fetch_rapid_api_linkedin_posts(lead_linkedin_url=lead_linkedin_url)
+            linkedin_activities.posts = posts
+        except Exception as e:
+            logger.error(f"{str(e)}")
+
+        try:
+            comments = await self.fetch_rapid_api_linkedin_comments(lead_linkedin_url=lead_linkedin_url)
+            linkedin_activities.comments = comments
+        except Exception as e:
+            logger.error(f"{str(e)}")
+
+        try:
+            reactions = await self.fetch_rapid_api_linkedin_reactions(lead_linkedin_url=lead_linkedin_url)
+            linkedin_activities.reactions = reactions
+        except Exception as e:
+            logger.error(f"{str(e)}")
+
+        return linkedin_activities
 
     async def fetch_rapid_api_linkedin_posts(self, lead_linkedin_url: str) -> List[RapidAPIPost]:
         """Fetch Posts of given lead from Rapid API service."""
