@@ -16,10 +16,6 @@ class ActorRunFailed(Exception):
     pass
 
 
-class RapidAPIFetchFailed(Exception):
-    pass
-
-
 LINKEDIN_RETRY_CONFIG = RetryConfig(
     max_attempts=3,
     base_delay=1.0,
@@ -31,7 +27,6 @@ LINKEDIN_RETRY_CONFIG = RetryConfig(
         httpx.ConnectTimeout,
         httpx.ConnectError,
         ActorRunFailed,
-        RapidAPIFetchFailed
     ]
 )
 
@@ -150,7 +145,10 @@ class RapidAPIReaction(BaseModel):
 
     action: Optional[str] = Field(default=None, description="Example: Anant S. likes this")
     entityType: Optional[str] = Field(default=None, description="Example: post")
+    author: Optional[RapidAPIAuthor] = None
+    company: Optional[RapidAPICompany] = None
     text: Optional[str] = None
+
     totalReactionCount: Optional[int] = None
     likeCount: Optional[int] = None
     empathyCount: Optional[int] = None
@@ -161,8 +159,7 @@ class RapidAPIReaction(BaseModel):
     postedDate: Optional[str] = Field(default=None, description="Example: 2025-05-05 03:37:40.122 +0000 UTC")
     shareUrn: Optional[str] = Field(default=None, description="Example: 7325000704052383745")
     urn: Optional[str] = Field(default=None, description="Example: 7325000705495179264")
-    author: Optional[RapidAPIAuthor] = None
-    company: Optional[RapidAPICompany] = None
+
     image: Optional[List[RapidAPIImage]] = Field(default=None, description="Images linked to the post content")
     video: Optional[List[RapidAPIVideo]] = Field(default=None, description="Images linked to the post content")
     comment: Optional[Comment] = None
@@ -226,6 +223,7 @@ class LinkedInService:
         self.cache_service = APICacheService(bq_service=BigQueryService())
         self.RAPID_API_CHEAPER_BASE_URL = "https://linkedin-api8.p.rapidapi.com/"
         self.rapid_api_key = os.getenv("RAPID_API_KEY")
+        self.cache_ttl_hours = 24*7  # Cache for 7 days
 
     @with_retry(retry_config=LINKEDIN_RETRY_CONFIG, operation_name="_fetch_linkedin_reactions")
     async def fetch_reactions(self, lead_linkedin_url: str, force_refresh: bool = False) -> List[LinkedInReaction]:
@@ -252,7 +250,7 @@ class LinkedInService:
                         params=cache_params,
                         method="GET",
                         headers=headers,
-                        ttl_hours=24*7  # Cache for 7 days
+                        ttl_hours=self.cache_ttl_hours
                     )
 
                     if status_code < 400 and cached_data:
@@ -323,48 +321,81 @@ class LinkedInService:
         except Exception as e:
             raise ActorRunFailed(f"LinkedIn Reactions Run for lead URL: {lead_linkedin_url} failed with error: {str(e)}")
 
-    @with_retry(retry_config=LINKEDIN_RETRY_CONFIG, operation_name="_rapid_api_fetch_linkedin_posts")
-    async def fetch_latest_posts(self, lead_linkedin_url: str) -> List[RapidAPIPost]:
+    async def fetch_rapid_api_linkedin_posts(self, lead_linkedin_url: str) -> List[RapidAPIPost]:
         """Fetch Latest Posts of given lead from Rapid API service."""
         try:
             lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
-            endpoint = f"{self.APIFY_BASE_URL}get-profile-posts?username={lead_username}&start=0"
-            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_response(endpoint=endpoint)
+            endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-posts"
+            params = {
+                "username": lead_username,
+                "start": 0
+            }
+            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response_with_retry(endpoint=endpoint, params=params)
             if not isinstance(rapid_api_response.data, list):
                 raise ValueError(f"Expected list type in Rapid API response data, got {type(rapid_api_response.data)}")
             posts: List[RapidAPIPost] = rapid_api_response.data
             logger.debug(f"Got {len(posts)} LinkedIn posts from Rapid API from Lead URL: {lead_linkedin_url}")
             return posts
         except Exception as e:
-            raise RapidAPIFetchFailed(f"Fetching Rapid API LinkedIn Posts for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
+            raise ValueError(f"Fetching Rapid API LinkedIn Posts for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
 
-    @with_retry(retry_config=LINKEDIN_RETRY_CONFIG, operation_name="_rapid_api_fetch_linkedin_reactions")
-    async def fetch_latest_reactions(self, lead_linkedin_url: str) -> List[RapidAPIReaction]:
+    async def fetch_rapid_api_linkedin_reactions(self, lead_linkedin_url: str) -> List[RapidAPIReaction]:
         """Fetch Latest reactions of given lead from Rapid API service."""
         try:
             lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
-            endpoint = f"{self.APIFY_BASE_URL}get-profile-likes?username={lead_username}&start=0"
-            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_response(endpoint=endpoint)
+            endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-likes"
+            params = {
+                "username": lead_username,
+                "start": 0
+            }
+            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response_with_retry(endpoint=endpoint, params=params)
             reactions: List[RapidAPIReaction] = rapid_api_response.data.items
             logger.debug(f"Got {len(reactions)} LinkedIn Reactions from Rapid API for Lead URL: {lead_linkedin_url}")
             return reactions
         except Exception as e:
-            raise RapidAPIFetchFailed(f"Fetching Rapid API LinkedIn Reactions for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
+            raise ValueError(f"Fetching Rapid API LinkedIn Reactions for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
 
-    async def _fetch_rapidapi_linkedin_response(self, endpoint: str) -> RapidAPIResponse:
-        """Helper to fetch Rapid API LinkedIn response for given endpoint."""
+    async def _fetch_rapidapi_linkedin_activity_response_with_retry(self, endpoint: str, params: str) -> RapidAPIResponse:
+        """Helper to manually retry RapidAPI responses if they received a 200 but success field is false.
+
+        The response is stored in cache since it had a 200 success code but we want to retry and force refresh in this case.
+
+        See https://rapidapi.com/rockapis-rockapis-default/api/linkedin-api8.
+        """
+        force_refresh = False
+        for i in range(LINKEDIN_RETRY_CONFIG.max_attempts):
+            rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response(endpoint=endpoint, params=params, force_refresh=force_refresh)
+            if not rapid_api_response.success:
+                logger.error(f"Rapid API LinkedIn Activity failed in attempt number: {i+1} with response: {rapid_api_response}")
+                force_refresh = True
+                continue
+
+            # Successful response.
+            return rapid_api_response
+
+        raise ValueError(f"Rapid API LinkedIn Activity failed after all attempts with response: {rapid_api_response}")
+
+    @with_retry(retry_config=LINKEDIN_RETRY_CONFIG, operation_name="_rapid_api_fetch_linkedin_activity")
+    async def _fetch_rapidapi_linkedin_activity_response(self, endpoint: str, params: str, force_refresh: bool) -> RapidAPIResponse:
+        """Helper to fetch Rapid API LinkedIn Activity response for given endpoint."""
         headers = {
             "x-rapidapi-host": "linkedin-api8.p.rapidapi.com",
             "x-rapidapi-key": self.rapid_api_key
         }
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url=endpoint, headers=headers, timeout=self.API_TIMEOUT)
-            response.raise_for_status()
-            rapid_api_response = RapidAPIResponse(**response.json())
-            if not rapid_api_response.success:
-                raise ValueError(f"Failed to get Rapid API LinkedIn Activity response with error: {response.json()}")
 
-            return rapid_api_response
+        response, status_code = await cached_request(
+            cache_service=self.cache_service,
+            url=endpoint,
+            method='GET',
+            params=params,
+            headers=headers,
+            force_refresh=force_refresh,
+            ttl_hours=self.cache_ttl_hours
+        )
+        if status_code == 200:
+            return RapidAPIResponse(**response)
+
+        raise RetryableError(f"Cache request for LinkedIn Activity URL: {endpoint} and params: {params} failed with status code: {status_code}")
 
     def _get_username(self, lead_linkedin_url: str) -> str:
         lead_linkedin_url = lead_linkedin_url.strip("/")
