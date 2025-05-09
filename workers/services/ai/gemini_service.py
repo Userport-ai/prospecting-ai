@@ -79,11 +79,11 @@ class GeminiService(AIService):
             user_prompt: Optional[str] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content using Gemini without using cache.
-        
+
         This method now supports two ways of providing prompts:
         1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
         2. Structured mode: Pass separate system_prompt and user_prompt parameters
-        
+
         If both methods are used, structured mode takes precedence.
         """
         try:
@@ -97,13 +97,13 @@ class GeminiService(AIService):
 
             # Determine which prompt to use based on parameters
             final_prompt = ""
-            
+
             if system_prompt is not None or user_prompt is not None:
                 # Structured mode - build combined prompt with system and user parts
                 # For Gemini we need to combine them as it doesn't have native system/user roles
                 system_part = system_prompt or ""
                 user_part = user_prompt or ""
-                
+
                 if system_part and user_part:
                     final_prompt = f"SYSTEM INSTRUCTIONS:\n{system_part}\n\nUSER MESSAGE:\n{user_part}"
                 elif system_part:
@@ -112,41 +112,64 @@ class GeminiService(AIService):
                     final_prompt = user_part
             else:
                 # Legacy mode - use the prompt parameter
-                final_prompt = prompt
-                
+                final_prompt = prompt or ""
+
             # Add JSON format instruction if needed
             if is_json:
                 config_params['response_mime_type'] = 'application/json'
 
+            response = None
             # Run in thread since we're using the synchronous API
-            response = await self._generate_content_in_thread(final_prompt, config_params, thinking_budget)
+            for i in range(3):
+                try:
+                    response = await self._generate_content_in_thread(final_prompt, config_params, thinking_budget)
+                    if response and hasattr(response, 'text') and response.text is not None:
+                        break
+                    logger.warning("Empty or invalid response from Gemini, retrying...")
+                except Exception as e:
+                    logger.warning(f"Error in _generate_content_in_thread (attempt {i+1}): {str(e)}", exc_info=True)
+                    response = None
 
-            if not response or not hasattr(response, 'text'):
-                logger.warning("Empty response from Gemini")
+            if not response or not hasattr(response, 'text') or response.text is None:
+                logger.warning("Final attempt: Empty or invalid response from Gemini")
                 token_usage = self._create_token_usage(0, 0, operation_tag)
-                raise ValueError("Empty response from Gemini")
+                return {} if is_json else "", token_usage
 
             response_text = response.text
             logger.debug(f"Gemini response: {response}")
 
             # Estimate token usage based on character count
-            prompt_tokens = len(prompt) // self.avg_chars_per_token
-            completion_tokens = len(response_text) // self.avg_chars_per_token
-            total_tokens = prompt_tokens + completion_tokens
-            total_cost = (total_tokens / 1000) * self.cost_per_1k_tokens
+            try:
+                prompt_tokens = 0
+                if final_prompt:
+                    prompt_tokens = len(final_prompt) // self.avg_chars_per_token
 
-            token_usage = self._create_token_usage(
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                operation_tag=operation_tag,
-                total_cost=total_cost
-            )
+                completion_tokens = 0
+                if response_text:
+                    completion_tokens = len(response_text) // self.avg_chars_per_token
+
+                total_tokens = prompt_tokens + completion_tokens
+                total_cost = (total_tokens / 1000) * self.cost_per_1k_tokens
+
+                token_usage = self._create_token_usage(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    operation_tag=operation_tag,
+                    total_cost=total_cost
+                )
+            except Exception as e:
+                logger.warning(f"Error calculating token usage: {str(e)}")
+                token_usage = self._create_token_usage(0, 0, operation_tag)
 
             if is_json:
-                result = await self._parse_json_response_async(response_text)
-                return result, token_usage
-            return response_text, token_usage
+                try:
+                    result = await self._parse_json_response_async(response_text)
+                    return result, token_usage
+                except Exception as e:
+                    logger.error(f"Error parsing JSON response: {str(e)}")
+                    return {}, token_usage
 
+            return response_text, token_usage
         except Exception as e:
             logger.error(f"Error generating content with Gemini: {str(e)}")
             token_usage = self._create_token_usage(0, 0, operation_tag)
