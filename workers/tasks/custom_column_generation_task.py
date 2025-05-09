@@ -2,6 +2,7 @@ import asyncio
 import json
 import time
 from datetime import datetime, timezone
+from json import JSONDecodeError, loads
 from typing import Dict, Any, List, Optional, Tuple
 
 from google.api_core.exceptions import ResourceExhausted
@@ -89,28 +90,28 @@ class CustomColumnTask(AccountEnrichmentTask):
 
     def _configure_ai_service(self, ai_config: Optional[Dict[str, Any]] = None) -> None:
         """Configure the AI service with factory pattern.
-        
+
         Args:
             ai_config: Optional configuration containing model settings.
                        If provided, uses model specified in ai_config.
         """
         factory = AIServiceFactory()
-        
+
         # Default model settings
         default_provider = "gemini"
         default_model = "gemini-2.5-flash-preview-04-17"
-        
+
         # Check if we should use a custom model from ai_config
         if ai_config and ai_config.get('model'):
             model_name = ai_config['model']
             model_provider = AIService.get_modelprovider(model_name)
-            
+
             if model_provider and model_name:
                 logger.debug(f"Configuring with custom model: {model_name} from provider: {model_provider}")
                 self.model = factory.create_service(model_provider, model_name=model_name)
                 self.search_model = factory.create_service(model_provider, model_name=model_name, default_temperature=0.1)
                 return
-        
+
         # Fall back to default models if custom configuration isn't provided or valid
         self.model = factory.create_service(default_provider, model_name=default_model)
         self.search_model = factory.create_service(default_provider, model_name=default_model, default_temperature=0.1)
@@ -162,7 +163,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         entity_type = payload.get('entity_type')
         current_stage = 'initialization'
         start_time = time.time()
-        
+
         if ai_config and ai_config.get('model'):
             logger.info(f"Task using custom model configuration from ai_config: {ai_config.get('model')}")
             self._configure_ai_service(ai_config)
@@ -470,13 +471,17 @@ class CustomColumnTask(AccountEnrichmentTask):
                 linkedin_activities: RapidAPILinkedInActivities = await self.linkedin_service.fetch_recent_linkedin_activities(lead_linkedin_url=lead_linkedin_url)
                 entity_context["enrichment_recent_linkedin_activities"] = linkedin_activities.model_dump()
 
-             # Prepare system and user prompts with context
+            # Check if unstructured response is enabled
+            unstructured_response = ai_config.get('unstructured_response', False)
+
+            # Prepare system and user prompts with context
             system_prompt, user_prompt = self._create_generation_prompt(
                 entity_id=entity_id,
                 entity_type=entity_type,
                 column_config=column_config,
                 ai_config=ai_config,
                 entity_context=entity_context,
+                unstructured_response=unstructured_response,
             )
 
             # Generate value with AI service
@@ -486,10 +491,8 @@ class CustomColumnTask(AccountEnrichmentTask):
                 # Use zero thinking budget by default for web search to prevent hallucination and simulated searches
                 thinking_budget = ai_config.get('thinking_budget', ThinkingBudget.ZERO)
                 temperature = ai_config.get('temperature', 0.0)
-                
-                # For search operations, we need to combine the prompts since the search API doesn't support 
-                # separate system/user prompts yet
-                combined_prompt = f"{system_prompt}\n\n{user_prompt}"
+
+                combined_prompt = f"<system_prompt>{system_prompt}</system_prompt>\n\n{user_prompt}"
                 response = await self.search_model.generate_search_content(combined_prompt,
                                                                            search_context_size="high",
                                                                            force_refresh=True,
@@ -501,9 +504,9 @@ class CustomColumnTask(AccountEnrichmentTask):
                 thinking_budget = ai_config.get('thinking_budget', None)
                 temperature = ai_config.get('temperature', 0.8)
                 response = await self.model.generate_content(
-                    is_json=True, 
-                    thinking_budget=thinking_budget, 
-                    temperature=temperature, 
+                    is_json=not unstructured_response,
+                    thinking_budget=thinking_budget,
+                    temperature=temperature,
                     operation_tag='custom_column',
                     system_prompt=system_prompt,
                     user_prompt=user_prompt
@@ -512,7 +515,7 @@ class CustomColumnTask(AccountEnrichmentTask):
             logger.debug(f"Value generation for entity {entity_id} completed in {generation_time:.2f}s")
 
             # Validate and format response
-            value = self._validate_response(response, column_config)
+            value = self._validate_response(response, column_config, unstructured_response)
 
             # Log the confidence score
             if 'confidence_score' in value:
@@ -531,9 +534,10 @@ class CustomColumnTask(AccountEnrichmentTask):
     def _create_generation_prompt(self, entity_id: str, column_config: Dict[str, Any],
                                   ai_config: Dict[str, Any],
                                   entity_context: Dict[str, Any],
-                                  entity_type=None) -> Tuple[str, str]:
+                                  entity_type=None,
+                                  unstructured_response=False) -> Tuple[str, str]:
         """Create system and user prompts for value generation.
-        
+
         Returns:
             Tuple containing (system_prompt, user_prompt)
         """
@@ -576,7 +580,31 @@ class CustomColumnTask(AccountEnrichmentTask):
         todays_date = datetime.now().strftime("%Y-%m-%d")
 
         # Create system prompt (instructions and role)
-        system_prompt = f"""You are an AI assistant acting as an experienced Business Development Representative (BDR).
+        if unstructured_response:
+            # Simpler system prompt for unstructured responses
+            system_prompt = f"""You are an AI assistant acting as an experienced Business Development Representative (BDR).
+
+Your goal is to analyze provided entity information and answer a specific question truthfully, accurately and concisely.
+{internet_use_text}
+
+**Instructions:**
+
+1. **Analyze Context:** Thoroughly examine the provided `Entity Information`.
+2. **Identify Need for Research:** Determine if the context contains sufficient, up-to-date information to answer the `Specific Question`.
+3. **Web Research (If Necessary):** If information is insufficient, conduct targeted web research using reliable sources.
+4. **Synthesize Answer:** Combine information from the context and any necessary web research to directly answer the `Specific Question`.
+5. **Provide Verifiable Sources:** Include relevant and verifiable URLs supporting your answer.
+6. **Format Your Response:** Respond directly with the answer to the question in a concise and clear manner. 
+   Include the following sections:
+   - **Answer:** [Your direct answer to the question]
+   - **Confidence:** [High/Medium/Low] - how confident you are in this answer
+   - **Sources:** [List any sources you used]
+   - **Rationale:** [Brief explanation of how you arrived at this answer]
+
+Your response should be in markdown format and well-structured. Do NOT respond in JSON format."""
+        else:
+            # Original system prompt for structured JSON responses
+            system_prompt = f"""You are an AI assistant acting as an experienced Business Development Representative (BDR).
 
 Your goal is to analyze provided entity information and answer a specific question truthfully, accurately and concisely.
 {internet_use_text}
@@ -652,96 +680,190 @@ Your goal is to analyze provided entity information and answer a specific questi
             format_for_response_type += f" from one of the following allowed values: {allowed_values}"
         return format_for_response_type
 
-    def _validate_response(self, response: Dict[str, Any], column_config: Any) -> Dict[str, Any]:
+    def _validate_response(self, response: Dict[str, Any] | str, column_config: Any, unstructured_response: bool = False) -> Dict[str, Any]:
         """Validate and format the AI response with enhanced error checking."""
         response_type = column_config['response_type']
 
-        if not response:
-            raise ValueError("Response is empty")
+        if unstructured_response:
+            # Process unstructured response
+            if isinstance(response, str):
+                text_response = response
+            else:
+                # Handle case where response might still be a dict
+                text_response = response.get('text', str(response))
 
-        if 'value' not in response:
-            logger.error(f"Invalid response format: {response}")
-            raise ValueError("Response missing 'value' field")
+            confidence = 1.0  # Default confidence
 
-        value = response['value']
-        confidence = response.get('confidence_score', 0.0)
-        rationale = response.get('rationale', '')
+            confidence_indicators = {
+                "high confidence": 0.9,
+                "medium confidence": 0.5,
+                "low confidence": 0.2,
+                "high": 0.9,
+                "medium": 0.5,
+                "low": 0.2
+            }
 
-        # Validate confidence score range
-        if not 0 <= confidence <= 1:
-            logger.warning(f"Confidence score out of range: {confidence}, clamping to valid range")
-            confidence = max(0.0, min(1.0, confidence))
+            for indicator, value in confidence_indicators.items():
+                if indicator.lower() in text_response.lower():
+                    confidence = value
+                    break
 
-        # Format based on response type with validation
-        try:
+            # Extract rationale if present and clean the response
+            rationale = ""
+            lower_text = text_response.lower()
+
+            clean_response = text_response
+            if "rationale:" in lower_text:
+                rationale_index = lower_text.rindex("rationale:")
+                rationale = text_response[rationale_index:].split(":", 1)[1].strip()
+                clean_response = text_response[:rationale_index].strip()
+
+            # Remove "Answer:" prefix with any markdown formatting
+            import re
+            clean_response = re.sub(r'(?i)^[\s\*_#]*answer[\s\*_#]*:[\s\*_#]*', '', clean_response)
+            clean_response = re.sub(r'^[^a-zA-Z0-9\s]+', '', clean_response)
+
+            # Create appropriate value based on response_type
             result = {}
+            clean_lower = clean_response.lower()
 
             if response_type == "string":
-                if not isinstance(value, str):
-                    logger.warning(f"Expected string but got {type(value).__name__}, converting to string")
-                    value = str(value)
-                result = {"value_string": value}
-
+                result = {"value_string": clean_response}
             elif response_type == "json_object":
-                if isinstance(value, str):
-                    # Try to parse string as JSON
-                    import json
-                    try:
-                        value = json.loads(value)
-                    except json.JSONDecodeError:
-                        logger.error(f"Failed to parse string as JSON: {value}")
-                        raise ValueError(f"Invalid JSON object: {value}")
-
-                if not isinstance(value, dict) and not isinstance(value, list):
-                    raise ValueError(f"Expected JSON object or array but got {type(value).__name__}")
-
-                result = {"value_json": value}
-
-            elif response_type == "boolean":
-                if isinstance(value, str):
-                    value_lower = value.lower()
-                    if value_lower in ["true", "yes", "1"]:
-                        value = True
-                    elif value_lower in ["false", "no", "0"]:
-                        value = False
+                # Try to extract JSON from the text if possible
+                try:
+                    # Look for JSON-like content between triple backticks
+                    import re
+                    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', clean_response)
+                    if json_match:
+                        json_str = json_match.group(1)
+                        value = loads(json_str)
                     else:
-                        raise ValueError(f"Cannot convert string '{value}' to boolean")
-
-                value = bool(value)  # Ensure it's a boolean
-                result = {"value_boolean": value}
-
+                        # Fallback to the whole text
+                        value = {"text": clean_response}
+                    result = {"value_json": value}
+                except JSONDecodeError:
+                    result = {"value_json": {"text": clean_response}}
+            elif response_type == "boolean":
+                # Try to determine boolean from text
+                if any(term in clean_lower for term in ["true", "yes", "correct", "right"]):
+                    result = {"value_boolean": True}
+                else:
+                    result = {"value_boolean": False}
             elif response_type == "number":
-                if isinstance(value, str):
-                    try:
-                        # Try to convert string to float
-                        value = float(value)
-                    except ValueError:
-                        raise ValueError(f"Cannot convert string '{value}' to number")
-
-                value = float(value)  # Ensure it's a float
-                result = {"value_number": value}
-
+                # Try to extract number from text
+                import re
+                number_match = re.search(r'\b(\d+(?:\.\d+)?)\b', clean_response)
+                if number_match:
+                    result = {"value_number": float(number_match.group(1))}
+                else:
+                    result = {"value_number": 0.0}
             elif response_type == "enum":
-                if isinstance(value, str):
-                    try:
-                        # Check if the string is a valid enum value
-                        if value not in column_config['response_config'].get("allowed_values", []):
-                            logger.error(f"Invalid enum value '{value}'")
-                    except Exception as e:
-                        raise ValueError(f"Error validating enum value '{value}': {str(e)}")
-                result = {"value_enum": value}
+                # Try to match one of the allowed values
+                allowed_values = column_config['response_config'].get("allowed_values", [])
+                found = False
+                for value in allowed_values:
+                    if value.lower() in clean_lower:
+                        result = {"value_enum": value}
+                        found = True
+                        break
+                if not found and allowed_values:
+                    result = {"value_enum": allowed_values[0]}
+                else:
+                    result = {"value_enum": clean_response}
 
-            else:
-                raise ValueError(f"Unsupported response type: {response_type}")
-
-            # Add confidence and rationale to the result
+            # Add confidence and rationale
             result["confidence_score"] = confidence
-            result["rationale"] = rationale  # Include rationale in the result
+            result["rationale"] = rationale
 
             return result
-        except Exception as e:
-            logger.error(f"Error validating response: {str(e)}")
-            raise ValueError(f"Response validation failed: {str(e)}")
+        else:
+            if not response:
+                raise ValueError("Response is empty")
+
+            if 'value' not in response:
+                logger.error(f"Invalid response format: {response}")
+                raise ValueError("Response missing 'value' field")
+
+            value = response['value']
+            confidence = response.get('confidence_score', 0.0)
+            rationale = response.get('rationale', '')
+
+            # Validate confidence score range
+            if not 0 <= confidence <= 1:
+                logger.warning(f"Confidence score out of range: {confidence}, clamping to valid range")
+                confidence = max(0.0, min(1.0, confidence))
+
+            # Format based on response type with validation
+            try:
+                result = {}
+
+                if response_type == "string":
+                    if not isinstance(value, str):
+                        logger.warning(f"Expected string but got {type(value).__name__}, converting to string")
+                        value = str(value)
+                    result = {"value_string": value}
+
+                elif response_type == "json_object":
+                    if isinstance(value, str):
+                        # Try to parse string as JSON
+                        import json
+                        try:
+                            value = json.loads(value)
+                        except json.JSONDecodeError:
+                            logger.error(f"Failed to parse string as JSON: {value}")
+                            raise ValueError(f"Invalid JSON object: {value}")
+
+                    if not isinstance(value, dict) and not isinstance(value, list):
+                        raise ValueError(f"Expected JSON object or array but got {type(value).__name__}")
+
+                    result = {"value_json": value}
+
+                elif response_type == "boolean":
+                    if isinstance(value, str):
+                        value_lower = value.lower()
+                        if value_lower in ["true", "yes", "1"]:
+                            value = True
+                        elif value_lower in ["false", "no", "0"]:
+                            value = False
+                        else:
+                            raise ValueError(f"Cannot convert string '{value}' to boolean")
+
+                    value = bool(value)  # Ensure it's a boolean
+                    result = {"value_boolean": value}
+
+                elif response_type == "number":
+                    if isinstance(value, str):
+                        try:
+                            # Try to convert string to float
+                            value = float(value)
+                        except ValueError:
+                            raise ValueError(f"Cannot convert string '{value}' to number")
+
+                    value = float(value)  # Ensure it's a float
+                    result = {"value_number": value}
+
+                elif response_type == "enum":
+                    if isinstance(value, str):
+                        try:
+                            # Check if the string is a valid enum value
+                            if value not in column_config['response_config'].get("allowed_values", []):
+                                logger.error(f"Invalid enum value '{value}'")
+                        except Exception as e:
+                            raise ValueError(f"Error validating enum value '{value}': {str(e)}")
+                    result = {"value_enum": value}
+
+                else:
+                    raise ValueError(f"Unsupported response type: {response_type}")
+
+                # Add confidence and rationale to the result
+                result["confidence_score"] = confidence
+                result["rationale"] = rationale  # Include rationale in the result
+
+                return result
+            except Exception as e:
+                logger.error(f"Error validating response: {str(e)}")
+                raise ValueError(f"Response validation failed: {str(e)}")
 
     @with_retry(retry_config=API_RETRY_CONFIG, operation_name="store_results")
     async def _store_results(

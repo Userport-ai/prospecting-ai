@@ -116,8 +116,6 @@ class GeminiService(AIService):
                 
             # Add JSON format instruction if needed
             if is_json:
-                if not final_prompt.endswith("Respond in JSON format only."):
-                    final_prompt = f"{final_prompt}\n\nRespond in JSON format only."
                 config_params['response_mime_type'] = 'application/json'
 
             # Run in thread since we're using the synchronous API
@@ -180,47 +178,15 @@ class GeminiService(AIService):
         If both methods are used, structured mode takes precedence.
         """
         try:
-            # Determine which prompt mode to use
-            using_structured_prompts = system_prompt is not None or user_prompt is not None
-            
-            # Prepare enhanced prompt based on schema and prompt mode
-            enhanced_prompt = ""
-            final_system_part = ""
-            
             # Configure search parameters
             search_params = {}
             
-            # Define JSON response structure if schema is provided
-            schema_instruction = ""
             if response_schema and hasattr(response_schema, "model_fields"):
                 schema_description = []
                 for field_name, field_info in response_schema.model_fields.items():
                     field_type = str(field_info.annotation)
                     description = getattr(field_info, "description", "")
                     schema_description.append(f"- {field_name}: {field_type}{' - ' + description if description else ''}")
-                
-                schema_instruction = f"Respond with JSON data in this structure:\n{chr(10).join(schema_description)}\n\nEnsure your response is valid JSON."
-            else:
-                schema_instruction = "Respond with valid JSON data."
-            
-            if using_structured_prompts:
-                # Handle structured prompts
-                if system_prompt:
-                    final_system_part = f"{system_prompt}\n\n{schema_instruction}"
-                else:
-                    final_system_part = schema_instruction
-                    
-                # Use user prompt if provided, otherwise fall back to legacy prompt
-                enhanced_prompt = user_prompt if user_prompt is not None else prompt
-                
-                # For Gemini, combine system and user parts
-                if final_system_part and enhanced_prompt:
-                    enhanced_prompt = f"SYSTEM INSTRUCTIONS:\n{final_system_part}\n\nUSER MESSAGE:\n{enhanced_prompt}"
-                elif final_system_part:
-                    enhanced_prompt = final_system_part
-            else:
-                # Legacy mode - combine everything
-                enhanced_prompt = f"{prompt}\n\n{schema_instruction}"
 
             if user_location:
                 search_params["user_location"] = user_location
@@ -231,7 +197,7 @@ class GeminiService(AIService):
             for i in range(10):
                 # Run in thread since we're using the synchronous API
                 response = await self._generate_search_content_in_thread(
-                    prompt=enhanced_prompt,
+                    prompt=prompt,
                     search_params=search_params,
                     temperature=current_temperature,
                     thinking_budget=thinking_budget
@@ -282,7 +248,7 @@ class GeminiService(AIService):
             # Estimate token usage with search multiplier
             multiplier = 1.0
 
-            prompt_tokens = len(enhanced_prompt) // self.avg_chars_per_token
+            prompt_tokens = len(prompt) // self.avg_chars_per_token
             prompt_tokens = int(prompt_tokens * multiplier)  # Account for search context
             completion_tokens = len(response_text) // self.avg_chars_per_token
             total_tokens = prompt_tokens + completion_tokens
@@ -299,7 +265,7 @@ class GeminiService(AIService):
             )
 
             # Parse JSON response if needed
-            if response_schema or "json" in enhanced_prompt.lower():
+            if response_schema:
                 result = await self._parse_json_response_async(response_text)
                 # Add metadata about the search
                 result["_search_metadata"] = {
