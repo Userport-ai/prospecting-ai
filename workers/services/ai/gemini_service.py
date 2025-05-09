@@ -194,7 +194,7 @@ class GeminiService(AIService):
             # Try multiple times until grounding result is found.
             current_temperature = temperature if temperature is not None else self.default_temperature
             response = None
-            for i in range(10):
+            for i in range(3):
                 # Run in thread since we're using the synchronous API
                 response = await self._generate_search_content_in_thread(
                     prompt=prompt,

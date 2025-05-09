@@ -711,19 +711,23 @@ Your goal is to analyze provided entity information and answer a specific questi
             # Extract rationale if present and clean the response
             rationale = ""
             lower_text = text_response.lower()
+            import re
+
 
             clean_response = text_response
             if "rationale:" in lower_text:
                 rationale_index = lower_text.rindex("rationale:")
                 rationale = text_response[rationale_index:].split(":", 1)[1].strip()
+                rationale = re.sub(r'^[^a-zA-Z0-9]+', '', rationale)
+                rationale = re.sub(r'[^a-zA-Z0-9]+$', '', rationale)
                 clean_response = text_response[:rationale_index].strip()
 
             # Remove "Answer:" prefix with any markdown formatting
-            import re
             clean_response = re.sub(r'(?i)^[\s\*_#]*answer[\s\*_#]*:[\s\*_#]*', '', clean_response)
-            clean_response = re.sub(r'^[^a-zA-Z0-9\s]+', '', clean_response)
+            clean_response = re.sub(r'^[^a-zA-Z0-9]+', '', clean_response)
+            clean_response = re.sub(r'[^a-zA-Z0-9]+$', '', clean_response)
 
-            # Create appropriate value based on response_type
+        # Create appropriate value based on response_type
             result = {}
             clean_lower = clean_response.lower()
 
