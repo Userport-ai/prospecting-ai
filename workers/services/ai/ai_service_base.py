@@ -263,6 +263,10 @@ class AIService(ABC):
             user_prompt=user_prompt
         )
 
+        if isinstance(result, dict) and "error" in result:
+            logger.warning(f"Error in search response: {result['error']}")
+            return {}
+
         # Store result in cache
         if self.cache_service:
             await self._store_search_result(

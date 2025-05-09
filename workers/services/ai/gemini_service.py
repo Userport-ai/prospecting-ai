@@ -196,12 +196,16 @@ class GeminiService(AIService):
             response = None
             for i in range(3):
                 # Run in thread since we're using the synchronous API
-                response = await self._generate_search_content_in_thread(
-                    prompt=prompt,
-                    search_params=search_params,
-                    temperature=current_temperature,
-                    thinking_budget=thinking_budget
-                )
+                try:
+                    response = await self._generate_search_content_in_thread(
+                        prompt=prompt,
+                        search_params=search_params,
+                        temperature=current_temperature,
+                        thinking_budget=thinking_budget
+                    )
+                except Exception as e:
+                    logger.error(f"Error in _generate_search_content_in_thread: {str(e)}", exc_info=True)
+                    response = None
                 logger.debug(f"Gemini search response : {response}...")
 
                 # Check if response is valid before accessing its properties
