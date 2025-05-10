@@ -598,7 +598,6 @@ Your goal is to analyze provided entity information and answer a specific questi
    Include the following sections:
    - **Answer:** [Your direct answer to the question]
    - **Confidence:** [High/Medium/Low] - how confident you are in this answer
-   - **Sources:** [List any sources you used]
    - **Rationale:** [Brief explanation of how you arrived at this answer]
 
 Your response should be in markdown format and well-structured. Do NOT respond in JSON format."""
@@ -713,6 +712,15 @@ Your goal is to analyze provided entity information and answer a specific questi
             lower_text = text_response.lower()
             import re
 
+            clean_sources = ""
+            sources = ""
+            if "sources:" in lower_text:
+                sources_index = lower_text.rindex("sources:")
+                sources = text_response[sources_index:].split(":", 1)[1].strip()
+                sources = re.sub(r'^[^a-zA-Z0-9]+', '', sources)
+                sources = re.sub(r'[^a-zA-Z0-9]+$', '', sources)
+                clean_sources = text_response[:sources_index].strip()
+
 
             clean_response = text_response
             if "rationale:" in lower_text:
@@ -726,6 +734,7 @@ Your goal is to analyze provided entity information and answer a specific questi
             clean_response = re.sub(r'(?i)^[\s\*_#]*answer[\s\*_#]*:[\s\*_#]*', '', clean_response)
             clean_response = re.sub(r'^[^a-zA-Z0-9]+', '', clean_response)
             clean_response = re.sub(r'[^a-zA-Z0-9]+$', '', clean_response)
+            clean_response += "\n\n" + clean_sources
 
         # Create appropriate value based on response_type
             result = {}
@@ -779,6 +788,7 @@ Your goal is to analyze provided entity information and answer a specific questi
             # Add confidence and rationale
             result["confidence_score"] = confidence
             result["rationale"] = rationale
+            result["sources"] = sources
 
             return result
         else:
@@ -862,7 +872,7 @@ Your goal is to analyze provided entity information and answer a specific questi
 
                 # Add confidence and rationale to the result
                 result["confidence_score"] = confidence
-                result["rationale"] = rationale  # Include rationale in the result
+                result["rationale"] = rationale
 
                 return result
             except Exception as e:
