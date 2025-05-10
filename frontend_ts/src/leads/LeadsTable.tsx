@@ -20,7 +20,9 @@ import EnumFilterV2 from "@/table/EnumFilterV2";
 import { Button } from "@/components/ui/button";
 import { Cpu, Download, Loader2 } from "lucide-react";
 import { exportToCSV } from "@/common/utils";
-import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
+import CreateCustomColumnDialog, {
+  EntityType,
+} from "@/components/custom-columns/CustomColumnDialog";
 import { CustomColumn } from "@/services/CustomColumn";
 
 interface BaseLeadInfoForCSVExport {
@@ -218,6 +220,7 @@ export const Table: React.FC<TableProps> = ({
         </Button>
 
         <CreateCustomColumnDialog
+          entityType={EntityType.LEAD}
           open={isCreateColumnDialogOpen}
           onOpenChange={onCreateColumnOpenChange}
           onSuccess={onColumnCreated}

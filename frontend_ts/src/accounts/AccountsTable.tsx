@@ -21,7 +21,9 @@ import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import { listProducts, Product } from "@/services/Products";
 import { Separator } from "@/components/ui/separator";
-import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
+import CreateCustomColumnDialog, {
+  EntityType,
+} from "@/components/custom-columns/CustomColumnDialog";
 import { Cpu, Loader2 } from "lucide-react";
 
 const ZeroStateDisplay = () => {
@@ -227,6 +229,7 @@ const Table: React.FC<TableProps> = ({
         </Button>
 
         <CreateCustomColumnDialog
+          entityType={EntityType.ACCOUNT}
           open={isCreateColumnDialogOpen}
           onOpenChange={onCreateColumnOpenChange}
           onSuccess={onColumnCreated}
