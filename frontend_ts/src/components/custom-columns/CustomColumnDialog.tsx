@@ -99,7 +99,7 @@ interface CreateCustomColumnDialogProps extends DialogProps {
   entityType: EntityType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: (newColumn: CustomColumn) => void; // Callback on successful creation
+  onSuccess: (newColumn: CustomColumn) => Promise<void>; // Callback on successful creation
 }
 
 // --- Available Context Types (Adjust based on your actual backend options) ---
@@ -163,11 +163,10 @@ const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
   const onSubmit = async (data: CreateCustomColumnRequest) => {
     setLoading(true);
     setApiError(null);
-    console.log("Submitting data:", data); // Debug log
 
     try {
       const newColumn = await createCustomColumn(authContext, data);
-      onSuccess(newColumn); // Call success callback
+      await onSuccess(newColumn);
       if (onOpenChange) onOpenChange(false); // Close dialog on success
     } catch (error: any) {
       console.error("Failed to create custom column:", error);

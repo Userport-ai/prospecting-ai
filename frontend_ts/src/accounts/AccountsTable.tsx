@@ -129,7 +129,7 @@ interface TableProps {
   onPageSizeChange: (pageSize: number) => void;
   isCreateColumnDialogOpen: boolean;
   onCreateColumnOpenChange: (open: boolean) => void;
-  onColumnCreated: (newColumn: CustomColumn) => void;
+  onColumnCreated: (newColumn: CustomColumn) => Promise<void>;
 }
 
 // Component to display Accounts Table.
@@ -414,17 +414,18 @@ export default function AccountsTable() {
     setCurAccounts([...addedAccounts, ...curAccounts]);
   };
 
-  const handleColumnCreated = (newColumn: CustomColumn) => {
-    console.log("Custom column created:", newColumn);
-    // Optional: Show a success toast/notification
-    // Optional: You might want to refresh the accounts list *after a delay*
-    //           to allow the backend to start populating values, or add the
-    //           column definition immediately to the table state (though cells will be empty initially).
-    //           Simplest approach for now might be just closing the dialog.
-    setCreateColumnDialogOpen(false);
-
-    // Example: Trigger a refresh after a short delay
-    // setTimeout(() => listAccountsHelper(curPageNum || 1), 2000);
+  // Handle creation of new custom column.
+  const handleColumnCreated = async (newColumn: CustomColumn) => {
+    try {
+      // Fetch new column by refetching all accounts on current page.
+      await listAccountsHelper(curPageNum);
+    } catch (error) {
+      setError(
+        new Error(
+          `Failed to fetch Accounts after creating column ${newColumn} for page ${curPageNum}: ${error}`
+        )
+      );
+    }
   };
 
   if (loading) {
