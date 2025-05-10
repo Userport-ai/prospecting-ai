@@ -20,6 +20,7 @@ class ThinkingBudget(enum.Enum):
     MEDIUM = 8192
     HIGH = 24576
 
+
 SUPPORTED_MODELS = {
     # OpenAI models
     "gpt-4.1": "openai",
@@ -87,7 +88,7 @@ class AIService(ABC):
             user_prompt: Optional[str] = None
     ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
         """Generate content from prompt without using cache.
-        
+
         If system_prompt and user_prompt are provided, the prompt parameter is ignored and 
         the LLM-specific implementation should handle formatting these appropriately for the model.
         """
@@ -105,16 +106,16 @@ class AIService(ABC):
             user_prompt: Optional[str] = None
     ) -> Union[Dict[str, Any], str]:
         """Generate content from prompt, using cache if available.
-        
+
         This method now supports two ways of providing prompts:
         1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
         2. Structured mode: Pass separate system_prompt and user_prompt parameters
-        
+
         If both methods are used, structured mode takes precedence.
         """
         # Use provided temperature or fall back to default
         used_temperature = temperature if temperature is not None else self.default_temperature
-        
+
         # Generate a combined prompt for caching purposes if using separate prompts
         cache_prompt = prompt
         if system_prompt is not None or user_prompt is not None:
@@ -122,7 +123,7 @@ class AIService(ABC):
             system_part = system_prompt or ""
             user_part = user_prompt or ""
             cache_prompt = f"<system>\n{system_part}\n</system>\n\n<user>\n{user_part}\n</user>"
-        
+
         # Ensure we have at least one form of prompt
         if cache_prompt is None:
             raise ValueError("Either 'prompt' or at least one of 'system_prompt'/'user_prompt' must be provided")
@@ -144,6 +145,7 @@ class AIService(ABC):
                 cached_response = None
 
             if cached_response:
+                logger.debug("Generate Content: Found result in Cache")
                 return cached_response["content"]
 
         try:
@@ -158,7 +160,7 @@ class AIService(ABC):
             )
         except ValueError as ve:
             logger.error(f"Got empty response while generating content: {ve}")
-            return {} # Empty response
+            return {}  # Empty response
 
         if self.cache_service:
             try:
@@ -197,7 +199,7 @@ class AIService(ABC):
             user_prompt: Optional[str] = None
     ) -> Tuple[Dict[str, Any], TokenUsage]:
         """Execute a search request specific to the provider.
-        
+
         If system_prompt and user_prompt are provided, the prompt parameter is ignored and 
         the LLM-specific implementation should handle formatting these appropriately for the model.
         """
@@ -218,11 +220,11 @@ class AIService(ABC):
         """Generate content with web search capability.
 
         This is a generic implementation that subclasses can override if needed.
-        
+
         This method now supports two ways of providing prompts:
         1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
         2. Structured mode: Pass separate system_prompt and user_prompt parameters
-        
+
         If both methods are used, structured mode takes precedence.
         """
         # Generate a combined prompt for caching purposes if using separate prompts
@@ -232,11 +234,11 @@ class AIService(ABC):
             system_part = system_prompt or ""
             user_part = user_prompt or ""
             cache_prompt = f"<system>\n{system_part}\n</system>\n\n<user>\n{user_part}\n</user>"
-        
+
         # Ensure we have at least one form of prompt
         if cache_prompt is None:
             raise ValueError("Either 'prompt' or at least one of 'system_prompt'/'user_prompt' must be provided")
-            
+
         # Generate cache key
         cache_key = self._generate_search_cache_key(
             prompt=cache_prompt,
@@ -294,11 +296,11 @@ class AIService(ABC):
         """Generate content with web search capability and structured output format.
 
         This is a generic implementation that subclasses can override if needed.
-        
+
         This method now supports two ways of providing prompts:
         1. Legacy mode: Pass a single combined prompt in the 'prompt' parameter
         2. Structured mode: Pass separate system_prompt and user_prompt parameters
-        
+
         If both methods are used, structured mode takes precedence.
         """
         # Generate a combined prompt for caching purposes if using separate prompts
@@ -308,11 +310,11 @@ class AIService(ABC):
             system_part = system_prompt or ""
             user_part = user_prompt or ""
             cache_prompt = f"<system>\n{system_part}\n</system>\n\n<user>\n{user_part}\n</user>"
-        
+
         # Ensure we have at least one form of prompt
         if cache_prompt is None:
             raise ValueError("Either 'prompt' or at least one of 'system_prompt'/'user_prompt' must be provided")
-            
+
         # Create schema_info for cache key
         schema_info = str(response_schema) if response_schema else None
 
@@ -411,7 +413,6 @@ class AIService(ABC):
         except Exception as e:
             logger.error(f"Error parsing JSON response: {str(e)}")
             return {}
-
 
     # ===============================
     # Cache-related Methods

@@ -509,7 +509,8 @@ class CustomColumnTask(AccountEnrichmentTask):
                     temperature=temperature,
                     operation_tag='custom_column',
                     system_prompt=system_prompt,
-                    user_prompt=user_prompt
+                    user_prompt=user_prompt,
+                    force_refresh=True
                 )
             generation_time = time.time() - start_time
             logger.debug(f"Value generation for entity {entity_id} completed in {generation_time:.2f}s")
@@ -711,7 +712,6 @@ Your goal is to analyze provided entity information and answer a specific questi
             rationale = ""
             lower_text = text_response.lower()
             import re
-
             clean_sources = ""
             sources = ""
             if "sources:" in lower_text:
@@ -720,7 +720,6 @@ Your goal is to analyze provided entity information and answer a specific questi
                 sources = re.sub(r'^[^a-zA-Z0-9]+', '', sources)
                 sources = re.sub(r'[^a-zA-Z0-9]+$', '', sources)
                 clean_sources = text_response[:sources_index].strip()
-
 
             clean_response = text_response
             if "rationale:" in lower_text:
