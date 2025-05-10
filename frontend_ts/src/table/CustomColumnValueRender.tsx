@@ -6,7 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CustomColumnValueData } from "@/services/CustomColumn";
-import { Info, Play, Loader2 } from "lucide-react";
+import { Info, Play, Loader2, RefreshCw } from "lucide-react";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import JsonDataView from "@/components/common/JsonDataView";
@@ -19,6 +19,7 @@ import {
 
 // Import the function to trigger generation
 import { generateCustomColumnValues } from "@/services/CustomColumn";
+import { regenCustomColumnBtnDataId } from "@/common/utils";
 
 // Helper to remove markdown backticks so that the Markdown renderer
 // does not render it as a Code block. This is needed because LLM
@@ -34,27 +35,25 @@ const removeMarkdownBackticks = (text: string | null) => {
   return text.split("```").join("");
 };
 
-// Uncomment if this is needed in the future otherwise can be deleted
-// const RationaleTooltip = ({ rationale }: { rationale: string | null }) => {
-//   if (!rationale) return null;
-//   return (
-//     <Tooltip>
-//       <TooltipTrigger asChild>
-//         <Info
-//           size={14}
-//           className="ml-1 text-gray-400 hover:text-gray-600 cursor-pointer"
-//         />
-//       </TooltipTrigger>
-//       <TooltipContent
-//         className="max-w-xs p-2 bg-gray-800 text-white rounded text-xs"
-//         side="top"
-//       >
-//         <p className="font-semibold mb-1">Rationale:</p>
-//         <p>{rationale}</p>
-//       </TooltipContent>
-//     </Tooltip>
-//   );
-// };
+// Button to regenerate custom column.
+const RegenCustomColumnButton: React.FC<{ onClick: () => void }> = ({
+  onClick,
+}) => {
+  return (
+    <div className="mt-6 mb-2 flex justify-end">
+      <Button
+        data-id={regenCustomColumnBtnDataId}
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground hover:text-blue-600 hover:bg-transparent"
+        onClick={onClick}
+      >
+        <RefreshCw className="mr-1 h-4 w-4" />
+        Regenerate
+      </Button>
+    </div>
+  );
+};
 
 const RationaleAccordion: React.FC<{ rationale: string | null }> = ({
   rationale,
@@ -72,14 +71,16 @@ const RationaleAccordion: React.FC<{ rationale: string | null }> = ({
   );
 };
 
-const renderValueWithTooltip = (
+const renderValueWithRationale = (
   valueElement: React.ReactNode,
-  rationale: string | null
+  rationale: string | null,
+  onRegen: () => void
 ) => {
   return (
     <div className="flex-col justify-center">
       {valueElement}
       <RationaleAccordion rationale={rationale} />
+      <RegenCustomColumnButton onClick={onRegen} />
     </div>
   );
 };
@@ -193,17 +194,8 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
 
   // Render based on response type
   switch (customColumnValueData.response_type) {
-    case "enum":
-      // Simple rendering for enum values - just display the string value
-      return renderValueWithTooltip(
-        <span className="whitespace-normal break-words">
-          {String(customColumnValueData.value)}
-        </span>,
-        customColumnValueData.rationale
-      );
-
     case "string":
-      return renderValueWithTooltip(
+      return renderValueWithRationale(
         <div className="max-w-full whitespace-normal break-words">
           <MarkdownRenderer
             content={removeMarkdownBackticks(
@@ -211,35 +203,50 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
             )}
           />
         </div>,
-        customColumnValueData.rationale
+        customColumnValueData.rationale,
+        handleGenerateValue
       );
 
     case "number":
-      return renderValueWithTooltip(
+      return renderValueWithRationale(
         <span>{Number(customColumnValueData.value).toLocaleString()}</span>, // Format number if needed
-        customColumnValueData.rationale
+        customColumnValueData.rationale,
+        handleGenerateValue
+      );
+
+    case "enum":
+      // Simple rendering for enum values - just display the string value
+      return renderValueWithRationale(
+        <span className="whitespace-normal break-words">
+          {String(customColumnValueData.value)}
+        </span>,
+        customColumnValueData.rationale,
+        handleGenerateValue
       );
 
     case "boolean":
-      return renderValueWithTooltip(
+      return renderValueWithRationale(
         <span>{customColumnValueData.value ? "Yes" : "No"}</span>, // Or use configured labels if available
-        customColumnValueData.rationale
+        customColumnValueData.rationale,
+        handleGenerateValue
       );
 
     case "json_object":
       // Render an expandable JSON view
-      return renderValueWithTooltip(
+      return renderValueWithRationale(
         <JsonDataView
           data={customColumnValueData.value as object}
           initialExpanded={false}
         />,
-        customColumnValueData.rationale
+        customColumnValueData.rationale,
+        handleGenerateValue
       );
 
     default:
-      return renderValueWithTooltip(
+      return renderValueWithRationale(
         <span>{String(customColumnValueData.value)}</span>,
-        customColumnValueData.rationale
+        customColumnValueData.rationale,
+        handleGenerateValue
       );
   }
 };

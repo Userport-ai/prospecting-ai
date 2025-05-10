@@ -4,6 +4,8 @@ import { unparse } from "papaparse";
 // Classes used to ensure content in a given Table column breaks and wraps at container column size width.
 export const wrapColumnContentClass = "whitespace-normal break-all";
 
+export const regenCustomColumnBtnDataId = "regen-custom-column";
+
 // Convert given ISO format date string to date
 // represented in the client's time zone;
 export function formatDate(isoDateString: string): string {

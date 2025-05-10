@@ -530,6 +530,7 @@ export const getAccountColumns = (
         cellExpandable: ["string", "json_object", "enum"].includes(
           colData.response_type
         ),
+        isCustomColumn: true,
       } as CustomColumnMeta,
     });
   });

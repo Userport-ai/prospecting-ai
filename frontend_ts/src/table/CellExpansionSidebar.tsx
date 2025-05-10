@@ -10,6 +10,7 @@ import { Lead as LeadRow } from "@/services/Leads";
 import { CellContext, flexRender } from "@tanstack/react-table";
 import { X } from "lucide-react";
 import { CustomColumnMeta } from "./CustomColumnMeta";
+import { regenCustomColumnBtnDataId } from "@/common/utils";
 
 // Need this interface to fix compilation error.
 // Solution found here: https://github.com/shadcn-ui/ui/issues/5509
@@ -22,7 +23,7 @@ export type AccountOrLeadRow = AccountRow | LeadRow;
 const CellSidebar: React.FC<{
   cellContext: CellContext<any, unknown>;
 }> = ({ cellContext }) => {
-  const { setOpen } = useSidebar();
+  const { open, setOpen } = useSidebar();
 
   // Returns either company name or lead name.
   const getName = (row: AccountOrLeadRow) => {
@@ -65,7 +66,8 @@ const CellSidebar: React.FC<{
             </a>
           </div>
           <X
-            className="text-gray-700 hover:cursor-pointer"
+            size={24}
+            className="text-gray-700 hover:cursor-pointer hover:bg-white hover:border hover:border-gray-800 mr-4"
             onClick={() => setOpen(false)}
           />
         </div>
@@ -75,7 +77,17 @@ const CellSidebar: React.FC<{
         <h2 className="text-xl font-medium text-gray-900 mb-4">
           {(cellContext.column.columnDef.meta as CustomColumnMeta).displayName}
         </h2>
-        <div className="p-4 border border-gray-400 rounded-xl shadow-sm bg-gray-50">
+        <div
+          className="p-4 border border-gray-400 rounded-xl shadow-sm bg-gray-50"
+          onClick={(e: React.MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const id = target.getAttribute("data-id");
+            if (id === regenCustomColumnBtnDataId) {
+              // Regeneration of custom column has been triggered, close the sidebar.
+              if (open) setOpen(false);
+            }
+          }}
+        >
           {flexRender(cellContext.cell.column.columnDef.cell, cellContext)}
         </div>
       </SidebarContent>
