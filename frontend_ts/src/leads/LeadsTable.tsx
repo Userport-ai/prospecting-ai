@@ -20,7 +20,9 @@ import EnumFilterV2 from "@/table/EnumFilterV2";
 import { Button } from "@/components/ui/button";
 import { Cpu, Download, Loader2 } from "lucide-react";
 import { exportToCSV } from "@/common/utils";
-import CreateCustomColumnDialog from "@/components/custom-columns/CustomColumnDialog";
+import CreateCustomColumnDialog, {
+  EntityType,
+} from "@/components/custom-columns/CustomColumnDialog";
 import { CustomColumn } from "@/services/CustomColumn";
 
 interface BaseLeadInfoForCSVExport {
@@ -62,7 +64,7 @@ interface TableProps {
   onPersonaFilterValuesChange: (newPersonaFilterValues: string[]) => void;
   isCreateColumnDialogOpen: boolean;
   onCreateColumnOpenChange: (open: boolean) => void;
-  onColumnCreated: (newColumn: CustomColumn) => void;
+  onColumnCreated: (newColumn: CustomColumn) => Promise<void>;
 }
 
 export const Table: React.FC<TableProps> = ({
@@ -218,6 +220,7 @@ export const Table: React.FC<TableProps> = ({
         </Button>
 
         <CreateCustomColumnDialog
+          entityType={EntityType.LEAD}
           open={isCreateColumnDialogOpen}
           onOpenChange={onCreateColumnOpenChange}
           onSuccess={onColumnCreated}
@@ -443,17 +446,18 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     setPersonaFilterValues(newPersonaFilterValues);
   };
 
-  const handleColumnCreated = (newColumn: CustomColumn) => {
-    console.log("Custom column created:", newColumn);
-    // Optional: Show a success toast/notification
-    // Optional: You might want to refresh the accounts list *after a delay*
-    //           to allow the backend to start populating values, or add the
-    //           column definition immediately to the table state (though cells will be empty initially).
-    //           Simplest approach for now might be just closing the dialog.
-    setCreateColumnDialogOpen(false);
-
-    // Example: Trigger a refresh after a short delay
-    // setTimeout(() => listAccountsHelper(curPageNum || 1), 2000);
+  // Handle creation of new custom column.
+  const handleColumnCreated = async (newColumn: CustomColumn) => {
+    try {
+      // Refetch the current page so that the created column is visible in the UI.
+      await listLeads(cursorValues[curPageNum - 1], true);
+    } catch (error) {
+      setError(
+        new Error(
+          `Failed to fetch Leads after creating column ${newColumn} for page ${curPageNum}: ${error}`
+        )
+      );
+    }
   };
 
   if (loading) {
