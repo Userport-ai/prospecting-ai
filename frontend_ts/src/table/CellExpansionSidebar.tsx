@@ -80,6 +80,9 @@ const CellSidebar: React.FC<{
         <div
           className="p-4 border border-gray-400 rounded-xl shadow-sm bg-gray-50"
           onClick={(e: React.MouseEvent) => {
+            // This is a hack to listen to DOM click event to close expansion side bar.
+            // TODO: Lift up state so that DOM closing can be done using props
+            // recevied by CellExpansionSidebar.
             const target = e.target as HTMLElement;
             const id = target.getAttribute("data-id");
             if (id === regenCustomColumnBtnDataId) {

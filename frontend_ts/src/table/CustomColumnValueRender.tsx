@@ -151,7 +151,8 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
   if (
     !customColumnValueData ||
     customColumnValueData.value === null ||
-    customColumnValueData.value === undefined
+    customColumnValueData.value === undefined ||
+    isGenerating
   ) {
     // For the case where there's no customColumnValueData at all, we need to ensure we have a columnId
     // This button will only appear if both entityId and columnId are available
