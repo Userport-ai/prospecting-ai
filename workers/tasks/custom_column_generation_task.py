@@ -727,7 +727,6 @@ Your goal is to analyze provided entity information and answer a specific questi
                 rationale_index = lower_text.rindex("rationale:")
                 rationale = text_response[rationale_index:].split(":", 1)[1].strip()
                 rationale = re.sub(r'^[^a-zA-Z0-9]+', '', rationale)
-                rationale = re.sub(r'[^a-zA-Z0-9]+$', '', rationale)
                 clean_response = text_response[:rationale_index].strip()
 
             # Remove "Answer:" prefix with any markdown formatting
