@@ -307,8 +307,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
       return;
     }
 
-    const pollingInterval = 30 * 1000; // Poll every 30s.
-    const intervalId = setInterval(async () => {
+    const pollLeads = async () => {
       try {
         const response = await listLeads(cursorValues[curPageNum - 1], false);
         const pollingRequired = response.results.some((lead) => {
@@ -337,7 +336,13 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
         // Optionally show a toast notification instead of setting error state
         // toast.error(`Failed to refresh: ${error.message}`);
       }
-    }, pollingInterval);
+    };
+
+    // Call immediately once.
+    pollLeads();
+
+    const pollingInterval = 30 * 1000; // Poll every 30s.
+    const intervalId = setInterval(pollLeads, pollingInterval);
 
     // Clean up the interval when the component unmounts
     return () => {
