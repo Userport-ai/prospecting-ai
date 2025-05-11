@@ -168,7 +168,7 @@ class CustomColumnValidator:
                 
                 QUESTION: {question}
                 
-                ANSWER TO VALIDATE: 
+                CLAIMED ANSWER(NEED TO VALIDATE): 
                 {answer_value}
                 
                 COMPANY CONTEXT: {entity_context}
