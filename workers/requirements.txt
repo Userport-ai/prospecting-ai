@@ -1,9 +1,14 @@
+duckduckgo-search==5.3.1b1
 fastapi==0.109.0
 google-cloud-bigquery==3.27.0
 google-cloud-tasks==2.14.2
 google-genai==1.11.0
 httpx==0.28.1
 json_repair==0.44.0
+langchain==0.3.25
+langchain-core==0.3.59
+langchain-community==0.3.23
+langchain-google-genai==2.1.4
 loguru==0.7.2  # For improved logging capabilities
 markdownify==0.14.1
 openai~=1.68.0
