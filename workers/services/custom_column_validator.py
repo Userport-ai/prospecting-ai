@@ -68,8 +68,9 @@ class CustomColumnValidator:
         1. First, identify 2-3 specific claims in the answer that are critical to validate. Make sure the claims are critical for the answer to be factually correct in response to the question asked.
         2. For each claim, formulate a precise search query
         3. Execute the search and analyze the results
-        4. Compare the search results to the original claim - is it confirmed, contradicted, or inconclusive?
-        5. After checking all claims, provide an overall validation assessment
+        4. Perform more searches **only if needed**.
+        5. Assimilate and compare the search results to the original claim - is it confirmed, contradicted, or inconclusive?
+        6. After checking all claims, provide an overall validation assessment
         
         Think step-by-step and document your reasoning clearly. Be thorough in your analysis
         of the search results, noting when information is confirmed or contradicted.
@@ -78,15 +79,15 @@ class CustomColumnValidator:
         E.g.:
             - Search claim 1 → Analyze results
             - Search claim 2 → Analyze results  
-            - Only then provide final JSON assessment
+            - Compare only then provide final JSON assessment
         Never conclude after just one search unless you find contradictory evidence.
 
         
         End your analysis with a JSON validation result formatted exactly like this:
         ```json
         {{
-          "is_validated": true or false,
-          "confidence": 0.8,
+          "is_validated": true or false, // is_validated: true if the answer is validated and proved to be correct by your research, false if the answer is incorrect and needs to be corrected
+          "confidence": 0.8, // confidence of your assessment
           "validation_notes": "Your reasoning here",
           "corrected_answer": "Corrected version if needed, or null"
         }}

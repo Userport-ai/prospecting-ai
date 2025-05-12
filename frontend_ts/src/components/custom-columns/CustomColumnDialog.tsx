@@ -112,7 +112,7 @@ const AVAILABLE_CONTEXT_TYPES = [
 
 // --- Available AI Models (Adjust as needed) ---
 const AVAILABLE_AI_MODELS = [
-  "gemini-2.5-pro-preview-03-25",
+  "gemini-2.5-pro-preview-05-06",
   "gemini-2.5-flash-preview-04-17",
   "gpt-4.1",
   "gpt-4.1-mini",

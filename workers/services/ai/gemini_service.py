@@ -57,11 +57,23 @@ class GeminiService(AIService):
 
         # Create client instead of configuring globally
         self.client = genai.Client(api_key=api_key)
-        self.model = model_name or 'gemini-2.0-flash'
+        self.model = model_name or 'gemini-2.5-flash-preview-04-17'
+        self.fallback_model = 'gemini-2.5-flash-preview-04-17'
 
         # Approximate token count for cost estimation
         self.avg_chars_per_token = 4
         self.cost_per_1k_tokens = 0.00015  # Example rate
+
+    @staticmethod
+    def _should_fallback(error: Exception) -> bool:
+        """Check if error indicates need for fallback model."""
+        error_str = str(error).lower()
+        return (
+                '500' in error_str or '503' in error_str or
+                'internal server error' in error_str or
+                'service unavailable' in error_str or
+                isinstance(error, GoogleAPIResourceExhausted)
+        )
 
     # ===============================
     # Core Content Generation Methods
@@ -70,7 +82,7 @@ class GeminiService(AIService):
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_content")
     async def _generate_content_without_cache(
             self,
-            prompt: str = None,
+            prompt: str,
             is_json: bool = True,
             operation_tag: str = "default",
             temperature: Optional[float] = None,
@@ -119,16 +131,36 @@ class GeminiService(AIService):
                 config_params['response_mime_type'] = 'application/json'
 
             response = None
-            # Run in thread since we're using the synchronous API
-            for i in range(3):
+            max_attempts = 3
+            # Try multiple times before falling back
+            for i in range(max_attempts):
                 try:
                     response = await self._generate_content_in_thread(final_prompt, config_params, thinking_budget)
                     if response and hasattr(response, 'text') and response.text is not None:
+                        # Success with primary model
                         break
-                    logger.warning("Empty or invalid response from Gemini, retrying...")
+                    logger.warning(f"Empty response from primary model, retrying... (attempt {i+1})")
                 except Exception as e:
-                    logger.warning(f"Error in _generate_content_in_thread (attempt {i+1}): {str(e)}", exc_info=True)
+                    logger.warning(f"Error in generate_content_in_thread (attempt {i+1}): {e}")
                     response = None
+
+                    # If it's a fallback-worthy error on the last attempt, try fallback
+                    if i == (max_attempts - 1) and (self._should_fallback(e) or not response):
+                        logger.warning(f"Primary model failed after 3 attempts, trying fallback: {e}")
+                        try:
+                            response = await self._generate_content_in_thread(
+                                final_prompt,
+                                config_params,
+                                thinking_budget,
+                                _override_model=self.fallback_model
+                            )
+                            if response and hasattr(response, 'text') and response.text is not None:
+                                logger.info(f"Fallback to {self.fallback_model} successful")
+                            else:
+                                raise ValueError("Empty response from fallback model")
+                        except Exception as fallback_error:
+                            logger.error(f"Fallback model also failed: {fallback_error}")
+                            raise e
 
             if not response or not hasattr(response, 'text') or response.text is None:
                 logger.warning("Final attempt: Empty or invalid response from Gemini")
@@ -182,7 +214,7 @@ class GeminiService(AIService):
     @with_retry(retry_config=GEMINI_RETRY_CONFIG, operation_name="_gemini_generate_search_content")
     async def _execute_search_request(
             self,
-            prompt: str = None,
+            prompt: str,
             search_context_size: str = "medium",
             user_location: Optional[Dict[str, Any]] = None,
             response_schema: Optional[Any] = None,
@@ -191,7 +223,7 @@ class GeminiService(AIService):
             thinking_budget: Optional[ThinkingBudget] = None,
             system_prompt: Optional[str] = None,
             user_prompt: Optional[str] = None
-    ) -> Tuple[Union[Dict[str, Any], str], TokenUsage]:
+    ) -> Tuple[Dict[str, Any], TokenUsage]:
         """Execute search request using Gemini API."""
         try:
             # Configure search parameters
@@ -210,6 +242,8 @@ class GeminiService(AIService):
             # Try multiple times until grounding result is found.
             current_temperature = temperature if temperature is not None else self.default_temperature
             response = None
+            used_fallback = False
+
             for i in range(3):
                 # Run in thread since we're using the synchronous API
                 try:
@@ -219,9 +253,26 @@ class GeminiService(AIService):
                         temperature=current_temperature,
                         thinking_budget=thinking_budget
                     )
-                except Exception as e:
-                    logger.error(f"Error in _generate_search_content_in_thread: {str(e)}", exc_info=True)
-                    response = None
+                except Exception as search_error:
+                    # Try fallback if it's a fallback-worthy error
+                    if self._should_fallback(search_error):
+                        logger.warning(f"Primary search model failed, trying fallback: {search_error}")
+                        try:
+                            response = await self._generate_search_content_in_thread(
+                                prompt=prompt,
+                                search_params=search_params,
+                                temperature=current_temperature,
+                                thinking_budget=thinking_budget,
+                                _override_model=self.fallback_model
+                            )
+                            used_fallback = True
+                            logger.info(f"Search fallback to {self.fallback_model} successful")
+                        except Exception as fallback_error:
+                            logger.error(f"Search fallback also failed: {fallback_error}")
+                            response = None
+                    else:
+                        response = None
+
                 logger.debug(f"Gemini search response : {response}...")
 
                 # Check if response is valid before accessing its properties
@@ -296,10 +347,11 @@ class GeminiService(AIService):
             # Parse JSON response if needed
             if response_schema:
                 result = await self._parse_json_response_async(response_text)
-                # Add metadata about the search
+                # Add metadata about the search - use correct model name
+                actual_model = self.fallback_model if used_fallback else self.model
                 result["_search_metadata"] = {
                     "provider": self.provider_name,
-                    "model": self.model,
+                    "model": actual_model,
                     "search_context_size": search_context_size,
                     "sources": sources,
                     "sources_markdown": all_sources_markdown,
@@ -317,11 +369,10 @@ class GeminiService(AIService):
 
         except Exception as e:
             logger.error(f"Error in Gemini search request: {str(e)}", exc_info=True)
-            error_result = {"error": str(e)}
-            # Ensure we have a usable prompt length for token calculation
+            # Return empty dict to respect contract
             prompt_len = len(prompt) if prompt else 0
             token_usage = self._create_token_usage(prompt_len // 4, 10, operation_tag, 0.001)
-            return error_result, token_usage
+            return {}, token_usage
 
     def _process_grounding_metadata(self, grounding_metadata, response_text):
         """Process grounding metadata to extract sources and their relationship to the response text."""
@@ -423,7 +474,8 @@ class GeminiService(AIService):
 
         return sources, segment_source_mapping, source_segments
 
-    def _create_source_markdown(self, idx, title, url, snippet, published_date):
+    @staticmethod
+    def _create_source_markdown(idx, title, url, snippet, published_date):
         """Create a markdown representation of a single source."""
         markdown = []
 
@@ -446,7 +498,8 @@ class GeminiService(AIService):
         # Join with newlines
         return '\n'.join(markdown)
 
-    def _create_all_sources_markdown(self, sources):
+    @staticmethod
+    def _create_all_sources_markdown(sources):
         """Create a combined markdown representation of all sources."""
         if not sources:
             return ""
@@ -465,7 +518,7 @@ class GeminiService(AIService):
     # ===============================
 
     @to_thread
-    def _generate_content_in_thread(self, prompt: str, config_params: Dict[str, Any], thinking_budget: Optional[ThinkingBudget] = None):
+    def _generate_content_in_thread(self, prompt: str, config_params: Dict[str, Any], thinking_budget: Optional[ThinkingBudget] = None, _override_model: Optional[str] = None):
         """Run Gemini's synchronous generate_content in a separate thread"""
         # Create a GenerateContentConfig object from the config dictionary
         config = types.GenerateContentConfig(**config_params) if config_params else None
@@ -473,8 +526,11 @@ class GeminiService(AIService):
         # Use provided thinking_budget if available, otherwise use the default
         current_thinking_budget = thinking_budget if thinking_budget is not None else self.thinking_budget
 
+        # Use override model if provided, otherwise use instance model
+        model_to_use = _override_model or self.model
+
         # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
-        if self.model and self.model.startswith('gemini-2.5') and current_thinking_budget:
+        if model_to_use and model_to_use.startswith('gemini-2.5') and current_thinking_budget:
             if not config:
                 config = types.GenerateContentConfig()
             config.thinking_config = types.ThinkingConfig(
@@ -487,13 +543,13 @@ class GeminiService(AIService):
             config.response_mime_type = config_params['response_mime_type']
 
         return self.client.models.generate_content(
-            model=self.model,
+            model=model_to_use,
             contents=prompt,
             config=config
         )
 
     @to_thread
-    def _generate_search_content_in_thread(self, prompt: str, search_params: Dict[str, Any], temperature: Optional[float] = None, thinking_budget: Optional[ThinkingBudget] = None):
+    def _generate_search_content_in_thread(self, prompt: str, search_params: Dict[str, Any], temperature: Optional[float] = None, thinking_budget: Optional[ThinkingBudget] = None, _override_model: Optional[str] = None):
         """Execute Gemini's search-enabled content generation in a separate thread."""
         # Create the Google Search tool
         search_tool = types.Tool(google_search=types.GoogleSearch())
@@ -512,15 +568,18 @@ class GeminiService(AIService):
         # Use provided thinking_budget if available, otherwise use the default
         current_thinking_budget = thinking_budget if thinking_budget is not None else self.thinking_budget
 
+        # Use override model if provided, otherwise use instance model
+        model_to_use = _override_model or self.model
+
         # Apply thinking budget if model is gemini-2.5-flash and thinking_budget is set
-        if self.model and self.model.startswith('gemini-2.5') and current_thinking_budget:
+        if model_to_use and model_to_use.startswith('gemini-2.5') and current_thinking_budget:
             config.thinking_config = types.ThinkingConfig(
                 thinking_budget=current_thinking_budget.value if isinstance(current_thinking_budget, enum.Enum) else 0,
                 include_thoughts=True
             )
 
         return self.client.models.generate_content(
-            model=self.model,
+            model=model_to_use,
             contents=prompt,
             config=config
         )
