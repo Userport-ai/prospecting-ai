@@ -65,7 +65,7 @@ class CustomColumnValidator:
         about companies, markets, and sales information.
         
         Follow this validation process:
-        1. First, identify 2-3 specific claims in the answer that are critical to validate. Make sure that the claims are critical for the answer to be factually correct in response to the question asked.
+        1. First, identify 2-3 specific claims in the answer that are critical to validate. Make sure the claims are critical for the answer to be factually correct in response to the question asked.
         2. For each claim, formulate a precise search query
         3. Execute the search and analyze the results
         4. Compare the search results to the original claim - is it confirmed, contradicted, or inconclusive?
@@ -73,6 +73,14 @@ class CustomColumnValidator:
         
         Think step-by-step and document your reasoning clearly. Be thorough in your analysis
         of the search results, noting when information is confirmed or contradicted.
+        
+        IMPORTANT: You MUST verify multiple claims before concluding. 
+        E.g.:
+            - Search claim 1 → Analyze results
+            - Search claim 2 → Analyze results  
+            - Only then provide final JSON assessment
+        Never conclude after just one search unless you find contradictory evidence.
+
         
         End your analysis with a JSON validation result formatted exactly like this:
         ```json
