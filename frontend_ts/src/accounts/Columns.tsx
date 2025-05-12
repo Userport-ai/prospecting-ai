@@ -436,15 +436,15 @@ export const getAccountColumns = (
     }
   }
 
-  // Helper method that returns true if the custom column name contains "Score" and false otherwise.
-  const columnNameIncludesScore = (colData: CustomColumnValueData): boolean => {
-    return colData.name.includes("Score");
+  // Helper method that returns true if the custom column name contains "Fit" and false otherwise.
+  const columnNameIncludesFit = (colData: CustomColumnValueData): boolean => {
+    return colData.name.includes("Fit");
   };
 
   // Sort custom columns if Fit Score is present so it is always the first custom column.
   var fitScoreColumEntry: [string, CustomColumnValueData] | null = null;
   customColumnDefinitions.forEach((colData, columnId) => {
-    if (columnNameIncludesScore(colData)) {
+    if (columnNameIncludesFit(colData)) {
       // Fit Score column found.
       fitScoreColumEntry = [columnId, colData];
     }
@@ -476,7 +476,7 @@ export const getAccountColumns = (
           <div className="flex justify-between items-center gap-2 mr-2">
             {colData.name}
             {/* Only make Score custom column sortable */}
-            {columnNameIncludesScore(colData) && (
+            {columnNameIncludesFit(colData) && (
               <SortingDropdown
                 onSelect={(val) => {
                   if (val === "asc") {
@@ -520,9 +520,9 @@ export const getAccountColumns = (
           />
         );
       },
-      minSize: !columnNameIncludesScore(colData) ? 300 : 100, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
-      maxSize: !columnNameIncludesScore(colData) ? 300 : 100, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
-      enableSorting: !columnNameIncludesScore(colData) ? false : true,
+      minSize: !columnNameIncludesFit(colData) ? 300 : 200, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
+      maxSize: !columnNameIncludesFit(colData) ? 300 : 200, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
+      enableSorting: !columnNameIncludesFit(colData) ? false : true,
       enableColumnFilter: false,
       meta: {
         displayName: colData.name,
