@@ -55,17 +55,17 @@ class CustomColumnValidator:
 
         ddg_tool = DuckDuckGoSearchRun()
         ddg_tool.name = "duckduckgo_search"
-        ddg_tool.description = "Searches the web using DuckDuckGo. Use this for general web searches when you need to verify factual information."
+        ddg_tool.description = "FALLBACK TOOL: **Use only if Jina doesn't find information**.\n Good for general verification but less reliable for exact numbers."
         tools.append(ddg_tool)
 
         return tools
 
     def _create_validation_agent(self) -> AgentExecutor:
-        system_prompt = """You are a validation agent for B2B sales data. Your task is to verify AI-generated answers 
+        system_prompt = """You are a B2B sales data fact validator. Your task is to verify AI-generated answers 
         about companies, markets, and sales information.
         
         Follow this validation process:
-        1. First, identify 2-3 specific claims in the answer that should be verified
+        1. First, identify 2-3 specific claims in the answer that are critical to validate. Make sure that the claims are critical for the answer to be factually correct in response to the question asked.
         2. For each claim, formulate a precise search query
         3. Execute the search and analyze the results
         4. Compare the search results to the original claim - is it confirmed, contradicted, or inconclusive?
@@ -104,7 +104,7 @@ class CustomColumnValidator:
             verbose=True,
             memory=memory,
             handle_parsing_errors=True,
-            max_iterations=5
+            max_iterations=8,
         )
 
     async def apply_to_task(self, task_registry: TaskRegistry):
@@ -164,23 +164,22 @@ class CustomColumnValidator:
             # Construct the validation prompt for the agent
             input_data = {
                 "input": f"""
-                I need to validate this answer in a B2B sales context:
+                Validate this sales answer:
                 
-                QUESTION: {question}
+                QUESTION: <question> {question} </question>
                 
-                CLAIMED ANSWER(NEED TO VALIDATE): 
-                {answer_value}
+                CLAIMED ANSWER(NEED TO VALIDATE): <answer> {answer_value} </answer>
                 
-                COMPANY CONTEXT: {entity_context}
+                COMPANY CONTEXT: <context> {entity_context} </context>
                 
-                Please validate this answer by:
-                1. Identifying 2-3 key claims that need verification
-                2. Searching for relevant information using the search tools
-                3. Evaluating if the search results confirm or contradict the claims
-                4. Providing a final validation with confidence score
+                INSTRUCTIONS:
+                1. Identify 2-3 critical claims that need verification
+                2. Search for relevant information using the search tools
+                3. Evaluate if the search results CONFIRM or CONTRADICT the claims
+                4. Provide a final validation with confidence score
                 
                 After your analysis, provide a JSON validation result with these fields:
-                - "is_validated": boolean (true if answer is validated by search)
+                - "is_validated": boolean (true if answer is validated and proved to be correct by your research)
                 - "confidence": float from 0.0 to 1.0
                 - "validation_notes": your assessment explanation
                 - "corrected_answer": corrected answer if the original has factual errors, or null
