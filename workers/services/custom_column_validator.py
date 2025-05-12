@@ -104,7 +104,7 @@ class CustomColumnValidator:
             verbose=True,
             memory=memory,
             handle_parsing_errors=True,
-            max_iterations=3 # max number of times, it can use the tool
+            max_iterations=5
         )
 
     async def apply_to_task(self, task_registry: TaskRegistry):
