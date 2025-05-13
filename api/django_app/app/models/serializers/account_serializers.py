@@ -18,6 +18,7 @@ class EnrichmentStatusSerializer(serializers.Serializer):
     completed = serializers.IntegerField()
     failed = serializers.IntegerField()
     in_progress = serializers.IntegerField()
+    scheduled = serializers.IntegerField()
     pending = serializers.IntegerField()
     last_update = serializers.DateTimeField(allow_null=True)
     quality_score = serializers.FloatField(allow_null=True)

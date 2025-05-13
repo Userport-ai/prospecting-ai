@@ -12,6 +12,7 @@ class EnrichmentType(models.TextChoices):
 
 class EnrichmentStatus(models.TextChoices):
     PENDING = 'pending', 'Pending'
+    SCHEDULED = 'scheduled', 'Scheduled'
     IN_PROGRESS = 'processing', 'In Progress'
     COMPLETED = 'completed', 'Completed'
     FAILED = 'failed', 'Failed'

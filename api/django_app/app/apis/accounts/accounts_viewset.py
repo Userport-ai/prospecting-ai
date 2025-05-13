@@ -99,6 +99,21 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                 }
                 
                 if trigger_account_enrichment:
+                    # Create or update AccountEnrichmentStatus with SCHEDULED status
+                    from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType, EnrichmentStatus
+                    from django.utils import timezone
+                    
+                    # Update status to SCHEDULED
+                    AccountEnrichmentStatus.objects.update_or_create(
+                        account=account,
+                        enrichment_type=EnrichmentType.COMPANY_INFO,
+                        defaults={
+                            'status': EnrichmentStatus.SCHEDULED,
+                            'last_attempted_run': timezone.now(),
+                            'source': 'api'
+                        }
+                    )
+                    
                     # Trigger Account Enrichment
                     account_response = worker_service.trigger_account_enrichment(
                         accounts=[{"account_id": str(account.id), "website": account.website}]
@@ -107,6 +122,21 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                     response_data["account_enrichment_response"] = account_response
                 
                 if trigger_lead_enrichment:
+                    # Create or update AccountEnrichmentStatus with SCHEDULED status for lead generation
+                    from app.models.account_enrichment import AccountEnrichmentStatus, EnrichmentType, EnrichmentStatus
+                    from django.utils import timezone
+                    
+                    # Update status to SCHEDULED
+                    AccountEnrichmentStatus.objects.update_or_create(
+                        account=account,
+                        enrichment_type=EnrichmentType.GENERATE_LEADS,
+                        defaults={
+                            'status': EnrichmentStatus.SCHEDULED,
+                            'last_attempted_run': timezone.now(),
+                            'source': 'api'
+                        }
+                    )
+                    
                     # Trigger Lead Enrichment
                     lead_response = self._trigger_lead_generation(account)
                     logger.debug(f"Triggered Leads generation in worker for Account ID: {account.id}")

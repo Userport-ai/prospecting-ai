@@ -78,6 +78,7 @@ class BaseCustomColumnValue(BaseMixin):
 
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
+        SCHEDULED = 'scheduled', 'Scheduled'
         PROCESSING = 'processing', 'Processing'
         COMPLETED = 'completed', 'Completed'
         ERROR = 'error', 'Error'

@@ -52,6 +52,7 @@ class Account(BaseMixin):
                 'completed': 0,
                 'failed': 0,
                 'in_progress': 0,
+                'scheduled': 0,
                 'pending': 0,
                 'last_update': None,
                 'quality_score': None,
@@ -63,6 +64,7 @@ class Account(BaseMixin):
         percent = sum([s.completion_percent for s in statuses if s.completion_percent is not None]) / len(statuses) if statuses else 0
         failed = sum(1 for s in statuses if s.status == EnrichmentStatus.FAILED)
         in_progress = sum(1 for s in statuses if s.status == EnrichmentStatus.IN_PROGRESS)
+        scheduled = sum(1 for s in statuses if s.status == EnrichmentStatus.SCHEDULED)
         pending = sum(1 for s in statuses if (not s.status) or (s.status == EnrichmentStatus.PENDING))
 
         last_update = max((s.last_attempted_run for s in statuses if s.last_attempted_run), default=None)
@@ -75,6 +77,7 @@ class Account(BaseMixin):
             'completed': completed,
             'failed': failed,
             'in_progress': in_progress,
+            'scheduled': scheduled,
             'pending': pending,
             'last_update': last_update,
             'quality_score': avg_score,
