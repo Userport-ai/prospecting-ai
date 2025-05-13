@@ -24,7 +24,7 @@ from app.utils.custom_column_utils import trigger_custom_column_generation
 
 logger = logging.getLogger(__name__)
 
-MAX_ACCOUNTS_PER_REQUEST = 20
+MAX_ACCOUNTS_PER_REQUEST = 100
 
 
 class ClientControlledPagination(PageNumberPagination):
