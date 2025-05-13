@@ -10,6 +10,9 @@ from services.bigquery_service import BigQueryService
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
 from utils.loguru_setup import logger
 from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+from dateutil import parser
+from dateutil.relativedelta import relativedelta
 
 
 class ActorRunFailed(Exception):
@@ -360,28 +363,30 @@ class LinkedInService:
     async def fetch_recent_linkedin_activities(self, lead_linkedin_url: str) -> RapidAPILinkedInActivities:
         """Fetches latest Posts, Comments and Reactions from given lead's profile."""
         linkedin_activities = RapidAPILinkedInActivities(posts=[], comments=[], reactions=[])
+        # Use 3 months as default cutoff.
+        cutoff_timestamp: int = datetime.now(timezone.utc) - relativedelta(months=3)
         try:
-            posts = await self.fetch_rapid_api_linkedin_posts(lead_linkedin_url=lead_linkedin_url)
+            posts = await self.fetch_rapid_api_linkedin_posts(lead_linkedin_url=lead_linkedin_url, cutoff_timestamp=cutoff_timestamp)
             linkedin_activities.posts = posts
         except Exception as e:
             logger.error(f"{str(e)}")
 
         try:
-            comments = await self.fetch_rapid_api_linkedin_comments(lead_linkedin_url=lead_linkedin_url)
+            comments = await self.fetch_rapid_api_linkedin_comments(lead_linkedin_url=lead_linkedin_url, cutoff_timestamp=cutoff_timestamp)
             linkedin_activities.comments = comments
         except Exception as e:
             logger.error(f"{str(e)}")
 
         try:
-            reactions = await self.fetch_rapid_api_linkedin_reactions(lead_linkedin_url=lead_linkedin_url)
+            reactions = await self.fetch_rapid_api_linkedin_reactions(lead_linkedin_url=lead_linkedin_url, cutoff_timestamp=cutoff_timestamp)
             linkedin_activities.reactions = reactions
         except Exception as e:
             logger.error(f"{str(e)}")
 
         return linkedin_activities
 
-    async def fetch_rapid_api_linkedin_posts(self, lead_linkedin_url: str) -> List[RapidAPIPost]:
-        """Fetch Posts of given lead from Rapid API service."""
+    async def fetch_rapid_api_linkedin_posts(self, lead_linkedin_url: str, cutoff_timestamp: Optional[datetime]) -> List[RapidAPIPost]:
+        """Fetch Posts of given lead from Rapid API service after provided cutoff timestamp if any."""
         try:
             lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
             endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-posts"
@@ -394,12 +399,17 @@ class LinkedInService:
                 raise ValueError(f"Expected list type in Rapid API response data for LinkedIn posts, got {type(rapid_api_response.data)}")
             posts: List[RapidAPIPost] = rapid_api_response.data
             logger.debug(f"Got {len(posts)} LinkedIn posts from Rapid API from Lead URL: {lead_linkedin_url}")
+
+            if cutoff_timestamp:
+                # Filter posts after cutoff.
+                posts = list(filter(lambda p: self._get_datetime(p.postedDate) >= cutoff_timestamp, posts))
+                logger.debug(f"Got {len(posts)} LinkedIn posts after filtering for cutoff timestamp: {cutoff_timestamp} from Lead URL: {lead_linkedin_url}")
             return posts
         except Exception as e:
             raise ValueError(f"Fetching Rapid API LinkedIn Posts for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
 
-    async def fetch_rapid_api_linkedin_comments(self, lead_linkedin_url: str) -> List[RapidAPIComment]:
-        """Fetch Comments of given lead from Rapid API service."""
+    async def fetch_rapid_api_linkedin_comments(self, lead_linkedin_url: str, cutoff_timestamp: Optional[datetime]) -> List[RapidAPIComment]:
+        """Fetch Comments of given lead from Rapid API service after provided cutoff timestamp if any."""
         try:
             lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
             endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-comments"
@@ -411,12 +421,17 @@ class LinkedInService:
                 raise ValueError(f"Expected list type in Rapid API response data for LinkedIn comments, got {type(rapid_api_response.data)}")
             comments: List[RapidAPIComment] = rapid_api_response.data
             logger.debug(f"Got {len(comments)} LinkedIn comments from Rapid API from Lead URL: {lead_linkedin_url}")
+
+            if cutoff_timestamp:
+                # Filter comments after cutoff.
+                comments = list(filter(lambda c: self._get_datetime(c.postedDate) >= cutoff_timestamp, comments))
+                logger.debug(f"Got {len(comments)} LinkedIn comments after filtering for cutoff timestamp: {cutoff_timestamp} from Lead URL: {lead_linkedin_url}")
             return comments
         except Exception as e:
             raise ValueError(f"Fetching Rapid API LinkedIn Comments for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
 
-    async def fetch_rapid_api_linkedin_reactions(self, lead_linkedin_url: str) -> List[RapidAPIReaction]:
-        """Fetch Reactions of given lead from Rapid API service."""
+    async def fetch_rapid_api_linkedin_reactions(self, lead_linkedin_url: str,  cutoff_timestamp: Optional[datetime]) -> List[RapidAPIReaction]:
+        """Fetch Reactions of given lead from Rapid API service after provided cutoff timestamp if any."""
         try:
             lead_username: str = self._get_username(lead_linkedin_url=lead_linkedin_url)
             endpoint = f"{self.RAPID_API_CHEAPER_BASE_URL}get-profile-likes"
@@ -427,6 +442,12 @@ class LinkedInService:
             rapid_api_response: RapidAPIResponse = await self._fetch_rapidapi_linkedin_activity_response_with_retry(endpoint=endpoint, params=params)
             reactions: List[RapidAPIReaction] = rapid_api_response.data.items
             logger.debug(f"Got {len(reactions)} LinkedIn Reactions from Rapid API for Lead URL: {lead_linkedin_url}")
+
+            if cutoff_timestamp:
+                # Filter reactions after cutoff.
+                reactions = list(filter(lambda r: self._get_datetime(r.postedDate) >= cutoff_timestamp, reactions))
+                logger.debug(f"Got {len(reactions)} LinkedIn Reactions after filtering for cutoff timestamp: {cutoff_timestamp} from Lead URL: {lead_linkedin_url}")
+
             return reactions
         except Exception as e:
             raise ValueError(f"Fetching Rapid API LinkedIn Reactions for Lead URL: {lead_linkedin_url} failed with error: {str(e)}")
@@ -480,3 +501,12 @@ class LinkedInService:
             raise ValueError(f"Invalid lead LinkedIn URL format : {lead_linkedin_url}")
         lead_username = url_list[1]
         return lead_username
+
+    def _get_datetime(self, date_str: Optional[str]) -> datetime:
+        """Helper to convert date string in the format '2025-05-05 03:37:40.122 +0000 UTC' to datetime object."""
+        try:
+            cleaned_date_str = date_str.replace(" UTC", "")
+            return parser.parse(cleaned_date_str)
+        except Exception as e:
+            logger.error(f"Failed to convert date string: {date_str} to datetime object: {str(e)}")
+            return datetime.min.replace(tzinfo=timezone.utc)
