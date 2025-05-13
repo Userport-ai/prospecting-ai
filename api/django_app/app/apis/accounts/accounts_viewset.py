@@ -12,19 +12,26 @@ from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
 from app.apis.common.base import TenantScopedViewSet
 from app.apis.leads.lead_generation_mixin import LeadGenerationMixin
-from app.models import UserRole, Account, EnrichmentType
-from app.models.custom_column import AccountCustomColumnValue, CustomColumn
+from app.models import UserRole, Account
+from app.models.custom_column import AccountCustomColumnValue
 from app.models.serializers.account_serializers import (
     AccountDetailsSerializer,
     AccountBulkCreateSerializer
 )
 from app.permissions import HasRole
 from app.services.worker_service import WorkerService
-from app.utils.custom_column_utils import trigger_custom_column_generation
+from rest_framework.serializers import Serializer, BooleanField
 
 logger = logging.getLogger(__name__)
 
 MAX_ACCOUNTS_PER_REQUEST = 20
+
+
+class EnrichmentSerializer(Serializer):
+    """Serializer for enrichment flags"""
+    account_enrichment = BooleanField(default=True)
+    lead_enrichment = BooleanField(default=False)
+    custom_columns = BooleanField(default=True)
 
 
 class ClientControlledPagination(PageNumberPagination):
@@ -68,67 +75,60 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
 
-    def _trigger_enrichments_old(self, accounts):
-        """[DEPRECATED] Helper method to trigger all enrichments for accounts"""
-        warnings.warn("_trigger_enrichments_old is deprecated, use _trigger_enrichments instead")
-        worker_service = WorkerService()
-        accounts_list = accounts if isinstance(accounts, list) else [accounts]
-        results = []
-
-        for enrichment_type in [EnrichmentType.COMPANY_INFO, EnrichmentType.GENERATE_LEADS]:
-            try:
-                if enrichment_type == EnrichmentType.COMPANY_INFO:
-                    enrichment_data = [
-                        {"account_id": str(account.id), "website": account.website}
-                        for account in accounts_list
-                    ]
-                    response = worker_service.trigger_account_enrichment(enrichment_data)
-
-                elif enrichment_type == EnrichmentType.GENERATE_LEADS:
-                    response = {
-                        "account_responses": [
-                            self._trigger_lead_generation(account)
-                            for account in accounts_list
-                        ]
-                    }
-
-                results.append({
-                    "enrichment_type": enrichment_type,
-                    "response": response
-                })
-
-            except Exception as e:
-                logger.error(f"Failed to trigger {enrichment_type} enrichment: {str(e)}")
-                results.append({
-                    "enrichment_type": enrichment_type,
-                    "status": "failed",
-                    "error": str(e)
-                })
-
-        return results
-
-    def _trigger_enrichments(self, accounts) -> List[Dict[str, Any]]:
-        """Helper method to trigger all enrichments for accounts"""
+    def _trigger_enrichments(self, accounts, trigger_account_enrichment=True, trigger_lead_enrichment=False, trigger_custom_columns=True) -> List[Dict[str, Any]]:
+        """
+        Helper method to trigger selected enrichments for accounts
+        
+        Args:
+            accounts: Single account or list of accounts to enrich
+            trigger_account_enrichment: Whether to trigger account enrichment (default: True)
+            trigger_lead_enrichment: Whether to trigger lead enrichment (default: False)
+            trigger_custom_columns: Whether to trigger custom column generation (default: True)
+            
+        Returns:
+            List of enrichment responses for each account
+        """
         worker_service = WorkerService()
         accounts_list = accounts if isinstance(accounts, list) else [accounts]
         results = []
 
         for account in accounts_list:
             try:
-                # Trigger Account Enrichment.
-                account_response = worker_service.trigger_account_enrichment(accounts=[{"account_id": str(account.id), "website": account.website}])
-                logger.debug(f"Triggered Account enrichment in worker for Account ID: {account.id}")
-
-                # Trigger Lead Enrichment.
-                lead_response = self._trigger_lead_generation(account)
-
-                logger.debug(f"Triggered Leads generation in worker for Account ID: {account.id}")
-
-                results.append({
-                    "account_id": account.id,
-                    "account_enrichment_response": account_response,
-                    "lead_generation_response": lead_response
-                })
+                response_data = {
+                    "account_id": account.id
+                }
+                
+                if trigger_account_enrichment:
+                    # Trigger Account Enrichment
+                    account_response = worker_service.trigger_account_enrichment(
+                        accounts=[{"account_id": str(account.id), "website": account.website}]
+                    )
+                    logger.debug(f"Triggered Account enrichment in worker for Account ID: {account.id}")
+                    response_data["account_enrichment_response"] = account_response
+                
+                if trigger_lead_enrichment:
+                    # Trigger Lead Enrichment
+                    lead_response = self._trigger_lead_generation(account)
+                    logger.debug(f"Triggered Leads generation in worker for Account ID: {account.id}")
+                    response_data["lead_generation_response"] = lead_response
+                
+                if trigger_custom_columns:
+                    # Trigger Custom Column Generation
+                    try:
+                        from app.utils.custom_column_utils import trigger_custom_column_generation
+                        custom_column_response = trigger_custom_column_generation(
+                            tenant_id=account.tenant_id,
+                            entity_type='account',
+                            entity_ids=[account.id],
+                            respect_dependencies=True
+                        )
+                        logger.debug(f"Triggered Custom Column generation for Account ID: {account.id}")
+                        response_data["custom_column_response"] = custom_column_response
+                    except Exception as custom_column_error:
+                        logger.error(f"Failed to trigger custom column generation for account ID: {account.id} with error: {custom_column_error}")
+                        response_data["custom_column_error"] = str(custom_column_error)
+                
+                results.append(response_data)
             except Exception as e:
                 logger.error(f"Failed to trigger enrichment for account ID: {account.id} with error: {e}")
                 results.append({
@@ -143,7 +143,12 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
 
         if response.status_code == status.HTTP_201_CREATED:
             account = self.get_queryset().get(id=response.data['id'])
-            enrichment_responses = self._trigger_enrichments(account)
+            enrichment_responses = self._trigger_enrichments(
+                account, 
+                trigger_account_enrichment=True,
+                trigger_lead_enrichment=False,
+                trigger_custom_columns=False
+            )
             response.data['enrichment_responses'] = enrichment_responses
 
             logger.info(f"Triggered Account Enrichment successfully for Account: {account}.")
@@ -200,7 +205,12 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
                     id__in=[account.id for account in created_accounts]
                 ).select_related('product'))  # Refresh to get related data
 
-            enrichment_responses = self._trigger_enrichments(created_accounts)
+            enrichment_responses = self._trigger_enrichments(
+                created_accounts,
+                trigger_account_enrichment=True,
+                trigger_lead_enrichment=False,
+                trigger_custom_columns=False
+            )
 
             logger.info(f"Triggered Bulk Account Enrichments successfully for Accounts: {accounts_data}.")
 
@@ -214,6 +224,128 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'])
+    def bulk_trigger_enrichment(self, request):
+        """
+        Trigger specific enrichment types for multiple accounts
+        
+        Request body should include:
+        {
+            "account_ids": ["uuid1", "uuid2", ...],
+            "account_enrichment": true,
+            "lead_enrichment": true,
+            "custom_columns": true
+        }
+        """
+        account_ids = request.data.get('account_ids', [])
+        if not account_ids:
+            return Response(
+                {"error": "No account_ids provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Validate the enrichment flags
+        serializer = EnrichmentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the enrichment flags from the serializer
+        trigger_account = serializer.validated_data.get('account_enrichment', True)
+        trigger_lead = serializer.validated_data.get('lead_enrichment', False)
+        trigger_custom = serializer.validated_data.get('custom_columns', False)
+
+        if not (trigger_account or trigger_lead or trigger_custom):
+            return {
+                "message": "No enrichments to trigger",
+                "account_count": 0,
+                "enrichment_responses": []
+            }
+
+        # Get the accounts
+        accounts = self.get_queryset().filter(id__in=account_ids)
+        if not accounts:
+            return Response(
+                {"error": "No valid accounts found for the provided IDs"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Trigger the selected enrichments
+        try:
+            enrichment_responses = self._trigger_enrichments(
+                accounts,
+                trigger_account_enrichment=trigger_account,
+                trigger_lead_enrichment=trigger_lead,
+                trigger_custom_columns=trigger_custom
+            )
+            
+            response_data = {
+                "message": "Enrichment triggered successfully",
+                "account_count": len(accounts),
+                "enrichment_responses": enrichment_responses
+            }
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Failed to trigger enrichment for accounts with error: {e}")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            
+    @action(detail=True, methods=['post'])
+    def trigger_enrichment(self, request, pk=None):
+        """
+        Trigger specific enrichment types for an account
+        
+        Request body should include flags for which enrichments to trigger:
+        {
+            "account_enrichment": true,
+            "lead_enrichment": true,
+            "custom_columns": true
+        }
+        """
+        account = self.get_object()
+        
+        # Validate the enrichment flags
+        serializer = EnrichmentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the enrichment flags from the serializer
+        trigger_account = serializer.validated_data.get('account_enrichment', False)
+        trigger_lead = serializer.validated_data.get('lead_enrichment', False)
+        trigger_custom = serializer.validated_data.get('custom_columns', False)
+
+        if not (trigger_account or trigger_lead or trigger_custom):
+            return {
+                "message": "No enrichments to trigger",
+                "account_count": 0,
+                "enrichment_responses": []
+            }
+
+        # Trigger the selected enrichments
+        try:
+            enrichment_responses = self._trigger_enrichments(
+                account,
+                trigger_account_enrichment=trigger_account,
+                trigger_lead_enrichment=trigger_lead,
+                trigger_custom_columns=trigger_custom
+            )
+            
+            response_data = {
+                "message": "Enrichment triggered successfully",
+                "account_id": str(account.id),
+                "enrichment_responses": enrichment_responses
+            }
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Failed to trigger enrichment for account ID: {account.id} with error: {e}")
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
