@@ -214,6 +214,7 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const AccountNameColumnHeader = "Name";
   const AccountWebsiteColumnHeader = "Website";
+  const MAX_ACCOUNTS_PER_UPLOAD = 100;
 
   // CSV File is uploaded. Will validate contents during submit.
   const handleFileUpload = (file: File | null) => {
@@ -249,9 +250,9 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
         return;
       }
     }
-    if (data.length > 20) {
+    if (data.length > MAX_ACCOUNTS_PER_UPLOAD) {
       setErrorMessage(
-        `Error! More than 20 accounts uploaded, please retry with fewer accounts!`
+        `Error! More than ${MAX_ACCOUNTS_PER_UPLOAD} accounts uploaded, please retry with fewer accounts!`
       );
       return;
     }
@@ -272,12 +273,32 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
     createBulkAccountsRequest: CreateBulkAccountsRequest
   ) => {
     setLoading(true);
-    createBulkAccounts(authContext, createBulkAccountsRequest)
-      .then((createdAccounts) => onImported(createdAccounts))
-      .catch((error) =>
-        setErrorMessage(`Failed to Import Accounts: ${error.message}`)
-      )
-      .finally(() => setLoading(false));
+    // Uncomment once hacky fix is removed.
+    // createBulkAccounts(authContext, createBulkAccountsRequest)
+    //   .then((createdAccounts) => {
+    //     console.log("created accounts: ", createdAccounts);
+    //     onImported(createdAccounts);
+    //   })
+    //   .catch((error) =>
+    //     setErrorMessage(`Failed to Import Accounts: ${error.message}`)
+    //   )
+    //   .finally(() => setLoading(false));
+
+    // Fire and forget. Hacky way to ensure that we don't wait for API response.
+    createBulkAccounts(authContext, createBulkAccountsRequest);
+
+    // It usually takes server 2-3 seconds to write all uploaded accounts
+    // to the database. Wait and then force reload the app.
+    // TODO: this is the hacky way, please add server side fix in the future.
+    const WAIT_DURATION_SECONDS = 5000;
+    setTimeout(() => {
+      setLoading(false);
+      // Force reload the page.
+      window.location.reload();
+
+      // Won't reach this code but calling it prevent the error 'onImported' is declared but its value is never read.
+      onImported([]);
+    }, WAIT_DURATION_SECONDS);
   };
 
   // Handle user submitting CSV and production selection.
@@ -343,7 +364,10 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
           </p>
           <p>
             You can upload a maximum of{" "}
-            <span className="font-bold">20 accounts</span> at once.
+            <span className="font-bold">
+              {MAX_ACCOUNTS_PER_UPLOAD} accounts
+            </span>{" "}
+            at once.
           </p>
         </div>
 

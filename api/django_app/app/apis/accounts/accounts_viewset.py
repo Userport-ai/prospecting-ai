@@ -24,7 +24,7 @@ from rest_framework.serializers import Serializer, BooleanField
 
 logger = logging.getLogger(__name__)
 
-MAX_ACCOUNTS_PER_REQUEST = 20
+MAX_ACCOUNTS_PER_REQUEST = 100
 
 
 class EnrichmentSerializer(Serializer):
