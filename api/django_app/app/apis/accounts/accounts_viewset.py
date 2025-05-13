@@ -29,9 +29,9 @@ MAX_ACCOUNTS_PER_REQUEST = 100
 
 class EnrichmentSerializer(Serializer):
     """Serializer for enrichment flags"""
-    account_enrichment = BooleanField(default=True)
+    account_enrichment = BooleanField(default=False)
     lead_enrichment = BooleanField(default=False)
-    custom_columns = BooleanField(default=True)
+    custom_columns = BooleanField(default=False)
 
 
 class ClientControlledPagination(PageNumberPagination):
@@ -75,7 +75,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
         return [HasRole(allowed_roles=[UserRole.USER, UserRole.TENANT_ADMIN,
                                        UserRole.INTERNAL_ADMIN, UserRole.INTERNAL_CS])]
 
-    def _trigger_enrichments(self, accounts, trigger_account_enrichment=True, trigger_lead_enrichment=False, trigger_custom_columns=True) -> List[Dict[str, Any]]:
+    def _trigger_enrichments(self, accounts, trigger_account_enrichment=False, trigger_lead_enrichment=False, trigger_custom_columns=False) -> List[Dict[str, Any]]:
         """
         Helper method to trigger selected enrichments for accounts
         
@@ -255,7 +255,7 @@ class AccountsViewSet(TenantScopedViewSet, LeadGenerationMixin):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         # Get the enrichment flags from the serializer
-        trigger_account = serializer.validated_data.get('account_enrichment', True)
+        trigger_account = serializer.validated_data.get('account_enrichment', False)
         trigger_lead = serializer.validated_data.get('lead_enrichment', False)
         trigger_custom = serializer.validated_data.get('custom_columns', False)
 
