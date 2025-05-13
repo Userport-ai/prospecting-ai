@@ -94,14 +94,6 @@ const refinedSchema = baseSchema.refine(
   }
 );
 
-// --- Component Props ---
-interface CreateCustomColumnDialogProps extends DialogProps {
-  entityType: EntityType;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: (newColumn: CustomColumn) => Promise<void>; // Callback on successful creation
-}
-
 // --- Available Context Types (Adjust based on your actual backend options) ---
 const AVAILABLE_CONTEXT_TYPES = [
   { id: "company_profile", label: "Company Profile" },
@@ -120,45 +112,56 @@ const AVAILABLE_AI_MODELS = [
   "gpt-4o-mini",
 ];
 
+// --- Component Props ---
+interface CreateOrEditCustomColumnDialogProps extends DialogProps {
+  customColumn: CustomColumn | null; // Existing custom column value if edit mode else null in create mode.
+  entityType: EntityType;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (newColumn: CustomColumn) => Promise<void>; // Callback on successful creation
+}
+
 // --- The Component ---
-const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
-  entityType,
-  open,
-  onOpenChange,
-  onSuccess,
-}) => {
+const CreateOrEditCustomColumnDialog: React.FC<
+  CreateOrEditCustomColumnDialogProps
+> = ({ customColumn, entityType, open, onOpenChange, onSuccess }) => {
   const authContext = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  // Populate default values using existing custom column (edit mode) if it exists.
+  const defaultValues: CreateCustomColumnRequest = {
+    name: customColumn?.name ?? "",
+    question: customColumn?.question ?? "",
+    entity_type: customColumn?.entity_type ?? entityType,
+    response_type: customColumn?.response_type ?? "string",
+    response_config: customColumn?.response_config ?? { allowed_values: [] },
+    ai_config: customColumn?.ai_config ?? {
+      model: AVAILABLE_AI_MODELS[0],
+      temperature: 0.1,
+      use_internet: false,
+      unstructured_response: false,
+      use_linkedin_activity: false,
+    },
+    context_type: customColumn?.context_type ?? [AVAILABLE_CONTEXT_TYPES[0].id], // Default context
+    refresh_interval: customColumn?.refresh_interval ?? 24 * 7, // Default to weekly
+    is_active: customColumn?.is_active ?? true,
+  };
+
   const form = useForm<CreateCustomColumnRequest>({
     resolver: zodResolver(refinedSchema),
-    defaultValues: {
-      name: "",
-      question: "",
-      entity_type: entityType,
-      response_type: "string",
-      response_config: { allowed_values: [] },
-      ai_config: {
-        model: AVAILABLE_AI_MODELS[0],
-        temperature: 0.1,
-        use_internet: false,
-        unstructured_response: false,
-        use_linkedin_activity: false,
-      },
-      context_type: [AVAILABLE_CONTEXT_TYPES[0].id], // Default context
-      refresh_interval: 24 * 7, // Default to weekly
-      is_active: true,
-    },
+    defaultValues: defaultValues,
   });
 
-  // Reset form when dialog closes
+  // Reset form when dialog opens or closes or custom column value changes.
   React.useEffect(() => {
-    if (!open) {
+    if (open) {
+      form.reset(defaultValues);
+    } else {
       form.reset();
-      setApiError(null);
     }
-  }, [open, form]);
+    setApiError(null);
+  }, [open, customColumn, form]);
 
   const onSubmit = async (data: CreateCustomColumnRequest) => {
     setLoading(true);
@@ -373,4 +376,4 @@ const CreateCustomColumnDialog: React.FC<CreateCustomColumnDialogProps> = ({
   );
 };
 
-export default CreateCustomColumnDialog;
+export default CreateOrEditCustomColumnDialog;

@@ -20,7 +20,7 @@ import EnumFilterV2 from "@/table/EnumFilterV2";
 import { Button } from "@/components/ui/button";
 import { Cpu, Download, Loader2 } from "lucide-react";
 import { exportToCSV } from "@/common/utils";
-import CreateCustomColumnDialog, {
+import CreateOrEditCustomColumnDialog, {
   EntityType,
 } from "@/components/custom-columns/CustomColumnDialog";
 import { CustomColumn } from "@/services/CustomColumn";
@@ -219,7 +219,8 @@ export const Table: React.FC<TableProps> = ({
           <Cpu size={16} /> Ask AI
         </Button>
 
-        <CreateCustomColumnDialog
+        <CreateOrEditCustomColumnDialog
+          customColumn={null}
           entityType={EntityType.LEAD}
           open={isCreateColumnDialogOpen}
           onOpenChange={onCreateColumnOpenChange}
