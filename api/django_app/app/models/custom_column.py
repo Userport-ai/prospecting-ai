@@ -36,7 +36,14 @@ class CustomColumn(BaseMixin):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = [['tenant', 'entity_type', 'name']]
+        # Add conditional unique constraint that only applies to non-deleted rows
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'entity_type', 'name'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='unique_active_custom_column'
+            )
+        ]
         indexes = [
             models.Index(fields=['tenant']),
             models.Index(fields=['entity_type']),

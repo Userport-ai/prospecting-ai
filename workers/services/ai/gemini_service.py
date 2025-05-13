@@ -317,10 +317,14 @@ class GeminiService(AIService):
             response_text = response.text
 
             # Process grounding metadata to extract sources and their relationships to response segments
-            sources, segment_source_mapping, source_segments = self._process_grounding_metadata(
-                response.candidates[0].grounding_metadata,
-                response_text
-            )
+            try:
+                sources, segment_source_mapping, source_segments = self._process_grounding_metadata(
+                    response.candidates[0].grounding_metadata,
+                    response_text
+                )
+            except Exception as e:
+                logger.warning(f"Error processing grounding metadata: {str(e)}")
+                sources, segment_source_mapping, source_segments = [], {}, {}
 
             # Estimate token usage with search multiplier
             multiplier = 1.0
@@ -380,66 +384,65 @@ class GeminiService(AIService):
         segment_source_mapping = {}  # Maps segments of text to source indices
         source_segments = {}  # Maps source indices to segments they support
 
-        # Extract web search queries if available
-        search_queries = getattr(grounding_metadata, 'web_search_queries', []) or []
-
         # Process grounding chunks (the actual sources)
         grounding_chunks = getattr(grounding_metadata, 'grounding_chunks', [])
-        for idx, chunk in enumerate(grounding_chunks):
-            # Extract web information if available
-            if hasattr(chunk, 'web') and chunk.web:
-                source = {
-                    'id': idx,
-                    'type': 'web',
-                    'title': getattr(chunk.web, 'title', f"Source {idx}"),
-                    'domain': getattr(chunk.web, 'domain', None),
-                    'uri': getattr(chunk.web, 'uri', None),
-                }
+        if grounding_chunks:
+            for idx, chunk in enumerate(grounding_chunks):
+                # Extract web information if available
+                if hasattr(chunk, 'web') and chunk.web:
+                    source = {
+                        'id': idx,
+                        'type': 'web',
+                        'title': getattr(chunk.web, 'title', f"Source {idx}"),
+                        'domain': getattr(chunk.web, 'domain', None),
+                        'uri': getattr(chunk.web, 'uri', None),
+                    }
 
-                # Create markdown representation for this source
-                markdown = self._create_source_markdown(
-                    idx,
-                    source['title'],
-                    source['uri'],
-                    None,  # No snippet available directly in chunk
-                    None   # No publish date available
-                )
-                source['markdown'] = markdown
+                    # Create markdown representation for this source
+                    markdown = self._create_source_markdown(
+                        idx,
+                        source['title'],
+                        source['uri'],
+                        None,  # No snippet available directly in chunk
+                        None   # No publish date available
+                    )
+                    source['markdown'] = markdown
 
-                sources.append(source)
-                source_segments[idx] = []  # Initialize empty list for segments
+                    sources.append(source)
+                    source_segments[idx] = []  # Initialize empty list for segments
 
         # Process grounding supports (connections between text segments and sources)
         grounding_supports = getattr(grounding_metadata, 'grounding_supports', [])
-        for support_idx, support in enumerate(grounding_supports):
-            if (hasattr(support, 'segment') and support.segment and
-                    hasattr(support, 'grounding_chunk_indices')):
+        if grounding_supports:
+            for support_idx, support in enumerate(grounding_supports):
+                if (hasattr(support, 'segment') and support.segment and
+                        hasattr(support, 'grounding_chunk_indices')):
 
-                segment_text = getattr(support.segment, 'text', '')
-                start_index = getattr(support.segment, 'start_index', None)
-                end_index = getattr(support.segment, 'end_index', None)
+                    segment_text = getattr(support.segment, 'text', '')
+                    start_index = getattr(support.segment, 'start_index', None)
+                    end_index = getattr(support.segment, 'end_index', None)
 
-                # Create segment identifier
-                segment_id = f"segment_{support_idx}"
+                    # Create segment identifier
+                    segment_id = f"segment_{support_idx}"
 
-                # Map segment to sources
-                chunk_indices = support.grounding_chunk_indices
-                segment_source_mapping[segment_id] = {
-                    'text': segment_text,
-                    'start_index': start_index,
-                    'end_index': end_index,
-                    'source_indices': chunk_indices
-                }
+                    # Map segment to sources
+                    chunk_indices = support.grounding_chunk_indices
+                    segment_source_mapping[segment_id] = {
+                        'text': segment_text,
+                        'start_index': start_index,
+                        'end_index': end_index,
+                        'source_indices': chunk_indices
+                    }
 
-                # Add segment to each source's supported segments
-                for chunk_idx in chunk_indices:
-                    if chunk_idx in source_segments:
-                        source_segments[chunk_idx].append({
-                            'segment_id': segment_id,
-                            'text': segment_text,
-                            'start_index': start_index,
-                            'end_index': end_index
-                        })
+                    # Add segment to each source's supported segments
+                    for chunk_idx in chunk_indices:
+                        if chunk_idx in source_segments:
+                            source_segments[chunk_idx].append({
+                                'segment_id': segment_id,
+                                'text': segment_text,
+                                'start_index': start_index,
+                                'end_index': end_index
+                            })
 
         # Add search entry point links if available
         if (hasattr(grounding_metadata, 'search_entry_point') and
