@@ -514,6 +514,9 @@ def trigger_custom_column_generation(
     if not entity_ids:
         logger.error("No entity IDs provided for custom column generation")
         return [{"error": "No entity IDs provided"}]
+    
+    # Ensure all entity_ids are strings to avoid UUID serialization issues
+    entity_ids = [str(entity_id) for entity_id in entity_ids]
 
     # If column_id is provided, get just that column
     if column_id:

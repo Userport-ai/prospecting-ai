@@ -11,7 +11,7 @@ import urllib.parse
 import logging
 
 from app.utils.retry_utils import with_retry
-from app.utils.serialization_utils import convert_datetimes_to_isoformat
+from app.utils.serialization_utils import serialize_custom_types
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +214,7 @@ class WorkerService:
             "Content-Type": "application/json"
         }
 
-        processed_payload = convert_datetimes_to_isoformat(payload)
+        processed_payload = serialize_custom_types(payload)
 
         # Make request to worker service
         response = requests.post(

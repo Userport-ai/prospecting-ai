@@ -96,25 +96,31 @@ def get_custom_column_values(obj):
     return result
 
 
-def convert_datetimes_to_isoformat(data: Any) -> Any:
+def serialize_custom_types(data: Any) -> Any:
     """
-    Recursively converts all datetime objects to ISO format strings.
+    Recursively converts objects that are not JSON-serializable to appropriate format.
+    Currently handles:
+    - datetime objects to ISO format strings
+    - UUID objects to strings
 
     Args:
-        data: Any data structure that might contain datetime objects
+        data: Any data structure that might contain non-serializable objects
 
     Returns:
-        The same data structure with datetime objects converted to strings
+        The same data structure with objects converted to JSON-serializable types
     """
     import datetime
+    import uuid
 
     if isinstance(data, datetime.datetime):
         return data.isoformat()
+    elif isinstance(data, uuid.UUID):
+        return str(data)
     elif isinstance(data, dict):
-        return {k: convert_datetimes_to_isoformat(v) for k, v in data.items()}
+        return {k: serialize_custom_types(v) for k, v in data.items()}
     elif isinstance(data, list):
-        return [convert_datetimes_to_isoformat(item) for item in data]
+        return [serialize_custom_types(item) for item in data]
     elif isinstance(data, tuple):
-        return tuple(convert_datetimes_to_isoformat(item) for item in data)
+        return tuple(serialize_custom_types(item) for item in data)
     else:
         return data
