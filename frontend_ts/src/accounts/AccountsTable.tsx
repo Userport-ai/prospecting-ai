@@ -8,7 +8,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CustomColumn } from "@/services/CustomColumn";
+import { CustomColumn, getCustomColumn } from "@/services/CustomColumn";
 import { Button } from "@/components/ui/button";
 import AddAccounts from "./AddAccounts";
 import CommonTable from "@/table/CommonTable";
@@ -319,7 +319,13 @@ export default function AccountsTable() {
 
       setTotalAccountsCount(response.count);
       setCurAccounts(response.results);
-      setColumns(getAccountColumns(response.results, refreshTableData));
+      setColumns(
+        getAccountColumns(
+          response.results,
+          refreshTableData,
+          onCustomColumnEditRequest
+        )
+      );
       setCurPageNum(pageNum);
 
       return response;
@@ -401,7 +407,13 @@ export default function AccountsTable() {
 
       // Also update the columns to ensure any custom column data is refreshed
       // But maintain the current page and state
-      setColumns(getAccountColumns(updatedAccounts, refreshTableData));
+      setColumns(
+        getAccountColumns(
+          updatedAccounts,
+          refreshTableData,
+          onCustomColumnEditRequest
+        )
+      );
     } catch (error) {
       console.error("Error updating polled accounts:", error);
     } finally {
@@ -426,6 +438,11 @@ export default function AccountsTable() {
         )
       );
     }
+  };
+
+  // Handler for when a custom column edit is requested by the user.
+  const onCustomColumnEditRequest = (customColumn: CustomColumn) => {
+    console.log("got custom column from backend: ", customColumn);
   };
 
   if (loading) {

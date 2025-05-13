@@ -2,6 +2,8 @@
 import { AuthContext } from "@/auth/AuthProvider";
 import { apiCall } from "./Api";
 
+const BASE_ENDPOINT = "/custom_columns/";
+
 // Interface matching the structure needed for the POST request
 export interface CreateCustomColumnRequest {
   name: string;
@@ -31,7 +33,6 @@ export interface CreateCustomColumnRequest {
 // Interface representing the created custom column (adjust based on actual API response)
 export interface CustomColumn extends CreateCustomColumnRequest {
   id: string; // UUID assigned by backend
-  tenant_id: string;
   created_by: string;
   created_at: string; // ISO Date string
   updated_at: string; // ISO Date string
@@ -77,9 +78,19 @@ export const createCustomColumn = async (
       delete payload.refresh_interval;
     if (payload.is_active === undefined) delete payload.is_active; // Keep default handling if undefined
 
-    const response = await apiClient.post<CustomColumn>(
-      "/custom_columns/",
-      payload
+    const response = await apiClient.post<CustomColumn>(BASE_ENDPOINT, payload);
+    return response.data;
+  });
+};
+
+// Get Custom Column with given ID.
+export const getCustomColumn = async (
+  authContext: AuthContext,
+  columnId: string
+): Promise<CustomColumn> => {
+  return await apiCall<CustomColumn>(authContext, async (apiClient) => {
+    const response = await apiClient.get<CustomColumn>(
+      `${BASE_ENDPOINT}${columnId}/`
     );
     return response.data;
   });
@@ -113,7 +124,7 @@ export const generateCustomColumnValues = async (
 
       try {
         const response = await apiClient.post<GenerateValuesResponse>(
-          `/custom_columns/${columnId}/generate_values/`,
+          `${BASE_ENDPOINT}${columnId}/generate_values/`,
           { entity_ids: entityIds }
         );
         return response.data;

@@ -1,6 +1,10 @@
 // Import CustomColumnValueData directly from its source
-import { CustomColumnValueData } from "@/services/CustomColumn";
-import { ChevronsUpDown, Link } from "lucide-react";
+import {
+  CustomColumn,
+  CustomColumnValueData,
+  getCustomColumn,
+} from "@/services/CustomColumn";
+import { ChevronsUpDown, Link, Loader2, Pencil } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import SortingDropdown from "../table/SortingDropdown";
 import { ColumnDef, Table } from "@tanstack/react-table";
@@ -15,6 +19,48 @@ import { wrapColumnContentClass } from "@/common/utils";
 import EnrichmentStatusView from "./EnrichmentStatusView";
 import RecentCompanyEventsView from "./RecentCompanyEventsView";
 import CustomColumnValueRender from "@/table/CustomColumnValueRender";
+import { useAuthContext } from "@/auth/AuthProvider";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+
+const EditCustomColumnBtn: React.FC<{
+  columnId: string;
+  onCustomColumnFetch: (customColumn: CustomColumn) => void;
+}> = ({ columnId, onCustomColumnFetch }) => {
+  const authContext = useAuthContext();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      const customColumn = await getCustomColumn(authContext, columnId);
+      onCustomColumnFetch(customColumn);
+    } catch (error) {
+      console.error(
+        `Failed to fetch custom column with ID: ${columnId} lead generation with error: ${error}`
+      );
+      // Show toast.
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Could not Edit Ask AI column, please contact support!",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return loading ? (
+    <Loader2 className="h-4 w-4 mr-2 animate-spin text-purple-400" />
+  ) : (
+    <Pencil
+      className="hover:cursor-pointer hover:text-yellow-300"
+      onClick={handleClick}
+      size={16}
+    />
+  );
+};
 
 // Base Account Columns that we know will exist in the table and are statically defined.
 const getBaseAccountColumns = (
@@ -420,7 +466,8 @@ const secondaryAccountColumns: ColumnDef<AccountRow>[] = [
 
 export const getAccountColumns = (
   rows: AccountRow[],
-  onRefreshTable?: () => void
+  onRefreshTable: () => void,
+  onCustomColumnEditRequest: (customColumn: CustomColumn) => void
 ): ColumnDef<AccountRow>[] => {
   const finalColumns: ColumnDef<AccountRow>[] = [
     ...getBaseAccountColumns(onRefreshTable),
@@ -482,24 +529,32 @@ export const getAccountColumns = (
       id: columnId, // Use the UUID as the column ID
       header: ({ column }) => {
         return (
-          <div className="flex justify-between items-center gap-2 mr-2">
+          <div className="flex w-full justify-between items-center">
             {colData.name}
-            {/* Only make Score custom column sortable */}
-            {columnNameIncludesFit(colData) && (
-              <SortingDropdown
-                onSelect={(val) => {
-                  if (val === "asc") {
-                    column.toggleSorting(false);
-                  } else if (val === "desc") {
-                    column.toggleSorting(true);
-                  } else if (val === "none") {
-                    column.clearSorting();
-                  }
-                }}
-              >
-                <ChevronsUpDown size={18} />
-              </SortingDropdown>
-            )}
+            <div className="flex gap-2">
+              {/* Only make Score custom column sortable */}
+              {columnNameIncludesFit(colData) && (
+                <SortingDropdown
+                  onSelect={(val) => {
+                    if (val === "asc") {
+                      column.toggleSorting(false);
+                    } else if (val === "desc") {
+                      column.toggleSorting(true);
+                    } else if (val === "none") {
+                      column.clearSorting();
+                    }
+                  }}
+                >
+                  <ChevronsUpDown size={18} />
+                </SortingDropdown>
+              )}
+
+              {/* Button to edit the custom column. */}
+              <EditCustomColumnBtn
+                columnId={columnId}
+                onCustomColumnFetch={onCustomColumnEditRequest}
+              />
+            </div>
           </div>
         );
       },
