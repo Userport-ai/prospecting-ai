@@ -17,137 +17,144 @@ import RecentCompanyEventsView from "./RecentCompanyEventsView";
 import CustomColumnValueRender from "@/table/CustomColumnValueRender";
 
 // Base Account Columns that we know will exist in the table and are statically defined.
-const baseAccountColumns: ColumnDef<AccountRow>[] = [
-  {
-    // Allows user to select rows from the table.
-    id: "select",
-    maxSize: 50,
-    header: ({ table }: { table: Table<AccountRow> }) => (
-      <Checkbox
-        className="bg-white data-[state=checked]:bg-purple-400"
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: (info) => (
-      <Checkbox
-        className="data-[state=checked]:bg-purple-400"
-        checked={info.row.getIsSelected()}
-        onCheckedChange={(value) => info.row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
-    size: 50,
-    enableSorting: false,
-    enableHiding: false,
-    meta: {
-      displayName: "",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
-    id: "name",
-    accessorFn: (row) => row.name,
-    accessorKey: "name",
-    minSize: 80,
-    header: ({ column }) => {
-      return (
-        <div className="flex justify-between items-center gap-2 mr-2">
-          Name
-          <SortingDropdown
-            onSelect={(val) => {
-              if (val === "asc") {
-                column.toggleSorting(false);
-              } else if (val === "desc") {
-                column.toggleSorting(true);
-              } else if (val === "none") {
-                column.clearSorting();
-              }
-            }}
-          >
-            <ChevronsUpDown size={18} />
-          </SortingDropdown>
-        </div>
-      );
-    },
-    cell: (info) => {
-      const name = info.getValue() as string | null;
-      if (!name) {
-        return null;
-      }
-      return <p className={wrapColumnContentClass}>{name}</p>;
-    },
-    meta: {
-      displayName: "Name",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
-    id: "enrichment_status",
-    accessorFn: (row) => row.enrichment_status,
-    header: "Enrichment Status",
-    minSize: 200,
-    cell: (info) => {
-      const enrichmentStatus = info.getValue() as EnrichmentStatus | null;
-      if (!enrichmentStatus) {
-        return null;
-      }
-
-      return (
-        <EnrichmentStatusView
-          accountId={info.row.original.id}
-          enrichmentStatus={enrichmentStatus}
+const getBaseAccountColumns = (
+  onRefreshTable?: () => void
+): ColumnDef<AccountRow>[] => {
+  return [
+    {
+      // Allows user to select rows from the table.
+      id: "select",
+      maxSize: 50,
+      header: ({ table }: { table: Table<AccountRow> }) => (
+        <Checkbox
+          className="bg-white data-[state=checked]:bg-purple-400"
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
         />
-      );
+      ),
+      cell: (info) => (
+        <Checkbox
+          className="data-[state=checked]:bg-purple-400"
+          checked={info.row.getIsSelected()}
+          onCheckedChange={(value) => info.row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      size: 50,
+      enableSorting: false,
+      enableHiding: false,
+      meta: {
+        displayName: "",
+        visibleInitially: true,
+      } as CustomColumnMeta,
     },
-    // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
-    filterFn: "arrIncludesSome",
-    meta: {
-      displayName: "Enrichment Status",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
-    id: "employee_count",
-    accessorFn: (row) => row.employee_count,
-    header: "Employee Count",
-    minSize: 100,
-    maxSize: 100,
-    cell: (info) => {
-      const count = info.getValue() as number | null;
-      if (!count) {
-        return null;
-      }
-      return <p className={wrapColumnContentClass}>{count}</p>;
+    {
+      id: "name",
+      accessorFn: (row) => row.name,
+      accessorKey: "name",
+      minSize: 80,
+      header: ({ column }) => {
+        return (
+          <div className="flex justify-between items-center gap-2 mr-2">
+            Name
+            <SortingDropdown
+              onSelect={(val) => {
+                if (val === "asc") {
+                  column.toggleSorting(false);
+                } else if (val === "desc") {
+                  column.toggleSorting(true);
+                } else if (val === "none") {
+                  column.clearSorting();
+                }
+              }}
+            >
+              <ChevronsUpDown size={18} />
+            </SortingDropdown>
+          </div>
+        );
+      },
+      cell: (info) => {
+        const name = info.getValue() as string | null;
+        if (!name) {
+          return null;
+        }
+        return <p className={wrapColumnContentClass}>{name}</p>;
+      },
+      meta: {
+        displayName: "Name",
+        visibleInitially: true,
+      } as CustomColumnMeta,
     },
-    meta: {
-      displayName: "Employee Count",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-  {
-    id: "location",
-    accessorFn: (row) => row.location,
-    header: "HQ",
-    minSize: 100,
-    maxSize: 100,
-    cell: (info) => {
-      const hq = info.getValue() as string | null;
-      if (!hq) {
-        return null;
-      }
-      return <p className="whitespace-normal break-words">{hq}</p>;
+    {
+      id: "enrichment_status",
+      accessorFn: (row) => row.enrichment_status,
+      header: "Enrichment Status",
+      minSize: 200,
+      cell: (info) => {
+        const enrichmentStatus = info.getValue() as EnrichmentStatus | null;
+        if (!enrichmentStatus) {
+          return null;
+        }
+
+        return (
+          <EnrichmentStatusView
+            accountId={info.row.original.id}
+            enrichmentStatus={enrichmentStatus}
+            onLeadGenTriggered={() => {
+              if (onRefreshTable) onRefreshTable();
+            }}
+          />
+        );
+      },
+      // Reference: https://tanstack.com/table/v8/docs/guide/column-filtering.
+      filterFn: "arrIncludesSome",
+      meta: {
+        displayName: "Enrichment Status",
+        visibleInitially: true,
+      } as CustomColumnMeta,
     },
-    meta: {
-      displayName: "HQ",
-      visibleInitially: true,
-    } as CustomColumnMeta,
-  },
-];
+    {
+      id: "employee_count",
+      accessorFn: (row) => row.employee_count,
+      header: "Employee Count",
+      minSize: 100,
+      maxSize: 100,
+      cell: (info) => {
+        const count = info.getValue() as number | null;
+        if (!count) {
+          return null;
+        }
+        return <p className={wrapColumnContentClass}>{count}</p>;
+      },
+      meta: {
+        displayName: "Employee Count",
+        visibleInitially: true,
+      } as CustomColumnMeta,
+    },
+    {
+      id: "location",
+      accessorFn: (row) => row.location,
+      header: "HQ",
+      minSize: 100,
+      maxSize: 100,
+      cell: (info) => {
+        const hq = info.getValue() as string | null;
+        if (!hq) {
+          return null;
+        }
+        return <p className="whitespace-normal break-words">{hq}</p>;
+      },
+      meta: {
+        displayName: "HQ",
+        visibleInitially: true,
+      } as CustomColumnMeta,
+    },
+  ];
+};
 
 // Secondary Account columns we know will exist in the table but we want them to be at the end
 // relative to custom columns.
@@ -415,7 +422,9 @@ export const getAccountColumns = (
   rows: AccountRow[],
   onRefreshTable?: () => void
 ): ColumnDef<AccountRow>[] => {
-  const finalColumns: ColumnDef<AccountRow>[] = [...baseAccountColumns];
+  const finalColumns: ColumnDef<AccountRow>[] = [
+    ...getBaseAccountColumns(onRefreshTable),
+  ];
 
   // Get unique custom column definitions from the rows provided
   var customColumnDefinitions = new Map<string, CustomColumnValueData>();

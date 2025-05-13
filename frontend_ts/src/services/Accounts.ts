@@ -236,3 +236,28 @@ export const createBulkAccounts = async (
     return response.data.accounts;
   });
 };
+
+interface TriggerGenerationResponse {
+  message: string;
+  account_id: string;
+  enrichment_responses: Record<string, any>[];
+}
+
+// Trigger lead generation for given Account.
+export const triggerLeadGeneration = async (
+  authContext: AuthContext,
+  accountId: string
+): Promise<TriggerGenerationResponse> => {
+  const endpoint = `${ACCOUNTS_ENDPOINT}${accountId}/trigger_enrichment/`;
+  const request = { lead_enrichment: true };
+  return await apiCall<TriggerGenerationResponse>(
+    authContext,
+    async (apiClient) => {
+      const response = await apiClient.post<TriggerGenerationResponse>(
+        endpoint,
+        request
+      );
+      return response.data;
+    }
+  );
+};

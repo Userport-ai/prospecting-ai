@@ -1,6 +1,7 @@
 import AppLayout from "./AppLayout";
 import { useAuthContext } from "./auth/AuthProvider";
 import { Navigate } from "react-router";
+import { Toaster } from "./components/ui/toaster";
 
 function App() {
   const { firebaseUser } = useAuthContext();
@@ -10,8 +11,9 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col font-inter">
+    <div className="flex flex-col font-sans">
       <AppLayout />
+      <Toaster />
     </div>
   );
 }

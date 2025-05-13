@@ -1,12 +1,63 @@
+import { useAuthContext } from "@/auth/AuthProvider";
 import { formatDate } from "@/common/utils";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import { triggerLeadGeneration } from "@/services/Accounts";
 import {
   EnrichmentStatus,
   EnrichmentStatusDetail,
   EnrichmentStatusEnum,
   EnrichmentType,
 } from "@/services/Common";
+import { Loader2, PlayCircle } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
+
+const GenerateLeadsButton: React.FC<{
+  accountId: string;
+  onLeadGenTriggered: () => void;
+}> = ({ accountId, onLeadGenTriggered }) => {
+  const authContext = useAuthContext();
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const onClick = async () => {
+    setLoading(true);
+    try {
+      await triggerLeadGeneration(authContext, accountId);
+
+      // Callback to refresh accounts table.
+      // We don't set loading to false again, will let the
+      // accounts table refresh update the UI to show lead gen progress.
+      onLeadGenTriggered();
+    } catch (error) {
+      console.error("Failed to trigger lead generation with error: ", error);
+      // Show toast.
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description:
+          "Could not trigger lead generation, please contact support!",
+      });
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-row gap-2">
+      <p className="min-w-[5rem] text-sm text-gray-700 ">Leads:</p>
+      {loading ? (
+        <Loader2 className="h-4 w-4 mr-2 animate-spin text-purple-400" />
+      ) : (
+        <PlayCircle
+          className="text-purple-400 hover:cursor-pointer"
+          size={18}
+          onClick={onClick}
+        />
+      )}
+    </div>
+  );
+};
 
 const CompletedStatusView: React.FC<{
   accountId: string;
@@ -93,7 +144,8 @@ const EnrichmentDetailView: React.FC<EnrichmentDetailViewProps> = ({
 const EnrichmentStatusView: React.FC<{
   accountId: string;
   enrichmentStatus: EnrichmentStatus;
-}> = ({ accountId, enrichmentStatus }) => {
+  onLeadGenTriggered: () => void; // Callback once lead generation is successfully triggered.
+}> = ({ accountId, enrichmentStatus, onLeadGenTriggered }) => {
   if (!enrichmentStatus.statuses) {
     // Enrichment is scheduled.
     return <ScheduledStatusView />;
@@ -109,8 +161,14 @@ const EnrichmentStatusView: React.FC<{
   const enrichmentsInProgress =
     enrichmentStatus.in_progress > 0 || enrichmentStatus.pending > 0;
 
+  // Check if lead enrichment is missing.
+  const isLeadEnrichmentMissing =
+    enrichmentStatus.statuses.find(
+      (detail) => detail.enrichment_type === EnrichmentType.GENERATE_LEADS
+    ) === undefined;
+
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-2">
       {enrichmentStatuses.map((detail) => {
         return (
           <EnrichmentDetailView
@@ -120,6 +178,12 @@ const EnrichmentStatusView: React.FC<{
           />
         );
       })}
+      {isLeadEnrichmentMissing && (
+        <GenerateLeadsButton
+          accountId={accountId}
+          onLeadGenTriggered={onLeadGenTriggered}
+        />
+      )}
       {enrichmentsInProgress && (
         <div className="flex flex-col text-xs text-gray-600">
           <p>Last Updated:</p>
