@@ -295,6 +295,9 @@ const ImportCSV: React.FC<ImportCSVProps> = ({
       setLoading(false);
       // Force reload the page.
       window.location.reload();
+
+      // Won't reach this code but calling it prevent the error 'onImported' is declared but its value is never read.
+      onImported([]);
     }, WAIT_DURATION_SECONDS);
   };
 
