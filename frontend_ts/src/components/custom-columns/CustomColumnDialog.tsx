@@ -1,5 +1,5 @@
 // src/components/custom-columns/CreateCustomColumnDialog.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { DialogProps } from "@radix-ui/react-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,6 +36,7 @@ import {
   CreateCustomColumnRequest,
   createCustomColumn,
   CustomColumn,
+  updateCustomColumn,
 } from "@/services/CustomColumn";
 import { useAuthContext } from "@/auth/AuthProvider"; // Adjust path
 import ResponseConfigInput from "./ResponseConfigInput";
@@ -153,8 +154,11 @@ const CreateOrEditCustomColumnDialog: React.FC<
     defaultValues: defaultValues,
   });
 
+  const submitBtnName =
+    customColumn === null ? "Create Column" : "Update Column";
+
   // Reset form when dialog opens or closes or custom column value changes.
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
       form.reset(defaultValues);
     } else {
@@ -168,7 +172,20 @@ const CreateOrEditCustomColumnDialog: React.FC<
     setApiError(null);
 
     try {
-      const newColumn = await createCustomColumn(authContext, data);
+      var newColumn: CustomColumn;
+      if (customColumn === null) {
+        newColumn = await createCustomColumn(authContext, data);
+      } else {
+        // Hack: Manual deletion of response_config key so that we don't run into
+        // 400 validation error on the backend: {"response_config":["String response requires max_length as integer"]}.
+        // TODO: fix on backend and then remove this code.
+        delete data.response_config;
+        newColumn = await updateCustomColumn(
+          authContext,
+          customColumn.id,
+          data
+        );
+      }
       await onSuccess(newColumn);
       if (onOpenChange) onOpenChange(false); // Close dialog on success
     } catch (error: any) {
@@ -365,7 +382,7 @@ const CreateOrEditCustomColumnDialog: React.FC<
                     Loading...
                   </>
                 ) : (
-                  "Create Column"
+                  submitBtnName
                 )}
               </Button>
             </DialogFooter>

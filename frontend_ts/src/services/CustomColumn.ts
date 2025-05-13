@@ -96,6 +96,22 @@ export const getCustomColumn = async (
   });
 };
 
+// Update given Custom Column with new data.
+export const updateCustomColumn = async (
+  authContext: AuthContext,
+  columnId: string,
+  updatedColumnData: CreateCustomColumnRequest
+): Promise<CustomColumn> => {
+  const endpoint = `${BASE_ENDPOINT}${columnId}/`;
+  return await apiCall<CustomColumn>(authContext, async (apiClient) => {
+    const response = await apiClient.patch<CustomColumn>(
+      endpoint,
+      updatedColumnData
+    );
+    return response.data;
+  });
+};
+
 // Function to trigger the generation of custom column values
 export const generateCustomColumnValues = async (
   authContext: AuthContext,
