@@ -66,7 +66,7 @@ class CustomColumnValidator:
         
         Follow this validation process:
         1. First, identify 2-3 specific claims in the answer that are critical to validate. Make sure the claims are critical for the answer to be factually correct in response to the question asked.
-        2. For each claim, formulate a precise search query
+        2. For each claim, formulate a precise search query. Verify all the data with web search including any information provided as part of context in the query.
         3. Execute the search and analyze the results
         4. Perform more searches **only if needed**.
         5. Assimilate and compare the search results to the original claim - is it confirmed, contradicted, or inconclusive?
@@ -89,7 +89,8 @@ class CustomColumnValidator:
           "is_validated": true or false, // is_validated: true if the answer is validated and proved to be correct by your research, false if the answer is incorrect and needs to be corrected
           "confidence": 0.8, // confidence of your assessment
           "validation_notes": "Your reasoning here",
-          "corrected_answer": "Corrected version if needed, or null"
+          "corrected_answer": "Corrected version if needed, or null",
+          "sources": ["[sources](in markdown format)"] // list of URL sources used for validation. do not refer to context here
         }}
         ```
         
@@ -257,6 +258,7 @@ class CustomColumnValidator:
             updated_result.confidence_score = max(0.1, (entity_result.confidence_score or 0.5) - 0.2)
 
         corrected_answer = validation_result.get("corrected_answer")
+        sources = validation_result.get("sources", [])
         if corrected_answer:
             if response_type == "string":
                 updated_result.value_string = corrected_answer
@@ -273,6 +275,7 @@ class CustomColumnValidator:
         if validation_notes:
             existing_rationale = updated_result.rationale or ""
             updated_result.rationale = f"**Validation:** {validation_notes}\n\n{existing_rationale}"
+            updated_result.rationale = f"{updated_result.rationale}\n" + "\n".join(sources)
 
         if not updated_result.error_details:
             updated_result.error_details = {}
