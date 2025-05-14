@@ -7,8 +7,9 @@ import { Lead as LeadRow } from "@/services/Leads";
 import { formatDate } from "@/common/utils";
 import { getCustomColumnDisplayName } from "@/table/AddCustomColumn";
 import CellListView from "@/table/CellListView";
-import { CustomColumnValueData } from "@/services/CustomColumn";
+import { CustomColumn, CustomColumnValueData } from "@/services/CustomColumn";
 import CustomColumnValueRender from "@/table/CustomColumnValueRender";
+import EditCustomColumnBtn from "@/table/EditCustomColumnBtn";
 
 // Base Lead Columns that we know will exist in the table and are statically defined.
 export const baseLeadColumns: ColumnDef<LeadRow>[] = [
@@ -167,7 +168,8 @@ export const baseLeadColumns: ColumnDef<LeadRow>[] = [
 // information from the given Lead Rows.
 export const getLeadColumns = (
   rows: LeadRow[],
-  onRefreshTable?: () => void
+  onRefreshTable: () => void,
+  onCustomColumnEditRequest: (customColumn: CustomColumn) => void
 ): ColumnDef<LeadRow>[] => {
   // Get custom columns from all the rows in table.
   var customFieldKeys = new Set<string>();
@@ -307,7 +309,20 @@ export const getLeadColumns = (
   customColumnDefinitions.forEach((colData, columnId) => {
     finalColumns.push({
       id: columnId, // Use the UUID as the column ID
-      header: colData.name, // Use the name from the custom column data
+      // header: colData.name, // Use the name from the custom column data
+      header: () => {
+        return (
+          <div className="flex w-full justify-between items-center">
+            {colData.name}
+
+            {/* Button to edit the custom column. */}
+            <EditCustomColumnBtn
+              columnId={columnId}
+              onCustomColumnFetch={onCustomColumnEditRequest}
+            />
+          </div>
+        );
+      },
       accessorFn: (row) => row.custom_column_values?.[columnId]?.value ?? null, // Access the specific value
       cell: (info) => {
         const columnId = info.column.id;

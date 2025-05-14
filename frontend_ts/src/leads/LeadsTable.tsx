@@ -62,9 +62,10 @@ interface TableProps {
   allPersonaFilterValues: string[];
   personaFilterValues: string[];
   onPersonaFilterValuesChange: (newPersonaFilterValues: string[]) => void;
-  isCreateColumnDialogOpen: boolean;
-  onCreateColumnOpenChange: (open: boolean) => void;
+  customColumnDialogOpen: boolean;
+  onCustomColumnDialogOpenChange: (open: boolean) => void;
   onColumnCreated: (newColumn: CustomColumn) => Promise<void>;
+  editCustomColumn: CustomColumn | null;
 }
 
 export const Table: React.FC<TableProps> = ({
@@ -79,9 +80,10 @@ export const Table: React.FC<TableProps> = ({
   allPersonaFilterValues,
   personaFilterValues,
   onPersonaFilterValuesChange,
-  isCreateColumnDialogOpen,
-  onCreateColumnOpenChange,
+  customColumnDialogOpen,
+  onCustomColumnDialogOpenChange,
   onColumnCreated,
+  editCustomColumn,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   // This is only a JSON object mapping selected Row ID to true.
@@ -212,7 +214,7 @@ export const Table: React.FC<TableProps> = ({
 
         {/* Add custom column */}
         <Button
-          onClick={() => onCreateColumnOpenChange(true)}
+          onClick={() => onCustomColumnDialogOpenChange(true)}
           variant="outline"
           className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300 border-gray-200"
         >
@@ -220,10 +222,10 @@ export const Table: React.FC<TableProps> = ({
         </Button>
 
         <CreateOrEditCustomColumnDialog
-          customColumn={null}
+          customColumn={editCustomColumn}
           entityType={EntityType.LEAD}
-          open={isCreateColumnDialogOpen}
-          onOpenChange={onCreateColumnOpenChange}
+          open={customColumnDialogOpen}
+          onOpenChange={onCustomColumnDialogOpenChange}
           onSuccess={onColumnCreated}
         />
 
@@ -293,9 +295,12 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
-  const [isCreateColumnDialogOpen, setCreateColumnDialogOpen] = useState(false);
+  const [customColumnDialogOpen, setCustomColumnDialogOpen] = useState(false);
   const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
   const [tableNeedRefresh, setTableNeedsRefresh] = useState(false);
+  const [editCustomColumn, setEditCustomColumn] = useState<CustomColumn | null>(
+    null
+  );
 
   // Function to refresh table data (leads) in the background without full loading overlay
   const refreshTableData = () => {
@@ -379,7 +384,13 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
 
       setTotalLeadsCount(response.count);
       setCurLeads(response.results);
-      setColumns(getLeadColumns(response.results, refreshTableData));
+      setColumns(
+        getLeadColumns(
+          response.results,
+          refreshTableData,
+          onCustomColumnEditRequest
+        )
+      );
 
       return response;
     } catch (error: any) {
@@ -466,6 +477,22 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
     }
   };
 
+  // Handler for when a custom column edit is requested by the user.
+  const onCustomColumnEditRequest = (customColumn: CustomColumn) => {
+    setEditCustomColumn(customColumn);
+    setCustomColumnDialogOpen(true);
+  };
+
+  // Handle for when custom column dialog's open state changes
+  const onCustomColumnDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      setCustomColumnDialogOpen(false);
+      setEditCustomColumn(null);
+    } else {
+      setCustomColumnDialogOpen(true);
+    }
+  };
+
   if (loading) {
     return <ScreenLoader />;
   }
@@ -496,9 +523,10 @@ const LeadsTable: React.FC<LeadsTableProps> = ({ accountId }) => {
         allPersonaFilterValues={allPersonaFilterValues}
         personaFilterValues={personaFilterValues}
         onPersonaFilterValuesChange={onPersonaFilterValuesChange}
-        isCreateColumnDialogOpen={isCreateColumnDialogOpen}
-        onCreateColumnOpenChange={setCreateColumnDialogOpen}
+        customColumnDialogOpen={customColumnDialogOpen}
+        onCustomColumnDialogOpenChange={onCustomColumnDialogOpenChange}
         onColumnCreated={handleColumnCreated}
+        editCustomColumn={editCustomColumn}
       />
     </div>
   );
