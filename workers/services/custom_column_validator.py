@@ -86,13 +86,19 @@ class CustomColumnValidator:
         End your analysis with a JSON validation result formatted exactly like this:
         ```json
         {{
-          "is_validated": true or false, // is_validated: true if the answer is validated and proved to be correct by your research, false if the answer is incorrect and needs to be corrected
-          "confidence": 0.8, // confidence of your assessment
+          "validation_status": "validated_correct", // Use one of these exact values: "validated_correct", "validated_incorrect", "validation_failed", "insufficient_data"
+          "confidence": 0.8, // confidence of your assessment from 0.0 to 1.0
           "validation_notes": "Your reasoning here",
           "corrected_answer": "Corrected version if needed, or null",
           "sources": ["[sources](in markdown format)"] // list of URL sources used for validation. do not refer to context here
         }}
         ```
+        
+        Validation status meanings:
+        - "validated_correct": Answer verified and confirmed to be accurate
+        - "validated_incorrect": Answer contains factual errors that need correction
+        - "validation_failed": Unable to properly validate due to technical issues
+        - "insufficient_data": Not enough information found to validate conclusively
         
         Keep the JSON structure exactly as shown, with those exact field names.
         """
@@ -163,63 +169,76 @@ class CustomColumnValidator:
     async def validate_with_search(self,
                                    entity_result: Any,
                                    entity_context: Dict[str, Any],
-                                   column_config: Dict[str, Any]) -> Any:
-        try:
-            question = column_config.get('question', '')
-            response_type = column_config.get('response_type', 'string')
-            answer_value = self._extract_value(entity_result, response_type)
+                                   column_config: Dict[str, Any],
+                                   max_retries: int = 2) -> Any:
+        retry_count = 0
+        
+        while retry_count <= max_retries:
+            try:
+                question = column_config.get('question', '')
+                response_type = column_config.get('response_type', 'string')
+                answer_value = self._extract_value(entity_result, response_type)
 
-            logger.info(f"Validating answer for question: {question}")
+                if retry_count > 0:
+                    logger.info(f"Retry {retry_count}/{max_retries}: Validating answer for question: {question}")
+                else:
+                    logger.info(f"Validating answer for question: {question}")
 
-            # Construct the validation prompt for the agent
-            input_data = {
-                "input": f"""
-                Validate this sales answer:
-                
-                QUESTION: <question> {question} </question>
-                
-                CLAIMED ANSWER(NEED TO VALIDATE): <answer> {answer_value} </answer>
-                
-                COMPANY CONTEXT: <context> {entity_context} </context>
-                
-                INSTRUCTIONS:
-                1. Identify 2-3 critical claims that need verification
-                2. Search for relevant information using the search tools
-                3. Evaluate if the search results CONFIRM or CONTRADICT the claims
-                4. Provide a final validation with confidence score
-                
-                After your analysis, provide a JSON validation result with these fields:
-                - "is_validated": boolean (true if answer is validated and proved to be correct by your research)
-                - "confidence": float from 0.0 to 1.0
-                - "validation_notes": your assessment explanation
-                - "corrected_answer": corrected answer if the original has factual errors, or null
-                """
-            }
-
-            agent_result = await self.validator_agent.ainvoke(input_data)
-            agent_output = agent_result.get("output", "")
-
-            validation_result = self._extract_json_from_text(agent_output)
-
-            if not validation_result or not isinstance(validation_result, dict):
-                validation_result = {
-                    "is_validated": True, # Return true, so that we can keep the original answer
-                    "confidence": 0.5,
-                    "validation_notes": "Validation failed: Agent did not return proper validation result",
-                    "corrected_answer": None
+                # Construct the validation prompt for the agent
+                input_data = {
+                    "input": f"""
+                    Validate this sales answer:
+                    
+                    QUESTION: <question> {question} </question>
+                    
+                    CLAIMED ANSWER(NEED TO VALIDATE): <answer> {answer_value} </answer>
+                    
+                    COMPANY CONTEXT: <context> {entity_context} </context>
+                    
+                    INSTRUCTIONS:
+                    1. Identify 2-3 critical claims that need verification
+                    2. Search for relevant information using the search tools
+                    3. Evaluate if the search results CONFIRM or CONTRADICT the claims
+                    4. Provide a final validation with confidence score
+                    
+                    After your analysis, provide a JSON validation result with these fields:
+                    - "validation_status": string (one of: "validated_correct", "validated_incorrect", "validation_failed", "insufficient_data")
+                    - "confidence": float from 0.0 to 1.0
+                    - "validation_notes": your assessment explanation
+                    - "corrected_answer": corrected answer if the original has factual errors, or null
+                    """
                 }
 
-            updated_result = self._apply_validation_results(
-                entity_result,
-                validation_result,
-                response_type
-            )
+                agent_result = await self.validator_agent.ainvoke(input_data)
+                agent_output = agent_result.get("output", "")
 
-            return updated_result
+                validation_result = self._extract_json_from_text(agent_output)
 
-        except Exception as e:
-            logger.error(f"LangChain validation failed: {str(e)}", exc_info=True)
-            return entity_result
+                if not validation_result or not isinstance(validation_result, dict):
+                    validation_result = {
+                        "validation_status": "validation_failed",
+                        "confidence": 0.5,
+                        "validation_notes": "Validation failed: Agent did not return proper validation result",
+                        "corrected_answer": None
+                    }
+
+                updated_result = self._apply_validation_results(
+                    entity_result,
+                    validation_result,
+                    response_type
+                )
+
+                return updated_result
+
+            except Exception as e:
+                logger.error(f"LangChain validation failed (attempt {retry_count+1}/{max_retries+1}): {str(e)}", exc_info=True)
+
+                # Only retry for validation failures, not for obvious errors
+                if retry_count >= max_retries:
+                    logger.warning(f"Max retries ({max_retries}) reached for validation, returning original entity result")
+                    return entity_result
+
+            retry_count += 1
 
     @staticmethod
     def _extract_json_from_text(text: str) -> Dict[str, Any]:
@@ -252,14 +271,23 @@ class CustomColumnValidator:
                                   response_type: str) -> Any:
         updated_result = type(entity_result)(**entity_result.dict())
 
-        if validation_result.get("is_validated", False):
+        validation_status = validation_result.get("validation_status", "validation_failed")
+        
+        if validation_status == "validated_correct":
             updated_result.confidence_score = min(0.95, (entity_result.confidence_score or 0.5) + 0.1)
-        else:
+        elif validation_status == "validated_incorrect":
             updated_result.confidence_score = max(0.1, (entity_result.confidence_score or 0.5) - 0.2)
+        elif validation_status == "insufficient_data":
+            # Keep original confidence score for insufficient data
+            pass
+        else:  # validation_failed
+            # Keep original confidence score for validation failures
+            pass
 
         corrected_answer = validation_result.get("corrected_answer")
-        sources = validation_result.get("sources", [])
-        if corrected_answer:
+
+        # Only correct the answer when validation status is "validated_incorrect"
+        if corrected_answer and validation_status == "validated_incorrect":
             if response_type == "string":
                 updated_result.value_string = corrected_answer
             elif response_type == "json_object":
@@ -271,17 +299,23 @@ class CustomColumnValidator:
             elif response_type == "enum":
                 updated_result.value_enum = corrected_answer
 
+        validation_status = validation_result.get("validation_status", "validation_failed")
         validation_notes = validation_result.get("validation_notes", "")
-        if validation_notes:
+
+        sources = validation_result.get("sources", [])
+        if validation_status in ["validated_correct", "validated_incorrect", "insufficient_data"] and validation_notes:
             existing_rationale = updated_result.rationale or ""
-            updated_result.rationale = f"**Validation:** {validation_notes}\n\n{existing_rationale}"
-            updated_result.rationale = f"{updated_result.rationale}\n" + "\n".join(sources)
+            updated_result.rationale = f"**Validation:**\n\n {validation_notes}\n\n**Rationale:**\n\n {existing_rationale}"
+            
+            # Add sources if available
+            if sources:
+                updated_result.rationale = f"{updated_result.rationale}\n" + "\n".join(sources)
 
         if not updated_result.error_details:
             updated_result.error_details = {}
 
         updated_result.error_details["search_validation"] = {
-            "is_validated": validation_result.get("is_validated", False),
+            "validation_status": validation_result.get("validation_status", "validation_failed"),
             "validation_confidence": validation_result.get("confidence", 0.5),
             "validated_at": datetime.now().isoformat(),
             "validation_tool": "langchain_agent"

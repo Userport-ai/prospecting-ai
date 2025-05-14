@@ -16,6 +16,7 @@ from services.linkedin_service import LinkedInService, RapidAPILinkedInActivitie
 from tasks.enrichment_task import AccountEnrichmentTask
 from utils.loguru_setup import logger, set_trace_context
 from utils.retry_utils import RetryableError, RetryConfig, with_retry
+from json_repair import loads as repair_loads
 
 # Enhanced retry configuration for AI operations
 AI_RETRY_CONFIG = RetryConfig(
@@ -528,7 +529,7 @@ class CustomColumnTask(AccountEnrichmentTask):
             return value
 
         except Exception as e:
-            logger.error(f"Error generating column value for entity {entity_id}: {str(e)}")
+            logger.error(f"Error generating column value for entity {entity_id}: {str(e)}", exc_info=True)
             self.metrics["ai_errors"] += 1
             raise RetryableError(f"AI generation failed: {str(e)}")
 
@@ -664,7 +665,8 @@ Your goal is to analyze provided entity information and answer a specific questi
 
         return system_prompt, user_prompt
 
-    def _get_format_for_response_type(self, column_config: Dict[str, Any]) -> str:
+    @staticmethod
+    def _get_format_for_response_type(column_config: Dict[str, Any]) -> str:
         """Get the expected format description for the response type."""
         response_type = column_config.get('response_type', 'string')
         allowed_values = column_config['response_config'].get('allowed_values', [])
@@ -717,8 +719,8 @@ Your goal is to analyze provided entity information and answer a specific questi
             if "sources:" in lower_text:
                 sources_index = lower_text.rindex("sources:")
                 sources = text_response[sources_index:].split(":", 1)[1].strip()
-                sources = re.sub(r'^[^a-zA-Z0-9]+', '', sources)
-                sources = re.sub(r'[^a-zA-Z0-9]+$', '', sources)
+                sources = re.sub(r'^[^a-zA-Z0-9\*\#]+', '', sources)
+                sources = re.sub(r'[^a-zA-Z0-9\*\#]+$', '', sources)
                 clean_sources = text_response[:sources_index].strip()
 
             clean_response = text_response
@@ -792,6 +794,15 @@ Your goal is to analyze provided entity information and answer a specific questi
         else:
             if not response:
                 raise ValueError("Response is empty")
+
+            if isinstance(response, str):
+                # If response is a string, try to parse it as JSON
+                import json
+                try:
+                    response = repair_loads(response)
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse response as JSON: {response}")
+                    raise ValueError(f"Invalid JSON object: {response}")
 
             if 'value' not in response:
                 logger.error(f"Invalid response format: {response}")
