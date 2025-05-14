@@ -6,7 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CustomColumnValueData } from "@/services/CustomColumn";
-import { Info, Play, Loader2, RefreshCw } from "lucide-react";
+import { Info, Play, Loader2, RefreshCw, CircleAlert } from "lucide-react";
 import { useAuthContext } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import JsonDataView from "@/components/common/JsonDataView";
@@ -20,6 +20,21 @@ import {
 // Import the function to trigger generation
 import { generateCustomColumnValues } from "@/services/CustomColumn";
 import { regenCustomColumnBtnDataId } from "@/common/utils";
+
+const ErrorCustomColumnValue: React.FC<{}> = ({}) => {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex flex-row justify-center">
+          <CircleAlert size={16} className="text-red-500 cursor-pointer" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className="bg-white border border-red-200 text-red-500 p-2">
+        Failed to generate value, please try again!
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 // Helper to remove markdown backticks so that the Markdown renderer
 // does not render it as a Code block. This is needed because LLM
@@ -166,16 +181,21 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
             <span className="text-xs">Generating...</span>
           </div>
         ) : hasRequiredIds ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={disableGeneration}
-            onClick={handleGenerateValue}
-            className="flex items-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1"
-          >
-            <Play className="h-4 w-4 mr-1" />
-            <span className="text-xs">Generate</span>
-          </Button>
+          <div className="flex flex-col gap-2">
+            {customColumnValueData.status === "error" && (
+              <ErrorCustomColumnValue />
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={disableGeneration}
+              onClick={handleGenerateValue}
+              className="flex items-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1"
+            >
+              <Play className="h-4 w-4 mr-1" />
+              <span className="text-xs">Generate</span>
+            </Button>
+          </div>
         ) : (
           <span className="text-gray-400 italic text-xs">N/A</span>
         )}
