@@ -21,7 +21,7 @@ import { useAuthContext } from "@/auth/AuthProvider";
 import ScreenLoader from "@/common/ScreenLoader";
 import { listProducts, Product } from "@/services/Products";
 import { Separator } from "@/components/ui/separator";
-import CreateCustomColumnDialog, {
+import CreateOrEditCustomColumnDialog, {
   EntityType,
 } from "@/components/custom-columns/CustomColumnDialog";
 import { Cpu, Loader2 } from "lucide-react";
@@ -127,9 +127,10 @@ interface TableProps {
   dataLoading: boolean;
   curPageSize: number;
   onPageSizeChange: (pageSize: number) => void;
-  isCreateColumnDialogOpen: boolean;
-  onCreateColumnOpenChange: (open: boolean) => void;
+  customColumnDialogOpen: boolean;
+  onCustomColumnDialogOpenChange: (open: boolean) => void;
   onColumnCreated: (newColumn: CustomColumn) => Promise<void>;
+  editCustomColumn: CustomColumn | null;
 }
 
 // Component to display Accounts Table.
@@ -142,9 +143,10 @@ const Table: React.FC<TableProps> = ({
   dataLoading,
   curPageSize,
   onPageSizeChange,
-  isCreateColumnDialogOpen,
-  onCreateColumnOpenChange,
+  customColumnDialogOpen,
+  onCustomColumnDialogOpenChange,
   onColumnCreated,
+  editCustomColumn,
 }) => {
   const [sorting, setSorting] = useState<ColumnSort[]>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
@@ -221,17 +223,18 @@ const Table: React.FC<TableProps> = ({
 
         {/* Add custom column */}
         <Button
-          onClick={() => onCreateColumnOpenChange(true)}
+          onClick={() => onCustomColumnDialogOpenChange(true)}
           variant="outline"
           className="flex gap-2 items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md shadow-sm bg-white hover:bg-gray-100 transition duration-300 border-gray-200"
         >
           <Cpu size={16} /> Ask AI
         </Button>
 
-        <CreateCustomColumnDialog
+        <CreateOrEditCustomColumnDialog
+          customColumn={editCustomColumn}
           entityType={EntityType.ACCOUNT}
-          open={isCreateColumnDialogOpen}
-          onOpenChange={onCreateColumnOpenChange}
+          open={customColumnDialogOpen}
+          onOpenChange={onCustomColumnDialogOpenChange}
           onSuccess={onColumnCreated}
         />
       </div>
@@ -272,12 +275,15 @@ export default function AccountsTable() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
-  const [isCreateColumnDialogOpen, setCreateColumnDialogOpen] = useState(false);
+  const [customColumnDialogOpen, setCustomColumnDialogOpen] = useState(false);
   // Total accounts count found on the server.
   const [totalAccountsCount, setTotalAccountsCount] = useState(0);
   const [columns, setColumns] = useState<ColumnDef<AccountRow>[]>([]);
   const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
   const [tableNeedRefresh, setTableNeedsRefresh] = useState(false);
+  const [editCustomColumn, setEditCustomColumn] = useState<CustomColumn | null>(
+    null
+  );
 
   // Function to refresh table data (accounts) in the background without full loading overlay
   const refreshTableData = () => {
@@ -319,7 +325,13 @@ export default function AccountsTable() {
 
       setTotalAccountsCount(response.count);
       setCurAccounts(response.results);
-      setColumns(getAccountColumns(response.results, refreshTableData));
+      setColumns(
+        getAccountColumns(
+          response.results,
+          refreshTableData,
+          onCustomColumnEditRequest
+        )
+      );
       setCurPageNum(pageNum);
 
       return response;
@@ -401,7 +413,13 @@ export default function AccountsTable() {
 
       // Also update the columns to ensure any custom column data is refreshed
       // But maintain the current page and state
-      setColumns(getAccountColumns(updatedAccounts, refreshTableData));
+      setColumns(
+        getAccountColumns(
+          updatedAccounts,
+          refreshTableData,
+          onCustomColumnEditRequest
+        )
+      );
     } catch (error) {
       console.error("Error updating polled accounts:", error);
     } finally {
@@ -425,6 +443,22 @@ export default function AccountsTable() {
           `Failed to fetch Accounts after creating column ${newColumn} for page ${curPageNum}: ${error}`
         )
       );
+    }
+  };
+
+  // Handler for when a custom column edit is requested by the user.
+  const onCustomColumnEditRequest = (customColumn: CustomColumn) => {
+    setEditCustomColumn(customColumn);
+    setCustomColumnDialogOpen(true);
+  };
+
+  // Handle for when custom column dialog's open state changes
+  const onCustomColumnDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      setCustomColumnDialogOpen(false);
+      setEditCustomColumn(null);
+    } else {
+      setCustomColumnDialogOpen(true);
     }
   };
 
@@ -469,9 +503,10 @@ export default function AccountsTable() {
         dataLoading={dataLoading}
         curPageSize={curPageSize}
         onPageSizeChange={setCurPageSize}
-        isCreateColumnDialogOpen={isCreateColumnDialogOpen}
-        onCreateColumnOpenChange={setCreateColumnDialogOpen}
+        customColumnDialogOpen={customColumnDialogOpen}
+        onCustomColumnDialogOpenChange={onCustomColumnDialogOpenChange}
         onColumnCreated={handleColumnCreated}
+        editCustomColumn={editCustomColumn}
       />
     </div>
   );
