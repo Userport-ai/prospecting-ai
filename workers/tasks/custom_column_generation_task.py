@@ -800,6 +800,14 @@ Your goal is to analyze provided entity information and answer a specific questi
                 import json
                 try:
                     response = repair_loads(response)
+                    if isinstance(response, list):
+                        max_entry = {}
+                        for i, val in enumerate(response):
+                            # take the entry with the maximum number of keys and assign it to response
+                            if isinstance(val, dict) and len(val.keys()) > len(max_entry.keys()):
+                                max_entry = val
+                        if max_entry:
+                            response = max_entry
                 except json.JSONDecodeError:
                     logger.error(f"Failed to parse response as JSON: {response}")
                     raise ValueError(f"Invalid JSON object: {response}")
