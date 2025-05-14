@@ -539,8 +539,8 @@ export const getAccountColumns = (
           />
         );
       },
-      minSize: !columnNameIncludesFit(colData) ? 300 : 200, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
-      maxSize: !columnNameIncludesFit(colData) ? 300 : 200, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
+      minSize: !columnNameIncludesFit(colData) ? 300 : 150, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
+      maxSize: !columnNameIncludesFit(colData) ? 300 : 150, // Hacky way to have smaller width for Account Fit Score column. TODO: Store this in backend config instead.
       enableSorting: !columnNameIncludesFit(colData) ? false : true,
       enableColumnFilter: false,
       meta: {

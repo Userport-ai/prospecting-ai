@@ -63,7 +63,7 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   const totalColumnsWidth = table.getCenterTotalSize();
   const maxRowHeight = "max-h-[6rem]";
   // This is a hack to ensure Rationale is not visible for columns with small values like Fit Score.
-  const maxRowHeightToHideRationale = "max-h-[3rem]";
+  const maxRowHeightToHideRationale = "max-h-[2rem]";
 
   return (
     <div>

@@ -210,7 +210,11 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
 
     case "number":
       return renderValueWithRationale(
-        <span>{Number(customColumnValueData.value).toLocaleString()}</span>, // Format number if needed
+        <div className="w-full flex">
+          <span className="text-md font-semibold pl-2">
+            {Number(customColumnValueData.value).toLocaleString()}
+          </span>
+        </div>,
         customColumnValueData.rationale,
         handleGenerateValue
       );
