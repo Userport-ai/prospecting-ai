@@ -62,6 +62,8 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
   // Instead we set the table width as an inline style per https://stackoverflow.com/questions/76855056/unable-to-set-arbitrary-value-for-a-background-in-tailwindcss.
   const totalColumnsWidth = table.getCenterTotalSize();
   const maxRowHeight = "max-h-[6rem]";
+  // This is a hack to ensure Rationale is not visible for columns with small values like Fit Score.
+  const maxRowHeightToHideRationale = "max-h-[3rem]";
 
   return (
     <div>
@@ -161,7 +163,11 @@ const CommonTable: React.FC<CommonTableProps<any>> = ({
                             <div
                               className={cn(
                                 "overflow-hidden text-ellipsis line-clamp-3",
-                                maxRowHeight
+                                // Hack: Set Row height according to whether rationale needs to be hidden or not.
+                                (cell.column.columnDef.meta as CustomColumnMeta)
+                                  .hideRationaleInCell
+                                  ? maxRowHeightToHideRationale
+                                  : maxRowHeight
                               )}
                             >
                               {flexRender(

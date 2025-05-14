@@ -3,4 +3,5 @@ export interface CustomColumnMeta {
   visibleInitially?: boolean;
   cellExpandable?: boolean;
   isCustomColumn?: boolean;
+  hideRationaleInCell?: boolean;
 }

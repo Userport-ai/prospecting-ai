@@ -595,6 +595,7 @@ export const getAccountColumns = (
           colData.response_type
         ),
         isCustomColumn: true,
+        hideRationaleInCell: columnNameIncludesFit(colData), // This is a hacky config to ensure rendered custom column hides Rational in default render and only displays it in expanded view in the sidebar.
       } as CustomColumnMeta,
     });
   });
