@@ -79,6 +79,9 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
           customColumnValuesMap[columnId].status === "processing")
     );
     if (anyValuesGenerating) {
+      console.log(
+        `Some Custom Columns are pending or processing in Account: ${account.id}, continue Polling.`
+      );
       return true;
     }
 
@@ -89,7 +92,9 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
     // column immediately after enrichment so that UI knows it needs to poll and
     // doesn't need this hack.
     if (maybeCustomColumnsAreGenerating(account)) {
-      console.log("here brother for account: ", account.name);
+      console.log(
+        `Custom Column processing might start in the near future in Account: ${account.id}, continue Polling.`
+      );
       return true;
     }
 
