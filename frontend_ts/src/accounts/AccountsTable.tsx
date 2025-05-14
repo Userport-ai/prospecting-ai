@@ -57,13 +57,14 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
 
     const customColumnValuesMap = account.custom_column_values;
 
-    // If all custom columns have completed generation, no need to poll.
+    // If all custom columns have completed generation or have run into errors, no need to poll.
     const allValuesGenerationsCompleted: boolean = Object.keys(
       customColumnValuesMap
     ).every(
       (columnId) =>
         customColumnValuesMap[columnId].status &&
-        customColumnValuesMap[columnId].status === "completed"
+        (customColumnValuesMap[columnId].status === "completed" ||
+          customColumnValuesMap[columnId].status === "error")
     );
     if (allValuesGenerationsCompleted) {
       return false;

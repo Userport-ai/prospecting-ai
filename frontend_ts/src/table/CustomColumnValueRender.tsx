@@ -188,7 +188,9 @@ const CustomColumnValueRender: React.FC<CustomColumnValueRenderProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              disabled={disableGeneration}
+              disabled={
+                customColumnValueData.status !== "error" && disableGeneration
+              }
               onClick={handleGenerateValue}
               className="flex items-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1"
             >
