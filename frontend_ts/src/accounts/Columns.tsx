@@ -591,7 +591,7 @@ export const getAccountColumns = (
       meta: {
         displayName: colData.name,
         visibleInitially: true,
-        cellExpandable: ["string", "json_object", "enum"].includes(
+        cellExpandable: ["string", "number", "json_object", "enum"].includes(
           colData.response_type
         ),
         isCustomColumn: true,
