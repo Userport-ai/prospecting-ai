@@ -14,7 +14,7 @@ import AddAccounts from "./AddAccounts";
 import CommonTable from "@/table/CommonTable";
 import VisibleColumns from "@/table/VisibleColumns";
 import TextFilter from "@/table/TextFilter";
-import { getAccountColumns } from "./Columns";
+import { getAccountColumns, maybeCustomColumnsAreGenerating } from "./Columns";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Account as AccountRow, listAccounts } from "@/services/Accounts";
 import { useAuthContext } from "@/auth/AuthProvider";
@@ -56,12 +56,44 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
     }
 
     const customColumnValuesMap = account.custom_column_values;
-    return Object.keys(customColumnValuesMap).some(
+
+    // If all custom columns have completed generation, no need to poll.
+    const allValuesGenerationsCompleted: boolean = Object.keys(
+      customColumnValuesMap
+    ).every(
+      (columnId) =>
+        customColumnValuesMap[columnId].status &&
+        customColumnValuesMap[columnId].status === "completed"
+    );
+    if (allValuesGenerationsCompleted) {
+      return false;
+    }
+
+    // If some custom column values are generating, continue polling.
+    const anyValuesGenerating: boolean = Object.keys(
+      customColumnValuesMap
+    ).some(
       (columnId) =>
         customColumnValuesMap[columnId].status &&
         (customColumnValuesMap[columnId].status === "pending" ||
           customColumnValuesMap[columnId].status === "processing")
     );
+    if (anyValuesGenerating) {
+      return true;
+    }
+
+    // Hack: It's possible that all status values are null just after Account
+    // was enriched but before the custom column value generations have started.
+    // In this case, we want to keep polling for some duration post enrichment.
+    // TODO: Server should return a "pending" or "processing" status for each custom
+    // column immediately after enrichment so that UI knows it needs to poll and
+    // doesn't need this hack.
+    if (maybeCustomColumnsAreGenerating(account)) {
+      console.log("here brother for account: ", account.name);
+      return true;
+    }
+
+    return false;
   };
 
   // Setup polling in the background in case any of the accounts have enrichment

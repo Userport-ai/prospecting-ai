@@ -17,6 +17,35 @@ import RecentCompanyEventsView from "./RecentCompanyEventsView";
 import CustomColumnValueRender from "@/table/CustomColumnValueRender";
 import EditCustomColumnBtn from "@/table/EditCustomColumnBtn";
 
+// Duration post account creation when we are waiting for automatic
+// custom column generation to complete for the Account and this is a hacky way to
+// check for that status using a buffer duration.
+// Used in 2 flows:
+// 1. Continue Polling Accounts in this duration. even after basic account enrichment is done.
+// 2. Keep Custom column values disabled in this duration.
+export const maybeCustomColumnsAreGenerating = (
+  accountRow: AccountRow
+): boolean => {
+  if (accountRow.enrichment_status.avg_completion_percent !== 100) {
+    // Account enrichment in progress, generation disabled.
+    return true;
+  }
+
+  // Account enrichment is complete.
+  const lastUpdatedDate = new Date(accountRow.enrichment_status.last_update);
+  const waitDuration = 30 * 60 * 1000; // 30 minutes.
+  const createdDatePlusWaitDuration = new Date(
+    lastUpdatedDate.getTime() + waitDuration
+  );
+  const now = new Date();
+  if (now <= createdDatePlusWaitDuration) {
+    // Custom Column might still be generating.
+    return true;
+  } else {
+    return false;
+  }
+};
+
 // Base Account Columns that we know will exist in the table and are statically defined.
 const getBaseAccountColumns = (
   onRefreshTable?: () => void
@@ -533,9 +562,10 @@ export const getAccountColumns = (
             customColumnValueData={enrichedColumnData}
             entityId={accountId}
             onValueGenerated={onRefreshTable}
-            disableGeneration={
-              info.row.original.enrichment_status.avg_completion_percent !== 100
-            }
+            // TODO: Return scheduled or pending status from UI to disable generation instead of waiting for a duration.
+            disableGeneration={maybeCustomColumnsAreGenerating(
+              info.row.original
+            )}
           />
         );
       },
