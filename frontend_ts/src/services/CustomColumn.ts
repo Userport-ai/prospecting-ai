@@ -24,6 +24,7 @@ export interface CreateCustomColumnRequest {
     use_internet: boolean;
     unstructured_response: boolean;
     use_linkedin_activity: boolean;
+    validate_with_search: boolean;
   };
   context_type: string[]; // e.g., ['company_profile']
   refresh_interval?: number | null; // In hours

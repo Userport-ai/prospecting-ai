@@ -68,6 +68,7 @@ const baseSchema = z.object({
     temperature: z.coerce.number().min(0).max(1), // Coerce to number, validate range
     use_internet: z.boolean().optional(),
     unstructured_response: z.boolean().optional(),
+    validate_with_search: z.boolean().optional(),
     use_linkedin_activity: z.boolean().optional(),
   }),
   context_type: z
@@ -143,6 +144,7 @@ const CreateOrEditCustomColumnDialog: React.FC<
       use_internet: false,
       unstructured_response: false,
       use_linkedin_activity: false,
+      validate_with_search: false,
     },
     context_type: customColumn?.context_type ?? [AVAILABLE_CONTEXT_TYPES[0].id], // Default context
     refresh_interval: customColumn?.refresh_interval ?? 24 * 7, // Default to weekly
@@ -319,8 +321,9 @@ const CreateOrEditCustomColumnDialog: React.FC<
                             field.onChange({
                               ...field.value,
                               use_internet: checked,
-                              // Unstructured response is set/unset whenever use_internet is set/unset.
+                              // Unstructured response and validate with search is set/unset whenever use_internet is set/unset.
                               unstructured_response: checked,
+                              validate_with_search: checked,
                             });
                           }}
                         />
