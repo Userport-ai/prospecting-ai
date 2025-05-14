@@ -158,7 +158,7 @@ class CustomColumnTask(AccountEnrichmentTask):
         column_config = payload.get('column_config', {})
         context_data = payload.get('context_data', {})
         batch_size = payload.get('batch_size', 10)
-        concurrent_requests = payload.get('concurrent_requests', 5)
+        concurrent_requests = 1 # payload.get('concurrent_requests', 2)
         ai_config = payload.get('ai_config')
         entity_type = payload.get('entity_type')
         current_stage = 'initialization'
@@ -288,13 +288,13 @@ class CustomColumnTask(AccountEnrichmentTask):
                 failed_entities.extend(batch_failed)
 
             # Store results
-            current_stage = 'storing_results'
-            logger.info(f"Storing results for {len(processed_values)} processed values")
-            await self._store_results(
-                job_id=job_id,
-                column_id=column_id,
-                values=processed_values
-            )
+            # current_stage = 'storing_results'
+            # logger.info(f"Storing results for {len(processed_values)} processed values")
+            # await self._store_results(
+            #     job_id=job_id,
+            #     column_id=column_id,
+            #     values=processed_values
+            # )
 
             # Calculate success metrics
             successful_count = len([v for v in processed_values if v.status == "completed"])
