@@ -108,6 +108,7 @@ const PollPendingAccounts: React.FC<PollPendingAccountsProps> = ({
     .filter(
       (account) =>
         account.enrichment_status.total_enrichments === 0 ||
+        account.enrichment_status.scheduled > 0 ||
         account.enrichment_status.in_progress > 0 ||
         account.enrichment_status.pending > 0 ||
         anyCustomColumnValuesGenerating(account)

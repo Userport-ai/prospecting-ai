@@ -4,6 +4,7 @@ export enum EnrichmentType {
 }
 
 export enum EnrichmentStatusEnum {
+  SCHEDULED = "scheduled",
   PENDING = "pending",
   PROCESSING = "processing",
   COMPLETED = "completed",
@@ -31,6 +32,7 @@ export interface EnrichmentStatus {
   failed: number;
   in_progress: number;
   pending: number;
+  scheduled: number;
   last_update: string; // ISO Date string.
   quality_score: number | null;
   avg_completion_percent: number | null;
