@@ -1,0 +1,156 @@
+{
+  "product": "Tessell",
+  "total_targets": 10,
+  "timestamp": "2025-05-15T15:46:54.311508",
+  "qualification_signals": [
+    {
+      "name": "Operates in Multi-Cloud Environment",
+      "description": "Tessell provides a unified platform for managing databases across AWS, Azure, GCP, and OCI. Organizations operating in multiple cloud environments face significant complexity, data fragmentation, and inconsistent management tools, which Tessell directly addresses with its multi-cloud control plane.",
+      "importance": 5
+    },
+    {
+      "name": "Manages Large/Complex Relational Database Estate",
+      "description": "Tessell automates management, optimizes performance, and reduces costs for PostgreSQL, MySQL, Oracle, and SQL Server databases. The value proposition is strongest for organizations with a significant number of instances, large databases, or complex configurations where manual management is costly and inefficient.",
+      "importance": 5
+    },
+    {
+      "name": "High Database Operational Overhead or Costs",
+      "description": "Tessell's primary value propositions are reducing operational complexity and costs associated with database management (provisioning, patching, backups, scaling, monitoring, licensing). Companies struggling with high cloud database bills, large operational teams dedicated to databases, or slow database provisioning cycles are strong candidates.",
+      "importance": 5
+    },
+    {
+      "name": "Undergoing Cloud Migration or Data Modernization",
+      "description": "Tessell is well-suited for organizations in the process of migrating databases to the cloud or modernizing existing cloud database deployments. These strategic initiatives often involve re-evaluating database strategies and seeking platforms that offer better management, cost, and performance benefits compared to current solutions or self-managed approaches.",
+      "importance": 4
+    }
+  ],
+  "targets_by_fit": {
+    "excellent": [],
+    "good": [],
+    "moderate": [],
+    "poor": [],
+    "unsuitable": []
+  },
+  "targets": [
+    {
+      "company_name": "AYA Bank",
+      "website": "https://www.ayabank.com",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_aya_bank.json"
+    },
+    {
+      "company_name": "BAIDURI BANK BERHAD",
+      "website": "https://www.baiduri.com.bn",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_baiduri_bank_berhad.json"
+    },
+    {
+      "company_name": "Bank Islam Brunei Darussalam Berhad",
+      "website": "https://www.bibd.com.bn",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_bank_islam_brunei_darussalam_berhad.json"
+    },
+    {
+      "company_name": "Brunei Gas Carriers Sdn Bhd",
+      "website": "https://www.bgc.com.bn",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_brunei_gas_carriers_sdn_bhd.json"
+    },
+    {
+      "company_name": "BRUNEI METHANOL COMPANY SDN BHD",
+      "website": "https://www.brunei-methanol.com",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_brunei_methanol_company_sdn_bhd.json"
+    },
+    {
+      "company_name": "Jabatan Perdana Menteri",
+      "website": "https://www.pmo.gov.bn",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_jabatan_perdana_menteri.json"
+    },
+    {
+      "company_name": "MOTTAMA HOLDINGS LTD",
+      "website": "https://www.mottamaholdings.com",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_mottama_holdings_ltd.json"
+    },
+    {
+      "company_name": "MUARA MARITIMES SERVICES",
+      "website": "https://www.muaramaritimeservices.com",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_muara_maritimes_services.json"
+    },
+    {
+      "company_name": "PERBADANAN TABUNG AMANAH ISLAM BRUNEI",
+      "website": "https://www.taib.com.bn",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_perbadanan_tabung_amanah_islam_brunei.json"
+    },
+    {
+      "company_name": "SATIUS CO PTE. LTD.",
+      "website": "https://www.satius.com.sg",
+      "industry": "",
+      "fit_level": "unknown",
+      "fit_score": 0.0,
+      "matched_signals": [],
+      "pain_points": [],
+      "value_propositions": [],
+      "key_decision_makers": [],
+      "result_file": "prospect_satius_co_pte._ltd..json"
+    }
+  ]
+}
