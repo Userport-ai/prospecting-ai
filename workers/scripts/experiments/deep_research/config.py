@@ -17,13 +17,13 @@ TIMEOUTS = {
 DEFAULT_MODEL = "gemini-2.5-flash-preview-04-17"
 
 # Research step configuration
-MAX_QUALIFICATION_SIGNALS = 4  # Maximum number of qualification signals to process
+MAX_QUALIFICATION_SIGNALS = 3  # Maximum number of qualification signals to process
 
 # Fit score mapping for fit levels
 FIT_LEVEL_SCORES = {
     "excellent": 0.9,
     "good": 0.7,
-    "moderate": 0.5,
+    "weak": 0.5,
     "poor": 0.3,
     "unsuitable": 0.1,
     "unknown": 0.5

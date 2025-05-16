@@ -272,21 +272,36 @@ class ApolloCompanySource:
             "x-api-key": self.api_key  # Pass as x-api-key header
         }
         
-        
         session = await self.get_session()
         
         try:
             await asyncio.sleep(self.rate_limit_delay)
             
+            # Convert array parameters to query params as Apollo expects
+            url_params = []
+            json_params = {}
+            
+            from urllib.parse import quote
+            
+            for key, value in params.items():
+                if isinstance(value, list):
+                    # For array parameters, add them as query parameters with URL encoding
+                    for item in value:
+                        url_params.append(f"{key}[]={quote(str(item))}")
+                else:
+                    # Non-array parameters go in the JSON body
+                    json_params[key] = value
+            
+            # Construct final URL with query parameters
+            if url_params:
+                url = f"{url}?{'&'.join(url_params)}"
+            
             # Debug output for troubleshooting
             logger.info(f"Making Apollo API request to: {url}")
             logger.info(f"Headers: {headers}")
-            # Log full params and pretty format for debugging
-            logger.info(f"Full params payload: {json.dumps(params, default=str, indent=2)}")
-            logger.info(f"Using Apollo API parameters: page={params.get('page')}, industries={params.get('organization_industries')}, employees={params.get('organization_num_employees_ranges')}, locations={params.get('organization_locations')}")
+            logger.info(f"JSON body: {json.dumps(json_params, default=str, indent=2)}")
             
-            
-            async with session.post(url, json=params, headers=headers) as response:
+            async with session.post(url, json=json_params, headers=headers) as response:
                 status_code = response.status
                 logger.info(f"Apollo API response status: {status_code}")
                 
@@ -558,6 +573,7 @@ class ApolloCompanySource:
             "b2c": false,  // Boolean if B2C is relevant
             "countries": ["United States", "Canada"],  // List of target countries
             "keywords": "cloud platform security",  // Keywords to search across all fields (space-separated)
+            "keyword_tags": ["cloud computing", "data security"],  // Organization keyword tags to match
             "exclude_keywords": ["gaming", "blockchain"]  // Keywords to exclude
         }}}}
         
@@ -770,7 +786,8 @@ class ApolloCompanySource:
                 "organization_ids": "company_ids",
                 "currently_using_any_of_technology_uids": "technologies",
                 "funding_stages": "funding_stage",
-                "revenue_range": "revenue"
+                "revenue_range": "revenue",
+                "q_organization_keyword_tags": "keyword_tags"
             }
             
             # Apply the mapping

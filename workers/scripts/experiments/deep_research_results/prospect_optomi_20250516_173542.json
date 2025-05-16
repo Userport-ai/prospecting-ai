@@ -1,0 +1,145 @@
+{
+  "target": {
+    "company_name": "Optomi",
+    "website": "http://www.optomi.com",
+    "industry": "",
+    "description": "",
+    "additional_info": {
+      "apollo_id": "54a1bc4a7468695860328a0c",
+      "linkedin_url": "http://www.linkedin.com/company/optomi",
+      "founded_year": 2012,
+      "location": null,
+      "employee_count": null,
+      "annual_revenue": null,
+      "funding": {
+        "total_funding": null,
+        "funding_stage": null,
+        "latest_funding_round": null,
+        "latest_funding_amount": null,
+        "latest_funding_date": null
+      },
+      "technologies": [],
+      "phone": "+1 678-250-0820",
+      "keywords": [],
+      "source": "organization"
+    }
+  },
+  "selling_product": {
+    "name": "Zenskar",
+    "website": "https://www.zenskar.com/",
+    "description": "",
+    "value_proposition": "",
+    "key_features": [],
+    "target_industries": [],
+    "ideal_customer_profile": "",
+    "competitor_alternatives": [],
+    "qualification_signals": [
+      {
+        "name": "Employs Complex or Usage-Based Pricing Models",
+        "description": "Zenskar excels at automating billing for businesses with intricate pricing structures, including subscriptions, usage-based, hybrid models, tiered pricing, volume discounts, or custom-negotiated enterprise deals. Companies using such models often face challenges with manual processes or less flexible billing systems, making Zenskar's adaptable platform a strong fit.",
+        "importance": 5,
+        "is_confirmed": true,
+        "detection_instructions": "Review the company's public pricing page for terms like 'pay-as-you-go,' 'per unit,' 'tiered access,' 'usage allowances,' 'overages,' 'custom enterprise plans,' or specific metered units (e.g., API calls, data storage, active users). In job descriptions for product, sales, or finance roles, look for mentions of managing or developing 'usage-based billing,' 'complex pricing strategies,' or 'monetization models.' During discovery, ask: 'Can you describe your current pricing structures? Do you offer any usage-based, tiered, or highly customized plans?'"
+      },
+      {
+        "name": "Significant Manual Effort or Errors in Billing/Revenue Recognition",
+        "description": "Prospects spending excessive time on manual billing tasks (e.g., invoice creation, collections, reconciliation), relying heavily on spreadsheets for revenue recognition, or experiencing frequent billing errors and revenue leakage are ideal candidates. Zenskar's automation capabilities directly address these inefficiencies, freeing up resources and improving accuracy.",
+        "importance": 5,
+        "is_confirmed": true,
+        "detection_instructions": "During discovery calls, listen for statements like: 'Billing takes several days each month,' 'We use a lot of spreadsheets for revenue schedules,' 'We struggle with billing errors affecting customers,' 'Our finance team is overwhelmed with manual adjustments,' or 'Our current system can't keep up with our contract complexity.' Look for job postings for finance/RevOps roles that emphasize tasks like 'manual data entry for billing,' 'reconciling billing discrepancies,' or objectives like 'reduce billing cycle time' or 'improve accuracy of revenue reporting.' If they mention specific metrics like 'X hours spent on manual billing reconciliation' or 'Y% error rate in invoices,' this is a strong indicator."
+      },
+      {
+        "name": "Mandated ASC 606/IFRS 15 Compliance and Reporting Needs",
+        "description": "Companies, particularly B2B SaaS or those undergoing audits, seeking investment, or preparing for M&A, that must adhere to ASC 606/IFRS 15 revenue recognition standards and find it challenging to maintain compliance. Zenskar provides automated, audit-ready revenue recognition, which is a critical requirement for these businesses.",
+        "importance": 5,
+        "is_confirmed": true,
+        "detection_instructions": "Identify if the company is a B2B entity (especially SaaS, AI, Fintech) that is likely subject to these accounting standards. Ask finance leaders directly: 'How are you currently managing ASC 606 (or IFRS 15) compliance? Is this automated, or a largely manual effort?' Look for mentions of 'audit readiness,' 'ASC 606 implementation,' or 'IFRS 15 compliance' in job descriptions for senior finance roles (e.g., CFO, Controller, VP of Finance), company financial statements (if public), or press releases related to funding or audits. Note if they are using basic accounting software that lacks robust RevRec capabilities for complex contracts."
+      }
+    ],
+    "additional_info": {}
+  },
+  "fit_level": "good",
+  "fit_score": 0.88,
+  "fit_explanation": "Optomi is rated as a 'good' fit because three high-importance (5/5) qualification signals are strongly matched. \n1. **Employs Complex or Usage-Based Pricing Models:** Optomi's diverse service offerings (contract, contract-to-hire, team augmentation, project-based professional services, managed services) inherently involve varied and complex billing structures, often customized for large clients. Zenskar's platform excels at managing such complexity.\n2. **Significant Manual Effort or Errors in Billing/Revenue Recognition:** Optomi's rapid and sustained growth (145% in 3 years, 27.9% CAGR 2019-2023, $200M+ revenue run rate) combined with its diverse service portfolio strongly suggests a high likelihood of facing challenges with manual billing processes, scalability issues, and potential errors if not using an advanced automation platform. Zenskar directly addresses these issues.\n3. **Mandated ASC 606/IFRS 15 Compliance and Reporting Needs:** As a large, PE-backed (FFL Partners) IT services company with significant revenue and complex customer contracts, Optomi is highly likely required to comply with ASC 606 for accurate revenue recognition. Zenskar's automated, audit-ready revenue recognition is a core feature.",
+  "pain_points": [
+    "Scalability challenges in billing operations to keep pace with rapid growth (145% in 3 years, new CRO, expansion like the larger Charlotte office) and increasing revenue ($200M+ run rate, targeting $750M).",
+    "Complexity and potential errors in revenue recognition (ASC 606) across diverse service models (contract, contract-to-hire, project-based, managed services), especially critical given PE backing by FFL Partners.",
+    "Significant manual effort and risk of errors in invoicing for numerous clients (including Fortune-listed) with varied contract terms, project milestones, and consultant hours, potentially impacting cash flow.",
+    "Difficulty in obtaining consolidated, real-time financial and operational metrics across different service lines (Optomi, OPS, Provalus) for strategic decision-making by new leadership.",
+    "Inefficiency in managing and automating bespoke billing arrangements for large corporate clients and new service initiatives (e.g., evolving ServiceNow offerings, Acadomi program outputs)."
+  ],
+  "value_propositions": [
+    "Automate Optomi's diverse billing models (contract, contract-to-hire, project-based, managed services) with Zenskar, ensuring billing infrastructure scales seamlessly with your impressive growth (145% in 3 years) and supports new leadership's revenue goals.",
+    "Streamline ASC 606 compliance with Zenskar's audit-ready revenue recognition, providing accurate financial reporting crucial for a PE-backed firm (FFL Partners) and supporting your 'Best Company Outlook' status.",
+    "Reduce manual billing effort and errors for your varied client engagements, leading to faster, more accurate invoicing and improved cash flow, vital for managing your $200M+ revenue run rate.",
+    "Empower your new CRO and leadership with Zenskar's real-time, consolidated financial and service metrics across Optomi, OPS, and Provalus for data-driven strategic decisions, capitalizing on your 'Fastest Growing' recognition.",
+    "Increase operational agility with Zenskar's flexible platform, enabling quick configuration of billing for new service offerings (e.g., ServiceNow, Acadomi graduates) and custom client contracts as you expand, without significant engineering overhead."
+  ],
+  "objection_handling": [
+    {
+      "objection": "We have an existing system/ERP that handles billing.",
+      "response": "Many fast-growing services firms like Optomi find their existing ERPs struggle with the nuances of complex contract terms, usage-based components, and ASC 606 for services. Zenskar is designed to complement your ERP by specializing in automating these complex revenue workflows, integrating seamlessly to provide accurate data for financials, and reducing the manual workarounds you might be experiencing, especially given your 145% growth and diverse service portfolio."
+    },
+    {
+      "objection": "Implementation will be too disruptive for our current operations, especially with our ongoing growth and new leadership (CRO, VP Strategic Accounts).",
+      "response": "We understand minimizing disruption is key, particularly during high growth and leadership transitions. Zenskar is built for rapid, phased implementation. Our AI-powered contract parsing can accelerate setup, and we can focus on automating the most complex areas first, like your project-based professional services or managed services billing. This allows you to see value quickly and supports your new CRO's objectives for revenue optimization without halting momentum."
+    },
+    {
+      "objection": "Our needs are unique; we're not a typical SaaS company, even though we offer tech services.",
+      "response": "Absolutely, Optomi's model as an IT Talent and Professional Services firm is distinct. Zenskar isn't just for SaaS; it's for any business with complex, recurring, or usage-driven revenue streams. Your contract, contract-to-hire, team augmentation, and project-based professional services all involve intricate billing logic and revenue recognition rules that our platform is specifically designed to handle, much like we do for other complex service-based businesses."
+    }
+  ],
+  "key_decision_makers": [],
+  "matched_signals": [
+    {
+      "name": "Employs Complex or Usage-Based Pricing Models",
+      "description": "",
+      "importance": 5,
+      "evidence": "Optomi offers diverse IT talent and professional services through contract, contract-to-hire, team augmentation, project-based professional services, and managed services models. These inherently involve varied and potentially complex billing structures, often customized for large clients. (Source: company_research)"
+    },
+    {
+      "name": "Significant Manual Effort or Errors in Billing/Revenue Recognition",
+      "description": "",
+      "importance": 5,
+      "evidence": "Optomi's rapid and sustained growth (145% in 3 years, 27.9% CAGR 2019-2023), substantial revenue, and diverse service portfolio suggest a high likelihood of facing challenges with manual billing processes and potential errors if not using an advanced automation platform. (Source: company_research)"
+    },
+    {
+      "name": "Mandated ASC 606/IFRS 15 Compliance and Reporting Needs",
+      "description": "",
+      "importance": 5,
+      "evidence": "As a large, PE-backed (FFL Partners) IT services company with significant revenue and complex customer contracts, Optomi is highly likely required to comply with ASC 606 for accurate revenue recognition and financial reporting. (Source: company_research)"
+    }
+  ],
+  "steps": {
+    "company_research": {
+      "step_id": "company_research",
+      "question": "What does this company do and what are their recent developments?",
+      "answer": "Okay, here is a comprehensive overview of Optomi, including their recent developments, based on the research conducted.\n\n**PART 1 - COMPANY OVERVIEW:**\n\n*   **Core Products and Services:** Optomi is an IT Talent Services firm. They provide technology consultants and professionals through various engagement models, including contract, contract-to-hire, and team augmentation. Their expertise spans key technology areas such as Business Optimization, Software Engineering, Cloud & Infrastructure, Cybersecurity, Data Modernization, SaaS, and Emerging Technologies. As part of Optomi Professional Services (OPS), they also offer Professional Services in areas like ServiceNow, Cybersecurity, Program Management, and Software Solutions, as well as Managed Services through their Provalus brand. (Source: [optomi.com](https://www.optomi.com/), [linkedin.com](https://www.linkedin.com/company/optomi), [optomiservices.com](https://www.optomiservices.com/professional-services))\n*   **Primary Industry and Sector:** Optomi operates in the IT Services and IT Consulting industry, specifically focusing on IT staffing and talent solutions. (Source: [leadiq.com](https://leadiq.com/c/optomi/5a1d7fe224000024005ae6a3), [linkedin.com](https://www.linkedin.com/company/optomi))\n*   **Target Customers and Markets:** Optomi targets corporations, including Fortune-listed clients nationwide, who need highly-skilled IT talent to fuel business-critical projects and technology initiatives. (Source: [optomi.com](https://www.optomi.com/), [staffingindustry.com](https://www.staffingindustry.com/news/global-daily-news/optomi-professional-services-gets-significant-investment-pe-firm), [optomi.com/optomi-professional-services-secures-significant-investment-from-ffl-partners](https://www.optomi.com/optomi-professional-services-secures-significant-investment-from-ffl-partners))\n*   **Company Size and Scale:** Optomi has an estimated employee count in the range of 501-1,000 employees (Source: [linkedin.com](https://www.linkedin.com/company/optomi), [leadiq.com](https://leadiq.com/c/optomi/5a1d7fe224000024005ae6a3)). One source lists 145 U.S.-based employees (Source: [greatplacetowork.com](https://www.greatplacetowork.com/certified-company/5003067)). Their estimated annual revenue is in the range of $100M-$1B (Source: [leadiq.com](https://leadiq.com/c/optomi/5a1d7fe224000024005ae6a3)), with a reported revenue run rate of $200 million as of December 2021 (Source: [staffingindustry.com](https://www.staffingindustry.com/news/global-daily-news/optomi-professional-services-gets-significant-investment-pe-firm)). LeadIQ estimates their annual revenue reached $750M as of May 2025 (Source: [leadiq.com](https://leadiq.com/c/optomi/5a1d7fe224000024005ae6a3)). They are consistently recognized as one of the fastest-growing firms in their sector.\n*   **Key Value Propositions:** Optomi's value proposition centers on providing superior IT talent services by focusing on specific skillsets, which streamlines the hiring process for clients. They position themselves as a consultative partner that helps clients define future technology needs and fuels business-critical projects. They emphasize saving clients time and money and are a purpose-driven firm committed to giving back to communities. (Source: [optomi.com](https://www.optomi.com/), [linkedin.com](https://www.linkedin.com/company/optomi), [greatplacetowork.com](https://www.greatplacetowork.com/certified-company/5003067))\n*   **What Makes This Company Unique:** Key differentiators include their skillset-focused recruiting approach, their \"Anchored in America\" delivery model through the Provalus brand (providing onshore IT outsourcing in rural communities), and their proprietary talent development program, The Acadomi. They also highlight their culture rooted in core values and their consistent recognition for growth and as a desirable workplace. (Source: [optomi.com](https://www.optomi.com/), [optomiservices.com](https://www.optomiservices.com/professional-services), [linkedin.com](https://www.linkedin.com/company/optomi), [greatplacetowork.com](https://www.greatplacetowork.com/certified-company/5003067))\n\n**PART 2 - RECENT DEVELOPMENTS (past year - approximately mid-2023 to mid-2024, plus very recent relevant news):**\n\n*   **Growth Recognition:**\n    *   Recognized as one of America's Fastest Growing Private Companies by Inc. Magazine for the 8th consecutive year (August 13, 2024), reporting 145% growth over the past three years. (Source: [optomi.com/optomi-shines-again-as-an-inc-5000-fastest-growing-company-for-the-8th-year-in-a-row](https://www.optomi.com/optomi-shines-again-as-an-inc-5000-fastest-growing-company-for-the-8th-year-in-a-row))\n    *   Recognized by Staffing Industry Analysts (SIA) as one of the Fastest-Growing Staffing Firms in the U.S. for the fifth time (September 17, 2024), with a Compound Annual Growth Rate (CAGR) of 27.9% from 2019-2023. They ranked 9th among IT-focused firms on this list. (Source: [optomiservices.com/optomi-recognized-as-one-of-the-fastest-growing-staffing-firms-in-2024](https://www.optomiservices.com/optomi-recognized-as-one-of-the-fastest-growing-staffing-firms-in-2024))\n    *   Recognized by SIA as one of the Largest IT Staffing Firms in the US (July 15, 2024). (Source: [optomi.com/optomi-recognized-as-one-of-the-largest-it-staffing-firms-in-the-us-by-sia](https://www.optomi.com/optomi-recognized-as-one-of-the-largest-it-staffing-firms-in-the-us-by-sia))\n*   **Leadership Changes:**\n    *   Appointed Blake Guyton as Chief Revenue Officer (CRO) of Optomi Professional Services (October 4, 2024). (Source: [optomi.com/optomi-professional-services-appoints-chief-revenue-officer](https://www.optomi.com/optomi-professional-services-appoints-chief-revenue-officer))\n    *   Announced Carey Luhn as Vice President of Strategic Accounts for Optomi Professional Services (February 10, 2025). (Source: [optomi.com/optomi-professional-services-announces-vice-president-of-strategic-accounts](https://www.optomi.com/optomi-professional-services-announces-vice-president-of-strategic-accounts))\n*   **Expansion:**\n    *   Moved to a larger 15,000-square-foot office space in Charlotte, North Carolina (January 20, 2023). (Source: [leadiq.com](https://leadiq.com/c/optomi/5a1d7fe224000024005ae6a3))\n*   **Strategic Initiatives/Focus Areas:**\n    *   Continued focus on their Acadomi program for training new recruiters and sales team members (Acadomi Class 16 launching May 27, 2025). (Source: [linkedin.com/company/optomi](https://www.linkedin.com/company/optomi))\n    *   Active participation in key industry events, such as ServiceNow Knowledge25 (May 2025), highlighting their expertise in ServiceNow professional and managed services. (Source: [linkedin.com/company/optomi](https://www.linkedin.com/company/optomi))\n    *   Published case studies showcasing their work in areas like integrating IAM solutions, building agile teams, providing local on-site resources, seamlessly integrating ServiceNow, and re-integrating GRC modules (May 2024 - Feb 2025). (Source: [optomiservices.com/blog](https://www.optomiservices.com/blog))\n*   **Funding/Financial Announcements:** Optomi Professional Services received a \"significant\" investment from private equity firm FFL Partners (December 16, 2021), which supported their continued growth and expansion plans. (Source: [staffingindustry.com](https://www.staffingindustry.com/news/global-daily-news/optomi-professional-services-gets-significant-investment-pe-firm), [optomi.com/optomi-professional-services-secures-significant-investment-from-ffl-partners](https://www.optomi.com/optomi-professional-services-secures-significant-investment-from-ffl-partners))\n*   **Other Significant News:**\n    *   Received awards from Comparably for Best Company Leadership (#1 rank) (June 20, 2023) and Best Company Growth (June 19, 2023), based on employee ratings. (Source: [optomi.com/news](https://www.optomi.com/news))\n    *   Recognized among top businesses for Best Company Outlook for the second year in a row by Comparably (March 27, 2023). (Source: [optomi.com/news](https://www.optomi.com/news))",
+      "status": "completed",
+      "confidence": 0.5,
+      "confidence_level": "medium",
+      "sources": [],
+      "validation_status": null,
+      "validation_notes": null,
+      "error": null,
+      "timestamp": "2025-05-16T17:34:26.535696"
+    },
+    "qualification_signals": {
+      "step_id": "qualification_signals",
+      "question": "Which qualification signals does this company match for our product?",
+      "answer": "Okay, I will now analyze Optomi against Zenskar's qualification signals based on the provided company research.\n\n---\n\n**QUALIFICATION SIGNALS ANALYSIS:**\n\n**1. Employs Complex or Usage-Based Pricing Models (Importance: 5/5)**\n\n*   **MATCHES**\n*   **Evidence:**\n    *   Optomi provides IT talent services through various engagement models: \"contract, contract-to-hire, and team augmentation\" (Source: company_research). These models inherently involve different billing structures \u2013 hourly/daily rates for contract staff, potential conversion fees for contract-to-hire, and rates based on team size/duration for augmentation.\n    *   They offer \"Professional Services in areas like ServiceNow, Cybersecurity, Program Management, and Software Solutions\" (Source: company_research). Professional services are often billed based on project scope, milestones, or time and materials, which can be complex to track and invoice.\n    *   Optomi also provides \"Managed Services through their Provalus brand\" (Source: company_research). Managed services typically involve recurring revenue models, potentially with tiered service levels, usage components (e.g., number of supported users/devices), or fixed fees with variable components, all of which add to billing complexity.\n    *   The company targets \"Fortune-listed clients nationwide\" (Source: company_research), which often means negotiating custom enterprise contracts with specific terms, rates, and service level agreements (SLAs) that require flexible billing.\n    *   The combination of these diverse service delivery models (contract staffing, project-based professional services, recurring managed services) and custom enterprise deals points to a high likelihood of complex pricing and billing requirements.\n*   **Confidence:** High\n\n**2. Significant Manual Effort or Errors in Billing/Revenue Recognition (Importance: 5/5)**\n\n*   **POTENTIALLY MATCHES / LIKELY CANDIDATE**\n*   **Evidence & Reasoning:**\n    *   Optomi has experienced significant and consistent growth: \"145% growth over the past three years\" (Inc. 5000, Aug 2024) and a \"Compound Annual Growth Rate (CAGR) of 27.9% from 2019-2023\" (SIA, Sep 2024) (Source: company_research). Rapid growth often outpaces the capabilities of existing manual or semi-automated billing and revenue recognition systems, leading to increased manual effort and potential for errors.\n    *   Their diverse service portfolio (contract, contract-to-hire, team augmentation, professional services, managed services) means managing different types of contracts, billing cycles, and revenue recognition rules. This complexity increases the likelihood of manual workarounds and errors if not managed by a sophisticated system.\n    *   The company's revenue is substantial (reported $200M run rate in Dec 2021, estimated $750M by May 2025 by LeadIQ) (Source: company_research). Managing billing and revenue at this scale, especially with complex service offerings, can be a significant operational burden without robust automation.\n    *   While there's no direct public admission of current struggles with manual effort or errors, the combination of rapid growth, diverse and complex service offerings, and large revenue volume makes Optomi a prime candidate to be experiencing these pain points or to be at risk of them, making Zenskar's automation capabilities highly relevant.\n*   **Confidence:** Medium (The match is based on the high probability of these issues arising from their business profile and growth trajectory, rather than direct evidence of current struggles.)\n\n**3. Mandated ASC 606/IFRS 15 Compliance and Reporting Needs (Importance: 5/5)**\n\n*   **MATCHES**\n*   **Evidence:**\n    *   Optomi is a large private company with significant revenue (\"revenue run rate of $200 million as of December 2021,\" \"LeadIQ estimates their annual revenue reached $750M as of May 2025\") (Source: company_research). Companies of this scale, even if private, typically adhere to stringent accounting standards for internal management, stakeholder reporting, and potential future financial events.\n    *   Optomi Professional Services received a \"significant\" investment from private equity firm FFL Partners in December 2021 (Source: company_research). PE firms almost invariably require their portfolio companies to maintain financials compliant with standards like ASC 606 (for US-based companies like Optomi) to ensure accurate performance tracking, valuation, and readiness for future exits (e.g., sale or IPO).\n    *   The nature of Optomi's services (contract staffing, project-based professional services, managed services) involves complex contracts with customers. ASC 606 provides specific guidance on revenue recognition for such contracts, including identifying performance obligations, determining transaction prices, and allocating revenue, which can be challenging to manage manually, especially at scale.\n    *   Their services span different revenue streams (e.g., time-based, project-based, recurring), each potentially having different revenue recognition timing and considerations under ASC 606.\n*   **Confidence:** High\n\n---\n\n**Matched Qualification Signals Summary:**\n\n*   **Employs Complex or Usage-Based Pricing Models (Importance: 5/5)**\n    *   **Evidence:** Optomi offers diverse IT talent and professional services through contract, contract-to-hire, team augmentation, project-based professional services, and managed services models. These inherently involve varied and potentially complex billing structures, often customized for large clients. (Source: company_research)\n*   **Significant Manual Effort or Errors in Billing/Revenue Recognition (Importance: 5/5)**\n    *   **Evidence (Potential/Likely):** Optomi's rapid and sustained growth (145% in 3 years, 27.9% CAGR 2019-2023), substantial revenue, and diverse service portfolio suggest a high likelihood of facing challenges with manual billing processes and potential errors if not using an advanced automation platform. (Source: company_research)\n*   **Mandated ASC 606/IFRS 15 Compliance and Reporting Needs (Importance: 5/5)**\n    *   **Evidence:** As a large, PE-backed (FFL Partners) IT services company with significant revenue and complex customer contracts, Optomi is highly likely required to comply with ASC 606 for accurate revenue recognition and financial reporting. (Source: company_research)",
+      "status": "completed",
+      "confidence": 0.5,
+      "confidence_level": "medium",
+      "sources": [],
+      "validation_status": null,
+      "validation_notes": null,
+      "error": null,
+      "timestamp": "2025-05-16T17:34:48.049228"
+    }
+  },
+  "started_at": "2025-05-16T17:33:41.495250",
+  "completed_at": "2025-05-16T17:35:42.094470",
+  "overall_status": "completed",
+  "total_time_seconds": 120.59932112693787
+}
