@@ -312,23 +312,56 @@ class ProspectingWorkflow:
     
     @staticmethod
     def _default_research_steps() -> List[ResearchStep]:
-        """Default research steps for streamlined prospecting."""
+        """Default research steps for streamlined prospecting with multi-stage architecture."""
         return [
+            # Stage 1: Planning & Discovery
+            ResearchStep(
+                step_id="research_plan",
+                question="What are the key research areas to investigate for this company?",
+                prompt_template="""
+                Create a detailed research plan for investigating {company_name}.
+                
+                Based on initial information about the company, identify:
+                1. Primary research areas to explore (3-5 key topics)
+                2. Specific questions that need answering
+                3. Types of information sources that would be most valuable
+                4. Potential challenges in researching this company
+                
+                Generate a structured plan that will guide subsequent research steps.
+                Consider the company's industry, size, and market position in your planning.
+                """
+            ),
+            
+            # Stage 2: Broad Information Gathering
             ResearchStep(
                 step_id="company_overview",
                 question="What does this company do? What are their main products and services?",
                 prompt_template="""
                 Provide a comprehensive overview of what this company does.
+                
+                IMPORTANT: Use the Apollo company profile tool to get enriched company data including:
+                - LinkedIn URL
+                - Funding information
+                - Employee count
+                - Revenue data
+                - Leadership information
+                
                 Include:
                 - Core products and services
                 - Primary industry and sector
                 - Target customers and markets
                 - Company size and scale
                 - Key value propositions
+                - Business model and revenue streams
+                - Social media profiles (LinkedIn, Twitter, etc.)
+                - Funding history if available
                 
                 Focus on factual information that would be relevant for B2B sales purposes.
                 Be specific about what makes this company unique in their space.
-                """
+                Cross-reference multiple sources to ensure accuracy.
+                """,
+                depends_on=["research_plan"],
+                use_apollo=True  # Use Apollo for enriched company data
             ),
             # Removed market_position step
             # Removed tech_stack step
@@ -352,24 +385,133 @@ class ProspectingWorkflow:
             #     """,
             #     depends_on=["company_overview"]
             # ),
+            # Stage 3: Deep Dive & Validation
+            ResearchStep(
+                step_id="market_dynamics",
+                question="What is the company's market position, competitive landscape, and industry trends?",
+                prompt_template="""
+                Analyze the company's market dynamics and positioning:
+                
+                1. MARKET POSITION:
+                   - Market share and ranking
+                   - Key competitors
+                   - Differentiation factors
+                   - Growth trajectory
+                
+                2. INDUSTRY TRENDS:
+                   - Major industry trends affecting the company
+                   - Regulatory changes
+                   - Technology disruptions
+                   - Market opportunities and threats
+                
+                3. VALIDATION:
+                   - Cross-reference findings from multiple sources
+                   - Flag any conflicting information
+                   - Assess data reliability
+                
+                Focus on insights that indicate business priorities and potential needs.
+                """,
+                depends_on=["company_overview"]
+            ),
+            
+            ResearchStep(
+                step_id="technology_landscape",
+                question="What is the company's technology infrastructure and digital maturity?",
+                prompt_template="""
+                Research the company's technology landscape:
+                
+                1. CURRENT TECH STACK:
+                   - Core business systems (ERP, CRM, etc.)
+                   - Development technologies
+                   - Infrastructure and cloud platforms
+                   - Security and compliance tools
+                
+                2. DIGITAL MATURITY:
+                   - Technology adoption level
+                   - Digital transformation initiatives
+                   - Innovation practices
+                   - Technical debt indicators
+                
+                3. TECHNOLOGY GAPS:
+                   - Missing capabilities
+                   - Integration challenges
+                   - Scalability issues
+                   - Security concerns
+                
+                Validate findings through multiple sources when possible.
+                Note confidence levels for unverified information.
+                
+                NOTE: The technology research agent will automatically use BuiltWith data when available.
+                """,
+                depends_on=["company_overview"],
+                use_builtwith=True  # Flag to indicate this step should use BuiltWith data
+            ),
+            
             ResearchStep(
                 step_id="recent_developments",
                 question="What recent company developments, news, or changes have occurred in the past year?",
                 prompt_template="""
                 Research recent news, developments, and changes at the company in the past year.
-                Look for:
-                - Leadership changes
-                - Funding or financial announcements
-                - Product launches
-                - Partnerships or acquisitions
-                - Strategic initiatives
-                - Expansion or contraction
+                
+                1. MAJOR EVENTS (with dates):
+                   - Leadership changes
+                   - Funding or financial announcements
+                   - Product launches
+                   - Partnerships or acquisitions
+                   - Strategic initiatives
+                   - Expansion or contraction
+                
+                2. BUSINESS SIGNALS:
+                   - Hiring patterns
+                   - Investment areas
+                   - Strategic pivots
+                   - Market expansion
+                
+                3. SOURCE VERIFICATION:
+                   - Prioritize official company announcements
+                   - Cross-reference with industry news
+                   - Note source reliability
                 
                 Include dates when available to establish a timeline of events.
                 Focus on developments that suggest business priorities and direction.
                 """,
-                depends_on=["company_overview"]
+                depends_on=["market_dynamics", "technology_landscape"]
             ),
+            # Stage 4: Synthesis & Validation
+            ResearchStep(
+                step_id="pain_points_opportunities",
+                question="What are the key business challenges and opportunities for this company?",
+                prompt_template="""
+                Based on all previous research, synthesize the key pain points and opportunities:
+                
+                1. BUSINESS CHALLENGES:
+                   - Operational inefficiencies
+                   - Technology gaps
+                   - Market pressures
+                   - Growth obstacles
+                   - Compliance/regulatory issues
+                   
+                2. STRATEGIC OPPORTUNITIES:
+                   - Market expansion potential
+                   - Technology modernization needs
+                   - Process optimization areas
+                   - Competitive advantages to leverage
+                
+                3. VALIDATION & CONFIDENCE:
+                   - Rate confidence level (High/Medium/Low) for each finding
+                   - Note any conflicting information
+                   - Highlight verified vs. inferred insights
+                
+                4. PRIORITY RANKING:
+                   - Rank pain points by urgency and impact
+                   - Identify which opportunities align with recent developments
+                
+                Ground your analysis in the factual research collected.
+                Be specific about evidence supporting each pain point or opportunity.
+                """,
+                depends_on=["market_dynamics", "technology_landscape", "recent_developments"]
+            ),
+            
             ResearchStep(
                 step_id="product_fit",
                 question="How well does our product fit with this company's needs? What is the potential value proposition?",
@@ -381,29 +523,50 @@ class ProspectingWorkflow:
                 PRODUCT RESEARCH:
                 {selling_product_info}
                 
-                In your analysis, include:
-                - Overall fit assessment (Excellent, Good, Moderate, Poor, Unsuitable)
-                - Specific pain points our product could address
-                - Key features that would be most valuable to them
-                - Potential objections or obstacles to adoption
-                - Customized value proposition for this specific company
-                - Potential decision-makers or departments to approach
+                COMPREHENSIVE FIT ANALYSIS:
                 
-                IMPORTANT - QUALIFICATION SIGNAL ANALYSIS:
-                Include a dedicated section titled "QUALIFICATION SIGNALS ANALYSIS" that contains:
-                1. For EACH qualification signal listed above (whether matched or not):
-                   - State whether the target company MATCHES or DOES NOT MATCH this signal
-                   - If MATCHES: Provide specific evidence from your research supporting this match
-                   - If DOES NOT MATCH: Briefly explain why not
-                   - Consider the importance rating of each signal in your overall fit assessment
+                1. OVERALL FIT ASSESSMENT:
+                   - Fit level (Excellent, Good, Moderate, Poor, Unsuitable)
+                   - Confidence in assessment (High/Medium/Low)
+                   - Key supporting evidence
                 
-                2. Create a summary section titled "Matched Qualification Signals" that lists only the signals that match,
-                   including their importance rating and a brief evidence statement for each.
+                2. PAIN POINT ALIGNMENT:
+                   - Map our product features to identified pain points
+                   - Quantify potential impact for each alignment
+                   - Note strength of evidence for each mapping
                 
-                Be honest and objective in your assessment. If there isn't a good fit, explain why.
-                If there is a good fit, be specific about which aspects of our product align with their needs.
+                3. VALUE PROPOSITION:
+                   - Primary value drivers for this specific company
+                   - Customized messaging based on their priorities
+                   - ROI potential based on their challenges
+                
+                4. QUALIFICATION SIGNAL ANALYSIS:
+                   For EACH qualification signal (whether matched or not):
+                   - MATCH STATUS: [YES/NO/PARTIAL]
+                   - EVIDENCE: Specific proof from research
+                   - CONFIDENCE: [HIGH/MEDIUM/LOW]
+                   - IMPORTANCE: Impact on overall fit assessment
+                
+                5. ADOPTION CONSIDERATIONS:
+                   - Technical fit with their current stack
+                   - Organizational readiness indicators
+                   - Potential obstacles or objections
+                   - Implementation complexity
+                
+                6. DECISION MAKER MAPPING:
+                   - Key stakeholders based on research
+                   - Department priorities alignment
+                   - Budget authority indicators
+                
+                7. COMPETITIVE CONTEXT:
+                   - How we compare to their current solutions
+                   - Unique differentiators for this account
+                   - Switching costs and barriers
+                
+                Be honest and objective. Include confidence levels throughout.
+                If there isn't a good fit, explain why with specific evidence.
                 """,
-                depends_on=["company_overview", "pain_points", "recent_developments"]
+                depends_on=["company_overview", "pain_points_opportunities", "recent_developments"]
             )
         ]
     
@@ -454,6 +617,9 @@ class ProspectingWorkflow:
                 
                 # Extract key data from "product_fit" step
                 await self._process_fit_assessment(result)
+                
+                # Calculate overall research quality and confidence
+                self._calculate_research_quality(result)
         
         except asyncio.TimeoutError:
             print(f"Overall research for {target.company_name} timed out after {TIMEOUTS['account_research']} seconds")
@@ -629,6 +795,77 @@ class ProspectingWorkflow:
             visit(step)
         
         return result
+    
+    def _calculate_research_quality(self, result: ProspectingResult):
+        """Calculate overall research quality and confidence based on step results."""
+        if not result.steps:
+            result.research_quality_score = 0.0
+            result.fit_confidence = 0.0
+            return
+        
+        # Calculate average confidence from all steps
+        total_confidence = 0.0
+        validated_steps = 0
+        conflicting_steps = 0
+        high_quality_sources = 0
+        
+        for step_result in result.steps.values():
+            if step_result.status == ResearchStatus.COMPLETED:
+                total_confidence += step_result.confidence
+                
+                # Count validated steps
+                if step_result.validation_status in ["validated_correct", "validated_incorrect"]:
+                    validated_steps += 1
+                
+                # Count conflicts
+                if step_result.conflict_notes:
+                    conflicting_steps += 1
+                
+                # Count high-quality sources
+                if step_result.source_quality in ["High", "Official"]:
+                    high_quality_sources += 1
+        
+        num_completed_steps = len([s for s in result.steps.values() if s.status == ResearchStatus.COMPLETED])
+        
+        if num_completed_steps > 0:
+            # Base quality score from average confidence
+            base_quality = total_confidence / num_completed_steps
+            
+            # Adjust for validation coverage
+            validation_factor = (validated_steps / num_completed_steps) * 0.2
+            
+            # Penalty for conflicts
+            conflict_penalty = (conflicting_steps / num_completed_steps) * 0.1
+            
+            # Bonus for high-quality sources
+            source_bonus = (high_quality_sources / num_completed_steps) * 0.1
+            
+            # Calculate final research quality score
+            result.research_quality_score = min(1.0, max(0.0, 
+                base_quality + validation_factor - conflict_penalty + source_bonus
+            ))
+            
+            # Set fit confidence based on research quality and specific fit analysis
+            fit_step = result.steps.get("product_fit")
+            if fit_step and fit_step.status == ResearchStatus.COMPLETED:
+                # Weight fit step confidence more heavily
+                result.fit_confidence = (fit_step.confidence * 0.7) + (result.research_quality_score * 0.3)
+            else:
+                result.fit_confidence = result.research_quality_score * 0.8
+                
+            # Add validation summary
+            conflicts = [s.conflict_notes for s in result.steps.values() if s.conflict_notes]
+            if conflicts:
+                result.validation_summary = f"Research completed with {len(conflicts)} conflicting data points: {'; '.join(conflicts[:3])}"
+            else:
+                result.validation_summary = f"Research validated with {result.research_quality_score:.0%} quality score"
+                
+            if self.verbose:
+                print(f"Research quality: {result.research_quality_score:.2f}, Fit confidence: {result.fit_confidence:.2f}")
+        else:
+            result.research_quality_score = 0.0
+            result.fit_confidence = 0.0
+            result.validation_summary = "No research steps completed successfully"
     
     def save_results(self, result: ProspectingResult, path: str = None):
         """Save research results to file."""

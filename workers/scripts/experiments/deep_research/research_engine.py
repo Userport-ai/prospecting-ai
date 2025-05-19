@@ -43,11 +43,13 @@ class ProspectingResearchEngine:
         selling_product: SellingProduct,
         model_name: str = "gemini-2.5-flash-preview-04-17",
         verbose: bool = True,
-        selling_product_research: str = ""
+        selling_product_research: str = "",
+        enable_validation: bool = True  # Enable multi-source validation
     ):
         self.verbose = verbose
         self.model_name = model_name
         self.selling_product = selling_product
+        self.enable_validation = enable_validation
         self.selling_product_research = selling_product_research
         
         # Configure LLM
@@ -66,6 +68,7 @@ class ProspectingResearchEngine:
         
         # Set up search tools
         self.search_tools = self._setup_search_tools()
+        self.specialized_tools = self._setup_specialized_tools()
         
         # Set up research agents
         self.research_agent = self._create_research_agent()
@@ -96,6 +99,84 @@ class ProspectingResearchEngine:
         tools.append(ddg_tool)
 
         return tools
+    
+    def _setup_specialized_tools(self) -> List[BaseTool]:
+        """Set up specialized tools like BuiltWith and Apollo."""
+        try:
+            from .specialized_tools import create_specialized_tools
+            apollo_key = os.getenv("APOLLO_API_KEY")
+            specialized_tools = create_specialized_tools(apollo_api_key=apollo_key)
+            if self.verbose:
+                print(f"Initialized {len(specialized_tools)} specialized tools")
+            return specialized_tools
+        except ImportError as e:
+            if self.verbose:
+                print(f"Could not import specialized tools: {e}")
+            return []
+        except Exception as e:
+            if self.verbose:
+                print(f"Error setting up specialized tools: {e}")
+            return []
+    
+    def _create_agent_for_step(self, step: ResearchStep) -> AgentExecutor:
+        """Create an agent with appropriate tools for a specific research step."""
+        # Determine which tools to use based on step
+        tools = list(self.search_tools)  # Always include search tools
+        
+        # Add specialized tools based on step flags
+        if hasattr(step, 'use_builtwith') and step.use_builtwith:
+            for tool in self.specialized_tools:
+                if tool.name == "builtwith_technology":
+                    tools.append(tool)
+                    if self.verbose:
+                        print(f"Added BuiltWith tool for step {step.step_id}")
+        
+        if hasattr(step, 'use_apollo') and step.use_apollo:
+            for tool in self.specialized_tools:
+                if tool.name == "apollo_company_profile":
+                    tools.append(tool)
+                    if self.verbose:
+                        print(f"Added Apollo tool for step {step.step_id}")
+        
+        # Create agent with the selected tools
+        system_prompt = f"""You are an expert B2B sales and account research specialist.
+        Your task is to research companies to identify sales opportunities, pain points, and fit with a product.
+        
+        CURRENT RESEARCH TASK: {step.question}
+        
+        AVAILABLE TOOLS:
+        {', '.join([f'{tool.name}: {tool.description}' for tool in tools])}
+        
+        RESEARCH PROCESS:
+        1. Understand the research question clearly
+        2. Use the most appropriate tools for the task
+        3. For technology research, prioritize BuiltWith if available
+        4. For company profiles, prioritize Apollo if available
+        5. Complement with web search for additional context
+        6. Synthesize findings into a comprehensive answer
+        
+        Be thorough but CONCISE - focus on the most valuable insights.
+        """
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
+        
+        agent = create_tool_calling_agent(self.llm, tools, prompt)
+        memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
+        
+        return AgentExecutor(
+            agent=agent,
+            tools=tools,
+            verbose=self.verbose,
+            memory=memory,
+            handle_parsing_errors=True,
+            max_iterations=TIMEOUTS["agent_max_iterations"],
+            max_execution_time=TIMEOUTS["agent_execution_time"]
+        )
     
     def _create_research_agent(self) -> AgentExecutor:
         """Create a LangChain agent for performing research."""
@@ -246,10 +327,13 @@ class ProspectingResearchEngine:
             if self.verbose:
                 print(f"\\n--- Researching {step.step_id} for {target.company_name} ---")
             
+            # Create an agent with appropriate tools for this step
+            agent = self._create_agent_for_step(step)
+            
             # Execute research with timeout
             try:
                 agent_result = await asyncio.wait_for(
-                    self.research_agent.ainvoke({"input": research_prompt}),
+                    agent.ainvoke({"input": research_prompt}),
                     timeout=TIMEOUTS["research_step"]
                 )
                 answer = agent_result.get("output", "")
@@ -278,7 +362,7 @@ class ProspectingResearchEngine:
                 )
             
             # Validate if required
-            if step.validate_with_search:
+            if self.enable_validation or step.validate_with_search:
                 result = await self._validate_result(target, step, result)
                 
             return result
@@ -375,13 +459,13 @@ class ProspectingResearchEngine:
         step: ResearchStep, 
         result: ResearchStepResult
     ) -> ResearchStepResult:
-        """Validate a research result using search."""
+        """Validate a research result using search with enhanced confidence scoring."""
         try:
             if self.verbose:
                 print(f"\\n--- Validating {step.step_id} for {target.company_name} ---")
                 
             validation_prompt = f"""
-            Validate this sales research answer:
+            Validate this sales research answer using multiple sources:
             
             QUESTION: <question> {step.question} </question>
             
@@ -392,6 +476,24 @@ class ProspectingResearchEngine:
             - Website: {target.website}
             - Industry: {target.industry if target.industry else "Unknown"}
             </context>
+            
+            VALIDATION INSTRUCTIONS:
+            1. IDENTIFY CRITICAL CLAIMS: List 3-5 critical claims that need verification
+            2. SEARCH MULTIPLE SOURCES: Verify each claim using at least 2 different sources
+            3. CHECK FOR CONFLICTS: Identify any conflicting information between sources
+            4. ASSESS SOURCE QUALITY: Rate the reliability of each source (official company info, news outlets, industry reports)
+            5. CALCULATE CONFIDENCE: Provide a confidence score (0.0-1.0) based on:
+               - Number of confirming sources
+               - Quality of sources
+               - Presence of conflicting information
+               - Recency of information
+               
+            FORMAT YOUR RESPONSE AS:
+            - VERIFIED CLAIMS: [List of verified claims with supporting sources]
+            - CONFLICTS FOUND: [Any conflicting information discovered]
+            - SOURCE QUALITY: [Assessment of source reliability]
+            - CONFIDENCE SCORE: [0.0-1.0]
+            - UPDATED ANSWER: [Corrected answer if changes needed, or "No changes needed"]
             
             INSTRUCTIONS:
             1. Identify 2-3 critical claims that need verification
@@ -440,6 +542,9 @@ class ProspectingResearchEngine:
                 }
             
             # Update result with validation information
+            conflicts = validation_result.get("conflicts_found", [])
+            source_quality = validation_result.get("source_quality", "Unknown")
+            
             updated_result = ResearchStepResult(
                 step_id=result.step_id,
                 question=result.question,
@@ -447,6 +552,8 @@ class ProspectingResearchEngine:
                 status=result.status,
                 validation_status=validation_result.get("validation_status"),
                 validation_notes=validation_result.get("validation_notes"),
+                conflict_notes="; ".join(conflicts) if conflicts else None,
+                source_quality=source_quality,
                 sources=validation_result.get("sources", []),
                 error=result.error
             )

@@ -15,7 +15,7 @@ from .data_models import (
 )
 from .database import DatabaseManager
 from .utils import load_targets_from_csv, format_time
-from .workflow import ProspectingWorkflow
+from .workflow_enhanced import ProspectingWorkflow
 
 
 async def research_selling_product(product: SellingProduct, engine) -> str:
@@ -816,24 +816,68 @@ def run_research_mode(db_manager: DatabaseManager, args):
 
 def main():
     """Main entry point."""
+    # Load environment variables from .env file if it exists
+    # Check both current directory and the script's directory
+    env_locations = ['.env', os.path.join(os.path.dirname(__file__), '.env')]
+    for env_path in env_locations:
+        if os.path.exists(env_path):
+            with open(env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        if '=' in line:
+                            key, value = line.split('=', 1)
+                            os.environ[key] = value
+            break  # Found and loaded, stop looking
+    
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Deep Research Prospecting Tool")
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
-    # File input/output options
+    # Create a shared parent parser for common options
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument("--output", type=str, default="deep_research_results", help="Directory to save research results")
+    common_parser.add_argument("--db", type=str, default="deep_research.db", help="Database file path")
+    common_parser.add_argument("--use-sqlite", action="store_true", help="Use SQLite instead of DuckDB (if available)")
+    common_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    
+    # Add research-single subcommand
+    single_parser = subparsers.add_parser('research-single', parents=[common_parser],
+                                         help='Research a single target company')
+    single_parser.add_argument("--selling-product", required=True, 
+                              help="Name of the product you're selling")
+    single_parser.add_argument("--selling-website", required=True, 
+                              help="Website of the product you're selling")
+    single_parser.add_argument("--target-name", required=True, 
+                              help="Name of the target company")
+    single_parser.add_argument("--target-website", required=True, 
+                              help="Website of the target company")
+    single_parser.add_argument("--target-industry", default="", 
+                              help="Industry of the target company")
+    
+    # Add batch-research subcommand
+    batch_parser = subparsers.add_parser('batch-research', parents=[common_parser],
+                                        help='Research multiple targets from a CSV file')
+    batch_parser.add_argument("--selling-product", required=True, 
+                             help="Name of the product you're selling")
+    batch_parser.add_argument("--selling-website", required=True, 
+                             help="Website of the product you're selling")
+    batch_parser.add_argument("--targets-csv", required=True, 
+                             help="Path to CSV file with target companies")
+    batch_parser.add_argument("--limit", type=int, default=0, 
+                             help="Limit the number of targets to process (0 for all)")
+    batch_parser.add_argument("--offset", type=int, default=0, 
+                             help="Skip this many targets from the beginning")
+    
+    # Keep the original interface as default behavior (for backwards compatibility)
     parser.add_argument("--csv", type=str, default="", help="Path to CSV file with target companies")
     parser.add_argument("--output", type=str, default="deep_research_results", help="Directory to save research results")
-    
-    # Pagination/limiting options
     parser.add_argument("--limit", type=int, default=0, help="Limit the number of targets to process (0 for all)")
     parser.add_argument("--offset", type=int, default=0, help="Skip this many targets from the beginning of CSV")
-    
-    # Basic settings
     parser.add_argument("--sample-product", action="store_true", help="Use a sample product definition for testing")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--db", type=str, default="deep_research.db", help="Database file path")
     parser.add_argument("--use-sqlite", action="store_true", help="Use SQLite instead of DuckDB (if available)")
-    
-    # Mode selection
     parser.add_argument("--query", action="store_true", help="Query mode - search existing results instead of running research")
     
     # Query mode options
@@ -867,15 +911,62 @@ def main():
     
     args = parser.parse_args()
     
-    # Set up database manager
-    db_manager = DatabaseManager(args.db, use_duckdb=not args.use_sqlite)
-    
-    # Query mode - search existing results
-    if args.query:
-        return run_query_mode(db_manager, args)
-    
-    # Research mode - run new research
-    return run_research_mode(db_manager, args)
+    # Handle subcommands
+    if args.command == 'research-single':
+        # Create SellingProduct
+        product = SellingProduct(
+            name=args.selling_product,
+            website=args.selling_website
+        )
+        
+        # Create ProspectingTarget
+        target = ProspectingTarget(
+            company_name=args.target_name,
+            website=args.target_website,
+            industry=args.target_industry
+        )
+        
+        # Set up database
+        db_manager = DatabaseManager(args.db, use_duckdb=not args.use_sqlite)
+        
+        try:
+            asyncio.run(research_single_target(target, product, args.output, db_manager))
+        finally:
+            db_manager.close()
+            
+    elif args.command == 'batch-research':
+        # Create SellingProduct
+        product = SellingProduct(
+            name=args.selling_product,
+            website=args.selling_website
+        )
+        
+        # Load targets from CSV
+        targets = load_targets_from_csv(args.targets_csv)
+        
+        # Apply limit and offset if specified
+        if args.offset > 0:
+            targets = targets[args.offset:]
+        if args.limit > 0:
+            targets = targets[:args.limit]
+        
+        # Set up database
+        db_manager = DatabaseManager(args.db, use_duckdb=not args.use_sqlite)
+        
+        try:
+            asyncio.run(batch_research_targets(targets, product, args.output, args.offset, db_manager))
+        finally:
+            db_manager.close()
+    else:
+        # Original behavior for backwards compatibility
+        db_manager = DatabaseManager(args.db, use_duckdb=not args.use_sqlite)
+        
+        # Query mode - search existing results
+        if args.query:
+            return run_query_mode(db_manager, args)
+        
+        # Research mode - run new research
+        return run_research_mode(db_manager, args)
 
 
 if __name__ == "__main__":
