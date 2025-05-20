@@ -173,4 +173,5 @@ export interface CustomColumnValueData {
   response_type: "string" | "json_object" | "boolean" | "number" | "enum";
   columnId: string; // ID of the custom column this value belongs to - REQUIRED
   status?: "pending" | "processing" | "completed" | "error"; // Status of the generation
+  created_at: string; // Custom column creation date.
 }

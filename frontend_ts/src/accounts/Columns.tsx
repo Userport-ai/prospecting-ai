@@ -7,7 +7,11 @@ import { ColumnDef, Table } from "@tanstack/react-table";
 import { CustomColumnMeta } from "@/table/CustomColumnMeta";
 import { Account as AccountRow, FundingDetails } from "@/services/Accounts";
 import { formatDate } from "@/common/utils";
-import { EnrichmentStatus, RecentCompanyEvent } from "@/services/Common";
+import {
+  EnrichmentStatus,
+  EnrichmentType,
+  RecentCompanyEvent,
+} from "@/services/Common";
 import FundingDetailsView from "./FundingDetailsView";
 import CellListView from "../table/CellListView";
 import { cn } from "@/lib/utils";
@@ -24,21 +28,37 @@ import EditCustomColumnBtn from "@/table/EditCustomColumnBtn";
 // 1. Continue Polling Accounts in this duration. even after basic account enrichment is done.
 // 2. Keep Custom column values disabled in this duration.
 export const maybeCustomColumnsAreGenerating = (
-  accountRow: AccountRow
+  accountRow: AccountRow,
+  customColumnValue: CustomColumnValueData | null
 ): boolean => {
-  if (accountRow.enrichment_status.avg_completion_percent !== 100) {
+  if (
+    accountRow.enrichment_status.statuses?.filter(
+      (enrichment) => enrichment.enrichment_type === EnrichmentType.COMPANY_INFO
+    )[0].status !== "completed"
+  ) {
     // Account enrichment in progress, generation disabled.
     return true;
   }
 
   // Account enrichment is complete.
-  const lastUpdatedDate = new Date(accountRow.enrichment_status.last_update);
+  const accountCreationDate = new Date(accountRow.created_at);
+  if (customColumnValue) {
+    const customColumnCreationDate = new Date(customColumnValue.created_at);
+    if (customColumnCreationDate > accountCreationDate) {
+      // Custom column created after Account enrichment was started, allow its generation.
+      // This does not take care of an edge case where this column may be automatically
+      // picked up by backend to generate but that's ok, atleast they should be allowed to experiment.
+      return false;
+    }
+  }
+
+  // const lastUpdatedDate = new Date(accountRow.enrichment_status.last_update);
   const waitDuration = 30 * 60 * 1000; // 30 minutes.
-  const createdDatePlusWaitDuration = new Date(
-    lastUpdatedDate.getTime() + waitDuration
+  const accountCreationDatePlusWaitDuration = new Date(
+    accountCreationDate.getTime() + waitDuration
   );
   const now = new Date();
-  if (now <= createdDatePlusWaitDuration) {
+  if (now <= accountCreationDatePlusWaitDuration) {
     // Custom Column might still be generating.
     return true;
   } else {
@@ -564,7 +584,8 @@ export const getAccountColumns = (
             onValueGenerated={onRefreshTable}
             // TODO: Return scheduled or pending status from UI to disable generation instead of waiting for a duration.
             disableGeneration={maybeCustomColumnsAreGenerating(
-              info.row.original
+              info.row.original,
+              customColumnValueData ?? null
             )}
           />
         );
