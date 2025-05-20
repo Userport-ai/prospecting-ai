@@ -8,6 +8,27 @@ import time
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
+# Load environment variables from .env file first
+def load_env_file():
+    env_locations = ['.env', os.path.join(os.path.dirname(__file__), '.env')]
+    for env_path in env_locations:
+        if os.path.exists(env_path):
+            with open(env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        if '=' in line:
+                            key, value = line.split('=', 1)
+                            os.environ[key] = value
+            print(f"Loaded environment variables from {env_path}")
+            break  # Found and loaded, stop looking
+
+# Load environment variables BEFORE importing clean_jina
+load_env_file()
+
+# Import clean_jina to ensure it runs before other imports
+from .clean_jina import *
+
 from .apollo_source import ApolloCompanySource
 from .config import APOLLO_API_CONFIG, COMMON_FILTER_TEMPLATES
 from .data_models import (
@@ -15,10 +36,10 @@ from .data_models import (
 )
 from .database import DatabaseManager
 from .utils import load_targets_from_csv, format_time
-from .workflow_enhanced import ProspectingWorkflow
+from .workflow import ProspectingWorkflow
 
 
-async def research_selling_product(product: SellingProduct, engine) -> str:
+async def research_selling_product(product: SellingProduct, engine, interactive: bool = False) -> str:
     print(f"\n=== Researching Selling Product: {product.name} ===\n")
     
     try:
@@ -72,7 +93,7 @@ async def research_selling_product(product: SellingProduct, engine) -> str:
         )
         
         # Generate qualification signals from the research using the engine's LLM
-        await temp_workflow.identify_qualification_signals(product, step_result.answer, interactive=False)
+        await temp_workflow.identify_qualification_signals(product, step_result.answer, interactive=interactive)
         
         # Store the research in the engine for use in formatting prompts
         engine.selling_product_research = step_result.answer
@@ -85,33 +106,26 @@ async def research_selling_product(product: SellingProduct, engine) -> str:
 
 
 async def research_single_target(target: ProspectingTarget, product: SellingProduct, output_dir: str, 
-                                db_manager: Optional[DatabaseManager] = None) -> ProspectingResult:
+                                db_manager: Optional[DatabaseManager] = None, interactive: bool = False) -> ProspectingResult:
     """Research a single target company."""
     start_time = time.time()
     
     from .research_engine import ProspectingResearchEngine
-    engine = ProspectingResearchEngine(selling_product=product, verbose=True, selling_product_research="")
+    engine = ProspectingResearchEngine(selling_product=product, verbose=False, selling_product_research="")
     
     # Research the selling product once
-    selling_product_research = await research_selling_product(product, engine)
+    selling_product_research = await research_selling_product(product, engine, interactive=interactive)
     
     # Create workflow with researched selling product
     workflow = ProspectingWorkflow(
         selling_product=product,
         selling_product_research=selling_product_research,
-        verbose=True
+        verbose=False
     )
     
     result = await workflow.research_target(target)
     
     os.makedirs(output_dir, exist_ok=True)
-    
-    # Save results
-    output_path = os.path.join(
-        output_dir, 
-        f"prospect_{target.company_name.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    )
-    workflow.save_results(result, output_path)
     
     # Save to database if manager provided
     if db_manager:
@@ -119,6 +133,13 @@ async def research_single_target(target: ProspectingTarget, product: SellingProd
         selling_product_id = db_manager.save_selling_product(product)
         # Save research result with reference to selling product
         research_id = db_manager.save_research_result(result, selling_product_id)
+    
+    # Save results
+    output_path = os.path.join(
+        output_dir, 
+        f"prospect_{target.company_name.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
+    workflow.save_results(result, output_path, db_manager)
     
     end_time = time.time()
     total_duration = end_time - start_time
@@ -353,16 +374,16 @@ async def batch_research_targets(targets: List[ProspectingTarget], product: Sell
     
     # Create research engine for selling product research
     from .research_engine import ProspectingResearchEngine
-    engine = ProspectingResearchEngine(selling_product=product, verbose=True, selling_product_research="")
+    engine = ProspectingResearchEngine(selling_product=product, verbose=False, selling_product_research="")
     
     # Research the selling product once
-    selling_product_research = await research_selling_product(product, engine)
+    selling_product_research = await research_selling_product(product, engine, interactive=interactive)
     
     # Create workflow with researched selling product
     workflow = ProspectingWorkflow(
         selling_product=product,
         selling_product_research=selling_product_research,
-        verbose=True
+        verbose=False
     )
     
     # Save selling product to database if manager provided
@@ -382,6 +403,10 @@ async def batch_research_targets(targets: List[ProspectingTarget], product: Sell
         try:
             # Run research
             result = await workflow.research_target(target)
+            
+            # Save to database if manager provided
+            if db_manager and selling_product_id:
+                db_manager.save_research_result(result, selling_product_id)
             
             # Save results
             output_path = os.path.join(
@@ -724,7 +749,7 @@ def run_research_mode(db_manager: DatabaseManager, args):
     
     # Initialize LLM model for filter derivation if needed
     from .research_engine import ProspectingResearchEngine
-    engine = ProspectingResearchEngine(selling_product=product, verbose=True, selling_product_research="")
+    engine = ProspectingResearchEngine(selling_product=product, verbose=False, selling_product_research="")
     
     # Get target companies
     targets = []
@@ -816,20 +841,7 @@ def run_research_mode(db_manager: DatabaseManager, args):
 
 def main():
     """Main entry point."""
-    # Load environment variables from .env file if it exists
-    # Check both current directory and the script's directory
-    env_locations = ['.env', os.path.join(os.path.dirname(__file__), '.env')]
-    for env_path in env_locations:
-        if os.path.exists(env_path):
-            with open(env_path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        if '=' in line:
-                            key, value = line.split('=', 1)
-                            os.environ[key] = value
-            break  # Found and loaded, stop looking
-    
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Deep Research Prospecting Tool")
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
@@ -854,6 +866,8 @@ def main():
                               help="Website of the target company")
     single_parser.add_argument("--target-industry", default="", 
                               help="Industry of the target company")
+    single_parser.add_argument("--interactive", action="store_true",
+                              help="Interactively confirm and edit qualification signals")
     
     # Add batch-research subcommand
     batch_parser = subparsers.add_parser('batch-research', parents=[common_parser],
@@ -930,7 +944,7 @@ def main():
         db_manager = DatabaseManager(args.db, use_duckdb=not args.use_sqlite)
         
         try:
-            asyncio.run(research_single_target(target, product, args.output, db_manager))
+            asyncio.run(research_single_target(target, product, args.output, db_manager, interactive=args.interactive))
         finally:
             db_manager.close()
             

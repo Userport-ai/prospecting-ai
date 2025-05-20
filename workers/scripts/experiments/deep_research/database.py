@@ -50,6 +50,7 @@ class DatabaseManager:
         """Create necessary tables if they don't exist."""
         cursor = self.conn.cursor()
         
+        # Create the research_results table with the markdown column
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS research_results (
             id TEXT PRIMARY KEY,
@@ -62,9 +63,35 @@ class DatabaseManager:
             timestamp TEXT NOT NULL,
             selling_product_id TEXT NOT NULL,
             total_time_seconds REAL NOT NULL,
-            result_json TEXT NOT NULL
+            result_json TEXT NOT NULL,
+            markdown TEXT
         )
         """)
+        
+        # Check if markdown column exists, and add it if it doesn't
+        try:
+            # Check if the table exists but is missing the markdown column
+            if self.use_duckdb:
+                # DuckDB approach
+                cursor.execute("DESCRIBE research_results")
+                columns = cursor.fetchall()
+                column_names = [col[1] for col in columns]  # Column name is at index 1
+                
+                if "markdown" not in column_names:
+                    cursor.execute("ALTER TABLE research_results ADD COLUMN markdown TEXT")
+                    print("Added markdown column to existing research_results table")
+            else:
+                # SQLite approach
+                cursor.execute("PRAGMA table_info(research_results)")
+                columns = cursor.fetchall()
+                column_names = [col[1] for col in columns]  # Column name is at index 1
+                
+                if columns and "markdown" not in column_names:
+                    cursor.execute("ALTER TABLE research_results ADD COLUMN markdown TEXT")
+                    print("Added markdown column to existing research_results table")
+        except Exception as e:
+            print(f"Note: Could not add markdown column: {e}")
+            # Not a critical error, as we have fallback mechanisms
         
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS selling_products (
@@ -139,25 +166,70 @@ class DatabaseManager:
         result_json = json.dumps(result.to_dict())
         
         cursor = self.conn.cursor()
-        cursor.execute("""
-        INSERT INTO research_results (
-            id, company_name, website, industry, fit_level, fit_score, 
-            fit_explanation, timestamp, selling_product_id, total_time_seconds, result_json
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            result_id,
-            result.target.company_name,
-            result.target.website,
-            result.target.industry,
-            result.fit_level.value if isinstance(result.fit_level, Enum) else result.fit_level,
-            result.fit_score,
-            result.fit_explanation,
-            datetime.now().isoformat(),
-            selling_product_id,
-            result.total_time_seconds,
-            result_json
-        ))
+        # Generate markdown from the raw step outputs
+        markdown_content = self._generate_markdown_from_result(result)
+        
+        # Check if markdown column exists to handle both old and new DB schema
+        try:
+            # Try inserting with the markdown column
+            cursor.execute("""
+            INSERT INTO research_results (
+                id, company_name, website, industry, fit_level, fit_score, 
+                fit_explanation, timestamp, selling_product_id, total_time_seconds, result_json,
+                markdown
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                result_id,
+                result.target.company_name,
+                result.target.website,
+                result.target.industry,
+                result.fit_level.value if isinstance(result.fit_level, Enum) else result.fit_level,
+                result.fit_score,
+                result.fit_explanation,
+                datetime.now().isoformat(),
+                selling_product_id,
+                result.total_time_seconds,
+                result_json,
+                markdown_content
+            ))
+        except (sqlite3.OperationalError, Exception) as e:
+            # If the markdown column doesn't exist, insert without it
+            if "no column named markdown" in str(e):
+                print("Warning: Using legacy database schema without markdown support")
+                cursor.execute("""
+                INSERT INTO research_results (
+                    id, company_name, website, industry, fit_level, fit_score, 
+                    fit_explanation, timestamp, selling_product_id, total_time_seconds, result_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    result_id,
+                    result.target.company_name,
+                    result.target.website,
+                    result.target.industry,
+                    result.fit_level.value if isinstance(result.fit_level, Enum) else result.fit_level,
+                    result.fit_score,
+                    result.fit_explanation,
+                    datetime.now().isoformat(),
+                    selling_product_id,
+                    result.total_time_seconds,
+                    result_json
+                ))
+                # Save markdown to file as a fallback
+                try:
+                    import os
+                    output_dir = "deep_research_results"
+                    os.makedirs(output_dir, exist_ok=True)
+                    markdown_path = os.path.join(output_dir, f"prospect_{result.target.company_name.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
+                    with open(markdown_path, 'w') as f:
+                        f.write(markdown_content)
+                    print(f"Saved markdown report to {markdown_path} (database does not support markdown column)")
+                except Exception as md_err:
+                    print(f"Could not save markdown report to file: {md_err}")
+            else:
+                # Re-raise if it's a different error
+                raise
         
         # Save matched signals for easier querying
         for signal in result.matched_signals:
@@ -308,6 +380,69 @@ class DatabaseManager:
         
         return json.loads(row[0])
     
+    def get_research_markdown(self, research_id: str) -> str:
+        """Get the markdown content for a research result by ID."""
+        cursor = self.conn.cursor()
+        
+        try:
+            # Try to get the markdown directly from the database
+            cursor.execute(
+                "SELECT markdown FROM research_results WHERE id = ?",
+                (research_id,)
+            )
+            row = cursor.fetchone()
+            
+            if not row:
+                return None
+            
+            if row[0]:  # If there's actual content
+                return row[0]
+                
+        except (sqlite3.OperationalError, Exception) as e:
+            # If the markdown column doesn't exist, generate it on the fly
+            if "no column named markdown" in str(e):
+                print("Legacy database detected - generating markdown from research data")
+                try:
+                    # Get the full result and generate markdown
+                    result_data = self.get_research_detail(research_id)
+                    if result_data:
+                        # Import necessary classes to reconstruct the result
+                        from .data_models import ProspectingTarget, SellingProduct, ProspectingResult
+                        
+                        # Create minimal objects for markdown generation
+                        target = ProspectingTarget(
+                            company_name=result_data.get("target", {}).get("company_name", "Unknown"),
+                            website=result_data.get("target", {}).get("website", ""),
+                            industry=result_data.get("target", {}).get("industry", "")
+                        )
+                        
+                        selling_product = SellingProduct(
+                            name=result_data.get("selling_product", {}).get("name", "Unknown"),
+                            website=result_data.get("selling_product", {}).get("website", "")
+                        )
+                        
+                        # Create a result object with the minimum needed fields
+                        result = ProspectingResult(
+                            target=target,
+                            selling_product=selling_product
+                        )
+                        
+                        # Set the fields needed for the markdown generation
+                        result.fit_level = result_data.get("fit_level", "unknown")
+                        result.fit_score = result_data.get("fit_score", 0.0)
+                        result.fit_explanation = result_data.get("fit_explanation", "")
+                        result.completed_at = result_data.get("completed_at", "")
+                        result.steps = result_data.get("steps", {})
+                        result.matched_signals = result_data.get("matched_signals", [])
+                        
+                        # Generate the markdown
+                        return self._generate_markdown_from_result(result)
+                except Exception as gen_err:
+                    print(f"Error generating markdown from result data: {gen_err}")
+        
+        # If we couldn't get or generate markdown
+        return None
+    
     def get_signals_summary(self, selling_product_id: str = None) -> Dict[str, Dict]:
         """Get summary statistics for matched signals."""
         query = """
@@ -381,6 +516,61 @@ class DatabaseManager:
             "total_time_seconds": row[4]
         }
 
+    def _generate_markdown_from_result(self, result: 'ProspectingResult') -> str:
+        """Generate markdown from result steps (uses existing LLM outputs without extra processing)."""
+        try:
+            markdown = f"# Research Report: {result.target.company_name}\n\n"
+            markdown += f"- Website: [{result.target.website}]({result.target.website})\n"
+            markdown += f"- Industry: {result.target.industry or 'Unknown'}\n"
+            
+            # Use safer attribute access for enum values
+            fit_level = result.fit_level
+            if hasattr(result.fit_level, 'value'):
+                fit_level = result.fit_level.value
+                
+            markdown += f"- Fit Level: {fit_level}\n"
+            markdown += f"- Fit Score: {result.fit_score:.2f}/1.0\n"
+            markdown += f"- Research Completed: {result.completed_at}\n\n"
+            
+            # Write each research step's raw output
+            markdown += "## Research Steps\n\n"
+            for step_id, step in result.steps.items():
+                # Safely check completion status
+                status = step.status
+                if hasattr(step.status, "value"):
+                    status = step.status.value
+                    
+                if status == "completed":
+                    markdown += f"### {step_id.replace('_', ' ').title()}\n\n"
+                    markdown += f"**Question**: {step.question}\n\n"
+                    markdown += f"{step.answer}\n\n"
+                    if step.sources:
+                        markdown += "**Sources**:\n"
+                        for source in step.sources:
+                            markdown += f"- {source}\n"
+                        markdown += "\n"
+                    markdown += "---\n\n"
+            
+            # Write the final assessment if available
+            if "final_assessment" in result.steps:
+                markdown += "## Final Assessment\n\n"
+                markdown += result.steps["final_assessment"].answer + "\n\n"
+            
+            # Add matched signals section
+            if result.matched_signals:
+                markdown += "## Matched Qualification Signals\n\n"
+                for signal in sorted(result.matched_signals, key=lambda x: x.importance, reverse=True):
+                    markdown += f"- **{signal.name}** (Importance: {signal.importance}/5)\n"
+                    if hasattr(signal, "evidence") and signal.evidence:
+                        markdown += f"  Evidence: {signal.evidence}\n"
+            
+            return markdown
+            
+        except Exception as e:
+            print(f"Error generating markdown: {e}")
+            # Return a basic markdown if we encounter an error
+            return f"# Research Report: {result.target.company_name}\n\nResearch completed on {result.completed_at}"
+    
     def close(self):
         if self.conn:
             self.conn.close()

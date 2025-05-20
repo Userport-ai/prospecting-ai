@@ -11,6 +11,9 @@ import asyncio
 import re
 from typing import Dict, Any, List, Optional
 
+# clean_jina module is imported at the module level in main.py
+# which sets up all the logging before any imports
+
 # LangChain imports
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.memory import ConversationBufferMemory
@@ -21,6 +24,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import SecretStr
+
+# Import AgentExecutor (removed custom executor)
 
 from .data_models import (
     SellingProduct, ProspectingTarget, ResearchStepResult, 
@@ -42,15 +47,18 @@ class ProspectingResearchEngine:
         self, 
         selling_product: SellingProduct,
         model_name: str = "gemini-2.5-flash-preview-04-17",
+        pro_model_name: str = "gemini-2.5-pro-preview-05-06",
         verbose: bool = True,
         selling_product_research: str = "",
-        enable_validation: bool = True  # Enable multi-source validation
+        enable_validation: bool = True,  # Enable multi-source validation
+        disable_blue_tool_output: bool = True  # Disable blue coloring for tool output
     ):
         self.verbose = verbose
         self.model_name = model_name
         self.selling_product = selling_product
         self.enable_validation = enable_validation
         self.selling_product_research = selling_product_research
+        self.disable_blue_tool_output = disable_blue_tool_output
         
         # Configure LLM
         if "gemini" in model_name.lower():
@@ -60,6 +68,11 @@ class ProspectingResearchEngine:
 
             self.llm = ChatGoogleGenerativeAI(
                 model=model_name,
+                temperature=0.2,
+                google_api_key=google_api_key
+            )
+            self.pro_llm = ChatGoogleGenerativeAI(
+                model=pro_model_name,
                 temperature=0.2,
                 google_api_key=google_api_key
             )
@@ -74,22 +87,41 @@ class ProspectingResearchEngine:
         self.research_agent = self._create_research_agent()
         self.validation_agent = self._create_validation_agent()
     
-    @staticmethod
-    def _setup_search_tools() -> List[BaseTool]:
+    def _setup_search_tools(self) -> List[BaseTool]:
         """Set up search tools for research and validation."""
         tools = []
 
-        # Set up Jina search if API key is available
-        jina_api_key_value = os.getenv("JINA_API_TOKEN")
-        if jina_api_key_value:
-            jina_wrapper = JinaSearchAPIWrapper(
-                api_key=SecretStr(jina_api_key_value)
-            )
-            jina_tool = JinaSearch(search_wrapper=jina_wrapper)
-            jina_tool.description = """Searches the web using Jina's AI-powered search. 
-            Use this for finding specific facts and information about companies, products, 
-            recent events, or market data."""
-            tools.append(jina_tool)
+        # Set up search tools
+        # Try to use Jina if available, otherwise use DuckDuckGo
+        try:
+            # Make sure the environment variables are properly mapped
+            if "JINA_API_TOKEN" in os.environ and "JINA_API_KEY" not in os.environ:
+                os.environ["JINA_API_KEY"] = os.environ["JINA_API_TOKEN"]
+                
+            # Use JINA_API_KEY which is what the wrapper expects
+            jina_api_key = os.getenv("JINA_API_KEY")
+            if jina_api_key:
+                from langchain_community.utilities.jina_search import JinaSearchAPIWrapper
+                from langchain_community.tools.jina_search import JinaSearch
+                
+                # Create standard wrapper without passing api_key explicitly
+                # This makes it use JINA_API_KEY from environment
+                wrapper = JinaSearchAPIWrapper()
+                
+                # Create tool with adjusted name
+                jina_tool = JinaSearch(api_wrapper=wrapper)
+                jina_tool.description = """Searches the web using Jina's AI-powered search. 
+                Use this for finding specific facts and information about companies, products, 
+                recent events, or market data."""
+                
+                tools.append(jina_tool)
+            else:
+                # Fallback to DuckDuckGo (already added below)
+                pass
+        except Exception as e:
+            if self.verbose:
+                print(f"Error setting up Jina search: {e}")
+            # Will fall back to DuckDuckGo
 
         # Set up DuckDuckGo as fallback
         ddg_tool = DuckDuckGoSearchRun()
@@ -168,6 +200,13 @@ class ProspectingResearchEngine:
         agent = create_tool_calling_agent(self.llm, tools, prompt)
         memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
         
+        # Import our custom callback handler if blue tool output is disabled
+        if self.disable_blue_tool_output:
+            from .custom_callbacks import SilentToolCallbackHandler
+            callbacks = [SilentToolCallbackHandler()]
+        else:
+            callbacks = None
+            
         return AgentExecutor(
             agent=agent,
             tools=tools,
@@ -175,7 +214,8 @@ class ProspectingResearchEngine:
             memory=memory,
             handle_parsing_errors=True,
             max_iterations=TIMEOUTS["agent_max_iterations"],
-            max_execution_time=TIMEOUTS["agent_execution_time"]
+            max_execution_time=TIMEOUTS["agent_execution_time"],
+            callbacks=callbacks
         )
     
     def _create_research_agent(self) -> AgentExecutor:
@@ -225,6 +265,13 @@ class ProspectingResearchEngine:
 
         memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
 
+        # Import our custom callback handler if blue tool output is disabled
+        if self.disable_blue_tool_output:
+            from .custom_callbacks import SilentToolCallbackHandler
+            callbacks = [SilentToolCallbackHandler()]
+        else:
+            callbacks = None
+
         return AgentExecutor(
             agent=agent,
             tools=self.search_tools,
@@ -232,7 +279,8 @@ class ProspectingResearchEngine:
             memory=memory,
             handle_parsing_errors=True,
             max_iterations=TIMEOUTS["agent_max_iterations"],
-            max_execution_time=TIMEOUTS["agent_execution_time"]
+            max_execution_time=TIMEOUTS["agent_execution_time"],
+            callbacks=callbacks
         )
     
     def _create_validation_agent(self) -> AgentExecutor:
@@ -290,6 +338,13 @@ class ProspectingResearchEngine:
 
         memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
 
+        # Import our custom callback handler if blue tool output is disabled
+        if self.disable_blue_tool_output:
+            from .custom_callbacks import SilentToolCallbackHandler
+            callbacks = [SilentToolCallbackHandler()]
+        else:
+            callbacks = None
+            
         return AgentExecutor(
             agent=agent,
             tools=self.search_tools,
@@ -297,7 +352,8 @@ class ProspectingResearchEngine:
             memory=memory,
             handle_parsing_errors=True,
             max_iterations=TIMEOUTS["agent_max_iterations"],
-            max_execution_time=TIMEOUTS["agent_execution_time"]
+            max_execution_time=TIMEOUTS["agent_execution_time"],
+            callbacks=callbacks
         )
     
     async def research_step(
@@ -325,7 +381,7 @@ class ProspectingResearchEngine:
             )
             
             if self.verbose:
-                print(f"\\n--- Researching {step.step_id} for {target.company_name} ---")
+                print(f"\n--- Researching {step.step_id} for {target.company_name} ---")
             
             # Create an agent with appropriate tools for this step
             agent = self._create_agent_for_step(step)
