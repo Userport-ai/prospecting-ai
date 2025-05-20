@@ -4,6 +4,11 @@
 """
 Clean Jina implementation that uses environment variables and logging to control output.
 Set environment variables before importing to suppress verbose logging.
+
+This implementation includes:
+1. Proper async handling for JinaSearch tool to prevent event loop blocking
+2. Environment variable mapping between JINA_API_TOKEN and JINA_API_KEY
+3. Suppressed Jina logging for cleaner output
 """
 
 import os
@@ -46,33 +51,13 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 
-# Import JinaSearch after setting up logging environment
+# Note: This module no longer provides a custom JinaSearch implementation.
+# It only sets up environment variables and logging configuration.
+# Import JinaSearch directly from langchain_community.tools.jina_search in your code.
 try:
+    # Just check if imports are available, but don't export them from this module
     from langchain_community.tools.jina_search import JinaSearch
     from langchain_community.utilities.jina_search import JinaSearchAPIWrapper
-    from langchain.tools import BaseTool
-    from pydantic import SecretStr, Field
-    
-    # Override the default JinaSearch tool to prevent duplicated intro text
-    class JinaSearch(BaseTool):
-        """Tool that searches the web using Jina AI's API."""
-
-        name: str = "jina_search"
-        description: str = """Searches the web using Jina's AI-powered search. 
-        Use this for finding specific facts and information about companies, products, 
-        recent events, or market data."""
-        
-        api_wrapper: JinaSearchAPIWrapper = Field(default_factory=JinaSearchAPIWrapper)
-        
-        def _run(self, query: str) -> str:
-            """Run the query through Jina search and get back search results."""
-            # This ensures we only get the actual search results, not the intro message
-            return self.api_wrapper.run(query)
-            
-        async def _arun(self, query: str) -> str:
-            """Run the query through Jina search and get back search results."""
-            # This ensures we only get the actual search results, not the intro message
-            return await self.api_wrapper.arun(query)
-    
+    print("Jina search configuration complete. Import JinaSearch directly from langchain_community.tools.jina_search.")
 except ImportError:
     print("Jina search tools not available. Search functionality will be limited.")

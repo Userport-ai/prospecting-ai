@@ -12,12 +12,14 @@ import re
 from typing import Dict, Any, List, Optional
 
 # clean_jina module is imported at the module level in main.py
-# which sets up all the logging before any imports
+# which sets up environment variables and logging configuration before any imports
+# JinaSearch is imported directly from langchain_community.tools.jina_search
 
 # LangChain imports
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.memory import ConversationBufferMemory
 from langchain_community.tools import DuckDuckGoSearchRun
+# Import JinaSearch directly from langchain_community
 from langchain_community.tools.jina_search import JinaSearch
 from langchain_community.utilities.jina_search import JinaSearchAPIWrapper
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -50,15 +52,15 @@ class ProspectingResearchEngine:
         pro_model_name: str = "gemini-2.5-pro-preview-05-06",
         verbose: bool = True,
         selling_product_research: str = "",
-        enable_validation: bool = True,  # Enable multi-source validation
-        disable_blue_tool_output: bool = True  # Disable blue coloring for tool output
+        enable_validation: bool = False,
+        disable_tool_output: bool = True
     ):
         self.verbose = verbose
         self.model_name = model_name
         self.selling_product = selling_product
         self.enable_validation = enable_validation
         self.selling_product_research = selling_product_research
-        self.disable_blue_tool_output = disable_blue_tool_output
+        self.disable_tool_output = disable_tool_output
         
         # Configure LLM
         if "gemini" in model_name.lower():
@@ -101,16 +103,11 @@ class ProspectingResearchEngine:
             # Use JINA_API_KEY which is what the wrapper expects
             jina_api_key = os.getenv("JINA_API_KEY")
             if jina_api_key:
-                from langchain_community.utilities.jina_search import JinaSearchAPIWrapper
-                from langchain_community.tools.jina_search import JinaSearch
-                
                 # Create standard wrapper without passing api_key explicitly
                 # This makes it use JINA_API_KEY from environment
                 wrapper = JinaSearchAPIWrapper()
                 
-                # Use our overridden version of JinaSearch that doesn't repeat intro text
-                from .clean_jina import JinaSearch
-                
+                # Use the standard JinaSearch from langchain_community
                 jina_tool = JinaSearch(api_wrapper=wrapper)
                 tools.append(jina_tool)
             else:
@@ -199,7 +196,7 @@ class ProspectingResearchEngine:
         memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
         
         # Import our custom callback handler if blue tool output is disabled
-        if self.disable_blue_tool_output:
+        if self.disable_tool_output:
             from .custom_callbacks import SilentToolCallbackHandler
             callbacks = [SilentToolCallbackHandler()]
         else:
@@ -264,7 +261,7 @@ class ProspectingResearchEngine:
         memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
 
         # Import our custom callback handler if blue tool output is disabled
-        if self.disable_blue_tool_output:
+        if self.disable_tool_output:
             from .custom_callbacks import SilentToolCallbackHandler
             callbacks = [SilentToolCallbackHandler()]
         else:
@@ -337,7 +334,7 @@ class ProspectingResearchEngine:
         memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
 
         # Import our custom callback handler if blue tool output is disabled
-        if self.disable_blue_tool_output:
+        if self.disable_tool_output:
             from .custom_callbacks import SilentToolCallbackHandler
             callbacks = [SilentToolCallbackHandler()]
         else:
