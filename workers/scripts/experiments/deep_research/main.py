@@ -413,11 +413,7 @@ async def batch_research_targets(targets: List[ProspectingTarget], product: Sell
                 output_dir, 
                 f"prospect_{target.company_name.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             )
-            workflow.save_results(result, output_path)
-            
-            # Save to database if manager provided
-            if db_manager and selling_product_id:
-                db_manager.save_research_result(result, selling_product_id)
+            workflow.save_results(result, output_path, db_manager)
             
             # Add to results list
             results.append(result)

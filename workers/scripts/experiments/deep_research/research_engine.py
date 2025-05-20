@@ -108,12 +108,10 @@ class ProspectingResearchEngine:
                 # This makes it use JINA_API_KEY from environment
                 wrapper = JinaSearchAPIWrapper()
                 
-                # Create tool with adjusted name
-                jina_tool = JinaSearch(api_wrapper=wrapper)
-                jina_tool.description = """Searches the web using Jina's AI-powered search. 
-                Use this for finding specific facts and information about companies, products, 
-                recent events, or market data."""
+                # Use our overridden version of JinaSearch that doesn't repeat intro text
+                from .clean_jina import JinaSearch
                 
+                jina_tool = JinaSearch(api_wrapper=wrapper)
                 tools.append(jina_tool)
             else:
                 # Fallback to DuckDuckGo (already added below)

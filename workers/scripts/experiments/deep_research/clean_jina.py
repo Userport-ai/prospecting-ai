@@ -10,7 +10,7 @@ import os
 import logging
 import warnings
 import sys
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # Set environment variables before importing
 os.environ["JINA_LOG_LEVEL"] = "ERROR"
@@ -50,6 +50,29 @@ logging.basicConfig(
 try:
     from langchain_community.tools.jina_search import JinaSearch
     from langchain_community.utilities.jina_search import JinaSearchAPIWrapper
-    from pydantic import SecretStr
+    from langchain.tools import BaseTool
+    from pydantic import SecretStr, Field
+    
+    # Override the default JinaSearch tool to prevent duplicated intro text
+    class JinaSearch(BaseTool):
+        """Tool that searches the web using Jina AI's API."""
+
+        name = "jina_search"
+        description = """Searches the web using Jina's AI-powered search. 
+        Use this for finding specific facts and information about companies, products, 
+        recent events, or market data."""
+        
+        api_wrapper: JinaSearchAPIWrapper = Field(default_factory=JinaSearchAPIWrapper)
+        
+        def _run(self, query: str) -> str:
+            """Run the query through Jina search and get back search results."""
+            # This ensures we only get the actual search results, not the intro message
+            return self.api_wrapper.run(query)
+            
+        async def _arun(self, query: str) -> str:
+            """Run the query through Jina search and get back search results."""
+            # This ensures we only get the actual search results, not the intro message
+            return await self.api_wrapper.arun(query)
+    
 except ImportError:
     print("Jina search tools not available. Search functionality will be limited.")
