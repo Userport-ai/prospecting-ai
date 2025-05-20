@@ -57,8 +57,8 @@ try:
     class JinaSearch(BaseTool):
         """Tool that searches the web using Jina AI's API."""
 
-        name = "jina_search"
-        description = """Searches the web using Jina's AI-powered search. 
+        name: str = "jina_search"
+        description: str = """Searches the web using Jina's AI-powered search. 
         Use this for finding specific facts and information about companies, products, 
         recent events, or market data."""
         
