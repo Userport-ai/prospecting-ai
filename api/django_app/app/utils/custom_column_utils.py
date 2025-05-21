@@ -59,7 +59,7 @@ def get_batch_custom_column_values(entity_type: str, entity_ids: List[str], excl
                 elif cv.value_boolean is not None:
                     value = cv.value_boolean
                 elif cv.value_number is not None:
-                    value = str(cv.value_number)
+                    value = float(cv.value_number)  # Convert Decimal to float for JSON serialization
                 else:
                     continue
 
