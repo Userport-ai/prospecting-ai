@@ -119,7 +119,7 @@ def serialize_custom_types(data: Any) -> Any:
     elif isinstance(data, uuid.UUID):
         return str(data)
     elif isinstance(data, Decimal):
-        return float(data)  # Convert Decimal to float for JSON serialization
+        return float(data)
     elif isinstance(data, dict):
         return {k: serialize_custom_types(v) for k, v in data.items()}
     elif isinstance(data, list):
