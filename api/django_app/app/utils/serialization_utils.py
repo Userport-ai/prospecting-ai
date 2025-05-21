@@ -102,6 +102,7 @@ def serialize_custom_types(data: Any) -> Any:
     Currently handles:
     - datetime objects to ISO format strings
     - UUID objects to strings
+    - Decimal objects to floats
 
     Args:
         data: Any data structure that might contain non-serializable objects
@@ -111,11 +112,14 @@ def serialize_custom_types(data: Any) -> Any:
     """
     import datetime
     import uuid
+    from decimal import Decimal
 
     if isinstance(data, datetime.datetime):
         return data.isoformat()
     elif isinstance(data, uuid.UUID):
         return str(data)
+    elif isinstance(data, Decimal):
+        return float(data)
     elif isinstance(data, dict):
         return {k: serialize_custom_types(v) for k, v in data.items()}
     elif isinstance(data, list):
