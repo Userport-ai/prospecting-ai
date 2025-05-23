@@ -14,7 +14,7 @@ TIMEOUTS = {
 }
 
 # LLM model configurations
-DEFAULT_MODEL = "gemini-2.5-flash-preview-04-17"
+DEFAULT_MODEL = "gemini-2.5-flash-preview-05-20"
 
 # Research step configuration
 MAX_QUALIFICATION_SIGNALS = 3  # Maximum number of qualification signals to process

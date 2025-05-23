@@ -359,7 +359,7 @@ async def generate_targets_from_apollo(
 
 
 async def batch_research_targets(targets: List[ProspectingTarget], product: SellingProduct, 
-                                output_dir: str, limit: int = 0, db_manager: Optional[DatabaseManager] = None):
+                                output_dir: str, limit: int = 0, db_manager: Optional[DatabaseManager] = None, interactive: bool = False):
     """Research multiple target companies."""
     global_start_time = time.time()
     
@@ -827,9 +827,9 @@ def run_research_mode(db_manager: DatabaseManager, args):
     # Run research
     try:
         if len(targets) == 1:
-            asyncio.run(research_single_target(targets[0], product, args.output, db_manager))
+            asyncio.run(research_single_target(targets[0], product, args.output, db_manager, interactive=args.interactive if hasattr(args, 'interactive') else False))
         else:
-            asyncio.run(batch_research_targets(targets, product, args.output, 0, db_manager))
+            asyncio.run(batch_research_targets(targets, product, args.output, 0, db_manager, interactive=args.interactive if hasattr(args, 'interactive') else False))
     finally:
         # Always close database connection
         db_manager.close()
@@ -964,7 +964,7 @@ def main():
         db_manager = DatabaseManager(args.db, use_duckdb=not args.use_sqlite)
         
         try:
-            asyncio.run(batch_research_targets(targets, product, args.output, args.offset, db_manager))
+            asyncio.run(batch_research_targets(targets, product, args.output, args.offset, db_manager, interactive=args.interactive if hasattr(args, 'interactive') else False))
         finally:
             db_manager.close()
     else:
