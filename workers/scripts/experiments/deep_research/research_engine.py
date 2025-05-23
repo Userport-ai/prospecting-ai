@@ -6,14 +6,10 @@ Core research engine for deep prospecting analysis.
 Handles the execution of research steps and validation.
 """
 
-import os
 import asyncio
+import os
 import re
-from typing import Dict, Any, List, Optional
-
-# clean_jina module is imported at the module level in main.py
-# which sets up environment variables and logging configuration before any imports
-# JinaSearch is imported directly from langchain_community.tools.jina_search
+from typing import Dict, Any, List
 
 # LangChain imports
 from langchain.agents import AgentExecutor, create_tool_calling_agent
@@ -21,19 +17,15 @@ from langchain.memory import ConversationBufferMemory
 from langchain_community.tools import DuckDuckGoSearchRun
 # Import JinaSearch directly from langchain_community
 from langchain_community.tools.jina_search import JinaSearch
-from langchain_community.utilities.jina_search import JinaSearchAPIWrapper
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langchain_google_genai import ChatGoogleGenerativeAI
-from pydantic import SecretStr
 
-# Import AgentExecutor (removed custom executor)
-
+from .config import TIMEOUTS
 from .data_models import (
-    SellingProduct, ProspectingTarget, ResearchStepResult, 
+    SellingProduct, ProspectingTarget, ResearchStepResult,
     ResearchStatus, ConfidenceLevel, ResearchStep
 )
-from .config import TIMEOUTS
 
 try:
     from json_repair import loads as repair_loads
@@ -103,9 +95,13 @@ class ProspectingResearchEngine:
             # Use JINA_API_KEY which is what the wrapper expects
             jina_api_key = os.getenv("JINA_API_KEY")
             if jina_api_key:
-                # Create standard wrapper without passing api_key explicitly
-                # This makes it use JINA_API_KEY from environment
-                wrapper = JinaSearchAPIWrapper()
+                # Use optimized wrapper to reduce token consumption
+                from .optimized_jina_wrapper import OptimizedJinaSearchAPIWrapper
+                wrapper = OptimizedJinaSearchAPIWrapper(
+                    max_results=10,  # Limit to top 5 results
+                    max_content_length=800,  # Limit content to 800 chars
+                    extract_relevant_content=True  # Extract only relevant parts
+                )
                 
                 # Use the standard JinaSearch from langchain_community
                 jina_tool = JinaSearch(api_wrapper=wrapper)

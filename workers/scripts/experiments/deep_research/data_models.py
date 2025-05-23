@@ -5,11 +5,10 @@
 Data models for the deep research prospecting tool.
 """
 
-import json
-from enum import Enum
-from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
+from enum import Enum
+from typing import Dict, Any, List, Optional
 
 try:
     from json_repair import loads as repair_loads
@@ -172,7 +171,7 @@ class ProspectingResult:
 
 
 class ResearchStep:
-    """A step in the research workflow"""
+    """A step    in the research workflow"""
     
     def __init__(
         self,

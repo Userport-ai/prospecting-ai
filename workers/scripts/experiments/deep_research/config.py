@@ -1,7 +1,7 @@
 """Configuration settings for the deep research prospecting tool."""
 TIMEOUTS = {
     # Agent timeouts
-    "agent_max_iterations": 8,        # Reduced from 12 to 8 to speed up processing
+    "agent_max_iterations": 5,        # Reduced from 8 to 5 to reduce token usage
     "agent_execution_time": 300,      # 5 minutes max per agent execution (reduced from 10 minutes)
     
     # Step timeouts
