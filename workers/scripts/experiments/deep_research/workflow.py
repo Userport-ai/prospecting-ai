@@ -24,7 +24,7 @@ class ProspectingWorkflow:
         self, 
         selling_product: SellingProduct,
         selling_product_research: str = "",
-        model_name: str = "gemini-2.5-flash-preview-04-17",
+        model_name: str = "gemini-2.5-flash-preview-05-20",
         verbose: bool = True
     ):
         self.engine = ProspectingResearchEngine(
@@ -246,104 +246,52 @@ class ProspectingWorkflow:
             print(f"{i}. {signal.name} (Importance: {signal.importance}/5)")
         
         return confirmed_signals[:MAX_QUALIFICATION_SIGNALS]
-    
+
     def _setup_streamlined_steps(self):
-        """Set up streamlined research steps focused on screening efficiency."""
-        base_steps = [
-            # Step 1: Quick Company Overview (enriched with Apollo)
-            ResearchStep(
-                step_id="company_essentials",
-                question="What are the essential facts about this company?",
-                prompt_template="""
-                Provide essential company information for quick screening:
-                
-                REQUIRED INFORMATION:
-                1. Company basics: name, website, industry, founded year
-                2. Size: employee count, revenue (if available)
-                3. Business model: B2B/B2C, primary offerings
-                4. Market focus: target customers, key verticals
-                5. Headquarters and major locations
-                6. Recent funding (if any)
-                7. Key leadership (CEO, CTO if relevant)
-                
-                Use Apollo.io data for enriched company profile including LinkedIn URL,
-                funding details, and accurate employee count.
-                
-                Keep responses factual and concise - aim for rapid screening efficiency.
-                """,
-                use_apollo=True
-            ),
-            
-            # Step 2: Technology & Operations Scan
-            ResearchStep(
-                step_id="tech_operations",
-                question="What technology does this company use and how do they operate?",
-                prompt_template="""
-                Research the company's technology and operations:
-                
-                1. TECHNOLOGY STACK:
-                   - Use BuiltWith data to identify their tech stack
-                   - Core business systems (CRM, ERP, etc.)
-                   - Development technologies and platforms
-                   - Cloud infrastructure and tools
-                   
-                2. OPERATIONAL INDICATORS:
-                   - Digital maturity level
-                   - Innovation indicators (R&D, patents, tech initiatives)
-                   - Automation level
-                   - Security/compliance focus
-                
-                3. BUSINESS PRIORITIES:
-                   - Recent technology investments
-                   - Digital transformation initiatives
-                   - Hiring focus areas (from job postings)
-                
-                Focus on factual findings that indicate readiness for new solutions.
-                BuiltWith data will be automatically included for tech stack analysis.
-                """,
-                depends_on=["company_essentials"],
-                use_builtwith=True
-            ),
-            
-            # Step 3: Recent Developments & Signals
-            ResearchStep(
-                step_id="market_signals",
-                question="What recent developments and market signals indicate company direction?",
-                prompt_template="""
-                Identify recent developments and market signals (last 12 months):
-                
-                1. GROWTH INDICATORS:
-                   - Funding rounds or acquisitions
-                   - New product launches
-                   - Market expansion
-                   - Partnership announcements
-                   
-                2. ORGANIZATIONAL CHANGES:
-                   - Leadership changes
-                   - Restructuring
-                   - Strategic pivots
-                   - Hiring patterns
-                
-                3. CHALLENGES & OPPORTUNITIES:
-                   - Mentioned pain points in press/interviews
-                   - Competitive pressures
-                   - Regulatory changes affecting them
-                   - Market opportunities they're pursuing
-                
-                4. BUYING SIGNALS:
-                   - Technology modernization initiatives
-                   - Process improvement focus
-                   - Budget allocations
-                   - Vendor evaluation activities
-                
-                Include specific dates and sources for key findings.
-                Focus on signals that indicate readiness for new solutions.
-                """,
-                depends_on=["company_essentials", "tech_operations"]
-            )
-        ]
-        
-        self.research_steps = base_steps
+        """Set up a single, consolidated research step for initial screening."""
+        consolidated_step = ResearchStep(
+            step_id="comprehensive_initial_research",
+            question="What are the essential facts, technology stack, operational details, and recent market signals for this company?",
+            prompt_template="""
+            Provide a comprehensive overview of the target company for initial screening.
+            Combine information on company essentials, technology, operations, and recent market signals.
+
+            REQUIRED INFORMATION:
+
+            1.  COMPANY ESSENTIALS (Utilize Apollo.io for enriched data):
+                *   Company basics: Official name, website, primary industry, year founded.
+                *   Size: Current employee count, latest reported revenue (if available).
+                *   Business model: B2B/B2C, primary products/services offered.
+                *   Market focus: Target customer segments, key geographical markets or verticals.
+                *   Headquarters and any other major operational locations.
+                *   Recent funding rounds: Dates, amounts, and lead investors (if applicable).
+                *   Key leadership: CEO, CTO, and other relevant C-suite executives.
+                *   LinkedIn URL for the company.
+
+            2.  TECHNOLOGY & OPERATIONS (Utilize BuiltWith data for tech stack):
+                *   Technology Stack: Identify core technologies used (CRM, ERP, marketing automation, cloud provider, web technologies, etc.).
+                *   Operational Indicators: Assess digital maturity, any visible innovation efforts (R&D, patents), and focus on automation or security/compliance.
+                *   Business Priorities from Tech: Note recent technology investments, digital transformation projects, or specific tech-related hiring trends from job postings.
+
+            3.  RECENT DEVELOPMENTS & MARKET SIGNALS (Focus on the last 12-18 months):
+                *   Growth Indicators: Significant funding rounds, mergers or acquisitions, major new product launches, market expansion initiatives, key strategic partnerships.
+                *   Organizational Changes: Important leadership changes, significant restructuring, or strategic pivots in business direction.
+                *   Challenges & Opportunities: Publicly mentioned pain points, competitive pressures, impactful regulatory changes, or new market opportunities being pursued.
+                *   Buying Signals: Explicit mentions of technology modernization, process improvement initiatives, budget allocations for new tools, or active vendor evaluations.
+
+            INSTRUCTIONS:
+            - Synthesize all this information into a coherent overview.
+            - Prioritize factual, verifiable information.
+            - Be concise but thorough, aiming for efficient screening.
+            - Cite sources for critical data points if possible (e.g., funding news).
+            - Apollo.io data will be used for company profile enrichment.
+            - BuiltWith data will be used for technology stack analysis.
+            """,
+            use_apollo=True,
+            use_builtwith=True
+        )
+
+        self.research_steps = [consolidated_step]
     
     def _create_qualification_steps(self, signals: List[QualificationSignal]) -> List[ResearchStep]:
         """Dynamically create one step per qualification signal."""

@@ -75,6 +75,8 @@ def load_targets_from_csv(csv_file: str, limit: int = 0, offset: int = 0) -> Lis
 
 
 def format_time(seconds: float) -> str:
+    if seconds is None:
+        return "0.0 seconds"
     if seconds < 60:
         return f"{seconds:.1f} seconds"
     elif seconds < 3600:

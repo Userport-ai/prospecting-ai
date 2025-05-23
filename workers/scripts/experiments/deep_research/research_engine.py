@@ -48,7 +48,7 @@ class ProspectingResearchEngine:
     def __init__(
         self, 
         selling_product: SellingProduct,
-        model_name: str = "gemini-2.5-flash-preview-04-17",
+        model_name: str = "gemini-2.5-flash-preview-05-20",
         pro_model_name: str = "gemini-2.5-pro-preview-05-06",
         verbose: bool = True,
         selling_product_research: str = "",
