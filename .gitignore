@@ -15,16 +15,26 @@ frontend/coverage
 # production
 frontend/build
 
+# Cloud SQL proxy binary.
+cloud-sql-proxy
+
 # misc
 .DS_Store
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+api/django_app/usrprt-venv
 
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+workers/scripts/experiments/prospecting_results/
+workers/scripts/experiments/deep_research_results/
+*CLAUDE.md*
+
 # Generated to manage python path settings locally
 .vscode/
+api/django_app/.dev.env
+*.env

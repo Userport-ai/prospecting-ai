@@ -1,0 +1,2 @@
+from .product_serializers import ProductDetailsSerializer
+from .settings_serializer import SettingsSerializer

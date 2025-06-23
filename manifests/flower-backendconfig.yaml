@@ -6,7 +6,8 @@ metadata:
   name: flower-backendconfig
 spec:
   healthCheck:
-    checkIntervalSec: 15
+    checkIntervalSec: 30
+    timeoutSec: 15  # Must be less than checkIntervalSec
     # Should match container port of serving pod.
     port: 5000
     type: HTTP

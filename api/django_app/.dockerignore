@@ -1,0 +1,8 @@
+*.pyc
+__pycache__
+.git
+.env
+*.pem
+.DS_Store
+.gitignore
+.vscode
